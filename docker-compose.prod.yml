@@ -1,0 +1,76 @@
+# Docker Compose - Production
+# Usage: docker-compose -f docker-compose.prod.yml up -d
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    container_name: cayhesabim-db-prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cayhesabim-network
+
+  # Backend API (Production)
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: cayhesabim-api-prod
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE: ${DB_DATABASE}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      MAILGUN_API_KEY: ${MAILGUN_API_KEY}
+      MAILGUN_DOMAIN: ${MAILGUN_DOMAIN}
+      MAILGUN_FROM: ${MAILGUN_FROM}
+      APP_URL: ${APP_URL}
+    networks:
+      - cayhesabim-network
+    expose:
+      - "3000"
+
+  # Frontend (Production - Nginx)
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: /api
+    container_name: cayhesabim-web-prod
+    restart: always
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+    networks:
+      - cayhesabim-network
+
+volumes:
+  postgres_data_prod:
+
+networks:
+  cayhesabim-network:
+    driver: bridge

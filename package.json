@@ -1,0 +1,19 @@
+{
+  "name": "cayhesabim",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Çay Üreticisi Platformu - Monorepo",
+  "scripts": {
+    "dev:api": "pnpm --filter @cayhesabim/api dev",
+    "dev:web": "pnpm --filter @cayhesabim/web dev",
+    "build:api": "pnpm --filter @cayhesabim/api build",
+    "build:web": "pnpm --filter @cayhesabim/web build",
+    "lint": "pnpm -r lint",
+    "format": "pnpm -r format"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}
