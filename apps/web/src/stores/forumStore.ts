@@ -5,6 +5,7 @@ import {
     type ForumCategory,
     type ForumTopic,
     type ForumReply,
+    type ForumReactionStats,
     type ForumTopicListQuery,
     type ReactionType,
 } from '@/services/api';
@@ -254,13 +255,17 @@ export const useForumStore = defineStore('forum', () => {
                 const backendData = response.data as any;
                 const rawItems = Array.isArray(backendData) ? backendData : (backendData.items || []);
 
-                // Map backend 'user' to frontend 'author'
+                // Map backend 'user' to frontend 'author' and normalize reaction stats
                 replies.value = rawItems.map((item: any) => ({
                     ...item,
                     author: item.user ? { id: item.user.id, fullName: item.user.fullName } : item.author,
+                    authorId: item.userId || item.authorId || item.user?.id,
+                    reactions: item.reactions ? mapReactionStats(item.reactions) : undefined,
                     replies: item.childReplies ? item.childReplies.map((child: any) => ({
                         ...child,
                         author: child.user ? { id: child.user.id, fullName: child.user.fullName } : child.author,
+                        authorId: child.userId || child.authorId || child.user?.id,
+                        reactions: child.reactions ? mapReactionStats(child.reactions) : undefined,
                     })) : []
                 }));
             } else if (response.error) {
@@ -283,14 +288,28 @@ export const useForumStore = defineStore('forum', () => {
                 parentReplyId: data.parentId,
             });
             if (response.data) {
-                const newReply = {
-                    ...response.data,
-                    author: (response.data as any).user ? {
-                        id: (response.data as any).user.id,
-                        fullName: (response.data as any).user.fullName
-                    } : response.data.author
+                const raw = response.data as any;
+                const newReply: ForumReply = {
+                    ...raw,
+                    author: raw.user ? { id: raw.user.id, fullName: raw.user.fullName } : raw.author,
+                    authorId: raw.userId || raw.authorId || raw.user?.id,
+                    replies: [],
                 };
-                replies.value.push(newReply);
+
+                if (data.parentId) {
+                    // Insert as child reply under the parent
+                    const parent = replies.value.find((r) => r.id === data.parentId);
+                    if (parent) {
+                        if (!parent.replies) parent.replies = [];
+                        parent.replies.push(newReply);
+                    } else {
+                        // Parent might be nested; fallback to top-level
+                        replies.value.push(newReply);
+                    }
+                } else {
+                    replies.value.push(newReply);
+                }
+
                 if (currentTopic.value) {
                     currentTopic.value.replyCount++;
                 }
@@ -381,6 +400,30 @@ export const useForumStore = defineStore('forum', () => {
         }
     }
 
+    // Map backend reaction stats to frontend format
+    function mapReactionStats(stats: any): ForumReactionStats {
+        return {
+            like: stats.likeCount ?? stats.like ?? 0,
+            helpful: stats.helpfulCount ?? stats.helpful ?? 0,
+            thanks: stats.thanksCount ?? stats.thanks ?? 0,
+            userReaction: Array.isArray(stats.userReactions) && stats.userReactions.length > 0
+                ? stats.userReactions[0]
+                : (stats.userReaction ?? null),
+        };
+    }
+
+    // Find a reply in the nested structure (top-level or child)
+    function findReplyDeep(replyId: string): ForumReply | null {
+        for (const reply of replies.value) {
+            if (reply.id === replyId) return reply;
+            if (reply.replies) {
+                const child = reply.replies.find((c) => c.id === replyId);
+                if (child) return child;
+            }
+        }
+        return null;
+    }
+
     // Actions - Reactions
     async function toggleReaction(targetType: 'topic' | 'reply', targetId: string, type: ReactionType) {
         try {
@@ -389,12 +432,13 @@ export const useForumStore = defineStore('forum', () => {
                 // Refresh the stats for the target
                 const statsResponse = await api.getForumReactionStats(targetType, targetId);
                 if (statsResponse.data) {
+                    const mapped = mapReactionStats(statsResponse.data);
                     if (targetType === 'topic' && currentTopic.value?.id === targetId) {
-                        currentTopic.value.reactions = statsResponse.data;
+                        currentTopic.value.reactions = mapped;
                     } else if (targetType === 'reply') {
-                        const reply = replies.value.find((r) => r.id === targetId);
+                        const reply = findReplyDeep(targetId);
                         if (reply) {
-                            reply.reactions = statsResponse.data;
+                            reply.reactions = mapped;
                         }
                     }
                 }

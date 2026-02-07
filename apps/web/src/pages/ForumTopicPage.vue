@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { useForumStore } from '@/stores/forumStore';
 import { useAuthStore } from '@/stores/authStore';
 import AppLayout from '@/layouts/AppLayout.vue';
+import RichTextEditor from '@/components/forum/RichTextEditor.vue';
+import RichContent from '@/components/forum/RichContent.vue';
 import type { ReactionType } from '@/services/api';
 
 const route = useRoute();
@@ -18,9 +20,7 @@ const replyToId = ref<string | null>(null);
 const replyToAuthor = ref<string | null>(null);
 
 onMounted(async () => {
-    // Fetch topic directly by slug - backend supports fetching by slug
     await forumStore.fetchTopic(topicSlug.value);
-    
     if (forumStore.currentTopic) {
         await forumStore.fetchReplies(forumStore.currentTopic.id);
     }
@@ -42,7 +42,6 @@ async function handleReplyReact(replyId: string, type: ReactionType) {
 
 async function handleSubscribe() {
     if (!authStore.isAuthenticated || !forumStore.currentTopic) return;
-    
     if (forumStore.currentTopic.isSubscribed) {
         await forumStore.unsubscribeFromTopic(forumStore.currentTopic.id);
     } else {
@@ -52,14 +51,17 @@ async function handleSubscribe() {
 
 async function handleSubmitReply() {
     if (!replyContent.value.trim() || !forumStore.currentTopic || isSubmitting.value) return;
-    
+    // Strip empty editor content
+    const stripped = replyContent.value.replace(/<[^>]*>/g, '').trim();
+    if (!stripped) return;
+
     isSubmitting.value = true;
     const result = await forumStore.createReply({
         content: replyContent.value,
         topicId: forumStore.currentTopic.id,
         parentId: replyToId.value || undefined,
     });
-    
+
     if (result) {
         replyContent.value = '';
         replyToId.value = null;
@@ -71,7 +73,6 @@ async function handleSubmitReply() {
 function handleReplyTo(replyId: string, authorName: string) {
     replyToId.value = replyId;
     replyToAuthor.value = authorName;
-    // Scroll to reply form
     const replyForm = document.querySelector('.reply-form');
     replyForm?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
@@ -87,7 +88,7 @@ async function handleMarkAsSolution(replyId: string) {
 }
 
 async function handleDeleteReply(replyId: string) {
-    if (!confirm('Bu cevabı silmek istediğinize emin misiniz?')) return;
+    if (!confirm('Bu cevabi silmek istediginize emin misiniz?')) return;
     await forumStore.deleteReply(replyId);
 }
 
@@ -108,12 +109,20 @@ async function handleToggleSolve() {
 
 function formatDate(dateString: string) {
     const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'az once';
+    if (diffMins < 60) return `${diffMins} dk once`;
+    if (diffHours < 24) return `${diffHours} sa once`;
+    if (diffDays < 7) return `${diffDays} gun once`;
     return date.toLocaleDateString('tr-TR', {
         year: 'numeric',
-        month: 'long',
+        month: 'short',
         day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
     });
 }
 
@@ -122,254 +131,297 @@ function getReactionIcon(type: ReactionType) {
     return icons[type];
 }
 
+function getReactionLabel(type: ReactionType) {
+    const labels = { like: 'Begeni', helpful: 'Yardimci', thanks: 'Tesekkur' };
+    return labels[type];
+}
+
 function isReplyAuthor(authorId: string) {
     return authorId === authStore.user?.id;
+}
+
+function getInitials(name?: string) {
+    if (!name) return '?';
+    return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
 </script>
 
 <template>
     <AppLayout>
         <div class="topic-page">
-            <!-- Loading State -->
+            <!-- Loading -->
             <div v-if="forumStore.loading && !forumStore.currentTopic" class="loading-state">
                 <div class="spinner"></div>
-                <p>Konu yükleniyor...</p>
+                <p>Konu yukleniyor...</p>
             </div>
 
             <!-- Topic Content -->
             <div v-else-if="forumStore.currentTopic" class="topic-container">
                 <!-- Breadcrumb -->
-                <div class="breadcrumb">
-                    <router-link to="/forum" class="breadcrumb-link">Forum</router-link>
-                    <span class="breadcrumb-separator">/</span>
+                <nav class="breadcrumb">
+                    <router-link to="/forum" class="bc-link">Forum</router-link>
+                    <span class="bc-sep">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                    </span>
                     <router-link
                         v-if="forumStore.currentTopic.category"
                         :to="`/forum/category/${forumStore.currentTopic.category.slug}`"
-                        class="breadcrumb-link"
+                        class="bc-link"
                     >
                         {{ forumStore.currentTopic.category.name }}
                     </router-link>
-                    <span class="breadcrumb-separator">/</span>
-                    <span class="breadcrumb-current">{{ forumStore.currentTopic.title }}</span>
-                </div>
+                    <span class="bc-sep">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                    </span>
+                    <span class="bc-current">{{ forumStore.currentTopic.title }}</span>
+                </nav>
 
-                <!-- Topic Header -->
-                <div class="topic-header">
-                    <div class="topic-title-section">
-                        <h1>{{ forumStore.currentTopic.title }}</h1>
-                        <div class="topic-badges">
-                            <span v-if="forumStore.currentTopic.isPinned" class="badge pinned">📌 Sabitlenmiş</span>
-                            <span v-if="forumStore.currentTopic.isSolved" class="badge solved">✓ Çözüldü</span>
-                            <span v-if="forumStore.currentTopic.isLocked" class="badge locked">🔒 Kilitli</span>
+                <!-- Topic Card -->
+                <article class="topic-card">
+                    <div class="topic-card-header">
+                        <div class="topic-title-row">
+                            <div class="badges" v-if="forumStore.currentTopic.isPinned || forumStore.currentTopic.isSolved || forumStore.currentTopic.isLocked">
+                                <span v-if="forumStore.currentTopic.isPinned" class="badge badge-pinned">Sabitlenmis</span>
+                                <span v-if="forumStore.currentTopic.isSolved" class="badge badge-solved">Cozuldu</span>
+                                <span v-if="forumStore.currentTopic.isLocked" class="badge badge-locked">Kilitli</span>
+                            </div>
+                            <h1 class="topic-title">{{ forumStore.currentTopic.title }}</h1>
+                        </div>
+                        <div class="topic-meta-row">
+                            <div class="author-info">
+                                <div class="avatar">{{ getInitials(forumStore.currentTopic.author?.fullName) }}</div>
+                                <div class="meta-text">
+                                    <span class="author-name">{{ forumStore.currentTopic.author?.fullName }}</span>
+                                    <span class="meta-dot">·</span>
+                                    <span class="meta-date">{{ formatDate(forumStore.currentTopic.createdAt) }}</span>
+                                </div>
+                            </div>
+                            <div class="topic-stats-inline">
+                                <span class="stat-item">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    {{ forumStore.currentTopic.viewCount }}
+                                </span>
+                                <span class="stat-item">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                                    {{ forumStore.currentTopic.replyCount }}
+                                </span>
+                            </div>
                         </div>
                     </div>
-                    <div class="topic-meta">
-                        <span>by {{ forumStore.currentTopic.author?.fullName }}</span>
-                        <span>·</span>
-                        <span>{{ formatDate(forumStore.currentTopic.createdAt) }}</span>
-                        <span>·</span>
-                        <span>{{ forumStore.currentTopic.viewCount }} görüntülenme</span>
-                    </div>
-                </div>
 
-                <!-- Topic Actions -->
-                <div class="topic-actions">
-                    <button
-                        v-if="authStore.isAuthenticated"
-                        :class="{ active: forumStore.currentTopic.isSubscribed }"
-                        class="action-btn"
-                        @click="handleSubscribe"
-                    >
-                        {{ forumStore.currentTopic.isSubscribed ? '🔔 Takip Ediliyor' : '🔕 Takip Et' }}
-                    </button>
-                    
-                    <!-- Admin Controls (placeholder for role check) -->
-                    <div v-if="isTopicAuthor" class="admin-controls">
-                        <button class="action-btn admin" @click="handleTogglePin">
-                            {{ forumStore.currentTopic.isPinned ? 'Sabitlemeyi Kaldır' : 'Sabitle' }}
-                        </button>
-                        <button class="action-btn admin" @click="handleToggleLock">
-                            {{ forumStore.currentTopic.isLocked ? 'Kilidi Aç' : 'Kilitle' }}
-                        </button>
-                        <button class="action-btn admin" @click="handleToggleSolve">
-                            {{ forumStore.currentTopic.isSolved ? 'Çözüldü İşaretini Kaldır' : 'Çözüldü Olarak İşaretle' }}
-                        </button>
+                    <div class="topic-card-body">
+                        <RichContent :content="forumStore.currentTopic.content" />
                     </div>
-                </div>
 
-                <!-- Topic Content Card -->
-                <div class="topic-content-card">
-                    <div class="content-body">
-                        <p class="content-text">{{ forumStore.currentTopic.content }}</p>
+                    <div class="topic-card-footer">
+                        <div class="reactions">
+                            <button
+                                v-for="type in (['like', 'helpful', 'thanks'] as ReactionType[])"
+                                :key="type"
+                                :class="{ active: forumStore.currentTopic.reactions?.userReaction === type }"
+                                :disabled="!authStore.isAuthenticated"
+                                class="reaction-chip"
+                                @click="handleReact(type)"
+                            >
+                                <span class="reaction-emoji">{{ getReactionIcon(type) }}</span>
+                                <span class="reaction-label">{{ getReactionLabel(type) }}</span>
+                                <span v-if="(forumStore.currentTopic.reactions?.[type] || 0) > 0" class="reaction-count">{{ forumStore.currentTopic.reactions?.[type] }}</span>
+                            </button>
+                        </div>
+                        <div class="footer-actions">
+                            <button
+                                v-if="authStore.isAuthenticated"
+                                :class="{ active: forumStore.currentTopic.isSubscribed }"
+                                class="icon-btn"
+                                @click="handleSubscribe"
+                                :title="forumStore.currentTopic.isSubscribed ? 'Takibi Birak' : 'Takip Et'"
+                            >
+                                <svg v-if="forumStore.currentTopic.isSubscribed" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                                <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                            </button>
+                        </div>
                     </div>
-                    
-                    <!-- Reactions -->
-                    <div class="reactions-section">
-                        <button
-                            v-for="type in ['like', 'helpful', 'thanks'] as ReactionType[]"
-                            :key="type"
-                            :class="{ active: forumStore.currentTopic.reactions?.userReaction === type }"
-                            :disabled="!authStore.isAuthenticated"
-                            class="reaction-btn"
-                            @click="handleReact(type)"
-                        >
-                            <span class="reaction-icon">{{ getReactionIcon(type) }}</span>
-                            <span class="reaction-count">{{ forumStore.currentTopic.reactions?.[type] || 0 }}</span>
+
+                    <!-- Admin Controls -->
+                    <div v-if="isTopicAuthor" class="admin-bar">
+                        <button class="admin-btn" @click="handleTogglePin">
+                            {{ forumStore.currentTopic.isPinned ? 'Sabitlemeyi Kaldir' : 'Sabitle' }}
+                        </button>
+                        <button class="admin-btn" @click="handleToggleLock">
+                            {{ forumStore.currentTopic.isLocked ? 'Kilidi Ac' : 'Kilitle' }}
+                        </button>
+                        <button class="admin-btn" @click="handleToggleSolve">
+                            {{ forumStore.currentTopic.isSolved ? 'Cozuldu Kaldir' : 'Cozuldu Isaretle' }}
                         </button>
                     </div>
-                </div>
+                </article>
 
                 <!-- Replies Section -->
-                <div class="replies-section">
-                    <h2 class="section-title">
-                        {{ forumStore.replies.length }} {{ forumStore.replies.length === 1 ? 'Cevap' : 'Cevap' }}
-                    </h2>
+                <section class="replies-section">
+                    <div class="section-header">
+                        <h2>Cevaplar</h2>
+                        <span class="reply-count-badge">{{ forumStore.replies.length }}</span>
+                    </div>
 
-                    <!-- Reply Cards -->
-                    <div v-for="reply in forumStore.replies" :key="reply.id" class="reply-card">
-                        <div class="reply-header">
-                            <div class="reply-author">
+                    <!-- Reply List -->
+                    <div v-for="reply in forumStore.replies" :key="reply.id" class="reply-card" :class="{ 'is-solution': reply.isSolution }">
+                        <div v-if="reply.isSolution" class="solution-ribbon">Cozum</div>
+                        <div class="reply-top">
+                            <div class="reply-author-info">
+                                <div class="avatar avatar-sm">{{ getInitials(reply.author?.fullName) }}</div>
                                 <span class="author-name">{{ reply.author?.fullName }}</span>
-                                <span class="reply-date">{{ formatDate(reply.createdAt) }}</span>
+                                <span class="meta-dot">·</span>
+                                <span class="meta-date">{{ formatDate(reply.createdAt) }}</span>
                             </div>
-                            <div class="reply-actions">
-                                <span v-if="reply.isSolution" class="solution-badge">✓ Çözüm</span>
+                            <div class="reply-actions-menu">
                                 <button
                                     v-if="isTopicAuthor && !reply.isSolution"
-                                    class="action-link"
+                                    class="text-btn text-btn-green"
                                     @click="handleMarkAsSolution(reply.id)"
                                 >
-                                    Çözüm Olarak İşaretle
+                                    Cozum Isaretle
                                 </button>
                                 <button
                                     v-if="authStore.isAuthenticated && !forumStore.currentTopic.isLocked"
-                                    class="action-link"
-                                    @click="handleReplyTo(reply.id, reply.author?.fullName || 'Kullanıcı')"
+                                    class="text-btn"
+                                    @click="handleReplyTo(reply.id, reply.author?.fullName || 'Kullanici')"
                                 >
                                     Cevapla
                                 </button>
                                 <button
                                     v-if="isReplyAuthor(reply.authorId)"
-                                    class="action-link delete"
+                                    class="text-btn text-btn-red"
                                     @click="handleDeleteReply(reply.id)"
                                 >
                                     Sil
                                 </button>
                             </div>
                         </div>
-                        <div class="reply-content">
-                            <p>{{ reply.content }}</p>
+                        <div class="reply-body">
+                            <RichContent :content="reply.content" />
                         </div>
-                        <div class="reply-reactions">
-                            <button
-                                v-for="type in ['like', 'helpful', 'thanks'] as ReactionType[]"
-                                :key="type"
-                                :class="{ active: reply.reactions?.userReaction === type }"
-                                :disabled="!authStore.isAuthenticated"
-                                class="reaction-btn small"
-                                @click="handleReplyReact(reply.id, type)"
-                            >
-                                <span class="reaction-icon">{{ getReactionIcon(type) }}</span>
-                                <span class="reaction-count">{{ reply.reactions?.[type] || 0 }}</span>
-                            </button>
+                        <div class="reply-bottom">
+                            <div class="reactions reactions-sm">
+                                <button
+                                    v-for="type in (['like', 'helpful', 'thanks'] as ReactionType[])"
+                                    :key="type"
+                                    :class="{ active: reply.reactions?.userReaction === type }"
+                                    :disabled="!authStore.isAuthenticated"
+                                    class="reaction-chip reaction-chip-sm"
+                                    @click="handleReplyReact(reply.id, type)"
+                                >
+                                    <span class="reaction-emoji">{{ getReactionIcon(type) }}</span>
+                                    <span v-if="(reply.reactions?.[type] || 0) > 0" class="reaction-count">{{ reply.reactions?.[type] }}</span>
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Nested Child Replies -->
                         <div v-if="reply.replies && reply.replies.length > 0" class="nested-replies">
-                            <div v-for="childReply in reply.replies" :key="childReply.id" class="reply-card nested">
-                                <div class="reply-header">
-                                    <div class="reply-author">
-                                        <span class="author-name">{{ childReply.author?.fullName }}</span>
-                                        <span class="reply-date">{{ formatDate(childReply.createdAt) }}</span>
+                            <div v-for="child in reply.replies" :key="child.id" class="reply-card reply-card-nested" :class="{ 'is-solution': child.isSolution }">
+                                <div v-if="child.isSolution" class="solution-ribbon">Cozum</div>
+                                <div class="reply-top">
+                                    <div class="reply-author-info">
+                                        <div class="avatar avatar-xs">{{ getInitials(child.author?.fullName) }}</div>
+                                        <span class="author-name">{{ child.author?.fullName }}</span>
+                                        <span class="meta-dot">·</span>
+                                        <span class="meta-date">{{ formatDate(child.createdAt) }}</span>
                                     </div>
-                                    <div class="reply-actions">
-                                        <span v-if="childReply.isSolution" class="solution-badge">✓ Çözüm</span>
+                                    <div class="reply-actions-menu">
                                         <button
-                                            v-if="isTopicAuthor && !childReply.isSolution"
-                                            class="action-link"
-                                            @click="handleMarkAsSolution(childReply.id)"
+                                            v-if="isTopicAuthor && !child.isSolution"
+                                            class="text-btn text-btn-green"
+                                            @click="handleMarkAsSolution(child.id)"
                                         >
-                                            Çözüm Olarak İşaretle
+                                            Cozum Isaretle
                                         </button>
                                         <button
-                                            v-if="isReplyAuthor(childReply.authorId)"
-                                            class="action-link delete"
-                                            @click="handleDeleteReply(childReply.id)"
+                                            v-if="isReplyAuthor(child.authorId)"
+                                            class="text-btn text-btn-red"
+                                            @click="handleDeleteReply(child.id)"
                                         >
                                             Sil
                                         </button>
                                     </div>
                                 </div>
-                                <div class="reply-content">
-                                    <p>{{ childReply.content }}</p>
+                                <div class="reply-body">
+                                    <RichContent :content="child.content" />
                                 </div>
-                                <div class="reply-reactions">
-                                    <button
-                                        v-for="type in ['like', 'helpful', 'thanks'] as ReactionType[]"
-                                        :key="type"
-                                        :class="{ active: childReply.reactions?.userReaction === type }"
-                                        :disabled="!authStore.isAuthenticated"
-                                        class="reaction-btn small"
-                                        @click="handleReplyReact(childReply.id, type)"
-                                    >
-                                        <span class="reaction-icon">{{ getReactionIcon(type) }}</span>
-                                        <span class="reaction-count">{{ childReply.reactions?.[type] || 0 }}</span>
-                                    </button>
+                                <div class="reply-bottom">
+                                    <div class="reactions reactions-sm">
+                                        <button
+                                            v-for="type in (['like', 'helpful', 'thanks'] as ReactionType[])"
+                                            :key="type"
+                                            :class="{ active: child.reactions?.userReaction === type }"
+                                            :disabled="!authStore.isAuthenticated"
+                                            class="reaction-chip reaction-chip-sm"
+                                            @click="handleReplyReact(child.id, type)"
+                                        >
+                                            <span class="reaction-emoji">{{ getReactionIcon(type) }}</span>
+                                            <span v-if="(child.reactions?.[type] || 0) > 0" class="reaction-count">{{ child.reactions?.[type] }}</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Empty State -->
-                    <div v-if="forumStore.replies.length === 0" class="empty-replies">
-                        <span class="empty-icon">💬</span>
-                        <p>Henüz cevap yok. İlk cevaplayan siz olun!</p>
+                    <!-- Empty Replies -->
+                    <div v-if="forumStore.replies.length === 0 && !forumStore.loading" class="empty-replies">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4a5568" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                        <p>Henuz cevap yok. Ilk cevaplayan siz olun!</p>
                     </div>
-                </div>
+                </section>
 
                 <!-- Reply Form -->
-                <div v-if="authStore.isAuthenticated && !forumStore.currentTopic.isLocked" class="reply-form">
+                <section v-if="authStore.isAuthenticated && !forumStore.currentTopic.isLocked" class="reply-form">
                     <h3>Cevap Yaz</h3>
-                    
-                    <!-- Reply To Indicator -->
-                    <div v-if="replyToAuthor" class="reply-to-indicator">
-                        <span>{{ replyToAuthor }} kullanıcısına cevap yazılıyor</span>
-                        <button class="cancel-btn" @click="cancelReplyTo">✕</button>
+
+                    <div v-if="replyToAuthor" class="reply-to-bar">
+                        <span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 00-4-4H4"/></svg>
+                            {{ replyToAuthor }} kullanicisina cevap
+                        </span>
+                        <button class="close-btn" @click="cancelReplyTo">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
                     </div>
-                    
-                    <textarea
+
+                    <RichTextEditor
                         v-model="replyContent"
-                        class="reply-textarea"
-                        placeholder="Cevabınızı yazın..."
-                        rows="6"
-                    ></textarea>
+                        placeholder="Cevabnizi yazin..."
+                        min-height="150px"
+                    />
+
                     <div class="form-actions">
                         <button
                             :disabled="!replyContent.trim() || isSubmitting"
-                            class="submit-btn"
+                            class="btn-primary"
                             @click="handleSubmitReply"
                         >
-                            {{ isSubmitting ? 'Gönderiliyor...' : 'Cevabı Gönder' }}
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                            {{ isSubmitting ? 'Gonderiliyor...' : 'Cevabi Gonder' }}
                         </button>
                     </div>
-                </div>
+                </section>
 
-                <!-- Locked Message -->
-                <div v-else-if="forumStore.currentTopic.isLocked" class="locked-message">
-                    🔒 Bu konu kilitli. Yeni cevap eklenemez.
+                <!-- Locked -->
+                <div v-else-if="forumStore.currentTopic.isLocked" class="locked-msg">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                    Bu konu kilitli. Yeni cevap eklenemez.
                 </div>
 
                 <!-- Login Prompt -->
                 <div v-else class="login-prompt">
-                    <p>Bu konuya cevap vermek için lütfen <router-link to="/login">giriş yapın</router-link>.</p>
+                    <p>Bu konuya cevap vermek icin lutfen <router-link to="/login">giris yapin</router-link>.</p>
                 </div>
             </div>
 
-            <!-- Error State -->
+            <!-- Error -->
             <div v-else-if="forumStore.error" class="error-state">
-                <span class="error-icon">⚠️</span>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                 <p>{{ forumStore.error }}</p>
-                <button class="retry-btn" @click="router.push('/forum')">Foruma Dön</button>
+                <button class="btn-secondary" @click="router.push('/forum')">Foruma Don</button>
             </div>
         </div>
     </AppLayout>
@@ -378,11 +430,11 @@ function isReplyAuthor(authorId: string) {
 <style scoped>
 .topic-page {
     padding: 24px;
-    max-width: 900px;
+    max-width: 960px;
     margin: 0 auto;
 }
 
-/* Loading State */
+/* Loading */
 .loading-state {
     display: flex;
     flex-direction: column;
@@ -392,225 +444,329 @@ function isReplyAuthor(authorId: string) {
 }
 
 .spinner {
-    width: 48px;
-    height: 48px;
-    border: 4px solid rgba(255, 255, 255, 0.1);
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.08);
     border-top-color: #10b981;
     border-radius: 50%;
-    animation: spin 1s linear infinite;
+    animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+    to { transform: rotate(360deg); }
 }
 
 .loading-state p {
     margin-top: 16px;
-    color: #94a3b8;
+    color: #64748b;
+    font-size: 15px;
 }
 
 /* Breadcrumb */
 .breadcrumb {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     margin-bottom: 24px;
     font-size: 14px;
     flex-wrap: wrap;
 }
 
-.breadcrumb-link {
-    color: #10b981;
-    text-decoration: none;
-    transition: color 0.2s ease;
-}
-
-.breadcrumb-link:hover {
-    color: #059669;
-}
-
-.breadcrumb-separator {
+.bc-link {
     color: #64748b;
+    text-decoration: none;
+    transition: color 0.2s;
 }
 
-.breadcrumb-current {
-    color: #e2e8f0;
+.bc-link:hover {
+    color: #10b981;
 }
 
-/* Topic Header */
-.topic-header {
-    margin-bottom: 24px;
-}
-
-.topic-title-section {
+.bc-sep {
+    color: #374151;
     display: flex;
     align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
 }
 
-.topic-title-section h1 {
-    margin: 0;
-    font-size: 32px;
-    font-weight: 700;
-    color: #ffffff;
-}
-
-.topic-badges {
-    display: flex;
-    gap: 8px;
-}
-
-.badge {
-    padding: 6px 12px;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 500;
-}
-
-.badge.pinned {
-    background: rgba(251, 191, 36, 0.2);
-    color: #fbbf24;
-}
-
-.badge.solved {
-    background: rgba(16, 185, 129, 0.2);
-    color: #10b981;
-}
-
-.badge.locked {
-    background: rgba(148, 163, 184, 0.2);
+.bc-current {
     color: #94a3b8;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 300px;
 }
 
-.topic-meta {
-    display: flex;
-    gap: 8px;
-    font-size: 14px;
-    color: #64748b;
-}
-
-/* Topic Actions */
-.topic-actions {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
-}
-
-.action-btn {
-    padding: 10px 20px;
-    background: rgba(255, 255, 255, 0.05);
-    color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.action-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: #10b981;
-}
-
-.action-btn.active {
-    background: rgba(16, 185, 129, 0.2);
-    border-color: #10b981;
-    color: #10b981;
-}
-
-.action-btn.admin {
-    background: rgba(251, 191, 36, 0.1);
-    border-color: rgba(251, 191, 36, 0.3);
-    color: #fbbf24;
-}
-
-.action-btn.admin:hover {
-    background: rgba(251, 191, 36, 0.15);
-}
-
-.admin-controls {
-    display: flex;
-    gap: 8px;
-}
-
-/* Topic Content Card */
-.topic-content-card {
-    padding: 24px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+/* Topic Card */
+.topic-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 16px;
+    overflow: hidden;
     margin-bottom: 32px;
 }
 
-.content-body {
-    margin-bottom: 20px;
+.topic-card-header {
+    padding: 24px 28px 0;
 }
 
-.content-text {
-    margin: 0;
-    color: #e2e8f0;
-    font-size: 16px;
-    line-height: 1.7;
-    white-space: pre-wrap;
+.topic-title-row {
+    margin-bottom: 16px;
 }
 
-/* Reactions */
-.reactions-section {
+.badges {
     display: flex;
-    gap: 12px;
-    padding-top: 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    gap: 8px;
+    margin-bottom: 12px;
 }
 
-.reaction-btn {
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.badge-pinned {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+}
+
+.badge-solved {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+
+.badge-locked {
+    background: rgba(100, 116, 139, 0.15);
+    color: #94a3b8;
+}
+
+.topic-title {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 700;
+    color: #f1f5f9;
+    line-height: 1.3;
+}
+
+.topic-meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.author-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.avatar-sm {
+    width: 30px;
+    height: 30px;
+    font-size: 11px;
+    border-radius: 8px;
+}
+
+.avatar-xs {
+    width: 26px;
+    height: 26px;
+    font-size: 10px;
+    border-radius: 7px;
+}
+
+.meta-text {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 16px;
+}
+
+.author-name {
+    color: #e2e8f0;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.meta-dot {
+    color: #374151;
+}
+
+.meta-date {
+    color: #64748b;
+    font-size: 13px;
+}
+
+.topic-stats-inline {
+    display: flex;
+    gap: 16px;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: #64748b;
+    font-size: 13px;
+}
+
+.stat-item svg {
+    opacity: 0.6;
+}
+
+.topic-card-body {
+    padding: 24px 28px;
+}
+
+/* Topic Footer */
+.topic-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 28px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.footer-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
     background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 8px;
+    color: #64748b;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.2s;
 }
 
-.reaction-btn:hover:not(:disabled) {
+.icon-btn:hover {
     background: rgba(255, 255, 255, 0.08);
-    transform: translateY(-2px);
+    color: #e2e8f0;
 }
 
-.reaction-btn:disabled {
+.icon-btn.active {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.3);
+    color: #10b981;
+}
+
+/* Reactions */
+.reactions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.reaction-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    color: #94a3b8;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.reaction-chip:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.reaction-chip:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
-.reaction-btn.active {
-    background: rgba(16, 185, 129, 0.2);
-    border-color: #10b981;
+.reaction-chip.active {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.4);
+    color: #10b981;
 }
 
-.reaction-btn.small {
-    padding: 6px 12px;
+.reaction-chip-sm {
+    padding: 4px 10px;
+    font-size: 12px;
+    gap: 4px;
+}
+
+.reaction-emoji {
+    font-size: 15px;
+}
+
+.reaction-chip-sm .reaction-emoji {
     font-size: 13px;
 }
 
-.reaction-icon {
-    font-size: 18px;
-}
-
-.reaction-btn.small .reaction-icon {
-    font-size: 16px;
+.reaction-label {
+    font-size: 13px;
 }
 
 .reaction-count {
-    color: #94a3b8;
     font-weight: 600;
+    font-size: 12px;
+    min-width: 14px;
+    text-align: center;
+}
+
+/* Admin Bar */
+.admin-bar {
+    display: flex;
+    gap: 8px;
+    padding: 12px 28px;
+    background: rgba(251, 191, 36, 0.04);
+    border-top: 1px solid rgba(251, 191, 36, 0.1);
+    flex-wrap: wrap;
+}
+
+.admin-btn {
+    padding: 6px 14px;
+    background: rgba(251, 191, 36, 0.1);
+    border: 1px solid rgba(251, 191, 36, 0.2);
+    border-radius: 8px;
+    color: #fbbf24;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.admin-btn:hover {
+    background: rgba(251, 191, 36, 0.15);
 }
 
 /* Replies Section */
@@ -618,196 +774,209 @@ function isReplyAuthor(authorId: string) {
     margin-bottom: 32px;
 }
 
-.section-title {
-    margin: 0 0 20px 0;
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.section-header h2 {
+    margin: 0;
     font-size: 20px;
     font-weight: 700;
-    color: #ffffff;
+    color: #f1f5f9;
 }
 
-.reply-card {
-    padding: 20px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+.reply-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 8px;
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
     border-radius: 12px;
-    margin-bottom: 16px;
+    font-size: 13px;
+    font-weight: 700;
 }
 
-.reply-header {
+/* Reply Card */
+.reply-card {
+    position: relative;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 12px;
+    transition: border-color 0.2s;
+}
+
+.reply-card:hover {
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+.reply-card.is-solution {
+    border-color: rgba(16, 185, 129, 0.3);
+    background: rgba(16, 185, 129, 0.03);
+}
+
+.solution-ribbon {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    padding: 3px 10px;
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.reply-card-nested {
+    background: rgba(255, 255, 255, 0.02);
+    border-color: rgba(255, 255, 255, 0.06);
+    padding: 16px 20px;
+    margin-bottom: 8px;
+}
+
+.reply-card-nested:last-child {
+    margin-bottom: 0;
+}
+
+.reply-top {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 12px;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 8px;
 }
 
-.reply-author {
+.reply-author-info {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
 }
 
-.author-name {
-    font-weight: 600;
-    color: #ffffff;
+.reply-actions-menu {
+    display: flex;
+    gap: 8px;
+    align-items: center;
 }
 
-.reply-date {
+.text-btn {
+    background: none;
+    border: none;
+    color: #64748b;
     font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.15s;
+}
+
+.text-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #e2e8f0;
+}
+
+.text-btn-green:hover {
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.text-btn-red {
     color: #64748b;
 }
 
-.reply-actions {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-}
-
-.solution-badge {
-    padding: 4px 10px;
-    background: rgba(16, 185, 129, 0.2);
-    color: #10b981;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.action-link {
-    background: none;
-    border: none;
-    color: #10b981;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    transition: color 0.2s ease;
-}
-
-.action-link:hover {
-    color: #059669;
-}
-
-.action-link.delete {
+.text-btn-red:hover {
     color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
 }
 
-.action-link.delete:hover {
-    color: #dc2626;
+.reply-body {
+    margin-bottom: 12px;
 }
 
-.reply-content p {
-    margin: 0;
-    color: #e2e8f0;
-    line-height: 1.6;
-    white-space: pre-wrap;
-}
-
-.reply-reactions {
-    display: flex;
-    gap: 8px;
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+.reply-bottom {
+    padding-top: 8px;
 }
 
 /* Nested Replies */
 .nested-replies {
-    margin-top: 16px;
-    margin-left: 24px;
-    padding-left: 16px;
-    border-left: 2px solid rgba(16, 185, 129, 0.3);
+    margin-top: 12px;
+    padding-left: 20px;
+    border-left: 2px solid rgba(16, 185, 129, 0.2);
 }
 
-.reply-card.nested {
-    background: rgba(255, 255, 255, 0.03);
-    margin-bottom: 12px;
-    padding: 16px;
-}
-
-.reply-card.nested:last-child {
-    margin-bottom: 0;
-}
-
+/* Empty Replies */
 .empty-replies {
-    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     padding: 60px 24px;
-}
-
-.empty-icon {
-    font-size: 48px;
-    display: block;
-    margin-bottom: 12px;
+    text-align: center;
+    color: #4a5568;
 }
 
 .empty-replies p {
-    margin: 0;
+    margin: 16px 0 0;
     color: #64748b;
     font-size: 15px;
 }
 
 /* Reply Form */
 .reply-form {
-    padding: 24px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 16px;
+    padding: 24px;
 }
 
 .reply-form h3 {
-    margin: 0 0 16px 0;
+    margin: 0 0 16px;
     font-size: 18px;
     font-weight: 600;
-    color: #ffffff;
+    color: #f1f5f9;
 }
 
-.reply-to-indicator {
+.reply-to-bar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 16px;
-    background: rgba(16, 185, 129, 0.1);
-    border-left: 3px solid #10b981;
-    border-radius: 8px;
+    padding: 10px 14px;
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.15);
+    border-radius: 10px;
     margin-bottom: 16px;
     font-size: 14px;
     color: #10b981;
 }
 
-.cancel-btn {
+.reply-to-bar span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.close-btn {
     background: none;
     border: none;
     color: #64748b;
     cursor: pointer;
-    font-size: 18px;
-    padding: 0;
-    transition: color 0.2s ease;
+    padding: 2px;
+    display: flex;
+    transition: color 0.2s;
 }
 
-.cancel-btn:hover {
-    color: #ffffff;
-}
-
-.reply-textarea {
-    width: 100%;
-    padding: 16px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    color: #ffffff;
-    font-size: 15px;
-    font-family: inherit;
-    resize: vertical;
-    transition: all 0.2s ease;
-}
-
-.reply-textarea:focus {
-    outline: none;
-    border-color: #10b981;
-    background: rgba(0, 0, 0, 0.4);
-}
-
-.reply-textarea::placeholder {
-    color: #64748b;
+.close-btn:hover {
+    color: #e2e8f0;
 }
 
 .form-actions {
@@ -816,53 +985,76 @@ function isReplyAuthor(authorId: string) {
     margin-top: 16px;
 }
 
-.submit-btn {
-    padding: 12px 24px;
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
     border: none;
     border-radius: 10px;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    transition: all 0.2s;
 }
 
-.submit-btn:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+.btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
 }
 
-.submit-btn:disabled {
-    opacity: 0.6;
+.btn-primary:disabled {
+    opacity: 0.5;
     cursor: not-allowed;
     transform: none;
 }
 
-/* Locked Message */
-.locked-message {
-    padding: 24px;
-    background: rgba(148, 163, 184, 0.1);
-    border: 1px solid rgba(148, 163, 184, 0.2);
-    border-radius: 12px;
-    text-align: center;
-    color: #94a3b8;
-    font-size: 15px;
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #e2e8f0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
 }
 
-/* Login Prompt */
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Locked / Login */
+.locked-msg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 20px;
+    background: rgba(100, 116, 139, 0.08);
+    border: 1px solid rgba(100, 116, 139, 0.15);
+    border-radius: 12px;
+    color: #94a3b8;
+    font-size: 14px;
+}
+
 .login-prompt {
     padding: 24px;
-    background: rgba(16, 185, 129, 0.1);
-    border: 1px solid rgba(16, 185, 129, 0.2);
+    background: rgba(16, 185, 129, 0.05);
+    border: 1px solid rgba(16, 185, 129, 0.15);
     border-radius: 12px;
     text-align: center;
 }
 
 .login-prompt p {
     margin: 0;
-    color: #e2e8f0;
+    color: #94a3b8;
     font-size: 15px;
 }
 
@@ -873,10 +1065,10 @@ function isReplyAuthor(authorId: string) {
 }
 
 .login-prompt a:hover {
-    color: #059669;
+    text-decoration: underline;
 }
 
-/* Error State */
+/* Error */
 .error-state {
     display: flex;
     flex-direction: column;
@@ -885,30 +1077,10 @@ function isReplyAuthor(authorId: string) {
     text-align: center;
 }
 
-.error-icon {
-    font-size: 64px;
-    margin-bottom: 16px;
-}
-
 .error-state p {
-    margin: 0 0 24px 0;
+    margin: 16px 0 24px;
     color: #94a3b8;
-    font-size: 16px;
-}
-
-.retry-btn {
-    padding: 12px 24px;
-    background: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: all 0.2s ease;
-}
-
-.retry-btn:hover {
-    background: rgba(255, 255, 255, 0.15);
+    font-size: 15px;
 }
 
 /* Responsive */
@@ -917,26 +1089,45 @@ function isReplyAuthor(authorId: string) {
         padding: 16px;
     }
 
-    .topic-title-section h1 {
-        font-size: 24px;
+    .topic-title {
+        font-size: 22px;
     }
 
-    .topic-actions {
-        flex-direction: column;
+    .topic-card-header,
+    .topic-card-body,
+    .topic-card-footer,
+    .admin-bar {
+        padding-left: 16px;
+        padding-right: 16px;
     }
 
-    .action-btn {
-        width: 100%;
-        justify-content: center;
+    .reply-card {
+        padding: 16px;
     }
 
-    .reply-header {
+    .reply-form {
+        padding: 16px;
+    }
+
+    .nested-replies {
+        padding-left: 12px;
+    }
+
+    .topic-meta-row {
         flex-direction: column;
         align-items: flex-start;
     }
 
-    .reactions-section {
-        flex-wrap: wrap;
+    .reactions {
+        gap: 6px;
+    }
+
+    .reaction-chip {
+        padding: 5px 10px;
+    }
+
+    .reaction-label {
+        display: none;
     }
 }
 </style>
