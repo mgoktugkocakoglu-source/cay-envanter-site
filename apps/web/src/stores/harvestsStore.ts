@@ -10,7 +10,7 @@ export const useHarvestsStore = defineStore('harvests', () => {
 
     const harvestCount = computed(() => harvests.value.length);
     const totalHarvestKg = computed(() =>
-        harvests.value.reduce((sum, h) => sum + h.amountKg, 0)
+        harvests.value.reduce((sum, h) => + sum + Number.parseFloat(h.amountKg), 0)
     );
 
     async function fetchHarvests(params?: { fieldId?: string; year?: number; status?: string }) {

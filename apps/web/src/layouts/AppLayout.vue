@@ -44,12 +44,12 @@ function closeMobileMenu() {
         </svg>
       </button>
       <nav class="app-nav" :class="{ 'is-open': isMobileMenuOpen }">
-        <RouterLink to="/dashboard" class="nav-link" @click="closeMobileMenu">Ana Sayfa</RouterLink>
-        <RouterLink to="/fields" class="nav-link" @click="closeMobileMenu">Tarlalarım</RouterLink>
-        <RouterLink to="/harvests" class="nav-link" @click="closeMobileMenu">Hasatlarım</RouterLink>
-        <RouterLink to="/payments" class="nav-link" @click="closeMobileMenu">Ödemeler</RouterLink>
-        <RouterLink to="/forum" class="nav-link" @click="closeMobileMenu">Forum</RouterLink>
-        <RouterLink to="/settings" class="nav-link" @click="closeMobileMenu">Ayarlar</RouterLink>
+        <RouterLink to="/dashboard" class="nav-link" @click="closeMobileMenu" exact-active-class="router-link-active">Ana Sayfa</RouterLink>
+        <RouterLink to="/fields" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Tarlalarım</RouterLink>
+        <RouterLink to="/harvests" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Hasatlarım</RouterLink>
+        <RouterLink to="/payments" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Ödemeler</RouterLink>
+        <RouterLink to="/forum" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Forum</RouterLink>
+        <RouterLink to="/settings" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Ayarlar</RouterLink>
         <button class="btn btn-secondary" @click="handleLogout">
           Çıkış Yap
         </button>
@@ -106,8 +106,8 @@ function closeMobileMenu() {
 }
 
 .nav-link {
-  color: var(--color-text-secondary, #6b7280);
-  font-weight: var(--font-weight-medium, 500);
+  color: #94A3B8;
+  font-weight: 500;
   text-decoration: none;
   padding: 8px 12px;
   border-radius: 8px;
@@ -115,13 +115,13 @@ function closeMobileMenu() {
 }
 
 .nav-link:hover {
-  color: var(--color-text-primary, #1a1a2e);
-  background: #f3f4f6;
+  color: #F8FAFC;
+  background: #334155;
 }
 
 .nav-link.router-link-active {
   color: #10b981;
-  background: #ecfdf5;
+  background: #1E293B;
   font-weight: 600;
 }
 

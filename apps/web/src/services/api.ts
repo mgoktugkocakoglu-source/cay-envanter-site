@@ -127,11 +127,11 @@ export interface Harvest {
     fieldId: string;
     fieldName?: string;
     harvestDate: string;
-    amountKg: number;
+    amountKg: string;
     quality: 'shoot' | 'leaf' | 'mixed' | null;
     notes: string | null;
-    soldAmountKg?: number;
-    remainingKg?: number;
+    soldAmountKg?: string;
+    remainingKg?: string;
     status?: 'sold' | 'partial' | 'pending';
 }
 
