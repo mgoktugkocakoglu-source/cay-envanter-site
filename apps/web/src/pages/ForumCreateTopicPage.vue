@@ -5,6 +5,7 @@ import { useForumStore } from '@/stores/forumStore';
 import { useAuthStore } from '@/stores/authStore';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
+import RichTextEditor from '@/components/forum/RichTextEditor.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -17,11 +18,9 @@ const selectedCategoryId = ref('');
 const isSubmitting = ref(false);
 const errors = ref<{ title?: string; content?: string; category?: string }>({});
 
-// Pre-select category if provided in query params
 const preSelectedCategory = computed(() => route.query.category as string | undefined);
 
 onMounted(async () => {
-    // Redirect if not authenticated
     if (!authStore.isAuthenticated) {
         router.push('/login');
         return;
@@ -29,7 +28,6 @@ onMounted(async () => {
 
     await forumStore.fetchCategories();
 
-    // Pre-select category if provided
     if (preSelectedCategory.value) {
         const category = forumStore.categories.find(c => c.slug === preSelectedCategory.value);
         if (category) {
@@ -42,21 +40,24 @@ function validateForm(): boolean {
     errors.value = {};
 
     if (!title.value.trim()) {
-        errors.value.title = 'Başlık gereklidir';
+        errors.value.title = 'Baslik gereklidir';
     } else if (title.value.trim().length < 10) {
-        errors.value.title = 'Başlık en az 10 karakter olmalıdır';
+        errors.value.title = 'Baslik en az 10 karakter olmalidir';
     } else if (title.value.trim().length > 200) {
-        errors.value.title = 'Başlık 200 karakterden kısa olmalıdır';
+        errors.value.title = 'Baslik 200 karakterden kisa olmalidir';
     }
 
     if (!content.value.trim()) {
-        errors.value.content = 'İçerik gereklidir';
-    } else if (content.value.trim().length < 20) {
-        errors.value.content = 'İçerik en az 20 karakter olmalıdır';
+        errors.value.content = 'Icerik gereklidir';
+    } else {
+        const stripped = content.value.replace(/<[^>]*>/g, '').trim();
+        if (stripped.length < 20) {
+            errors.value.content = 'Icerik en az 20 karakter olmalidir';
+        }
     }
 
     if (!selectedCategoryId.value) {
-        errors.value.category = 'Lütfen bir kategori seçin';
+        errors.value.category = 'Lutfen bir kategori secin';
     }
 
     return Object.keys(errors.value).length === 0;
@@ -74,7 +75,6 @@ async function handleSubmit() {
     });
 
     if (result) {
-        // Navigate to the newly created topic
         router.push(`/forum/topic/${result.slug}`);
     } else if (forumStore.error) {
         errors.value.category = forumStore.error;
@@ -84,8 +84,9 @@ async function handleSubmit() {
 }
 
 function handleCancel() {
-    if (title.value.trim() || content.value.trim()) {
-        if (confirm('Yazdıklarınız kaybolacak. Sayfadan ayrılmak istediğinize emin misiniz?')) {
+    const stripped = content.value.replace(/<[^>]*>/g, '').trim();
+    if (title.value.trim() || stripped) {
+        if (confirm('Yazdiklariniz kaybolacak. Sayfadan ayrilmak istediginize emin misiniz?')) {
             router.back();
         }
     } else {
@@ -97,95 +98,110 @@ function clearError(field: 'title' | 'content' | 'category') {
     delete errors.value[field];
 }
 
-// Options for AppSelect
 const categoryOptions = computed(() =>
     forumStore.activeCategories.map(c => ({ value: c.id, label: `${c.icon} ${c.name}` }))
 );
+
+const titleCharClass = computed(() => {
+    if (title.value.length > 200) return 'over';
+    if (title.value.length > 180) return 'warn';
+    return '';
+});
 </script>
 
 <template>
     <AppLayout>
-        <div class="create-topic-page">
+        <div class="create-page">
+            <!-- Breadcrumb -->
+            <nav class="breadcrumb">
+                <router-link to="/forum" class="bc-link">Forum</router-link>
+                <span class="bc-sep">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                </span>
+                <span class="bc-current">Yeni Konu</span>
+            </nav>
+
             <!-- Header -->
             <div class="page-header">
                 <div>
-                    <h1>Yeni Konu Oluştur</h1>
-                    <p class="subtitle">Sorularınızı, fikirlerinizi veya deneyimlerinizi toplulukla paylaşın</p>
+                    <h1>Yeni Konu Olustur</h1>
+                    <p class="subtitle">Sorularinizi, fikirlerinizi veya deneyimlerinizi toplulukla paylasin</p>
                 </div>
-                <button class="cancel-btn" @click="handleCancel">İptal</button>
             </div>
 
             <!-- Form -->
             <form class="topic-form" @submit.prevent="handleSubmit">
-                <!-- Category Selection -->
+                <!-- Category -->
                 <div class="form-group">
                     <AppSelect
                         v-model="selectedCategoryId"
                         :options="categoryOptions"
                         label="Kategori"
-                        placeholder="Bir kategori seçin"
+                        placeholder="Bir kategori secin"
                         :error="errors.category"
                         :required="true"
                         @blur="() => clearError('category')"
                     />
                 </div>
 
-                <!-- Title Input -->
+                <!-- Title -->
                 <div class="form-group">
                     <label class="form-label" for="title">
-                        Başlık <span class="required">*</span>
+                        Baslik <span class="required">*</span>
                     </label>
                     <input
                         id="title"
                         v-model="title"
                         :class="{ error: errors.title }"
                         class="form-input"
-                        placeholder="Konunuz için açıklayıcı bir başlık girin..."
+                        placeholder="Konunuz icin aciklayici bir baslik girin..."
                         type="text"
                         @input="clearError('title')"
                     />
                     <div class="input-meta">
                         <p v-if="errors.title" class="error-message">{{ errors.title }}</p>
-                        <p class="character-count">{{ title.length }}/200</p>
+                        <p :class="['char-count', titleCharClass]">{{ title.length }}/200</p>
                     </div>
                 </div>
 
-                <!-- Content Textarea -->
+                <!-- Content - Rich Text Editor -->
                 <div class="form-group">
-                    <label class="form-label" for="content">
-                        İçerik <span class="required">*</span>
+                    <label class="form-label">
+                        Icerik <span class="required">*</span>
                     </label>
-                    <textarea
-                        id="content"
+                    <RichTextEditor
                         v-model="content"
-                        :class="{ error: errors.content }"
-                        class="form-textarea"
-                        placeholder="Sorunuzu veya konunuzu detaylı olarak açıklayın... Spesifik olun ve mümkün olduğunca fazla bilgi verin."
-                        rows="12"
-                        @input="clearError('content')"
-                    ></textarea>
+                        placeholder="Sorunuzu veya konunuzu detayli olarak aciklayin... Gorsel, YouTube videosu ve link ekleyebilirsiniz."
+                        min-height="280px"
+                    />
                     <div class="input-meta">
                         <p v-if="errors.content" class="error-message">{{ errors.content }}</p>
-                        <p class="character-count">{{ content.length }} karakter</p>
                     </div>
                 </div>
 
                 <!-- Guidelines -->
                 <div class="guidelines">
-                    <h3>💡 Gönderi Yönergeleri</h3>
+                    <div class="guidelines-header">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                        <span>Gonderi Yonergeleri</span>
+                    </div>
                     <ul>
-                        <li>İletişiminizde saygılı ve yapıcı olun</li>
-                        <li>Tekrarlardan kaçınmak için gönderi yapmadan önce benzer konuları arayın</li>
-                        <li>Başkalarının konunuzu anlamasına yardımcı olmak için açık ve özgün bilgiler sağlayın</li>
-                        <li>Daha iyi organizasyon için uygun kategorileri kullanın</li>
+                        <li>Iletisinizde saygili ve yapici olun</li>
+                        <li>Tekrarlardan kacinmak icin gonderi yapmadan once benzer konulari arayin</li>
+                        <li>Baskalarin konunuzu anlamasina yardimci olmak icin acik bilgiler saglayin</li>
+                        <li>Gorsel ve video ekleyerek konunuzu zenginlestirin</li>
                     </ul>
                 </div>
 
-                <!-- Form Actions -->
+                <!-- Actions -->
                 <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" @click="handleCancel">İptal</button>
-                    <button :disabled="isSubmitting" class="btn btn-primary" type="submit">
-                        {{ isSubmitting ? 'Oluşturuluyor...' : 'Konu Oluştur' }}
+                    <button type="button" class="btn-secondary" @click="handleCancel">
+                        Iptal
+                    </button>
+                    <button :disabled="isSubmitting" class="btn-primary" type="submit">
+                        <svg v-if="!isSubmitting" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                        <div v-else class="spinner-sm"></div>
+                        {{ isSubmitting ? 'Olusturuluyor...' : 'Konu Olustur' }}
                     </button>
                 </div>
             </form>
@@ -194,56 +210,65 @@ const categoryOptions = computed(() =>
 </template>
 
 <style scoped>
-.create-topic-page {
+.create-page {
     padding: 24px;
-    max-width: 900px;
+    max-width: 860px;
     margin: 0 auto;
+}
+
+/* Breadcrumb */
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 24px;
+    font-size: 14px;
+}
+
+.bc-link {
+    color: #64748b;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.bc-link:hover {
+    color: #10b981;
+}
+
+.bc-sep {
+    color: #374151;
+    display: flex;
+    align-items: center;
+}
+
+.bc-current {
+    color: #94a3b8;
 }
 
 /* Header */
 .page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 32px;
-    gap: 24px;
+    margin-bottom: 28px;
 }
 
 .page-header h1 {
     margin: 0;
-    font-size: 32px;
+    font-size: 28px;
     font-weight: 700;
-    color: #ffffff;
+    color: #f1f5f9;
 }
 
 .subtitle {
-    margin: 8px 0 0 0;
+    margin: 6px 0 0;
     font-size: 15px;
-    color: #94a3b8;
-}
-
-.cancel-btn {
-    padding: 10px 20px;
-    background: rgba(255, 255, 255, 0.05);
-    color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.cancel-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
+    color: #64748b;
 }
 
 /* Form */
 .topic-form {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 16px;
-    padding: 32px;
+    padding: 28px;
 }
 
 .form-group {
@@ -262,58 +287,30 @@ const categoryOptions = computed(() =>
     color: #ef4444;
 }
 
-.form-select,
-.form-input,
-.form-textarea {
+.form-input {
     width: 100%;
     padding: 12px 16px;
     background: rgba(0, 0, 0, 0.3);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    color: #ffffff;
+    border-radius: 10px;
+    color: #fff;
     font-size: 15px;
     font-family: inherit;
-    transition: all 0.2s ease;
+    transition: all 0.2s;
 }
 
-.form-select:focus,
-.form-input:focus,
-.form-textarea:focus {
+.form-input:focus {
     outline: none;
     border-color: #10b981;
     background: rgba(0, 0, 0, 0.4);
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
 }
 
-.form-select.error,
-.form-input.error,
-.form-textarea.error {
+.form-input.error {
     border-color: #ef4444;
 }
 
-.form-select.error:focus,
-.form-input.error:focus,
-.form-textarea.error:focus {
-    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-}
-
-.form-select {
-    cursor: pointer;
-}
-
-.form-select option {
-    background: #1e293b;
-    color: #ffffff;
-}
-
-.form-textarea {
-    resize: vertical;
-    min-height: 200px;
-}
-
-.form-input::placeholder,
-.form-textarea::placeholder {
-    color: #64748b;
+.form-input::placeholder {
+    color: #4a5568;
 }
 
 .input-meta {
@@ -330,117 +327,143 @@ const categoryOptions = computed(() =>
     font-size: 13px;
 }
 
-.character-count {
+.char-count {
     margin: 0;
     font-size: 12px;
-    color: #64748b;
+    color: #4a5568;
+    margin-left: auto;
+}
+
+.char-count.warn {
+    color: #f59e0b;
+}
+
+.char-count.over {
+    color: #ef4444;
+    font-weight: 600;
 }
 
 /* Guidelines */
 .guidelines {
-    padding: 20px;
-    background: rgba(16, 185, 129, 0.05);
-    border: 1px solid rgba(16, 185, 129, 0.2);
+    padding: 16px 20px;
+    background: rgba(16, 185, 129, 0.04);
+    border: 1px solid rgba(16, 185, 129, 0.12);
     border-radius: 12px;
     margin-bottom: 24px;
 }
 
-.guidelines h3 {
-    margin: 0 0 12px 0;
-    font-size: 16px;
+.guidelines-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-size: 14px;
     font-weight: 600;
     color: #10b981;
 }
 
 .guidelines ul {
     margin: 0;
-    padding-left: 24px;
+    padding-left: 20px;
 }
 
 .guidelines li {
-    color: #94a3b8;
-    font-size: 14px;
-    line-height: 1.6;
-    margin-bottom: 6px;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.7;
+    margin-bottom: 4px;
 }
 
 .guidelines li:last-child {
     margin-bottom: 0;
 }
 
-/* Form Actions */
+/* Actions */
 .form-actions {
     display: flex;
     justify-content: flex-end;
     gap: 12px;
 }
 
-.btn {
-    padding: 12px 24px;
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 24px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
     border: none;
     border-radius: 10px;
     font-size: 15px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.btn-secondary {
-    background: rgba(255, 255, 255, 0.05);
-    color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.08);
-}
-
-.btn-primary {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    transition: all 0.2s;
 }
 
 .btn-primary:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
 }
 
 .btn-primary:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
     transform: none;
 }
 
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 24px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #94a3b8;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #e2e8f0;
+}
+
+.spinner-sm {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 /* Responsive */
 @media (max-width: 768px) {
-    .create-topic-page {
+    .create-page {
         padding: 16px;
     }
 
-    .page-header {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
     .page-header h1 {
-        font-size: 24px;
-    }
-
-    .cancel-btn {
-        width: 100%;
-        justify-content: center;
+        font-size: 22px;
     }
 
     .topic-form {
-        padding: 24px 20px;
+        padding: 20px 16px;
     }
 
     .form-actions {
         flex-direction: column-reverse;
     }
 
-    .btn {
+    .btn-primary,
+    .btn-secondary {
         width: 100%;
         justify-content: center;
     }
