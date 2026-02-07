@@ -124,6 +124,12 @@ const router = createRouter({
             component: () => import('@/pages/AdminCategoriesPage.vue'),
             meta: { requiresAuth: true },
         },
+        // 404 catch-all route
+        {
+            path: '/:pathMatch(.*)*',
+            name: 'not-found',
+            component: () => import('@/pages/NotFoundPage.vue'),
+        },
     ],
 });
 

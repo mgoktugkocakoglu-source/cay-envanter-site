@@ -93,10 +93,6 @@ function formatDate(dateString: string) {
 function goBack() {
     router.push('/fields');
 }
-
-function navigateToEdit() {
-    router.push(`/fields/${fieldId.value}/edit`);
-}
 </script>
 
 <template>

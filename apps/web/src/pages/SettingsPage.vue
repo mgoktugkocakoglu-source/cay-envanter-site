@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
 import { api } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import AppLayout from '@/layouts/AppLayout.vue';
 
-const router = useRouter();
 const authStore = useAuthStore();
 
 const activeTab = ref<'account' | 'security'>('security');

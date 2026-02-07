@@ -83,7 +83,11 @@ async function handleSubmit() {
 }
 
 function handleCancel() {
-    if (confirm('Bu konuyu silmek istediğinize emin misiniz?')) {
+    if (title.value.trim() || content.value.trim()) {
+        if (confirm('Yazdıklarınız kaybolacak. Sayfadan ayrılmak istediğinize emin misiniz?')) {
+            router.back();
+        }
+    } else {
         router.back();
     }
 }

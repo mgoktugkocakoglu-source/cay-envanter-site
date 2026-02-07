@@ -12,14 +12,13 @@ export async function authGuard(
 ): Promise<void> {
     const authStore = useAuthStore();
 
+    // If we have a refresh token but no access token, ensure initialization completes first
+    if (authStore.hasRefreshToken && !authStore.isAuthenticated) {
+        await authStore.initialize();
+    }
+
     // Check if route requires auth
     if (to.meta.requiresAuth) {
-        // If we have a refresh token but no access token, try to initialize
-        if (authStore.refreshToken && !authStore.accessToken) {
-            await authStore.initialize();
-        }
-
-        // Now check if authenticated
         if (!authStore.isAuthenticated) {
             // Redirect to login with return URL
             next({

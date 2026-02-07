@@ -2,10 +2,12 @@
 import { ref, onMounted, computed } from 'vue';
 import { useHarvestsStore } from '@/stores/harvestsStore';
 import { useFieldsStore } from '@/stores/fieldsStore';
+import { useToast } from '@/composables/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
 
 const harvestsStore = useHarvestsStore();
 const fieldsStore = useFieldsStore();
+const toast = useToast();
 
 const fieldFilter = ref('');
 const yearFilter = ref(new Date().getFullYear());
@@ -83,6 +85,7 @@ async function createHarvest() {
     });
 
     if (result) {
+        toast.success('Hasat başarıyla eklendi');
         showCreateModal.value = false;
         createForm.value = {
             fieldId: '',
@@ -91,12 +94,19 @@ async function createHarvest() {
             quality: '',
             notes: ''
         };
+    } else {
+        toast.error('Hasat eklenirken bir hata oluştu');
     }
 }
 
 async function deleteHarvest(id: string) {
     if (confirm('Bu hasatı silmek istediğinize emin misiniz?')) {
-        await harvestsStore.deleteHarvest(id);
+        const success = await harvestsStore.deleteHarvest(id);
+        if (success) {
+            toast.success('Hasat başarıyla silindi');
+        } else {
+            toast.error('Hasat silinirken bir hata oluştu');
+        }
     }
 }
 </script>

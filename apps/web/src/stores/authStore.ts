@@ -28,16 +28,31 @@ export const useAuthStore = defineStore('auth', () => {
     const isLoading = ref(false);
     const isRefreshing = ref(false);
     let refreshPromise: Promise<AuthTokens | null> | null = null;
+    let initializePromise: Promise<void> | null = null;
 
     // Computed
-    const isAuthenticated = computed(() => !!accessToken.value || !!refreshToken.value);
+    const isAuthenticated = computed(() => !!accessToken.value);
+    const hasRefreshToken = computed(() => !!refreshToken.value);
 
     // Initialize - try to get user if we have a refresh token
+    // Uses a shared promise to prevent race conditions from multiple callers
     async function initialize(): Promise<void> {
+        if (initializePromise) {
+            return initializePromise;
+        }
+
         if (refreshToken.value && !accessToken.value) {
-            await refreshAccessToken();
-            if (accessToken.value) {
-                await fetchCurrentUser();
+            initializePromise = (async () => {
+                await refreshAccessToken();
+                if (accessToken.value) {
+                    await fetchCurrentUser();
+                }
+            })();
+
+            try {
+                await initializePromise;
+            } finally {
+                initializePromise = null;
             }
         }
     }
@@ -211,6 +226,7 @@ export const useAuthStore = defineStore('auth', () => {
         isRefreshing,
         // Computed
         isAuthenticated,
+        hasRefreshToken,
         // Actions
         initialize,
         setAuth,

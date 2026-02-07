@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install:*)",
+      "Bash(find:*)",
+      "Bash(npx vue-tsc:*)",
+      "Bash(pnpm --filter web build:*)"
+    ]
+  }
+}
