@@ -239,7 +239,7 @@ async function deletePayment(id: string) {
                     <td>{{ formatKg(payment.totalAmountKg) }}</td>
                     <td class="amount">{{ formatCurrency(payment.totalPrice) }}</td>
                     <td>{{ formatCurrency(payment.pricePerKg) }}/kg</td>
-                    <td>formatCurrency(payment.pricePerK
+                    <td>
                         <span
                             class="status-badge"
                             :class="payment.paymentStatus === 'received' ? 'status-received' : 'status-pending'"
