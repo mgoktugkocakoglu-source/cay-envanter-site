@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useForumStore } from '@/stores/forumStore';
 import AppLayout from '@/layouts/AppLayout.vue';
+import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -22,6 +23,8 @@ const categoryForm = ref({
 });
 
 const availableIcons = ['📁', '🌿', '🍃', '💬', '❓', '📢', '🛠️', '💡', '📊', '🎯', '🌱', '🏆'];
+const showDeleteConfirm = ref(false);
+const deleteTargetCategory = ref<typeof forumStore.categories[0] | null>(null);
 
 onMounted(() => {
     if (!authStore.isAuthenticated) {
@@ -98,13 +101,17 @@ async function handleSubmit() {
     await forumStore.fetchCategories();
 }
 
-async function handleDelete(category: typeof forumStore.categories[0]) {
-    if (!confirm(`"${category.name}" kategorisini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`)) {
-        return;
-    }
+function handleDelete(category: typeof forumStore.categories[0]) {
+    deleteTargetCategory.value = category;
+    showDeleteConfirm.value = true;
+}
 
-    await forumStore.deleteCategory(category.id);
-    await forumStore.fetchCategories();
+async function confirmDeleteCategory() {
+    if (deleteTargetCategory.value) {
+        await forumStore.deleteCategory(deleteTargetCategory.value.id);
+        await forumStore.fetchCategories();
+        deleteTargetCategory.value = null;
+    }
 }
 
 async function toggleCategoryStatus(category: typeof forumStore.categories[0]) {
@@ -300,6 +307,16 @@ function moveCategory(category: typeof forumStore.categories[0], direction: 'up'
                     </div>
                 </div>
             </div>
+        <!-- Delete Category Confirm Modal -->
+        <ConfirmModal
+            v-model="showDeleteConfirm"
+            title="Kategoriyi Sil"
+            :message="`&quot;${deleteTargetCategory?.name || ''}&quot; kategorisini silmek istediginize emin misiniz? Bu islem geri alinamaz.`"
+            confirm-text="Sil"
+            cancel-text="Vazgec"
+            variant="danger"
+            @confirm="confirmDeleteCategory"
+        />
         </div>
     </AppLayout>
 </template>

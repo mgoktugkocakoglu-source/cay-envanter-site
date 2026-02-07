@@ -5,6 +5,7 @@ import { useHarvestsStore } from '@/stores/harvestsStore';
 import { useToast } from '@/composables/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
+import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 
 const paymentsStore = usePaymentsStore();
 const harvestsStore = useHarvestsStore();
@@ -13,6 +14,8 @@ const toast = useToast();
 const yearFilter = ref(new Date().getFullYear());
 const statusFilter = ref('');
 const showCreateModal = ref(false);
+const showDeleteConfirm = ref(false);
+const deleteTargetId = ref('');
 const currentStep = ref(1);
 
 // Create form
@@ -166,14 +169,17 @@ async function createPayment() {
     }
 }
 
-async function deletePayment(id: string) {
-    if (confirm('Bu ödemeyi silmek istediğinize emin misiniz?')) {
-        const success = await paymentsStore.deletePayment(id);
-        if (success) {
-            toast.success('Ödeme başarıyla silindi');
-        } else {
-            toast.error('Ödeme silinirken bir hata oluştu');
-        }
+function deletePayment(id: string) {
+    deleteTargetId.value = id;
+    showDeleteConfirm.value = true;
+}
+
+async function confirmDeletePayment() {
+    const success = await paymentsStore.deletePayment(deleteTargetId.value);
+    if (success) {
+        toast.success('Ödeme başarıyla silindi');
+    } else {
+        toast.error('Ödeme silinirken bir hata oluştu');
     }
 }
 </script>
@@ -380,6 +386,16 @@ async function deletePayment(id: string) {
                 </div>
             </div>
         </div>
+        <!-- Delete Payment Confirm Modal -->
+        <ConfirmModal
+            v-model="showDeleteConfirm"
+            title="Odemeyi Sil"
+            message="Bu odemeyi silmek istediginize emin misiniz? Bu islem geri alinamaz."
+            confirm-text="Sil"
+            cancel-text="Vazgec"
+            variant="danger"
+            @confirm="confirmDeletePayment"
+        />
         </div>
     </AppLayout>
 </template>

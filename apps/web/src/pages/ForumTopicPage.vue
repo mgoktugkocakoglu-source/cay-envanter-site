@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/authStore';
 import AppLayout from '@/layouts/AppLayout.vue';
 import RichTextEditor from '@/components/forum/RichTextEditor.vue';
 import RichContent from '@/components/forum/RichContent.vue';
+import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 import type { ReactionType } from '@/services/api';
 
 const route = useRoute();
@@ -18,6 +19,8 @@ const replyContent = ref('');
 const isSubmitting = ref(false);
 const replyToId = ref<string | null>(null);
 const replyToAuthor = ref<string | null>(null);
+const showDeleteConfirm = ref(false);
+const deleteTargetId = ref<string | null>(null);
 
 onMounted(async () => {
     await forumStore.fetchTopic(topicSlug.value);
@@ -87,9 +90,16 @@ async function handleMarkAsSolution(replyId: string) {
     await forumStore.markAsSolution(replyId);
 }
 
-async function handleDeleteReply(replyId: string) {
-    if (!confirm('Bu cevabi silmek istediginize emin misiniz?')) return;
-    await forumStore.deleteReply(replyId);
+function handleDeleteReply(replyId: string) {
+    deleteTargetId.value = replyId;
+    showDeleteConfirm.value = true;
+}
+
+async function confirmDeleteReply() {
+    if (deleteTargetId.value) {
+        await forumStore.deleteReply(deleteTargetId.value);
+        deleteTargetId.value = null;
+    }
 }
 
 async function handleTogglePin() {
@@ -423,6 +433,17 @@ function getInitials(name?: string) {
                 <p>{{ forumStore.error }}</p>
                 <button class="btn-secondary" @click="router.push('/forum')">Foruma Don</button>
             </div>
+
+            <!-- Delete Reply Confirm Modal -->
+            <ConfirmModal
+                v-model="showDeleteConfirm"
+                title="Cevabi Sil"
+                message="Bu cevabi silmek istediginize emin misiniz? Bu islem geri alinamaz."
+                confirm-text="Sil"
+                cancel-text="Vazgec"
+                variant="danger"
+                @confirm="confirmDeleteReply"
+            />
         </div>
     </AppLayout>
 </template>

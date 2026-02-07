@@ -5,6 +5,7 @@ import { useFieldsStore } from '@/stores/fieldsStore';
 import { useToast } from '@/composables/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
+import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 
 const harvestsStore = useHarvestsStore();
 const fieldsStore = useFieldsStore();
@@ -14,6 +15,8 @@ const fieldFilter = ref('');
 const yearFilter = ref(new Date().getFullYear());
 const statusFilter = ref('');
 const showCreateModal = ref(false);
+const showDeleteConfirm = ref(false);
+const deleteTargetId = ref('');
 
 // Create form
 const createForm = ref({
@@ -129,14 +132,17 @@ async function createHarvest() {
     }
 }
 
-async function deleteHarvest(id: string) {
-    if (confirm('Bu hasatı silmek istediğinize emin misiniz?')) {
-        const success = await harvestsStore.deleteHarvest(id);
-        if (success) {
-            toast.success('Hasat başarıyla silindi');
-        } else {
-            toast.error('Hasat silinirken bir hata oluştu');
-        }
+function deleteHarvest(id: string) {
+    deleteTargetId.value = id;
+    showDeleteConfirm.value = true;
+}
+
+async function confirmDeleteHarvest() {
+    const success = await harvestsStore.deleteHarvest(deleteTargetId.value);
+    if (success) {
+        toast.success('Hasat başarıyla silindi');
+    } else {
+        toast.error('Hasat silinirken bir hata oluştu');
     }
 }
 </script>
@@ -278,6 +284,16 @@ async function deleteHarvest(id: string) {
                 <p v-if="harvestsStore.error" class="error-message">{{ harvestsStore.error }}</p>
             </div>
         </div>
+        <!-- Delete Harvest Confirm Modal -->
+        <ConfirmModal
+            v-model="showDeleteConfirm"
+            title="Hasati Sil"
+            message="Bu hasati silmek istediginize emin misiniz? Bu islem geri alinamaz."
+            confirm-text="Sil"
+            cancel-text="Vazgec"
+            variant="danger"
+            @confirm="confirmDeleteHarvest"
+        />
         </div>
     </AppLayout>
 </template>
