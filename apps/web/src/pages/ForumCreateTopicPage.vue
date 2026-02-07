@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { useForumStore } from '@/stores/forumStore';
 import { useAuthStore } from '@/stores/authStore';
 import AppLayout from '@/layouts/AppLayout.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -91,6 +92,11 @@ function handleCancel() {
 function clearError(field: 'title' | 'content' | 'category') {
     delete errors.value[field];
 }
+
+// Options for AppSelect
+const categoryOptions = computed(() =>
+    forumStore.activeCategories.map(c => ({ value: c.id, label: `${c.icon} ${c.name}` }))
+);
 </script>
 
 <template>
@@ -109,26 +115,15 @@ function clearError(field: 'title' | 'content' | 'category') {
             <form class="topic-form" @submit.prevent="handleSubmit">
                 <!-- Category Selection -->
                 <div class="form-group">
-                    <label class="form-label" for="category">
-                        Kategori <span class="required">*</span>
-                    </label>
-                    <select
-                        id="category"
+                    <AppSelect
                         v-model="selectedCategoryId"
-                        :class="{ error: errors.category }"
-                        class="form-select"
-                        @change="clearError('category')"
-                    >
-                        <option value="" disabled>Bir kategori seçin</option>
-                        <option
-                            v-for="category in forumStore.activeCategories"
-                            :key="category.id"
-                            :value="category.id"
-                        >
-                            {{ category.icon }} {{ category.name }}
-                        </option>
-                    </select>
-                    <p v-if="errors.category" class="error-message">{{ errors.category }}</p>
+                        :options="categoryOptions"
+                        label="Kategori"
+                        placeholder="Bir kategori seçin"
+                        :error="errors.category"
+                        :required="true"
+                        @blur="() => clearError('category')"
+                    />
                 </div>
 
                 <!-- Title Input -->

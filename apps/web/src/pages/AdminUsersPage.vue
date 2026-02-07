@@ -3,6 +3,7 @@ import { onMounted, ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import AppLayout from '@/layouts/AppLayout.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -26,6 +27,20 @@ const filterRole = ref('all');
 const filterStatus = ref('all');
 const selectedUser = ref<typeof users.value[0] | null>(null);
 const showUserModal = ref(false);
+
+// Options for AppSelect
+const roleFilterOptions = [
+    { value: 'all', label: 'Tüm Roller' },
+    { value: 'user', label: 'Kullanıcı' },
+    { value: 'moderator', label: 'Moderatör' },
+    { value: 'admin', label: 'Admin' }
+];
+
+const statusFilterOptions = [
+    { value: 'all', label: 'Tüm Durumlar' },
+    { value: 'active', label: 'Aktif' },
+    { value: 'banned', label: 'Yasaklı' }
+];
 
 // Mock data - would come from API
 onMounted(() => {
@@ -141,17 +156,16 @@ function formatDate(dateString: string) {
                         class="search-input"
                     />
                 </div>
-                <select v-model="filterRole" class="filter-select">
-                    <option value="all">Tüm Roller</option>
-                    <option value="user">Kullanıcı</option>
-                    <option value="moderator">Moderatör</option>
-                    <option value="admin">Admin</option>
-                </select>
-                <select v-model="filterStatus" class="filter-select">
-                    <option value="all">Tüm Durumlar</option>
-                    <option value="active">Aktif</option>
-                    <option value="banned">Yasaklı</option>
-                </select>
+                <AppSelect
+                    v-model="filterRole"
+                    :options="roleFilterOptions"
+                    placeholder="Rol filtresi"
+                />
+                <AppSelect
+                    v-model="filterStatus"
+                    :options="statusFilterOptions"
+                    placeholder="Durum filtresi"
+                />
             </div>
 
             <!-- Loading -->

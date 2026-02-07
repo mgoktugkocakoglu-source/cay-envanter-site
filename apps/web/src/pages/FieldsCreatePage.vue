@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useGeoStore } from '@/stores/geoStore';
 import { useFieldsStore } from '@/stores/fieldsStore';
-import { api, type Field, type GeoParcelDetail } from '@/services/api';
+import { api } from '@/services/api';
+import type { GeoParcelDetail, Field } from '@/services/api';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -267,24 +270,26 @@ function clearClickedParcelLayer() {
 }
 
 // Form handlers
-function handleProvinceChange(event: Event) {
-    const target = event.target as HTMLSelectElement;
-    geoStore.selectProvince(target.value || null);
+type SelectValue = string | number | (string | number)[] | null;
+
+function handleProvinceChange(value: SelectValue) {
+    const v = Array.isArray(value) ? value[0] : value;
+    geoStore.selectProvince(v ? String(v) : null);
 }
 
-function handleDistrictChange(event: Event) {
-    const target = event.target as HTMLSelectElement;
-    geoStore.selectDistrict(target.value || null);
+function handleDistrictChange(value: SelectValue) {
+    const v = Array.isArray(value) ? value[0] : value;
+    geoStore.selectDistrict(v ? String(v) : null);
 }
 
-function handleNeighborhoodChange(event: Event) {
-    const target = event.target as HTMLSelectElement;
-    geoStore.selectNeighborhood(target.value || null);
+function handleNeighborhoodChange(value: SelectValue) {
+    const v = Array.isArray(value) ? value[0] : value;
+    geoStore.selectNeighborhood(v ? String(v) : null);
 }
 
-function handleParcelChange(event: Event) {
-    const target = event.target as HTMLSelectElement;
-    geoStore.selectParcel(target.value || null);
+function handleParcelChange(value: SelectValue) {
+    const v = Array.isArray(value) ? value[0] : value;
+    geoStore.selectParcel(v ? String(v) : null);
 }
 
 function addPartner() {
@@ -361,8 +366,9 @@ function goBack() {
 </script>
 
 <template>
-    <div class="create-field-page">
-        <header class="page-header">
+    <AppLayout>
+        <div class="create-field-page">
+            <header class="page-header">
             <button class="btn-back" @click="goBack">
                 <span class="icon">←</span>
                 Geri Dön
@@ -407,87 +413,51 @@ function goBack() {
                     </div>
 
                     <!-- Province Select -->
-                    <div class="form-group">
-                        <label for="province">İl *</label>
-                        <select
-                            id="province"
-                            :value="geoStore.selectedProvinceId || ''"
-                            @change="handleProvinceChange"
-                            :disabled="geoStore.isLoadingProvinces"
-                        >
-                            <option value="">İl Seçin</option>
-                            <option
-                                v-for="province in geoStore.provinces"
-                                :key="province.id"
-                                :value="province.id"
-                            >
-                                {{ province.name }}
-                            </option>
-                        </select>
-                    </div>
+                    <AppSelect
+                        :model-value="geoStore.selectedProvinceId?.toString() || ''"
+                        :options="geoStore.provinces.map(p => ({ value: p.id.toString(), label: p.name }))"
+                        label="İl *"
+                        variant="light"
+                        placeholder="İl Seçin"
+                        :disabled="geoStore.isLoadingProvinces"
+                        @update:model-value="handleProvinceChange"
+                    />
 
                     <!-- District Select -->
-                    <div class="form-group">
-                        <label for="district">İlçe *</label>
-                        <select
-                            id="district"
-                            :value="geoStore.selectedDistrictId || ''"
-                            @change="handleDistrictChange"
-                            :disabled="!geoStore.selectedProvinceId || geoStore.isLoadingDistricts"
-                        >
-                            <option value="">İlçe Seçin</option>
-                            <option
-                                v-for="district in geoStore.districts"
-                                :key="district.id"
-                                :value="district.id"
-                            >
-                                {{ district.name }}
-                            </option>
-                        </select>
-                        <span v-if="geoStore.isLoadingDistricts" class="loading-text">Yükleniyor...</span>
-                    </div>
+                    <AppSelect
+                        :model-value="geoStore.selectedDistrictId?.toString() || ''"
+                        :options="geoStore.districts.map(d => ({ value: d.id.toString(), label: d.name }))"
+                        label="İlçe *"
+                        placeholder="İlçe Seçin"
+                        :disabled="!geoStore.selectedProvinceId || geoStore.isLoadingDistricts"
+                        variant="light"
+                        @update:model-value="handleDistrictChange"
+                    />
+                    <span v-if="geoStore.isLoadingDistricts" class="loading-text">Yükleniyor...</span>
 
                     <!-- Neighborhood Select -->
-                    <div class="form-group">
-                        <label for="neighborhood">Mahalle *</label>
-                        <select
-                            id="neighborhood"
-                            :value="geoStore.selectedNeighborhoodId || ''"
-                            @change="handleNeighborhoodChange"
-                            :disabled="!geoStore.selectedDistrictId || geoStore.isLoadingNeighborhoods"
-                        >
-                            <option value="">Mahalle Seçin</option>
-                            <option
-                                v-for="neighborhood in geoStore.neighborhoods"
-                                :key="neighborhood.id"
-                                :value="neighborhood.id"
-                            >
-                                {{ neighborhood.name }}
-                            </option>
-                        </select>
-                        <span v-if="geoStore.isLoadingNeighborhoods" class="loading-text">Yükleniyor...</span>
-                    </div>
+                    <AppSelect
+                        :model-value="geoStore.selectedNeighborhoodId?.toString() || ''"
+                        :options="geoStore.neighborhoods.map(n => ({ value: n.id.toString(), label: n.name }))"
+                        label="Mahalle *"
+                        placeholder="Mahalle Seçin"
+                        :disabled="!geoStore.selectedDistrictId || geoStore.isLoadingNeighborhoods"
+                        variant="light"
+                        @update:model-value="handleNeighborhoodChange"
+                    />
+                    <span v-if="geoStore.isLoadingNeighborhoods" class="loading-text">Yükleniyor...</span>
 
                     <!-- Parcel Select -->
-                    <div class="form-group">
-                        <label for="parcel">Parsel (Opsiyonel)</label>
-                        <select
-                            id="parcel"
-                            :value="geoStore.selectedParcelId || ''"
-                            @change="handleParcelChange"
-                            :disabled="!geoStore.selectedNeighborhoodId || geoStore.isLoadingParcels"
-                        >
-                            <option value="">Haritadan Seçin veya Listeden</option>
-                            <option
-                                v-for="parcel in geoStore.parcels"
-                                :key="parcel.id"
-                                :value="parcel.id"
-                            >
-                                {{ parcel.parcelNo }} ({{ parcel.area.toLocaleString('tr-TR') }} m²)
-                            </option>
-                        </select>
-                        <span v-if="geoStore.isLoadingParcels" class="loading-text">Parseller yükleniyor...</span>
-                    </div>
+                    <AppSelect
+                        :model-value="geoStore.selectedParcelId?.toString() || ''"
+                        :options="geoStore.parcels.map(p => ({ value: p.id.toString(), label: `${p.parcelNo} (${p.area.toLocaleString('tr-TR')} m²)` }))"
+                        label="Parsel (Opsiyonel)"
+                        variant="light"
+                        placeholder="Haritadan Seçin veya Listeden"
+                        :disabled="!geoStore.selectedNeighborhoodId || geoStore.isLoadingParcels"
+                        @update:model-value="handleParcelChange"
+                    />
+                    <span v-if="geoStore.isLoadingParcels" class="loading-text">Parseller yükleniyor...</span>
 
                     <!-- Area Display -->
                     <div v-if="selectedArea > 0" class="form-group">
@@ -622,7 +592,8 @@ function goBack() {
                 </form>
             </div>
         </div>
-    </div>
+        </div>
+    </AppLayout>
 </template>
 
 <style scoped>

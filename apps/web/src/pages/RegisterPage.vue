@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import { RouterLink } from 'vue-router';
 import { api } from '@/services/api';
+import AppSelect from '@/components/ui/AppSelect.vue';
 
 // Tea-producing provinces data
 const provinces = [
@@ -35,15 +36,22 @@ const showPassword = ref(false);
 const showConfirmPassword = ref(false);
 
 // Districts (simplified - would be loaded from API in production)
-const districts = computed(() => {
-  const districtMap: Record<string, string[]> = {
-    'Rize': ['Merkez', 'Ardeşen', 'Çamlıhemşin', 'Çayeli', 'Derepazarı', 'Fındıklı', 'Güneysu', 'Hemşin', 'İkizdere', 'İyidere', 'Kalkandere', 'Pazar'],
-    'Trabzon': ['Merkez', 'Akçaabat', 'Araklı', 'Arsin', 'Beşikdüzü', 'Çarşıbaşı', 'Çaykara', 'Dernekpazarı', 'Düzköy', 'Hayrat', 'Köprübaşı', 'Maçka', 'Of', 'Sürmene', 'Şalpazarı', 'Tonya', 'Vakfıkebir', 'Yomra'],
-    'Artvin': ['Merkez', 'Ardanuç', 'Arhavi', 'Borçka', 'Hopa', 'Kemalpaşa', 'Murgul', 'Şavşat', 'Yusufeli'],
-    'Giresun': ['Merkez', 'Alucra', 'Bulancak', 'Çamoluk', 'Çanakçı', 'Dereli', 'Doğankent', 'Espiye', 'Eynesil', 'Görele', 'Güce', 'Keşap', 'Piraziz', 'Şebinkarahisar', 'Tirebolu', 'Yağlıdere'],
-    'Ordu': ['Merkez', 'Akkuş', 'Altınordu', 'Aybastı', 'Çamaş', 'Çatalpınar', 'Çaybaşı', 'Fatsa', 'Gölköy', 'Gülyalı', 'Gürgentepe', 'İkizce', 'Kabadüz', 'Kabataş', 'Korgan', 'Kumru', 'Mesudiye', 'Perşembe', 'Ulubey', 'Ünye'],
-  };
-  return districtMap[form.value.province] || ['Merkez'];
+const districtMap: Record<string, string[]> = {
+  'Rize': ['Merkez', 'Ardeşen', 'Çamlıhemşin', 'Çayeli', 'Derepazarı', 'Fındıklı', 'Güneysu', 'Hemşin', 'İkizdere', 'İyidere', 'Kalkandere', 'Pazar'],
+  'Trabzon': ['Merkez', 'Akçaabat', 'Araklı', 'Arsin', 'Beşikdüzü', 'Çarşıbaşı', 'Çaykara', 'Dernekpazarı', 'Düzköy', 'Hayrat', 'Köprübaşı', 'Maçka', 'Of', 'Sürmene', 'Şalpazarı', 'Tonya', 'Vakfıkebir', 'Yomra'],
+  'Artvin': ['Merkez', 'Ardanuç', 'Arhavi', 'Borçka', 'Hopa', 'Kemalpaşa', 'Murgul', 'Şavşat', 'Yusufeli'],
+  'Giresun': ['Merkez', 'Alucra', 'Bulancak', 'Çamoluk', 'Çanakçı', 'Dereli', 'Doğankent', 'Espiye', 'Eynesil', 'Görele', 'Güce', 'Keşap', 'Piraziz', 'Şebinkarahisar', 'Tirebolu', 'Yağlıdere'],
+  'Ordu': ['Merkez', 'Akkuş', 'Altınordu', 'Aybastı', 'Çamaş', 'Çatalpınar', 'Çaybaşı', 'Fatsa', 'Gölköy', 'Gülyalı', 'Gürgentepe', 'İkizce', 'Kabadüz', 'Kabataş', 'Korgan', 'Kumru', 'Mesudiye', 'Perşembe', 'Ulubey', 'Ünye'],
+};
+
+// Options for AppSelect
+const provinceOptions = computed(() => 
+  provinces.map(p => ({ value: p.name, label: `${p.name} (${p.plateCode})` }))
+);
+
+const districtOptions = computed(() => {
+  const districts = districtMap[form.value.province] || [];
+  return districts.map(d => ({ value: d, label: d }));
 });
 
 // Password strength calculation
@@ -314,40 +322,26 @@ async function resendVerification() {
             
             <!-- Province & District -->
             <div class="form-row">
-              <div class="form-group">
-                <label class="form-label" for="province">İl *</label>
-                <select
-                  id="province"
-                  v-model="form.province"
-                  class="form-input"
-                  :class="{ 'has-error': errors.province }"
-                  @change="onProvinceChange"
-                >
-                  <option value="">İl Seçiniz</option>
-                  <option v-for="prov in provinces" :key="prov.plateCode" :value="prov.name">
-                    {{ prov.name }} ({{ prov.plateCode }})
-                  </option>
-                </select>
-                <p v-if="errors.province" class="form-error">{{ errors.province }}</p>
-              </div>
+              <AppSelect
+                v-model="form.province"
+                :options="provinceOptions"
+                label="İl *"
+                placeholder="İl Seçiniz"
+                :error="errors.province"
+                :required="true"
+                @blur="() => { onProvinceChange(); validateField('province'); }"
+              />
               
-              <div class="form-group">
-                <label class="form-label" for="district">İlçe *</label>
-                <select
-                  id="district"
-                  v-model="form.district"
-                  class="form-input"
-                  :class="{ 'has-error': errors.district }"
-                  :disabled="!form.province"
-                  @blur="validateField('district')"
-                >
-                  <option value="">İlçe Seçiniz</option>
-                  <option v-for="dist in districts" :key="dist" :value="dist">
-                    {{ dist }}
-                  </option>
-                </select>
-                <p v-if="errors.district" class="form-error">{{ errors.district }}</p>
-              </div>
+              <AppSelect
+                v-model="form.district"
+                :options="districtOptions"
+                label="İlçe *"
+                placeholder="İlçe Seçiniz"
+                :error="errors.district"
+                :disabled="!form.province"
+                :required="true"
+                @blur="() => validateField('district')"
+              />
             </div>
             
             <!-- Password -->
@@ -524,18 +518,5 @@ async function resendVerification() {
   padding: var(--space-1);
 }
 
-select.form-input {
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394A3B8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right var(--space-3) center;
-  background-size: 20px;
-  padding-right: var(--space-10);
-}
 
-select.form-input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
 </style>

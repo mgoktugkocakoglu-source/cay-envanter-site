@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useHarvestsStore } from '@/stores/harvestsStore';
 import { useFieldsStore } from '@/stores/fieldsStore';
 import AppLayout from '@/layouts/AppLayout.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 
 const harvestsStore = useHarvestsStore();
 const fieldsStore = useFieldsStore();
@@ -37,6 +38,35 @@ const qualityLabels: Record<string, string> = {
     'leaf': 'Yaprak',
     'mixed': 'Karışık'
 };
+
+// Options for AppSelect
+const yearOptions = computed(() => 
+    years.value.map(y => ({ value: y, label: String(y) }))
+);
+
+const fieldOptions = computed(() => [
+    { value: '', label: 'Tüm Tarlalar' },
+    ...fieldsStore.fields.map(f => ({ value: f.id, label: f.name }))
+]);
+
+const statusFilterOptions = [
+    { value: '', label: 'Tüm Durumlar' },
+    { value: 'pending', label: 'Bekliyor' },
+    { value: 'partial', label: 'Kısmi Satış' },
+    { value: 'sold', label: 'Satıldı' }
+];
+
+const fieldFormOptions = computed(() => [
+    { value: '', label: 'Seçiniz' },
+    ...fieldsStore.fields.map(f => ({ value: f.id, label: f.name }))
+]);
+
+const qualityOptions = [
+    { value: '', label: 'Belirtilmemiş' },
+    { value: 'shoot', label: 'Sürgün' },
+    { value: 'leaf', label: 'Yaprak' },
+    { value: 'mixed', label: 'Karışık' }
+];
 
 onMounted(() => {
     harvestsStore.fetchHarvests({ year: yearFilter.value });
@@ -119,19 +149,24 @@ async function deleteHarvest(id: string) {
         
 
         <div class="filters">
-            <select v-model="yearFilter" class="filter-select" @change="applyFilters">
-                <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
-            </select>
-            <select v-model="fieldFilter" class="filter-select" @change="applyFilters">
-                <option value="">Tüm Tarlalar</option>
-                <option v-for="f in fieldsStore.fields" :key="f.id" :value="f.id">{{ f.name }}</option>
-            </select>
-            <select v-model="statusFilter" class="filter-select" @change="applyFilters">
-                <option value="">Tüm Durumlar</option>
-                <option value="pending">Bekliyor</option>
-                <option value="partial">Kısmi Satış</option>
-                <option value="sold">Satıldı</option>
-            </select>
+            <AppSelect
+                v-model="yearFilter"
+                :options="yearOptions"
+                placeholder="Yıl"
+                @update:model-value="applyFilters"
+            />
+            <AppSelect
+                v-model="fieldFilter"
+                :options="fieldOptions"
+                placeholder="Tarla"
+                @update:model-value="applyFilters"
+            />
+            <AppSelect
+                v-model="statusFilter"
+                :options="statusFilterOptions"
+                placeholder="Durum"
+                @update:model-value="applyFilters"
+            />
         </div>
 
         <div v-if="harvestsStore.isLoading" class="loading">
@@ -190,15 +225,13 @@ async function deleteHarvest(id: string) {
                 <h2>Yeni Hasat Ekle</h2>
 
                 <form @submit.prevent="createHarvest" class="create-form">
-                    <div class="form-group">
-                        <label>Tarla *</label>
-                        <select v-model="createForm.fieldId" required>
-                            <option value="">Seçiniz</option>
-                            <option v-for="f in fieldsStore.fields" :key="f.id" :value="f.id">
-                                {{ f.name }}
-                            </option>
-                        </select>
-                    </div>
+                    <AppSelect
+                        v-model="createForm.fieldId"
+                        :options="fieldFormOptions"
+                        label="Tarla *"
+                        placeholder="Seçiniz"
+                        :required="true"
+                    />
 
                     <div class="form-group">
                         <label>Hasat Tarihi *</label>
@@ -210,15 +243,12 @@ async function deleteHarvest(id: string) {
                         <input type="number" v-model.number="createForm.amountKg" min="0.1" step="0.1" required />
                     </div>
 
-                    <div class="form-group">
-                        <label>Kalite</label>
-                        <select v-model="createForm.quality">
-                            <option value="">Belirtilmemiş</option>
-                            <option value="shoot">Sürgün</option>
-                            <option value="leaf">Yaprak</option>
-                            <option value="mixed">Karışık</option>
-                        </select>
-                    </div>
+                    <AppSelect
+                        v-model="createForm.quality"
+                        :options="qualityOptions"
+                        label="Kalite"
+                        placeholder="Seçiniz"
+                    />
 
                     <div class="form-group">
                         <label>Notlar</label>
@@ -319,6 +349,11 @@ async function deleteHarvest(id: string) {
     background: #f9fafb;
     font-weight: 600;
     color: #374151;
+    font-size: 14px;
+}
+
+.harvests-table td {
+    color: #1f2937;
     font-size: 14px;
 }
 

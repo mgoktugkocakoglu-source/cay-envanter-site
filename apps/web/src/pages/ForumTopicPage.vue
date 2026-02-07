@@ -273,6 +273,51 @@ function isReplyAuthor(authorId: string) {
                                 <span class="reaction-count">{{ reply.reactions?.[type] || 0 }}</span>
                             </button>
                         </div>
+
+                        <!-- Nested Child Replies -->
+                        <div v-if="reply.replies && reply.replies.length > 0" class="nested-replies">
+                            <div v-for="childReply in reply.replies" :key="childReply.id" class="reply-card nested">
+                                <div class="reply-header">
+                                    <div class="reply-author">
+                                        <span class="author-name">{{ childReply.author?.fullName }}</span>
+                                        <span class="reply-date">{{ formatDate(childReply.createdAt) }}</span>
+                                    </div>
+                                    <div class="reply-actions">
+                                        <span v-if="childReply.isSolution" class="solution-badge">✓ Çözüm</span>
+                                        <button
+                                            v-if="isTopicAuthor && !childReply.isSolution"
+                                            class="action-link"
+                                            @click="handleMarkAsSolution(childReply.id)"
+                                        >
+                                            Çözüm Olarak İşaretle
+                                        </button>
+                                        <button
+                                            v-if="isReplyAuthor(childReply.authorId)"
+                                            class="action-link delete"
+                                            @click="handleDeleteReply(childReply.id)"
+                                        >
+                                            Sil
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="reply-content">
+                                    <p>{{ childReply.content }}</p>
+                                </div>
+                                <div class="reply-reactions">
+                                    <button
+                                        v-for="type in ['like', 'helpful', 'thanks'] as ReactionType[]"
+                                        :key="type"
+                                        :class="{ active: childReply.reactions?.userReaction === type }"
+                                        :disabled="!authStore.isAuthenticated"
+                                        class="reaction-btn small"
+                                        @click="handleReplyReact(childReply.id, type)"
+                                    >
+                                        <span class="reaction-icon">{{ getReactionIcon(type) }}</span>
+                                        <span class="reaction-count">{{ childReply.reactions?.[type] || 0 }}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Empty State -->
@@ -663,6 +708,24 @@ function isReplyAuthor(authorId: string) {
     margin-top: 12px;
     padding-top: 12px;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Nested Replies */
+.nested-replies {
+    margin-top: 16px;
+    margin-left: 24px;
+    padding-left: 16px;
+    border-left: 2px solid rgba(16, 185, 129, 0.3);
+}
+
+.reply-card.nested {
+    background: rgba(255, 255, 255, 0.03);
+    margin-bottom: 12px;
+    padding: 16px;
+}
+
+.reply-card.nested:last-child {
+    margin-bottom: 0;
 }
 
 .empty-replies {

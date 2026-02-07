@@ -12,6 +12,7 @@
         'has-error': !!error,
         'is-disabled': disabled,
         'has-value': hasValue,
+        'variant-light': variant === 'light',
       }"
       role="combobox"
       :aria-expanded="isOpen"
@@ -119,6 +120,7 @@ interface Props {
   searchable?: boolean
   multiple?: boolean
   id?: string
+  variant?: 'default' | 'light'
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -127,6 +129,7 @@ const props = withDefaults(defineProps<Props>(), {
   required: false,
   searchable: false,
   multiple: false,
+  variant: 'default',
 })
 
 const emit = defineEmits<{
@@ -396,6 +399,25 @@ onBeforeUnmount(() => {
 .app-select-trigger.is-open {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+/* Light variant - white background */
+.app-select-trigger.variant-light {
+  background: #ffffff;
+  color: var(--color-text-primary);
+  border-color: var(--color-border);
+}
+
+.app-select-trigger.variant-light .app-select-placeholder {
+  color: #6b7280;
+}
+
+.app-select-trigger.variant-light .app-select-value {
+  color: #1f2937;
+}
+
+.app-select-trigger.variant-light .app-select-arrow {
+  color: #6b7280;
 }
 
 .app-select-trigger.has-error {

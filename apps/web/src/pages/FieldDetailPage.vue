@@ -34,7 +34,15 @@ onUnmounted(() => {
 function initializeMap() {
     if (!mapContainer.value) return;
 
-    map = L.map(mapContainer.value).setView([39.0, 35.0], 6);
+    map = L.map(mapContainer.value, {
+        scrollWheelZoom: false,
+        doubleClickZoom: false,
+        touchZoom: false,
+        zoomControl: false,
+        boxZoom: false,
+        keyboard: false,
+        dragging: true
+    }).setView([39.0, 35.0], 6);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
@@ -171,7 +179,7 @@ function navigateToEdit() {
                 </div>
 
                 <!-- Notes Card -->
-                <div v-if="fieldsStore.currentField.notes" class="info-card info-card-full">
+                <div v-if="fieldsStore.currentField.notes" class="info-card">
                     <h3>📝 Notlar</h3>
                     <p class="notes-text">{{ fieldsStore.currentField.notes }}</p>
                 </div>

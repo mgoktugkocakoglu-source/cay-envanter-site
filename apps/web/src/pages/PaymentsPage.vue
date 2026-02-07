@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue';
 import { usePaymentsStore } from '@/stores/paymentsStore';
 import { useHarvestsStore } from '@/stores/harvestsStore';
 import AppLayout from '@/layouts/AppLayout.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 
 const paymentsStore = usePaymentsStore();
 const harvestsStore = useHarvestsStore();
@@ -27,6 +28,27 @@ const years = computed(() => {
     const current = new Date().getFullYear();
     return [current, current - 1, current - 2, current - 3, current - 4];
 });
+
+// Options for AppSelect
+const yearOptions = computed(() => 
+    years.value.map(y => ({ value: y, label: String(y) }))
+);
+
+const statusOptions = [
+    { value: '', label: 'Tüm Durumlar' },
+    { value: 'received', label: 'Alındı' },
+    { value: 'pending', label: 'Bekliyor' }
+];
+
+const brokerFirmOptions = computed(() => [
+    { value: '', label: 'Seçiniz veya yeni ekleyin' },
+    ...paymentsStore.brokerFirms.map(firm => ({ value: firm.id, label: firm.firmName }))
+]);
+
+const paymentStatusOptions = [
+    { value: 'received', label: 'Alındı' },
+    { value: 'pending', label: 'Bekliyor' }
+];
 
 const totalSelectedKg = computed(() => 
     selectedHarvests.value.reduce((sum, h) => sum + h.usedAmountKg, 0)
@@ -163,14 +185,18 @@ async function deletePayment(id: string) {
             </header>
 
             <div class="filters">
-            <select v-model="yearFilter" class="filter-select" @change="applyFilters">
-                <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
-            </select>
-            <select v-model="statusFilter" class="filter-select" @change="applyFilters">
-                <option value="">Tüm Durumlar</option>
-                <option value="received">Alındı</option>
-                <option value="pending">Bekliyor</option>
-            </select>
+            <AppSelect
+                v-model="yearFilter"
+                :options="yearOptions"
+                placeholder="Yıl"
+                @update:model-value="applyFilters"
+            />
+            <AppSelect
+                v-model="statusFilter"
+                :options="statusOptions"
+                placeholder="Durum"
+                @update:model-value="applyFilters"
+            />
         </div>
 
         <div v-if="paymentsStore.isLoading" class="loading">
@@ -300,15 +326,12 @@ async function deletePayment(id: string) {
                             <input type="text" :value="formatCurrency(pricePerKg) + '/kg'" disabled />
                         </div>
 
-                        <div class="form-group">
-                            <label>Aracı Firma</label>
-                            <select v-model="createForm.brokerFirmId">
-                                <option value="">Seçiniz veya yeni ekleyin</option>
-                                <option v-for="firm in paymentsStore.brokerFirms" :key="firm.id" :value="firm.id">
-                                    {{ firm.firmName }}
-                                </option>
-                            </select>
-                        </div>
+                        <AppSelect
+                            v-model="createForm.brokerFirmId"
+                            :options="brokerFirmOptions"
+                            label="Aracı Firma"
+                            placeholder="Seçiniz veya yeni ekleyin"
+                        />
 
                         <div class="form-group" v-if="!createForm.brokerFirmId">
                             <label>Yeni Aracı Firma</label>
@@ -320,13 +343,12 @@ async function deletePayment(id: string) {
                                 <label>Ödeme Tarihi *</label>
                                 <input type="date" v-model="createForm.paymentDate" required />
                             </div>
-                            <div class="form-group">
-                                <label>Durum *</label>
-                                <select v-model="createForm.paymentStatus" required>
-                                    <option value="received">Alındı</option>
-                                    <option value="pending">Bekliyor</option>
-                                </select>
-                            </div>
+                            <AppSelect
+                                v-model="createForm.paymentStatus"
+                                :options="paymentStatusOptions"
+                                label="Durum *"
+                                :required="true"
+                            />
                         </div>
 
                         <div class="form-group">
@@ -430,6 +452,11 @@ async function deletePayment(id: string) {
     background: #f9fafb;
     font-weight: 600;
     color: #374151;
+    font-size: 14px;
+}
+
+.payments-table td {
+    color: #1f2937;
     font-size: 14px;
 }
 

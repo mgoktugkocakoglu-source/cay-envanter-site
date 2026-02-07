@@ -385,7 +385,7 @@ export const useForumStore = defineStore('forum', () => {
     async function toggleReaction(targetType: 'topic' | 'reply', targetId: string, type: ReactionType) {
         try {
             const response = await api.toggleForumReaction({ targetType, targetId, reactionType: type });
-            if (response.data?.success) {
+            if (response.data) {
                 // Refresh the stats for the target
                 const statsResponse = await api.getForumReactionStats(targetType, targetId);
                 if (statsResponse.data) {

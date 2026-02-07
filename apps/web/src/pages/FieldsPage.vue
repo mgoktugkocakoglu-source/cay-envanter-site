@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { useFieldsStore } from '@/stores/fieldsStore';
 import type { Field } from '@/services/api';
 import AppLayout from '@/layouts/AppLayout.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 
 const router = useRouter();
 const fieldsStore = useFieldsStore();
@@ -17,6 +18,12 @@ const fieldToDelete = ref<Field | null>(null);
 const isDeleting = ref(false);
 
 const provinces = ['Rize', 'Trabzon', 'Artvin', 'Giresun', 'Ordu'];
+
+// Options for AppSelect
+const provinceOptions = computed(() => [
+    { value: '', label: 'Tüm İller' },
+    ...provinces.map(p => ({ value: p, label: p }))
+]);
 
 const filteredFields = computed(() => {
     let result = fieldsStore.fields;
@@ -106,10 +113,11 @@ function formatArea(area: number, unit: string) {
                     class="search-input"
                 />
             </div>
-            <select v-model="provinceFilter" class="filter-select">
-                <option value="">Tüm İller</option>
-                <option v-for="p in provinces" :key="p" :value="p">{{ p }}</option>
-            </select>
+            <AppSelect
+                v-model="provinceFilter"
+                :options="provinceOptions"
+                placeholder="İl Seçin"
+            />
         </div>
 
         <div v-if="fieldsStore.isLoading" class="loading">

@@ -519,7 +519,7 @@ export const api = {
 
     // Forum Reactions
     toggleForumReaction: (data: { targetType: 'topic' | 'reply'; targetId: string; reactionType: ReactionType }) =>
-        request<{ success: boolean }>('/forum/reactions', {
+        request<{ added: boolean }>('/forum/reactions', {
             method: 'POST',
             body: JSON.stringify(data),
         }),

@@ -46,7 +46,7 @@ const handleLogout = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--space-4, 16px) var(--space-8, 32px);
+  padding: 8px var(--space-8, 32px);
   background: var(--color-bg-secondary, white);
   border-bottom: 1px solid var(--color-border, #e5e7eb);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -68,7 +68,7 @@ const handleLogout = () => {
 }
 
 .app-logo-img {
-  height: 48px;
+  height: 80px;
   width: auto;
   object-fit: contain;
 }
