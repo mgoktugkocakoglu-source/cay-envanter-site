@@ -1,14 +1,24 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 
 const authStore = useAuthStore();
 const router = useRouter();
+const isMobileMenuOpen = ref(false);
 
-const handleLogout = () => {
-  authStore.logout();
+const handleLogout = async () => {
+  await authStore.logout();
   router.push('/login');
 };
+
+function toggleMobileMenu() {
+  isMobileMenuOpen.value = !isMobileMenuOpen.value;
+}
+
+function closeMobileMenu() {
+  isMobileMenuOpen.value = false;
+}
 </script>
 
 <template>
@@ -17,13 +27,29 @@ const handleLogout = () => {
       <RouterLink to="/dashboard" class="app-logo">
         <img src="@/assets/images/logo.png" alt="Çay Hesabım Logo" class="app-logo-img" />
       </RouterLink>
-      <nav class="app-nav">
-        <RouterLink to="/dashboard" class="nav-link">Ana Sayfa</RouterLink>
-        <RouterLink to="/fields" class="nav-link">Tarlalarım</RouterLink>
-        <RouterLink to="/harvests" class="nav-link">Hasatlarım</RouterLink>
-        <RouterLink to="/payments" class="nav-link">Ödemeler</RouterLink>
-        <RouterLink to="/forum" class="nav-link">Forum</RouterLink>
-        <RouterLink to="/settings" class="nav-link">Ayarlar</RouterLink>
+      <button
+        class="mobile-menu-toggle"
+        :aria-expanded="isMobileMenuOpen"
+        aria-label="Menüyü aç/kapat"
+        @click="toggleMobileMenu"
+      >
+        <svg v-if="!isMobileMenuOpen" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+        <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+      <nav class="app-nav" :class="{ 'is-open': isMobileMenuOpen }">
+        <RouterLink to="/dashboard" class="nav-link" @click="closeMobileMenu">Ana Sayfa</RouterLink>
+        <RouterLink to="/fields" class="nav-link" @click="closeMobileMenu">Tarlalarım</RouterLink>
+        <RouterLink to="/harvests" class="nav-link" @click="closeMobileMenu">Hasatlarım</RouterLink>
+        <RouterLink to="/payments" class="nav-link" @click="closeMobileMenu">Ödemeler</RouterLink>
+        <RouterLink to="/forum" class="nav-link" @click="closeMobileMenu">Forum</RouterLink>
+        <RouterLink to="/settings" class="nav-link" @click="closeMobileMenu">Ayarlar</RouterLink>
         <button class="btn btn-secondary" @click="handleLogout">
           Çıkış Yap
         </button>
@@ -118,22 +144,58 @@ const handleLogout = () => {
   transform: translateY(-1px);
 }
 
+.mobile-menu-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--color-text-secondary, #6b7280);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mobile-menu-toggle:hover {
+  background: #f3f4f6;
+  color: var(--color-text-primary, #1a1a2e);
+}
+
 @media (max-width: 768px) {
   .app-header {
-    flex-direction: column;
-    gap: 16px;
-    padding: 16px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 12px 16px;
+  }
+
+  .mobile-menu-toggle {
+    display: flex;
   }
 
   .app-nav {
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 8px;
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    gap: 4px;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-border, #e5e7eb);
+  }
+
+  .app-nav.is-open {
+    display: flex;
   }
 
   .nav-link {
-    font-size: 14px;
-    padding: 6px 10px;
+    font-size: 15px;
+    padding: 10px 12px;
+    width: 100%;
+  }
+
+  .btn {
+    width: 100%;
+    text-align: center;
   }
 }
 </style>

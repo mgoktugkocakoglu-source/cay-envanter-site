@@ -2,11 +2,13 @@
 import { ref, onMounted, computed } from 'vue';
 import { usePaymentsStore } from '@/stores/paymentsStore';
 import { useHarvestsStore } from '@/stores/harvestsStore';
+import { useToast } from '@/composables/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 
 const paymentsStore = usePaymentsStore();
 const harvestsStore = useHarvestsStore();
+const toast = useToast();
 
 const yearFilter = ref(new Date().getFullYear());
 const statusFilter = ref('');
@@ -157,13 +159,21 @@ async function createPayment() {
     });
 
     if (result) {
+        toast.success('Ödeme başarıyla kaydedildi');
         showCreateModal.value = false;
+    } else {
+        toast.error('Ödeme kaydedilirken bir hata oluştu');
     }
 }
 
 async function deletePayment(id: string) {
     if (confirm('Bu ödemeyi silmek istediğinize emin misiniz?')) {
-        await paymentsStore.deletePayment(id);
+        const success = await paymentsStore.deletePayment(id);
+        if (success) {
+            toast.success('Ödeme başarıyla silindi');
+        } else {
+            toast.error('Ödeme silinirken bir hata oluştu');
+        }
     }
 }
 </script>
@@ -727,6 +737,19 @@ async function deletePayment(id: string) {
 
     .form-row {
         grid-template-columns: 1fr;
+    }
+
+    .payments-table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .payments-table th,
+    .payments-table td {
+        white-space: nowrap;
+        padding: 12px 10px;
+        font-size: 13px;
     }
 }
 </style>

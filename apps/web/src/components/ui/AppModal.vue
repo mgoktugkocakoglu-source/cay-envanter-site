@@ -91,6 +91,14 @@ watch(() => props.modelValue, (val) => {
     document.body.style.overflow = ''
   }
 })
+
+// Cleanup body overflow on unmount in case modal is destroyed while open
+import { onBeforeUnmount } from 'vue'
+onBeforeUnmount(() => {
+  if (props.modelValue) {
+    document.body.style.overflow = ''
+  }
+})
 </script>
 
 <style scoped>

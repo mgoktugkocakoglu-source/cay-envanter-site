@@ -340,15 +340,18 @@ watch(() => searchQuery.value, () => {
   highlightedIndex.value = filteredOptions.value.length > 0 ? 0 : -1
 })
 
+function onWindowResize() {
+  if (isOpen.value) positionDropdown()
+}
+
 onMounted(() => {
   document.addEventListener('click', onClickOutside)
-  window.addEventListener('resize', () => {
-    if (isOpen.value) positionDropdown()
-  })
+  window.addEventListener('resize', onWindowResize)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', onClickOutside)
+  window.removeEventListener('resize', onWindowResize)
 })
 </script>
 

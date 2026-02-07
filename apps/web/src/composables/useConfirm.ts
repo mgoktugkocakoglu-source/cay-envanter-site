@@ -39,6 +39,12 @@ export function useConfirm() {
       }
     }
 
+    // Resolve any previous pending promise before opening new one
+    if (resolvePromise) {
+      resolvePromise(false)
+      resolvePromise = null
+    }
+
     isVisible.value = true
 
     return new Promise<boolean>((resolve) => {

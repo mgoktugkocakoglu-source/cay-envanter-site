@@ -2,12 +2,14 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useFieldsStore } from '@/stores/fieldsStore';
+import { useToast } from '@/composables/useToast';
 import type { Field } from '@/services/api';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 
 const router = useRouter();
 const fieldsStore = useFieldsStore();
+const toast = useToast();
 
 const searchQuery = ref('');
 const provinceFilter = ref('');
@@ -72,7 +74,10 @@ async function confirmDelete() {
     try {
         const success = await fieldsStore.deleteField(fieldToDelete.value.id);
         if (success) {
+            toast.success('Tarla başarıyla silindi');
             closeDeleteModal();
+        } else {
+            toast.error('Tarla silinirken bir hata oluştu');
         }
     } finally {
         isDeleting.value = false;
