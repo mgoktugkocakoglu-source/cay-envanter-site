@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/authStore';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 import RichTextEditor from '@/components/forum/RichTextEditor.vue';
+import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -17,6 +18,7 @@ const content = ref('');
 const selectedCategoryId = ref('');
 const isSubmitting = ref(false);
 const errors = ref<{ title?: string; content?: string; category?: string }>({});
+const showCancelConfirm = ref(false);
 
 const preSelectedCategory = computed(() => route.query.category as string | undefined);
 
@@ -86,12 +88,14 @@ async function handleSubmit() {
 function handleCancel() {
     const stripped = content.value.replace(/<[^>]*>/g, '').trim();
     if (title.value.trim() || stripped) {
-        if (confirm('Yazdiklariniz kaybolacak. Sayfadan ayrilmak istediginize emin misiniz?')) {
-            router.back();
-        }
+        showCancelConfirm.value = true;
     } else {
         router.back();
     }
+}
+
+function confirmCancel() {
+    router.back();
 }
 
 function clearError(field: 'title' | 'content' | 'category') {
@@ -205,6 +209,17 @@ const titleCharClass = computed(() => {
                     </button>
                 </div>
             </form>
+
+            <!-- Cancel Confirm Modal -->
+            <ConfirmModal
+                v-model="showCancelConfirm"
+                title="Sayfadan Ayril"
+                message="Yazdiklariniz kaybolacak. Sayfadan ayrilmak istediginize emin misiniz?"
+                confirm-text="Ayril"
+                cancel-text="Kalmaya Devam Et"
+                variant="warning"
+                @confirm="confirmCancel"
+            />
         </div>
     </AppLayout>
 </template>

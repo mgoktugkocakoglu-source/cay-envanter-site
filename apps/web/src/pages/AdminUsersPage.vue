@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
+import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -27,6 +28,11 @@ const filterRole = ref('all');
 const filterStatus = ref('all');
 const selectedUser = ref<typeof users.value[0] | null>(null);
 const showUserModal = ref(false);
+const showBanConfirm = ref(false);
+const showRoleConfirm = ref(false);
+const banTargetUser = ref<typeof users.value[0] | null>(null);
+const roleTargetUser = ref<typeof users.value[0] | null>(null);
+const roleTargetRole = ref('');
 
 // Options for AppSelect
 const roleFilterOptions = [
@@ -87,20 +93,31 @@ function closeUserModal() {
     showUserModal.value = false;
 }
 
-async function toggleBan(user: typeof users.value[0]) {
-    const action = user.isBanned ? 'yasağı kaldırmak' : 'yasaklamak';
-    if (!confirm(`${user.fullName} kullanıcısını ${action} istediğinize emin misiniz?`)) return;
-    
-    // Call API to toggle ban
-    user.isBanned = !user.isBanned;
-    user.isActive = !user.isBanned;
+function toggleBan(user: typeof users.value[0]) {
+    banTargetUser.value = user;
+    showBanConfirm.value = true;
 }
 
-async function changeRole(user: typeof users.value[0], newRole: string) {
-    if (!confirm(`${user.fullName} kullanıcısının rolünü ${getRoleLabel(newRole)} olarak değiştirmek istediğinize emin misiniz?`)) return;
-    
-    // Call API to change role
-    user.role = newRole;
+function confirmBan() {
+    if (banTargetUser.value) {
+        banTargetUser.value.isBanned = !banTargetUser.value.isBanned;
+        banTargetUser.value.isActive = !banTargetUser.value.isBanned;
+        banTargetUser.value = null;
+    }
+}
+
+function changeRole(user: typeof users.value[0], newRole: string) {
+    roleTargetUser.value = user;
+    roleTargetRole.value = newRole;
+    showRoleConfirm.value = true;
+}
+
+function confirmChangeRole() {
+    if (roleTargetUser.value) {
+        roleTargetUser.value.role = roleTargetRole.value;
+        roleTargetUser.value = null;
+        roleTargetRole.value = '';
+    }
 }
 
 function getRoleLabel(role: string) {
@@ -289,6 +306,27 @@ function formatDate(dateString: string) {
                     </div>
                 </div>
             </div>
+        <!-- Ban/Unban Confirm Modal -->
+        <ConfirmModal
+            v-model="showBanConfirm"
+            :title="banTargetUser?.isBanned ? 'Yasagi Kaldir' : 'Kullaniciyi Yasakla'"
+            :message="`${banTargetUser?.fullName || ''} kullanicisini ${banTargetUser?.isBanned ? 'yasagini kaldirmak' : 'yasaklamak'} istediginize emin misiniz?`"
+            :confirm-text="banTargetUser?.isBanned ? 'Yasagi Kaldir' : 'Yasakla'"
+            cancel-text="Vazgec"
+            :variant="banTargetUser?.isBanned ? 'info' : 'danger'"
+            @confirm="confirmBan"
+        />
+
+        <!-- Change Role Confirm Modal -->
+        <ConfirmModal
+            v-model="showRoleConfirm"
+            title="Rol Degistir"
+            :message="`${roleTargetUser?.fullName || ''} kullanicisinin rolunu ${getRoleLabel(roleTargetRole)} olarak degistirmek istediginize emin misiniz?`"
+            confirm-text="Degistir"
+            cancel-text="Vazgec"
+            variant="warning"
+            @confirm="confirmChangeRole"
+        />
         </div>
     </AppLayout>
 </template>
