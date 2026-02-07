@@ -81,7 +81,7 @@ function formatDate(dateStr: string) {
 }
 
 function formatCurrency(amount: number) {
-    return amount.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' });
+    return amount?.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' });
 }
 
 function formatKg(kg: number) {
@@ -239,7 +239,7 @@ async function deletePayment(id: string) {
                     <td>{{ formatKg(payment.totalAmountKg) }}</td>
                     <td class="amount">{{ formatCurrency(payment.totalPrice) }}</td>
                     <td>{{ formatCurrency(payment.pricePerKg) }}/kg</td>
-                    <td>
+                    <td>formatCurrency(payment.pricePerK
                         <span
                             class="status-badge"
                             :class="payment.paymentStatus === 'received' ? 'status-received' : 'status-pending'"
@@ -341,6 +341,7 @@ async function deletePayment(id: string) {
                             :options="brokerFirmOptions"
                             label="Aracı Firma"
                             placeholder="Seçiniz veya yeni ekleyin"
+                            variant="light"
                         />
 
                         <div class="form-group" v-if="!createForm.brokerFirmId">
@@ -358,6 +359,7 @@ async function deletePayment(id: string) {
                                 :options="paymentStatusOptions"
                                 label="Durum *"
                                 :required="true"
+                                variant="light"
                             />
                         </div>
 
@@ -397,9 +399,9 @@ async function deletePayment(id: string) {
 }
 
 .header-content h1 {
-    font-size: 28px;
+    font-size: 32px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: #ffffff;
     margin: 0;
 }
 
@@ -431,6 +433,10 @@ async function deletePayment(id: string) {
     display: flex;
     gap: 16px;
     margin-bottom: 24px;
+}
+
+.filters .app-select-wrapper {
+    min-width: 200px;
 }
 
 .filter-select {
@@ -584,6 +590,9 @@ async function deletePayment(id: string) {
 
 .wizard-step h3 {
     margin: 0 0 16px 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: #1a1a2e;
 }
 
 .harvest-list {
@@ -619,6 +628,8 @@ async function deletePayment(id: string) {
 
 .harvest-info strong {
     display: block;
+    color: #1a1a2e;
+    font-size: 15px;
 }
 
 .harvest-info .date {

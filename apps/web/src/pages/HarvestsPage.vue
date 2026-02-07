@@ -241,6 +241,7 @@ async function deleteHarvest(id: string) {
                         label="Tarla *"
                         placeholder="Seçiniz"
                         :required="true"
+                        variant="light"
                     />
 
                     <div class="form-group">
@@ -258,6 +259,7 @@ async function deleteHarvest(id: string) {
                         :options="qualityOptions"
                         label="Kalite"
                         placeholder="Seçiniz"
+                        variant="light"
                     />
 
                     <div class="form-group">
@@ -295,9 +297,9 @@ async function deleteHarvest(id: string) {
 }
 
 .header-content h1 {
-    font-size: 28px;
+    font-size: 32px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: #ffffff;
     margin: 0;
 }
 
@@ -328,6 +330,10 @@ async function deleteHarvest(id: string) {
     display: flex;
     gap: 16px;
     margin-bottom: 24px;
+}
+
+.filters .app-select-wrapper {
+    min-width: 200px;
 }
 
 .filter-select {
@@ -473,6 +479,9 @@ async function deleteHarvest(id: string) {
 
 .modal-content h2 {
     margin: 0 0 24px 0;
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a1a2e;
 }
 
 .create-form {

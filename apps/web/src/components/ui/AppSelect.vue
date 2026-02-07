@@ -230,7 +230,11 @@ function selectOption(option: SelectOption) {
 
 function positionDropdown() {
   if (!wrapperRef.value) return
-  const rect = wrapperRef.value.getBoundingClientRect()
+  // Get the trigger element position, not the wrapper (which includes label)
+  const triggerEl = wrapperRef.value.querySelector('.app-select-trigger') as HTMLElement
+  if (!triggerEl) return
+  
+  const rect = triggerEl.getBoundingClientRect()
   const spaceBelow = window.innerHeight - rect.bottom
   const openAbove = spaceBelow < 260 && rect.top > spaceBelow
 
@@ -238,10 +242,10 @@ function positionDropdown() {
     position: 'fixed',
     left: `${rect.left}px`,
     width: `${rect.width}px`,
-    zIndex: 'var(--z-dropdown)',
+    zIndex: '1000',
     ...(openAbove
-      ? { bottom: `${window.innerHeight - rect.top + 4}px` }
-      : { top: `${rect.bottom + 4}px` }),
+      ? { bottom: `${window.innerHeight - rect.top + 2}px` }
+      : { top: `${rect.bottom + 2}px` }),
   }
 }
 
