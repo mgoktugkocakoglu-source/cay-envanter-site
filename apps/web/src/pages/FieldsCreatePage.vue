@@ -41,12 +41,17 @@ const isLoadingParcel = ref(false);
 const TURKEY_CENTER: L.LatLngExpression = [39.0, 35.0];
 const TURKEY_ZOOM = 6;
 
+// Step tracking
+const currentStep = computed(() => {
+    if (!fieldName.value.trim()) return 1;
+    if (!geoStore.selectedNeighborhoodId) return 2;
+    return 3;
+});
+
 // Computed
 const selectedArea = computed(() => {
-    // Prefer clicked parcel area, then selected parcel area
     if (clickedParcel.value) {
         const alanStr = clickedParcel.value.properties.alan;
-        // Parse area string like "59.955,71" to number
         return parseFloat(alanStr.replace('.', '').replace(',', '.')) || 0;
     }
     const parcel = geoStore.selectedParcel;
@@ -70,13 +75,17 @@ const totalPartnerPercentage = computed(() => {
 // Initialize map
 onMounted(async () => {
     if (mapContainer.value) {
-        map = L.map(mapContainer.value).setView(TURKEY_CENTER, TURKEY_ZOOM);
+        map = L.map(mapContainer.value, {
+            zoomControl: false,
+        }).setView(TURKEY_CENTER, TURKEY_ZOOM);
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+            maxZoom: 20,
         }).addTo(map);
 
-        // Add map click handler for parcel selection
         map.on('click', handleMapClick);
     }
 
@@ -119,12 +128,10 @@ watch(() => geoStore.parcels, (parcels) => {
 function zoomToBounds(coordinates: number[][][]) {
     if (!map) return;
 
-    // Clear previous layer
     if (currentLayer) {
         map.removeLayer(currentLayer);
     }
 
-    // Create GeoJSON from coordinates
     const geoJson: GeoJSON.Feature = {
         type: 'Feature',
         properties: {},
@@ -138,7 +145,8 @@ function zoomToBounds(coordinates: number[][][]) {
         style: {
             color: '#10b981',
             weight: 2,
-            fillOpacity: 0.1
+            fillOpacity: 0.08,
+            fillColor: '#10b981',
         }
     }).addTo(map);
 
@@ -148,7 +156,6 @@ function zoomToBounds(coordinates: number[][][]) {
 function displayParcels(parcels: typeof geoStore.parcels) {
     if (!map) return;
 
-    // Clear previous parcel layers
     if (parcelLayers) {
         map.removeLayer(parcelLayers);
     }
@@ -169,28 +176,30 @@ function displayParcels(parcels: typeof geoStore.parcels) {
 
     parcelLayers = L.geoJSON(geoJson, {
         style: (feature) => ({
-            color: feature?.properties?.id === geoStore.selectedParcelId ? '#059669' : '#6b7280',
+            color: feature?.properties?.id === geoStore.selectedParcelId ? '#10b981' : '#64748b',
             weight: feature?.properties?.id === geoStore.selectedParcelId ? 3 : 1,
-            fillOpacity: feature?.properties?.id === geoStore.selectedParcelId ? 0.3 : 0.1
+            fillOpacity: feature?.properties?.id === geoStore.selectedParcelId ? 0.25 : 0.08,
+            fillColor: feature?.properties?.id === geoStore.selectedParcelId ? '#10b981' : '#64748b',
         }),
         onEachFeature: (feature, layer) => {
             layer.on('click', () => {
                 geoStore.selectParcel(feature.properties?.id || null);
-                // Refresh styles
                 if (parcelLayers) {
                     parcelLayers.setStyle((f) => ({
-                        color: f?.properties?.id === geoStore.selectedParcelId ? '#059669' : '#6b7280',
+                        color: f?.properties?.id === geoStore.selectedParcelId ? '#10b981' : '#64748b',
                         weight: f?.properties?.id === geoStore.selectedParcelId ? 3 : 1,
-                        fillOpacity: f?.properties?.id === geoStore.selectedParcelId ? 0.3 : 0.1
+                        fillOpacity: f?.properties?.id === geoStore.selectedParcelId ? 0.25 : 0.08,
+                        fillColor: f?.properties?.id === geoStore.selectedParcelId ? '#10b981' : '#64748b',
                     }));
                 }
             });
-            layer.bindTooltip(`Parsel: ${feature.properties?.parcelNo || 'N/A'}`);
+            layer.bindTooltip(`Parsel: ${feature.properties?.parcelNo || 'N/A'}`, {
+                className: 'dark-tooltip'
+            });
         }
     }).addTo(map);
 }
 
-// Handle map click to get parcel by coordinates
 async function handleMapClick(e: L.LeafletMouseEvent) {
     if (!geoStore.selectedNeighborhoodId || isLoadingParcel.value) return;
 
@@ -204,16 +213,16 @@ async function handleMapClick(e: L.LeafletMouseEvent) {
             clickedParcel.value = response.data;
             displayClickedParcel(response.data);
         } else if (response.error) {
-            formError.value = 'Bu koordinatta parsel bulunamadı';
+            formError.value = 'Bu koordinatta parsel bulunamadi';
             clickedParcel.value = null;
             clearClickedParcelLayer();
         } else {
-            formError.value = 'Bu koordinatta parsel bulunamadı';
+            formError.value = 'Bu koordinatta parsel bulunamadi';
             clickedParcel.value = null;
             clearClickedParcelLayer();
         }
     } catch (e) {
-        formError.value = 'Parsel bilgisi alınamadı';
+        formError.value = 'Parsel bilgisi alinamadi';
         clickedParcel.value = null;
         clearClickedParcelLayer();
     } finally {
@@ -221,11 +230,9 @@ async function handleMapClick(e: L.LeafletMouseEvent) {
     }
 }
 
-// Display clicked parcel with red border on map
 function displayClickedParcel(parcel: GeoParcelDetail) {
     if (!map) return;
 
-    // Clear previous clicked parcel layer
     clearClickedParcelLayer();
 
     const geoJson: GeoJSON.Feature = {
@@ -243,25 +250,25 @@ function displayClickedParcel(parcel: GeoParcelDetail) {
 
     clickedParcelLayer = L.geoJSON(geoJson, {
         style: {
-            color: '#dc2626', // Red color
+            color: '#f59e0b',
             weight: 3,
-            fillOpacity: 0.3,
-            fillColor: '#dc2626'
+            fillOpacity: 0.2,
+            fillColor: '#f59e0b',
+            dashArray: '6 4',
         }
     }).addTo(map);
 
-    // Add popup with parcel info
     clickedParcelLayer.bindPopup(`
-        <strong>Parsel:</strong> ${parcel.properties.ozet}<br>
-        <strong>Alan:</strong> ${parcel.properties.alan} m²<br>
-        <strong>Nitelik:</strong> ${parcel.properties.nitelik}
+        <div style="font-family: Inter, sans-serif; font-size: 13px; line-height: 1.5;">
+            <strong>${parcel.properties.ozet}</strong><br>
+            <span style="color: #64748b;">Alan:</span> ${parcel.properties.alan} m&sup2;<br>
+            <span style="color: #64748b;">Nitelik:</span> ${parcel.properties.nitelik}
+        </div>
     `).openPopup();
 
-    // Zoom to parcel bounds
     map.fitBounds(clickedParcelLayer.getBounds(), { padding: [50, 50] });
 }
 
-// Clear clicked parcel layer
 function clearClickedParcelLayer() {
     if (clickedParcelLayer && map) {
         map.removeLayer(clickedParcelLayer);
@@ -299,7 +306,6 @@ function addPartner() {
 function removePartner(index: number) {
     if (partners.value.length > 1) {
         partners.value.splice(index, 1);
-        // Ensure at least one primary owner
         if (!partners.value.some(p => p.isPrimary)) {
             partners.value[0].isPrimary = true;
         }
@@ -316,7 +322,7 @@ async function handleSubmit() {
     if (!isFormValid.value) return;
 
     if (totalPartnerPercentage.value !== 100) {
-        formError.value = 'Ortakların toplam payı %100 olmalıdır';
+        formError.value = 'Ortaklarin toplam payi %100 olmalidir';
         return;
     }
 
@@ -324,10 +330,9 @@ async function handleSubmit() {
     formError.value = null;
 
     try {
-        // Prefer clicked parcel data, then selected parcel from dropdown
         const parcelCoordinates = clickedParcel.value?.polygon || geoStore.selectedParcel?.polygon || geoStore.selectedNeighborhood?.bounds || [];
         const parcelNo = clickedParcel.value?.properties.parselNo || geoStore.selectedParcel?.parcelNo || null;
-        
+
         const fieldData: Omit<Partial<Field>, 'partners'> & { partners?: Array<{ partnerName: string; sharePercentage: number; isPrimaryOwner: boolean }> } = {
             name: fieldName.value.trim(),
             province: clickedParcel.value?.properties.ilAd || geoStore.selectedProvince?.name || '',
@@ -351,10 +356,10 @@ async function handleSubmit() {
         if (result) {
             router.push('/fields');
         } else {
-            formError.value = fieldsStore.error || 'Tarla oluşturulamadı';
+            formError.value = fieldsStore.error || 'Tarla olusturulamadi';
         }
     } catch (e) {
-        formError.value = 'Bir hata oluştu';
+        formError.value = 'Bir hata olustu';
     } finally {
         isSubmitting.value = false;
     }
@@ -368,161 +373,259 @@ function goBack() {
 <template>
     <AppLayout>
         <div class="create-field-page">
+            <!-- Page Header -->
             <header class="page-header">
-            <button class="btn-back" @click="goBack">
-                <span class="icon">←</span>
-                Geri Dön
-            </button>
-            <h1>Yeni Tarla Ekle</h1>
-        </header>
+                <button class="btn-back" @click="goBack">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                    Geri Don
+                </button>
+                <div class="header-center">
+                    <h1>Yeni Tarla Ekle</h1>
+                    <p class="header-sub">Tarla bilgilerini girerek yeni tarla kaydi olusturun</p>
+                </div>
+            </header>
 
-        <div class="content-grid">
-            <!-- Map Section -->
-            <div class="map-section">
-                <div ref="mapContainer" class="map-container"></div>
-                <div v-if="isLoadingParcel" class="parcel-loading">
-                    <span class="spinner-small"></span>
-                    Parsel bilgisi yükleniyor...
+            <!-- Step Indicator -->
+            <div class="steps-bar">
+                <div class="step" :class="{ active: currentStep >= 1, done: currentStep > 1 }">
+                    <div class="step-dot">
+                        <svg v-if="currentStep > 1" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span v-else>1</span>
+                    </div>
+                    <span class="step-label">Temel Bilgi</span>
                 </div>
-                <div v-else-if="clickedParcel" class="parcel-info parcel-info-clicked">
-                    <strong>Haritadan Seçilen Parsel:</strong> {{ clickedParcel.properties.ozet }}
-                    <span class="area-badge area-badge-red">{{ clickedParcel.properties.alan }} m²</span>
+                <div class="step-line" :class="{ filled: currentStep > 1 }"></div>
+                <div class="step" :class="{ active: currentStep >= 2, done: currentStep > 2 }">
+                    <div class="step-dot">
+                        <svg v-if="currentStep > 2" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span v-else>2</span>
+                    </div>
+                    <span class="step-label">Konum</span>
                 </div>
-                <div v-else-if="geoStore.selectedParcel" class="parcel-info">
-                    <strong>Seçili Parsel:</strong> {{ geoStore.selectedParcel.parcelNo }}
-                    <span class="area-badge">{{ geoStore.selectedParcel.area.toLocaleString('tr-TR') }} m²</span>
-                </div>
-                <div v-else-if="geoStore.selectedNeighborhoodId" class="parcel-hint">
-                    💡 Haritaya tıklayarak parsel seçebilirsiniz
+                <div class="step-line" :class="{ filled: currentStep > 2 }"></div>
+                <div class="step" :class="{ active: currentStep >= 3 }">
+                    <div class="step-dot"><span>3</span></div>
+                    <span class="step-label">Parsel & Detay</span>
                 </div>
             </div>
 
-            <!-- Form Section -->
-            <div class="form-section">
-                <form @submit.prevent="handleSubmit">
-                    <!-- Field Name -->
-                    <div class="form-group">
-                        <label for="fieldName">Tarla Adı *</label>
-                        <input
-                            id="fieldName"
-                            v-model="fieldName"
-                            type="text"
-                            placeholder="Örn: Üst Bahçe"
-                            required
-                        />
-                    </div>
+            <!-- Content -->
+            <div class="content-layout">
+                <!-- Map Column -->
+                <div class="map-col">
+                    <div class="map-card">
+                        <div ref="mapContainer" class="map-container"></div>
 
-                    <!-- Province Select -->
-                    <AppSelect
-                        :model-value="geoStore.selectedProvinceId?.toString() || ''"
-                        :options="geoStore.provinces.map(p => ({ value: p.id.toString(), label: p.name }))"
-                        label="İl *"
-                        variant="light"
-                        placeholder="İl Seçin"
-                        :disabled="geoStore.isLoadingProvinces"
-                        @update:model-value="handleProvinceChange"
-                    />
-
-                    <!-- District Select -->
-                    <AppSelect
-                        :model-value="geoStore.selectedDistrictId?.toString() || ''"
-                        :options="geoStore.districts.map(d => ({ value: d.id.toString(), label: d.name }))"
-                        label="İlçe *"
-                        placeholder="İlçe Seçin"
-                        :disabled="!geoStore.selectedProvinceId || geoStore.isLoadingDistricts"
-                        variant="light"
-                        @update:model-value="handleDistrictChange"
-                    />
-                    <span v-if="geoStore.isLoadingDistricts" class="loading-text">Yükleniyor...</span>
-
-                    <!-- Neighborhood Select -->
-                    <AppSelect
-                        :model-value="geoStore.selectedNeighborhoodId?.toString() || ''"
-                        :options="geoStore.neighborhoods.map(n => ({ value: n.id.toString(), label: n.name }))"
-                        label="Mahalle *"
-                        placeholder="Mahalle Seçin"
-                        :disabled="!geoStore.selectedDistrictId || geoStore.isLoadingNeighborhoods"
-                        variant="light"
-                        @update:model-value="handleNeighborhoodChange"
-                    />
-                    <span v-if="geoStore.isLoadingNeighborhoods" class="loading-text">Yükleniyor...</span>
-
-                    <!-- Parcel Select -->
-                    <AppSelect
-                        :model-value="geoStore.selectedParcelId?.toString() || ''"
-                        :options="geoStore.parcels.map(p => ({ value: p.id.toString(), label: `${p.parcelNo} (${p.area.toLocaleString('tr-TR')} m²)` }))"
-                        label="Parsel (Opsiyonel)"
-                        variant="light"
-                        placeholder="Haritadan Seçin veya Listeden"
-                        :disabled="!geoStore.selectedNeighborhoodId || geoStore.isLoadingParcels"
-                        @update:model-value="handleParcelChange"
-                    />
-                    <span v-if="geoStore.isLoadingParcels" class="loading-text">Parseller yükleniyor...</span>
-
-                    <!-- Area Display -->
-                    <div v-if="selectedArea > 0" class="form-group">
-                        <label>Alan</label>
-                        <div class="area-display">
-                            {{ selectedArea.toLocaleString('tr-TR') }} m²
+                        <!-- Map Status Bar -->
+                        <div class="map-status">
+                            <div v-if="isLoadingParcel" class="map-status-item map-status-loading">
+                                <span class="spinner"></span>
+                                Parsel bilgisi yukleniyor...
+                            </div>
+                            <div v-else-if="clickedParcel" class="map-status-item map-status-selected">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                                <div class="map-status-text">
+                                    <span class="map-status-title">{{ clickedParcel.properties.ozet }}</span>
+                                    <span class="map-status-meta">{{ clickedParcel.properties.alan }} m&sup2; &middot; {{ clickedParcel.properties.nitelik }}</span>
+                                </div>
+                                <span class="area-chip">{{ clickedParcel.properties.alan }} m&sup2;</span>
+                            </div>
+                            <div v-else-if="geoStore.selectedParcel" class="map-status-item map-status-selected">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                                <div class="map-status-text">
+                                    <span class="map-status-title">Parsel: {{ geoStore.selectedParcel.parcelNo }}</span>
+                                </div>
+                                <span class="area-chip">{{ geoStore.selectedParcel.area.toLocaleString('tr-TR') }} m&sup2;</span>
+                            </div>
+                            <div v-else-if="geoStore.selectedNeighborhoodId" class="map-status-item map-status-hint">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                                Haritaya tiklayarak parsel secebilirsiniz
+                            </div>
+                            <div v-else class="map-status-item map-status-default">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+                                Konum secimi icin il, ilce ve mahalle secin
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Notes -->
-                    <div class="form-group">
-                        <label for="notes">Notlar</label>
-                        <textarea
-                            id="notes"
-                            v-model="notes"
-                            rows="3"
-                            placeholder="Tarla hakkında notlar..."
-                        ></textarea>
+                    <!-- Area Display (below map on large screens) -->
+                    <div v-if="selectedArea > 0" class="area-display-card">
+                        <div class="area-display-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+                        </div>
+                        <div class="area-display-info">
+                            <span class="area-display-label">Tarla Alani</span>
+                            <span class="area-display-value">{{ selectedArea.toLocaleString('tr-TR') }} m&sup2;</span>
+                        </div>
                     </div>
+                </div>
 
-                    <!-- Partners Section (Accordion) -->
-                    <div class="partners-accordion">
-                        <button 
-                            type="button" 
-                            class="accordion-header" 
-                            @click="isPartnersOpen = !isPartnersOpen"
-                        >
-                            <div class="accordion-title">
-                                <svg 
-                                    class="accordion-icon" 
-                                    :class="{ 'accordion-icon-open': isPartnersOpen }"
-                                    width="20" 
-                                    height="20" 
-                                    viewBox="0 0 24 24" 
-                                    fill="none" 
-                                    stroke="currentColor" 
-                                    stroke-width="2"
-                                >
-                                    <polyline points="6 9 12 15 18 9"></polyline>
-                                </svg>
-                                <span>Ortaklar</span>
-                                <span v-if="partners.filter(p => p.name.trim()).length > 0" class="partner-count">
-                                    {{ partners.filter(p => p.name.trim()).length }} ortak
-                                </span>
+                <!-- Form Column -->
+                <div class="form-col">
+                    <form @submit.prevent="handleSubmit" class="form-card">
+                        <!-- Section: Basic Info -->
+                        <div class="form-section">
+                            <div class="form-section-header">
+                                <div class="section-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                </div>
+                                <h3>Temel Bilgiler</h3>
                             </div>
-                            <span 
-                                v-if="totalPartnerPercentage !== 100 && partners.some(p => p.name.trim())" 
-                                class="accordion-warning"
-                            >
-                                ⚠️ %{{ totalPartnerPercentage }}
-                            </span>
-                        </button>
 
-                        <div class="accordion-content" :class="{ 'accordion-content-open': isPartnersOpen }">
-                            <div class="partners-section">
-                                <div class="partners-inner">
-                                    <div class="partners-actions">
-                                        <button type="button" class="btn-add-partner" @click="addPartner">
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <line x1="12" y1="5" x2="12" y2="19"></line>
-                                                <line x1="5" y1="12" x2="19" y2="12"></line>
-                                            </svg>
-                                            Ortak Ekle
-                                        </button>
+                            <div class="form-group">
+                                <label for="fieldName">Tarla Adi <span class="required">*</span></label>
+                                <input
+                                    id="fieldName"
+                                    v-model="fieldName"
+                                    type="text"
+                                    class="form-input"
+                                    placeholder="Orn: Ust Bahce"
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <!-- Section: Location -->
+                        <div class="form-section">
+                            <div class="form-section-header">
+                                <div class="section-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                                </div>
+                                <h3>Konum Bilgileri</h3>
+                            </div>
+
+                            <div class="select-grid">
+                                <AppSelect
+                                    :model-value="geoStore.selectedProvinceId?.toString() || ''"
+                                    :options="geoStore.provinces.map(p => ({ value: p.id.toString(), label: p.name }))"
+                                    label="Il"
+                                    placeholder="Il Secin"
+                                    :disabled="geoStore.isLoadingProvinces"
+                                    required
+                                    searchable
+                                    @update:model-value="handleProvinceChange"
+                                />
+
+                                <div>
+                                    <AppSelect
+                                        :model-value="geoStore.selectedDistrictId?.toString() || ''"
+                                        :options="geoStore.districts.map(d => ({ value: d.id.toString(), label: d.name }))"
+                                        label="Ilce"
+                                        placeholder="Ilce Secin"
+                                        :disabled="!geoStore.selectedProvinceId || geoStore.isLoadingDistricts"
+                                        required
+                                        searchable
+                                        @update:model-value="handleDistrictChange"
+                                    />
+                                    <span v-if="geoStore.isLoadingDistricts" class="loading-text">
+                                        <span class="spinner-tiny"></span> Yukleniyor...
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="select-grid">
+                                <div>
+                                    <AppSelect
+                                        :model-value="geoStore.selectedNeighborhoodId?.toString() || ''"
+                                        :options="geoStore.neighborhoods.map(n => ({ value: n.id.toString(), label: n.name }))"
+                                        label="Mahalle"
+                                        placeholder="Mahalle Secin"
+                                        :disabled="!geoStore.selectedDistrictId || geoStore.isLoadingNeighborhoods"
+                                        required
+                                        searchable
+                                        @update:model-value="handleNeighborhoodChange"
+                                    />
+                                    <span v-if="geoStore.isLoadingNeighborhoods" class="loading-text">
+                                        <span class="spinner-tiny"></span> Yukleniyor...
+                                    </span>
+                                </div>
+
+                                <div>
+                                    <AppSelect
+                                        :model-value="geoStore.selectedParcelId?.toString() || ''"
+                                        :options="geoStore.parcels.map(p => ({ value: p.id.toString(), label: `${p.parcelNo} (${p.area.toLocaleString('tr-TR')} m²)` }))"
+                                        label="Parsel"
+                                        placeholder="Haritadan veya listeden"
+                                        :disabled="!geoStore.selectedNeighborhoodId || geoStore.isLoadingParcels"
+                                        searchable
+                                        @update:model-value="handleParcelChange"
+                                    />
+                                    <span v-if="geoStore.isLoadingParcels" class="loading-text">
+                                        <span class="spinner-tiny"></span> Parseller yukleniyor...
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section: Notes -->
+                        <div class="form-section">
+                            <div class="form-section-header">
+                                <div class="section-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
+                                </div>
+                                <h3>Notlar</h3>
+                            </div>
+
+                            <div class="form-group">
+                                <textarea
+                                    id="notes"
+                                    v-model="notes"
+                                    rows="3"
+                                    class="form-textarea"
+                                    placeholder="Tarla hakkinda notlar..."
+                                ></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Section: Partners -->
+                        <div class="form-section">
+                            <button
+                                type="button"
+                                class="partners-toggle"
+                                @click="isPartnersOpen = !isPartnersOpen"
+                            >
+                                <div class="partners-toggle-left">
+                                    <div class="section-icon">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                                     </div>
+                                    <h3>Ortaklar</h3>
+                                    <span v-if="partners.filter(p => p.name.trim()).length > 0" class="partner-badge">
+                                        {{ partners.filter(p => p.name.trim()).length }}
+                                    </span>
+                                </div>
+                                <div class="partners-toggle-right">
+                                    <span
+                                        v-if="totalPartnerPercentage !== 100 && partners.some(p => p.name.trim())"
+                                        class="pct-warn"
+                                    >
+                                        %{{ totalPartnerPercentage }}
+                                    </span>
+                                    <svg
+                                        class="chevron"
+                                        :class="{ open: isPartnersOpen }"
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <polyline points="6 9 12 15 18 9"/>
+                                    </svg>
+                                </div>
+                            </button>
+
+                            <div class="partners-body" :class="{ open: isPartnersOpen }">
+                                <div class="partners-content">
+                                    <button type="button" class="btn-add-partner" @click="addPartner">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <line x1="12" y1="5" x2="12" y2="19"/>
+                                            <line x1="5" y1="12" x2="19" y2="12"/>
+                                        </svg>
+                                        Ortak Ekle
+                                    </button>
 
                                     <div
                                         v-for="(partner, index) in partners"
@@ -532,484 +635,759 @@ function goBack() {
                                         <input
                                             v-model="partner.name"
                                             type="text"
-                                            placeholder="Ortak Adı"
-                                            class="partner-name"
+                                            placeholder="Ortak Adi"
+                                            class="form-input partner-name-input"
                                         />
-                                        <div class="partner-percentage">
+                                        <div class="pct-input-wrap">
                                             <input
                                                 v-model.number="partner.percentage"
                                                 type="number"
                                                 min="0"
                                                 max="100"
                                                 step="1"
+                                                class="form-input pct-input"
                                             />
-                                            <span>%</span>
+                                            <span class="pct-symbol">%</span>
                                         </div>
-                                        <label class="primary-checkbox">
+                                        <label class="radio-label">
                                             <input
                                                 type="radio"
+                                                name="primaryOwner"
                                                 :checked="partner.isPrimary"
                                                 @change="setPrimaryOwner(index)"
                                             />
-                                            Ana Sahip
+                                            <span class="radio-text">Ana</span>
                                         </label>
                                         <button
                                             v-if="partners.length > 1"
                                             type="button"
-                                            class="btn-remove-partner"
+                                            class="btn-remove"
                                             @click="removePartner(index)"
                                         >
-                                            ✕
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                         </button>
                                     </div>
 
-                                    <div v-if="totalPartnerPercentage !== 100" class="percentage-warning">
-                                        Toplam pay: %{{ totalPartnerPercentage }} (100% olmalı)
+                                    <div v-if="totalPartnerPercentage !== 100 && partners.some(p => p.name.trim())" class="pct-warning-bar">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                        Toplam pay: %{{ totalPartnerPercentage }} (100% olmali)
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Error Message -->
-                    <div v-if="formError || geoStore.error" class="error-message">
-                        {{ formError || geoStore.error }}
-                    </div>
+                        <!-- Error -->
+                        <div v-if="formError || geoStore.error" class="error-banner">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                            {{ formError || geoStore.error }}
+                        </div>
 
-                    <!-- Actions -->
-                    <div class="form-actions">
-                        <button type="button" class="btn-secondary" @click="goBack">
-                            İptal
-                        </button>
-                        <button
-                            type="submit"
-                            class="btn-primary"
-                            :disabled="!isFormValid || isSubmitting"
-                        >
-                            {{ isSubmitting ? 'Kaydediliyor...' : 'Tarla Ekle' }}
-                        </button>
-                    </div>
-                </form>
+                        <!-- Actions -->
+                        <div class="form-actions">
+                            <button type="button" class="btn-cancel" @click="goBack">
+                                Iptal
+                            </button>
+                            <button
+                                type="submit"
+                                class="btn-submit"
+                                :disabled="!isFormValid || isSubmitting"
+                            >
+                                <span v-if="isSubmitting" class="spinner"></span>
+                                <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                {{ isSubmitting ? 'Kaydediliyor...' : 'Tarla Ekle' }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
-        </div>
         </div>
     </AppLayout>
 </template>
 
 <style scoped>
 .create-field-page {
-    padding: 24px;
     max-width: 1400px;
     margin: 0 auto;
+    padding: var(--space-6);
 }
 
+/* ── Page Header ── */
 .page-header {
     display: flex;
     align-items: center;
-    gap: 16px;
-    margin-bottom: 24px;
-}
-
-.page-header h1 {
-    font-size: 24px;
-    font-weight: 700;
-    color: #1a1a2e;
-    margin: 0;
+    gap: var(--space-4);
+    margin-bottom: var(--space-5);
 }
 
 .btn-back {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 8px;
-    background: transparent;
-    border: none;
-    color: #666;
+    gap: var(--space-2);
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-lg);
+    font-size: var(--font-size-sm);
     cursor: pointer;
-    font-size: 16px;
-    padding: 8px;
-    border-radius: 8px;
-    transition: background 0.2s;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
 }
 
 .btn-back:hover {
-    background: #f3f4f6;
-    color: #1a1a2e;
+    color: var(--color-text-primary);
+    border-color: var(--color-text-muted);
+    background: var(--color-bg-tertiary);
 }
 
-.content-grid {
+.header-center h1 {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text-primary);
+    margin-bottom: 2px;
+}
+
+.header-sub {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+}
+
+/* ── Steps Bar ── */
+.steps-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin-bottom: var(--space-6);
+    padding: var(--space-4) var(--space-6);
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+}
+
+.step {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.step-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-full);
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: var(--font-weight-semibold);
+    transition: all var(--transition-normal);
+    border: 2px solid transparent;
+}
+
+.step.active .step-dot {
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.step.done .step-dot {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+}
+
+.step-label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-medium);
+    transition: color var(--transition-fast);
+}
+
+.step.active .step-label {
+    color: var(--color-text-primary);
+}
+
+.step-line {
+    width: 60px;
+    height: 2px;
+    background: var(--color-bg-tertiary);
+    margin: 0 var(--space-3);
+    border-radius: 1px;
+    transition: background var(--transition-normal);
+}
+
+.step-line.filled {
+    background: var(--color-primary);
+}
+
+/* ── Content Layout ── */
+.content-layout {
     display: grid;
-    grid-template-columns: 1fr 400px;
-    gap: 24px;
+    grid-template-columns: 1fr 420px;
+    gap: var(--space-5);
+    align-items: start;
 }
 
-@media (max-width: 1024px) {
-    .content-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* Map Section */
-.map-section {
-    background: transparent;
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+/* ── Map Column ── */
+.map-col {
     display: flex;
     flex-direction: column;
+    gap: var(--space-4);
+    position: sticky;
+    top: 80px;
+}
+
+.map-card {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
 }
 
 .map-container {
-    height: 500px;
+    height: 480px;
     width: 100%;
-    border-radius: 16px;
+    background: var(--color-bg-primary);
+}
+
+/* Map Status Bar */
+.map-status {
+    border-top: 1px solid var(--color-border);
+}
+
+.map-status-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--font-size-sm);
+}
+
+.map-status-loading {
+    color: var(--color-warning);
+    background: rgba(245, 158, 11, 0.06);
+}
+
+.map-status-selected {
+    color: var(--color-text-primary);
+    background: rgba(16, 185, 129, 0.06);
+}
+
+.map-status-hint {
+    color: var(--color-info);
+    background: rgba(59, 130, 246, 0.06);
+}
+
+.map-status-default {
+    color: var(--color-text-muted);
+}
+
+.map-status-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.map-status-title {
+    display: block;
+    font-weight: var(--font-weight-medium);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.map-status-meta {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+}
+
+.area-chip {
+    background: var(--color-primary);
+    color: white;
+    padding: 2px 10px;
+    border-radius: var(--radius-full);
+    font-size: 11px;
+    font-weight: var(--font-weight-semibold);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Area Display Card */
+.area-display-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-5);
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+}
+
+.area-display-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-lg);
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.area-display-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    display: block;
+}
+
+.area-display-value {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-primary);
+}
+
+/* ── Form Column ── */
+.form-col {
+    min-width: 0;
+}
+
+.form-card {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
     overflow: hidden;
 }
 
-.parcel-info {
-    padding: 16px;
-    background: #f0fdf4;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-top: 12px;
-    border-radius: 12px;
-    border: 1px solid #bbf7d0;
-}
-
-.area-badge {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.area-badge-red {
-    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-}
-
-.parcel-info-clicked {
-    background: #fef2f2;
-    border-color: #fecaca;
-}
-
-.parcel-loading {
-    padding: 16px;
-    background: #fefce8;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    color: #854d0e;
-    margin-top: 12px;
-    border-radius: 12px;
-    border: 1px solid #fef08a;
-}
-
-.parcel-hint {
-    padding: 16px;
-    background: #f0f9ff;
-    color: #0369a1;
-    font-size: 14px;
-    margin-top: 12px;
-    border-radius: 12px;
-    border: 1px solid #bae6fd;
-}
-
-.spinner-small {
-    width: 16px;
-    height: 16px;
-    border: 2px solid #fef08a;
-    border-top-color: #ca8a04;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    display: inline-block;
-}
-
-/* Form Section */
+/* Form Sections */
 .form-section {
-    background: white;
-    border-radius: 16px;
-    padding: 24px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    padding: var(--space-5);
+    border-bottom: 1px solid var(--color-border);
 }
 
+.form-section:last-of-type {
+    border-bottom: none;
+}
+
+.form-section-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+}
+
+.section-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-md);
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.form-section-header h3 {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
+}
+
+/* Form Elements */
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: var(--space-4);
+}
+
+.form-group:last-child {
+    margin-bottom: 0;
 }
 
 .form-group label {
     display: block;
-    font-weight: 600;
-    color: #374151;
-    margin-bottom: 8px;
-    font-size: 14px;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-2);
 }
 
-.form-group input[type="text"],
-.form-group textarea,
-.form-group select {
+.required {
+    color: var(--color-danger);
+}
+
+.form-input,
+.form-textarea {
     width: 100%;
-    padding: 12px 16px;
-    border: 2px solid #e5e7eb;
-    border-radius: 10px;
-    font-size: 14px;
-    transition: border-color 0.2s;
-    background: white;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-primary);
+    font-size: var(--font-size-base);
+    font-family: var(--font-family);
+    transition: all var(--transition-fast);
+    min-height: 44px;
+    box-sizing: border-box;
 }
 
-.form-group input:focus,
-.form-group textarea:focus,
-.form-group select:focus {
+.form-input::placeholder,
+.form-textarea::placeholder {
+    color: var(--color-text-muted);
+}
+
+.form-input:focus,
+.form-textarea:focus {
     outline: none;
-    border-color: #10b981;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 
-.form-group select:disabled {
-    background: #f3f4f6;
-    cursor: not-allowed;
+.form-textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.select-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+}
+
+.select-grid:last-child {
+    margin-bottom: 0;
 }
 
 .loading-text {
-    font-size: 12px;
-    color: #6b7280;
-    margin-top: 4px;
-    display: block;
-}
-
-.area-display {
-    padding: 12px 16px;
-    background: #f0fdf4;
-    border-radius: 10px;
-    font-weight: 600;
-    color: #059669;
-}
-
-/* Partners Accordion */
-.partners-accordion {
-    margin-top: 24px;
-    border: 2px solid #e5e7eb;
-    border-radius: 12px;
-    overflow: hidden;
-    transition: border-color 0.2s;
-}
-
-.partners-accordion:hover {
-    border-color: #d1d5db;
-}
-
-.accordion-header {
-    width: 100%;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    padding: 16px 20px;
-    background: #f9fafb;
+    gap: var(--space-1);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-top: var(--space-1);
+}
+
+/* ── Partners ── */
+.partners-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: none;
     border: none;
     cursor: pointer;
-    transition: background 0.2s;
+    padding: 0;
+    color: inherit;
 }
 
-.accordion-header:hover {
-    background: #f3f4f6;
-}
-
-.accordion-title {
+.partners-toggle-left {
     display: flex;
     align-items: center;
-    gap: 12px;
-    font-size: 15px;
-    font-weight: 600;
-    color: #374151;
+    gap: var(--space-3);
 }
 
-.accordion-icon {
-    color: #6b7280;
-    transition: transform 0.3s ease;
+.partners-toggle-left h3 {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
 }
 
-.accordion-icon-open {
+.partner-badge {
+    background: var(--color-primary);
+    color: white;
+    width: 22px;
+    height: 22px;
+    border-radius: var(--radius-full);
+    font-size: 11px;
+    font-weight: var(--font-weight-semibold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.partners-toggle-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.pct-warn {
+    color: var(--color-warning);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+}
+
+.chevron {
+    color: var(--color-text-muted);
+    transition: transform var(--transition-normal);
+}
+
+.chevron.open {
     transform: rotate(180deg);
 }
 
-.partner-count {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
-    padding: 2px 10px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 500;
-}
-
-.accordion-warning {
-    color: #d97706;
-    font-size: 13px;
-    font-weight: 500;
-}
-
-.accordion-content {
+.partners-body {
     max-height: 0;
     overflow: hidden;
     transition: max-height 0.3s ease-out;
 }
 
-.accordion-content-open {
-    max-height: 500px;
+.partners-body.open {
+    max-height: 600px;
 }
 
-/* Partners Section */
-.partners-section {
-    padding: 0;
-}
-
-.partners-inner {
-    padding: 20px;
-    background: white;
-}
-
-.partners-actions {
-    margin-bottom: 16px;
+.partners-content {
+    padding-top: var(--space-4);
 }
 
 .btn-add-partner {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     background: transparent;
-    border: 2px dashed #10b981;
-    color: #10b981;
-    padding: 10px 18px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 500;
+    border: 1.5px dashed var(--color-primary);
+    color: var(--color-primary);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all var(--transition-fast);
+    margin-bottom: var(--space-4);
 }
 
 .btn-add-partner:hover {
-    background: #f0fdf4;
+    background: var(--color-primary-light);
     border-style: solid;
 }
 
 .partner-row {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
 }
 
-.partner-name {
+.partner-name-input {
     flex: 1;
-    padding: 10px 12px;
-    border: 2px solid #e5e7eb;
-    border-radius: 8px;
-    font-size: 14px;
+    min-width: 0;
 }
 
-.partner-percentage {
+.pct-input-wrap {
     display: flex;
     align-items: center;
     gap: 4px;
+    flex-shrink: 0;
 }
 
-.partner-percentage input {
-    width: 60px;
-    padding: 10px;
-    border: 2px solid #e5e7eb;
-    border-radius: 8px;
-    font-size: 14px;
+.pct-input {
+    width: 64px;
     text-align: center;
+    padding: var(--space-2) var(--space-2) !important;
+    min-height: 40px !important;
 }
 
-.primary-checkbox {
+.pct-symbol {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.radio-label {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 12px;
-    color: #6b7280;
+    cursor: pointer;
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
-.btn-remove-partner {
-    background: #fef2f2;
-    border: none;
-    color: #dc2626;
+.radio-label input[type="radio"] {
+    accent-color: var(--color-primary);
+    width: 14px;
+    height: 14px;
+}
+
+.radio-text {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+}
+
+.btn-remove {
     width: 32px;
     height: 32px;
-    border-radius: 8px;
-    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
+    background: rgba(239, 68, 68, 0.1);
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--color-danger);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all var(--transition-fast);
 }
 
-.btn-remove-partner:hover {
-    background: #fee2e2;
+.btn-remove:hover {
+    background: rgba(239, 68, 68, 0.2);
 }
 
-.percentage-warning {
-    background: #fef3c7;
-    color: #92400e;
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    margin-top: 8px;
-}
-
-/* Error Message */
-.error-message {
-    background: #fef2f2;
-    color: #dc2626;
-    padding: 12px 16px;
-    border-radius: 10px;
-    margin-bottom: 20px;
-    font-size: 14px;
-}
-
-/* Form Actions */
-.form-actions {
-    display: flex;
-    gap: 12px;
-    justify-content: flex-end;
-    margin-top: 24px;
-}
-
-.btn-primary {
+.pct-warning-bar {
     display: flex;
     align-items: center;
-    gap: 8px;
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 10px;
-    font-weight: 600;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: rgba(245, 158, 11, 0.1);
+    border-radius: var(--radius-md);
+    color: var(--color-warning);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+}
+
+/* ── Error Banner ── */
+.error-banner {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin: 0 var(--space-5) var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: var(--radius-md);
+    color: var(--color-danger);
+    font-size: var(--font-size-sm);
+}
+
+/* ── Form Actions ── */
+.form-actions {
+    display: flex;
+    gap: var(--space-3);
+    justify-content: flex-end;
+    padding: var(--space-4) var(--space-5);
+    background: var(--color-bg-primary);
+    border-top: 1px solid var(--color-border);
+}
+
+.btn-cancel {
+    padding: var(--space-3) var(--space-6);
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    color: var(--color-text-secondary);
+    font-weight: var(--font-weight-medium);
+    font-size: var(--font-size-sm);
     cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: all var(--transition-fast);
 }
 
-.btn-primary:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+.btn-cancel:hover {
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    border-color: var(--color-text-muted);
 }
 
-.btn-primary:disabled {
-    opacity: 0.6;
+.btn-submit {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-6);
+    background: var(--color-primary);
+    border: none;
+    border-radius: var(--radius-lg);
+    color: white;
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.btn-submit:hover:not(:disabled) {
+    background: var(--color-primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+}
+
+.btn-submit:disabled {
+    opacity: 0.5;
     cursor: not-allowed;
 }
 
-.btn-secondary {
-    background: #f3f4f6;
-    color: #374151;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 10px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s;
+/* ── Spinner ── */
+.spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
 }
 
-.btn-secondary:hover {
-    background: #e5e7eb;
+.spinner-tiny {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 1.5px solid var(--color-border);
+    border-top-color: var(--color-text-muted);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── Responsive ── */
+@media (max-width: 1100px) {
+    .content-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .map-col {
+        position: static;
+    }
+
+    .map-container {
+        height: 360px;
+    }
+}
+
+@media (max-width: 768px) {
+    .create-field-page {
+        padding: var(--space-4);
+    }
+
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .steps-bar {
+        padding: var(--space-3) var(--space-4);
+    }
+
+    .step-label {
+        display: none;
+    }
+
+    .step-line {
+        width: 40px;
+    }
+
+    .select-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .partner-row {
+        flex-wrap: wrap;
+    }
+
+    .partner-name-input {
+        flex: 1 1 100%;
+    }
+
+    .map-container {
+        height: 280px;
+    }
 }
 </style>
