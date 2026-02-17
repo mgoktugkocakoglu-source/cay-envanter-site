@@ -27,6 +27,38 @@ export class UsersService {
         });
     }
 
+    async findByFarmerIdNumber(farmerIdNumber: string): Promise<User | null> {
+        return this.userRepository.findOne({
+            where: { farmerIdNumber, deleted: false },
+        });
+    }
+
+    async findByPhone(phone: string): Promise<User | null> {
+        return this.userRepository.findOne({
+            where: { phone, deleted: false },
+        });
+    }
+
+    async searchUser(query: string, type: 'tc' | 'phone'): Promise<{
+        id: string;
+        fullName: string;
+        userType: string;
+    } | null> {
+        const user = type === 'tc'
+            ? await this.findByFarmerIdNumber(query)
+            : await this.findByPhone(query);
+
+        if (!user) {
+            return null;
+        }
+
+        return {
+            id: user.id,
+            fullName: user.fullName,
+            userType: user.userType,
+        };
+    }
+
     async findByVerificationToken(token: string): Promise<User | null> {
         return this.userRepository.findOne({
             where: { verificationToken: token, deleted: false },
@@ -55,7 +87,8 @@ export class UsersService {
             deleted: true,
             deletedAt: new Date(),
             email: `deleted_${id}@deleted.local`,
-            phone: 'DELETED',
+            phone: `deleted_${id}`,
+            farmerIdNumber: `DEL${id.substring(0, 8)}`,
             fullName: 'Deleted User',
             verificationToken: null,
             resetPasswordToken: null,

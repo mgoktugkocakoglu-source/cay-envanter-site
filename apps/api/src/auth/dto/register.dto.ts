@@ -1,15 +1,25 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
     IsEmail,
+    IsEnum,
     IsNotEmpty,
-    IsOptional,
     IsString,
     Matches,
     MaxLength,
     MinLength,
 } from 'class-validator';
+import { UserType } from '@/auth/enums';
 
 export class RegisterDto {
+    @ApiProperty({
+        example: 'land_owner',
+        description: 'User type',
+        enum: UserType,
+    })
+    @IsEnum(UserType, { message: 'Geçerli bir kullanıcı tipi seçiniz' })
+    @IsNotEmpty({ message: 'Kullanıcı tipi gereklidir' })
+    userType: UserType;
+
     @ApiProperty({ example: 'Ahmet Yılmaz', description: 'Full name of the user' })
     @IsString()
     @IsNotEmpty({ message: 'Ad Soyad gereklidir' })
@@ -59,13 +69,12 @@ export class RegisterDto {
 
     @ApiProperty({
         example: '12345678901',
-        description: 'Farmer ID number (optional)',
-        required: false,
+        description: 'TC Kimlik No (required, 11 digits)',
     })
-    @IsOptional()
     @IsString()
+    @IsNotEmpty({ message: 'TC Kimlik No gereklidir' })
     @Matches(/^[0-9]{11}$/, {
-        message: 'Çiftçi Kimlik No 11 haneli olmalıdır',
+        message: 'TC Kimlik No 11 haneli olmalıdır',
     })
-    farmerIdNumber?: string;
+    farmerIdNumber: string;
 }

@@ -13,8 +13,31 @@ const provinces = [
   { name: 'Ordu', plateCode: '52' },
 ];
 
+// User type definitions
+const userTypes = [
+  {
+    value: 'land_owner',
+    label: 'Arazi Sahibi',
+    description: 'Arazim var fakat kendim isleyemiyorum. Isci veya yarilici ariyorum.',
+    icon: '🏡',
+  },
+  {
+    value: 'worker',
+    label: 'Cay Iscisi',
+    description: 'Arazim yok, baskalarinin arazilerinde cay topluyorum veya yarilici olarak calisiyorum.',
+    icon: '👷',
+  },
+  {
+    value: 'self_farmer',
+    label: 'Kendi Isleyen',
+    description: 'Kendi arazimde cayi kendim topluyorum ve tum isleri kendim yurutuyorum.',
+    icon: '🌿',
+  },
+];
+
 // Form data
 const form = ref({
+  userType: '' as string,
   fullName: '',
   email: '',
   phone: '',
@@ -45,7 +68,7 @@ const districtMap: Record<string, string[]> = {
 };
 
 // Options for AppSelect
-const provinceOptions = computed(() => 
+const provinceOptions = computed(() =>
   provinces.map(p => ({ value: p.name, label: `${p.name} (${p.plateCode})` }))
 );
 
@@ -58,24 +81,36 @@ const districtOptions = computed(() => {
 const passwordStrength = computed(() => {
   const password = form.value.password;
   if (!password) return { level: 0, label: '' };
-  
+
   let score = 0;
   if (password.length >= 8) score++;
   if (/[a-z]/.test(password)) score++;
   if (/[A-Z]/.test(password)) score++;
   if (/[0-9]/.test(password)) score++;
   if (/[^a-zA-Z0-9]/.test(password)) score++;
-  
+
   if (score <= 2) return { level: 1, label: 'Zayıf', class: 'password-strength-weak' };
   if (score <= 3) return { level: 2, label: 'Orta', class: 'password-strength-medium' };
   return { level: 3, label: 'Güçlü', class: 'password-strength-strong' };
 });
 
+// User type selection
+function selectUserType(type: string) {
+  form.value.userType = type;
+  errors.value.userType = '';
+}
+
 // Validation
 function validateField(field: string): boolean {
   errors.value[field] = '';
-  
+
   switch (field) {
+    case 'userType':
+      if (!form.value.userType) {
+        errors.value[field] = 'Kullanıcı tipi seçiniz';
+      }
+      break;
+
     case 'fullName':
       if (!form.value.fullName) {
         errors.value[field] = 'Ad Soyad gereklidir';
@@ -85,7 +120,7 @@ function validateField(field: string): boolean {
         errors.value[field] = 'Sadece harf ve boşluk kullanabilirsiniz';
       }
       break;
-      
+
     case 'email':
       if (!form.value.email) {
         errors.value[field] = 'Email adresi gereklidir';
@@ -93,7 +128,7 @@ function validateField(field: string): boolean {
         errors.value[field] = 'Geçerli bir email adresi giriniz';
       }
       break;
-      
+
     case 'phone':
       const cleanPhone = form.value.phone.replace(/\D/g, '');
       if (!cleanPhone) {
@@ -102,19 +137,19 @@ function validateField(field: string): boolean {
         errors.value[field] = 'Geçerli bir telefon numarası giriniz (5XXXXXXXXX)';
       }
       break;
-      
+
     case 'province':
       if (!form.value.province) {
         errors.value[field] = 'Lütfen il seçiniz';
       }
       break;
-      
+
     case 'district':
       if (!form.value.district) {
         errors.value[field] = 'Lütfen ilçe seçiniz';
       }
       break;
-      
+
     case 'password':
       if (!form.value.password) {
         errors.value[field] = 'Şifre gereklidir';
@@ -128,7 +163,7 @@ function validateField(field: string): boolean {
         errors.value[field] = 'Şifre en az bir rakam içermelidir';
       }
       break;
-      
+
     case 'confirmPassword':
       if (!form.value.confirmPassword) {
         errors.value[field] = 'Şifre tekrarı gereklidir';
@@ -136,27 +171,27 @@ function validateField(field: string): boolean {
         errors.value[field] = 'Şifreler eşleşmiyor';
       }
       break;
-      
+
     case 'farmerIdNumber':
-      if (form.value.farmerIdNumber && !/^[0-9]{11}$/.test(form.value.farmerIdNumber)) {
-        errors.value[field] = 'Çiftçi Kimlik No 11 haneli olmalıdır';
+      if (!form.value.farmerIdNumber) {
+        errors.value[field] = 'TC Kimlik No gereklidir';
+      } else if (!/^[0-9]{11}$/.test(form.value.farmerIdNumber)) {
+        errors.value[field] = 'TC Kimlik No 11 haneli olmalıdır';
       }
       break;
-      
+
     case 'termsAccepted':
       if (!form.value.termsAccepted) {
         errors.value[field] = 'Kullanım koşullarını kabul etmelisiniz';
       }
       break;
   }
-  
+
   return !errors.value[field];
 }
 
 function validateAll(): boolean {
-  const fields = ['fullName', 'email', 'phone', 'province', 'district', 'password', 'confirmPassword', 'termsAccepted'];
-  if (form.value.farmerIdNumber) fields.push('farmerIdNumber');
-  
+  const fields = ['userType', 'fullName', 'email', 'phone', 'province', 'district', 'password', 'confirmPassword', 'farmerIdNumber', 'termsAccepted'];
   return fields.every(validateField);
 }
 
@@ -169,30 +204,31 @@ function onProvinceChange() {
 // Form submission
 async function handleSubmit() {
   serverError.value = '';
-  
+
   if (!validateAll()) return;
-  
+
   isLoading.value = true;
-  
+
   const cleanPhone = form.value.phone.replace(/\D/g, '');
-  
+
   const result = await api.register({
+    userType: form.value.userType,
     fullName: form.value.fullName,
     email: form.value.email,
     phone: cleanPhone,
     province: form.value.province,
     district: form.value.district,
     password: form.value.password,
-    farmerIdNumber: form.value.farmerIdNumber || undefined,
+    farmerIdNumber: form.value.farmerIdNumber,
   });
-  
+
   isLoading.value = false;
-  
+
   if (result.error) {
     serverError.value = result.error.message;
     return;
   }
-  
+
   registeredEmail.value = result.data?.email || form.value.email;
   isSuccess.value = true;
 }
@@ -203,17 +239,17 @@ const resendMessage = ref('');
 
 async function resendVerification() {
   if (resendCooldown.value > 0) return;
-  
+
   const result = await api.resendVerification(registeredEmail.value);
-  
+
   if (result.error) {
     resendMessage.value = result.error.message;
     return;
   }
-  
+
   resendMessage.value = 'Doğrulama emaili tekrar gönderildi';
   resendCooldown.value = 60;
-  
+
   const interval = setInterval(() => {
     resendCooldown.value--;
     if (resendCooldown.value <= 0) {
@@ -235,7 +271,7 @@ async function resendVerification() {
         Zaten hesabınız var mı? Giriş Yapın
       </RouterLink>
     </header>
-    
+
     <main class="auth-container">
       <div class="auth-card card card-elevated">
         <!-- Success State -->
@@ -249,11 +285,11 @@ async function resendVerification() {
             <p class="success-hint">
               Hesabınızı aktifleştirmek için lütfen e-postanızdaki linke tıklayın.
             </p>
-            
+
             <div class="resend-section">
               <p class="resend-text">E-postayı almadınız mı?</p>
-              <button 
-                class="btn btn-link" 
+              <button
+                class="btn btn-link"
                 @click="resendVerification"
                 :disabled="resendCooldown > 0"
               >
@@ -263,18 +299,58 @@ async function resendVerification() {
             </div>
           </div>
         </template>
-        
+
         <!-- Registration Form -->
         <template v-else>
           <h1 class="auth-title">Hesap Oluştur</h1>
           <p class="auth-subtitle">Çay üreticisi platformuna hoş geldiniz</p>
-          
+
           <div v-if="serverError" class="message-box message-box-error">
             <span>❌</span>
             <span>{{ serverError }}</span>
           </div>
-          
+
           <form @submit.prevent="handleSubmit" novalidate>
+            <!-- User Type Selection -->
+            <div class="form-group">
+              <label class="form-label">Kullanıcı Tipi *</label>
+              <div class="user-type-grid">
+                <button
+                  v-for="ut in userTypes"
+                  :key="ut.value"
+                  type="button"
+                  class="user-type-card"
+                  :class="{ selected: form.userType === ut.value }"
+                  @click="selectUserType(ut.value)"
+                >
+                  <span class="user-type-icon">{{ ut.icon }}</span>
+                  <span class="user-type-label">{{ ut.label }}</span>
+                  <span class="user-type-desc">{{ ut.description }}</span>
+                  <span v-if="form.userType === ut.value" class="user-type-check">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  </span>
+                </button>
+              </div>
+              <p v-if="errors.userType" class="form-error">{{ errors.userType }}</p>
+            </div>
+
+            <!-- TC Kimlik No -->
+            <div class="form-group">
+              <label class="form-label" for="farmerIdNumber">TC Kimlik No *</label>
+              <input
+                id="farmerIdNumber"
+                v-model="form.farmerIdNumber"
+                type="text"
+                class="form-input"
+                :class="{ 'has-error': errors.farmerIdNumber }"
+                placeholder="11 haneli TC kimlik numaranız"
+                maxlength="11"
+                @blur="validateField('farmerIdNumber')"
+              />
+              <p class="form-hint">TC kimlik numaranız, diger kullanıcılarla baglantı kurmak icin kullanılacaktır.</p>
+              <p v-if="errors.farmerIdNumber" class="form-error">{{ errors.farmerIdNumber }}</p>
+            </div>
+
             <!-- Full Name -->
             <div class="form-group">
               <label class="form-label" for="fullName">Ad Soyad *</label>
@@ -289,7 +365,7 @@ async function resendVerification() {
               />
               <p v-if="errors.fullName" class="form-error">{{ errors.fullName }}</p>
             </div>
-            
+
             <!-- Email -->
             <div class="form-group">
               <label class="form-label" for="email">Email Adresi *</label>
@@ -304,7 +380,7 @@ async function resendVerification() {
               />
               <p v-if="errors.email" class="form-error">{{ errors.email }}</p>
             </div>
-            
+
             <!-- Phone -->
             <div class="form-group">
               <label class="form-label" for="phone">Telefon Numarası *</label>
@@ -319,7 +395,7 @@ async function resendVerification() {
               />
               <p v-if="errors.phone" class="form-error">{{ errors.phone }}</p>
             </div>
-            
+
             <!-- Province & District -->
             <div class="form-row">
               <AppSelect
@@ -329,9 +405,10 @@ async function resendVerification() {
                 placeholder="İl Seçiniz"
                 :error="errors.province"
                 :required="true"
-                @blur="() => { onProvinceChange(); validateField('province'); }"
+                @update:modelValue="onProvinceChange"
+                @blur="() => validateField('province')"
               />
-              
+
               <AppSelect
                 v-model="form.district"
                 :options="districtOptions"
@@ -343,7 +420,7 @@ async function resendVerification() {
                 @blur="() => validateField('district')"
               />
             </div>
-            
+
             <!-- Password -->
             <div class="form-group">
               <label class="form-label" for="password">Şifre *</label>
@@ -373,7 +450,7 @@ async function resendVerification() {
               </p>
               <p v-if="errors.password" class="form-error">{{ errors.password }}</p>
             </div>
-            
+
             <!-- Confirm Password -->
             <div class="form-group">
               <label class="form-label" for="confirmPassword">Şifre Tekrarı *</label>
@@ -397,23 +474,7 @@ async function resendVerification() {
               </div>
               <p v-if="errors.confirmPassword" class="form-error">{{ errors.confirmPassword }}</p>
             </div>
-            
-            <!-- Farmer ID (Optional) -->
-            <div class="form-group">
-              <label class="form-label" for="farmerIdNumber">Çiftçi Kimlik No (Opsiyonel)</label>
-              <input
-                id="farmerIdNumber"
-                v-model="form.farmerIdNumber"
-                type="text"
-                class="form-input"
-                :class="{ 'has-error': errors.farmerIdNumber }"
-                placeholder="11 haneli kimlik numarası"
-                maxlength="11"
-                @blur="validateField('farmerIdNumber')"
-              />
-              <p v-if="errors.farmerIdNumber" class="form-error">{{ errors.farmerIdNumber }}</p>
-            </div>
-            
+
             <!-- Terms -->
             <div class="form-group">
               <div class="checkbox-wrapper">
@@ -432,14 +493,14 @@ async function resendVerification() {
               </div>
               <p v-if="errors.termsAccepted" class="form-error">{{ errors.termsAccepted }}</p>
             </div>
-            
+
             <!-- Submit -->
             <button type="submit" class="btn btn-primary btn-lg btn-block" :disabled="isLoading">
               <span v-if="isLoading" class="spinner"></span>
               {{ isLoading ? 'Kaydediliyor...' : 'Hesap Oluştur' }}
             </button>
           </form>
-          
+
           <p class="auth-footer">
             Zaten hesabınız var mı?
             <RouterLink to="/login">Giriş Yapın</RouterLink>
@@ -490,10 +551,87 @@ async function resendVerification() {
   font-size: var(--font-size-sm);
 }
 
+/* User Type Cards */
+.user-type-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.user-type-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--space-4) var(--space-3);
+  background: var(--color-bg-secondary);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  gap: var(--space-2);
+}
+
+.user-type-card:hover {
+  border-color: var(--color-primary);
+  background: var(--color-bg-tertiary);
+}
+
+.user-type-card.selected {
+  border-color: var(--color-primary);
+  background: rgba(16, 185, 129, 0.08);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.user-type-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.user-type-label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.user-type-desc {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.user-type-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.form-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-4);
+}
+
+@media (max-width: 640px) {
+  .user-type-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 480px) {
@@ -517,6 +655,4 @@ async function resendVerification() {
   cursor: pointer;
   padding: var(--space-1);
 }
-
-
 </style>

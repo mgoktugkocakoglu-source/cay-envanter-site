@@ -30,6 +30,10 @@ export interface AuthResponse {
         id: string;
         email: string;
         fullName: string;
+        userType: string;
+        phone: string;
+        province: string;
+        district: string;
     };
 }
 
@@ -57,6 +61,16 @@ export class AuthService {
             throw new ConflictException('Bu email adresi zaten kayıtlı');
         }
 
+        const existingTC = await this.usersService.findByFarmerIdNumber(registerDto.farmerIdNumber);
+        if (existingTC) {
+            throw new ConflictException('Bu TC Kimlik No zaten kayıtlı');
+        }
+
+        const existingPhone = await this.usersService.findByPhone(registerDto.phone);
+        if (existingPhone) {
+            throw new ConflictException('Bu telefon numarası zaten kayıtlı');
+        }
+
         const hashedPassword = await bcrypt.hash(registerDto.password, this.SALT_ROUNDS);
         const verificationToken = uuidv4();
         const verificationTokenExpiry = new Date();
@@ -71,7 +85,8 @@ export class AuthService {
             phone: registerDto.phone,
             province: registerDto.province,
             district: registerDto.district,
-            farmerIdNumber: registerDto.farmerIdNumber || null,
+            farmerIdNumber: registerDto.farmerIdNumber,
+            userType: registerDto.userType,
             emailVerified: false,
             verificationToken,
             verificationTokenExpiry,
@@ -181,6 +196,10 @@ export class AuthService {
                 id: user.id,
                 email: user.email,
                 fullName: user.fullName,
+                userType: user.userType,
+                phone: user.phone,
+                province: user.province,
+                district: user.district,
             },
         };
     }
@@ -447,7 +466,15 @@ export class AuthService {
         return { message: 'Çıkış yapıldı' };
     }
 
-    async getCurrentUser(userId: string): Promise<{ id: string; email: string; fullName: string } | null> {
+    async getCurrentUser(userId: string): Promise<{
+        id: string;
+        email: string;
+        fullName: string;
+        userType: string;
+        phone: string;
+        province: string;
+        district: string;
+    } | null> {
         const user = await this.usersService.findById(userId);
 
         if (!user) {
@@ -458,6 +485,10 @@ export class AuthService {
             id: user.id,
             email: user.email,
             fullName: user.fullName,
+            userType: user.userType,
+            phone: user.phone,
+            province: user.province,
+            district: user.district,
         };
     }
 

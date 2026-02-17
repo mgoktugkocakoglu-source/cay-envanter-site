@@ -118,15 +118,19 @@ const titleCharClass = computed(() => {
         <div class="create-page">
             <!-- Breadcrumb -->
             <nav class="breadcrumb">
-                <router-link to="/forum" class="bc-link">Forum</router-link>
-                <span class="bc-sep">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
-                </span>
+                <router-link to="/forum" class="bc-link">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                    Forum
+                </router-link>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
                 <span class="bc-current">Yeni Konu</span>
             </nav>
 
             <!-- Header -->
             <div class="page-header">
+                <div class="header-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </div>
                 <div>
                     <h1>Yeni Konu Olustur</h1>
                     <p class="subtitle">Sorularinizi, fikirlerinizi veya deneyimlerinizi toplulukla paylasin</p>
@@ -186,7 +190,7 @@ const titleCharClass = computed(() => {
                 <!-- Guidelines -->
                 <div class="guidelines">
                     <div class="guidelines-header">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
                         <span>Gonderi Yonergeleri</span>
                     </div>
                     <ul>
@@ -203,7 +207,7 @@ const titleCharClass = computed(() => {
                         Iptal
                     </button>
                     <button :disabled="isSubmitting" class="btn-primary" type="submit">
-                        <svg v-if="!isSubmitting" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                        <svg v-if="!isSubmitting" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                         <div v-else class="spinner-sm"></div>
                         {{ isSubmitting ? 'Olusturuluyor...' : 'Konu Olustur' }}
                     </button>
@@ -235,53 +239,62 @@ const titleCharClass = computed(() => {
 .breadcrumb {
     display: flex;
     align-items: center;
-    gap: 4px;
-    margin-bottom: 24px;
-    font-size: 14px;
+    gap: 6px;
+    margin-bottom: 20px;
+    font-size: 13px;
 }
 
 .bc-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     color: #64748b;
     text-decoration: none;
-    transition: color 0.2s;
+    transition: color 0.15s;
 }
 
-.bc-link:hover {
-    color: #10b981;
-}
+.bc-link:hover { color: #10b981; }
 
-.bc-sep {
-    color: #374151;
-    display: flex;
-    align-items: center;
-}
-
-.bc-current {
-    color: #94a3b8;
-}
+.bc-current { color: #94a3b8; font-weight: 500; }
 
 /* Header */
 .page-header {
-    margin-bottom: 28px;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 24px;
+}
+
+.header-icon {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(16, 185, 129, 0.1);
+    border-radius: 12px;
+    color: #10b981;
+    flex-shrink: 0;
 }
 
 .page-header h1 {
     margin: 0;
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 700;
     color: #f1f5f9;
+    letter-spacing: -0.5px;
 }
 
 .subtitle {
-    margin: 6px 0 0;
-    font-size: 15px;
+    margin: 4px 0 0;
+    font-size: 14px;
     color: #64748b;
 }
 
 /* Form */
 .topic-form {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 16px;
     padding: 28px;
 }
@@ -293,7 +306,7 @@ const titleCharClass = computed(() => {
 .form-label {
     display: block;
     margin-bottom: 8px;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     color: #e2e8f0;
 }
@@ -360,19 +373,19 @@ const titleCharClass = computed(() => {
 
 /* Guidelines */
 .guidelines {
-    padding: 16px 20px;
-    background: rgba(16, 185, 129, 0.04);
-    border: 1px solid rgba(16, 185, 129, 0.12);
-    border-radius: 12px;
+    padding: 14px 18px;
+    background: rgba(16, 185, 129, 0.03);
+    border: 1px solid rgba(16, 185, 129, 0.08);
+    border-radius: 10px;
     margin-bottom: 24px;
 }
 
 .guidelines-header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 10px;
-    font-size: 14px;
+    gap: 6px;
+    margin-bottom: 8px;
+    font-size: 13px;
     font-weight: 600;
     color: #10b981;
 }
@@ -384,32 +397,36 @@ const titleCharClass = computed(() => {
 
 .guidelines li {
     color: #64748b;
-    font-size: 13px;
+    font-size: 12px;
     line-height: 1.7;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
 }
 
 .guidelines li:last-child {
     margin-bottom: 0;
 }
 
+.guidelines li::marker {
+    color: rgba(16, 185, 129, 0.4);
+}
+
 /* Actions */
 .form-actions {
     display: flex;
     justify-content: flex-end;
-    gap: 12px;
+    gap: 10px;
 }
 
 .btn-primary {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 24px;
+    gap: 6px;
+    padding: 10px 22px;
     background: linear-gradient(135deg, #10b981, #059669);
     color: #fff;
     border: none;
     border-radius: 10px;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
@@ -418,6 +435,10 @@ const titleCharClass = computed(() => {
 .btn-primary:hover:not(:disabled) {
     transform: translateY(-1px);
     box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
+}
+
+.btn-primary:active:not(:disabled) {
+    transform: translateY(0);
 }
 
 .btn-primary:disabled {
@@ -429,13 +450,13 @@ const titleCharClass = computed(() => {
 .btn-secondary {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 24px;
-    background: rgba(255, 255, 255, 0.05);
+    gap: 6px;
+    padding: 10px 22px;
+    background: rgba(255, 255, 255, 0.04);
     color: #94a3b8;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 10px;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
@@ -447,8 +468,8 @@ const titleCharClass = computed(() => {
 }
 
 .spinner-sm {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
     border: 2px solid rgba(255, 255, 255, 0.3);
     border-top-color: #fff;
     border-radius: 50%;
@@ -460,27 +481,12 @@ const titleCharClass = computed(() => {
 }
 
 /* Responsive */
-@media (max-width: 768px) {
-    .create-page {
-        padding: 16px;
-    }
-
-    .page-header h1 {
-        font-size: 22px;
-    }
-
-    .topic-form {
-        padding: 20px 16px;
-    }
-
-    .form-actions {
-        flex-direction: column-reverse;
-    }
-
-    .btn-primary,
-    .btn-secondary {
-        width: 100%;
-        justify-content: center;
-    }
+@media (max-width: 640px) {
+    .create-page { padding: 16px; }
+    .header-icon { display: none; }
+    .page-header h1 { font-size: 22px; }
+    .topic-form { padding: 20px 16px; }
+    .form-actions { flex-direction: column-reverse; }
+    .btn-primary, .btn-secondary { width: 100%; justify-content: center; }
 }
 </style>

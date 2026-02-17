@@ -34,6 +34,15 @@ const firstName = computed(() => {
   return authStore.user.fullName.split(' ')[0];
 });
 
+const userTypeLabel = computed(() => {
+  const typeMap: Record<string, string> = {
+    land_owner: 'Arazi Sahibi',
+    worker: 'Cay Iscisi',
+    self_farmer: 'Kendi Isleyen',
+  };
+  return typeMap[authStore.user?.userType || ''] || '';
+});
+
 const totalArea = computed(() => {
   return fieldsStore.fields.reduce((sum, f) => {
     if (f.areaUnit === 'dekar') return sum + f.area;
@@ -166,17 +175,45 @@ onMounted(loadDashboardData);
         <header class="greeting-section">
           <div class="greeting-text">
             <h1>{{ greetingText }}<span v-if="firstName">, {{ firstName }}</span></h1>
-            <p>{{ currentYear }} sezon ozetiniz</p>
+            <div class="greeting-meta">
+              <span v-if="userTypeLabel" class="user-type-badge">{{ userTypeLabel }}</span>
+              <p>{{ currentYear }} sezon ozetiniz</p>
+            </div>
           </div>
           <div class="greeting-actions">
-            <RouterLink to="/fields/create" class="action-btn action-btn--primary">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Tarla Ekle
-            </RouterLink>
-            <RouterLink to="/harvests" class="action-btn action-btn--secondary">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-              Hasat Kaydet
-            </RouterLink>
+            <!-- Arazi Sahibi icin -->
+            <template v-if="authStore.user?.userType === 'land_owner'">
+              <RouterLink to="/fields" class="action-btn action-btn--primary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                Arazilerim
+              </RouterLink>
+              <RouterLink to="/forum" class="action-btn action-btn--secondary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                Isci Ara
+              </RouterLink>
+            </template>
+            <!-- Cay Iscisi icin -->
+            <template v-else-if="authStore.user?.userType === 'worker'">
+              <RouterLink to="/forum" class="action-btn action-btn--primary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+                Is Ara
+              </RouterLink>
+              <RouterLink to="/fields" class="action-btn action-btn--secondary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                Calistigim Araziler
+              </RouterLink>
+            </template>
+            <!-- Kendi Isleyen icin (varsayilan) -->
+            <template v-else>
+              <RouterLink to="/fields/create" class="action-btn action-btn--primary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Tarla Ekle
+              </RouterLink>
+              <RouterLink to="/harvests" class="action-btn action-btn--secondary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                Hasat Kaydet
+              </RouterLink>
+            </template>
           </div>
         </header>
 
@@ -436,6 +473,24 @@ onMounted(loadDashboardData);
 .greeting-text p {
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
+}
+
+.greeting-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.user-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
 }
 
 .greeting-actions {

@@ -13,6 +13,7 @@ import { HarvestsModule } from '@/harvests/harvests.module';
 import { PaymentsModule } from '@/payments/payments.module';
 import { ReportsModule } from '@/reports/reports.module';
 import { ForumModule } from '@/forum/forum.module';
+import { UploadsModule } from '@/uploads/uploads.module';
 
 @Module({
     imports: [
@@ -70,6 +71,7 @@ import { ForumModule } from '@/forum/forum.module';
         PaymentsModule,
         ReportsModule,
         ForumModule,
+        UploadsModule,
     ],
     providers: [
         {

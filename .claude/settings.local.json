@@ -6,7 +6,10 @@
       "Bash(npx vue-tsc:*)",
       "Bash(pnpm --filter web build:*)",
       "Bash(npm install:*)",
-      "Bash(npx vite build)"
+      "Bash(npx vite build)",
+      "Bash(dir:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx:*)"
     ]
   }
 }

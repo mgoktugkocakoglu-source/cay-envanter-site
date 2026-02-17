@@ -1,10 +1,16 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 
+export type UserType = 'land_owner' | 'worker' | 'self_farmer';
+
 interface User {
     id: string;
     email: string;
     fullName: string;
+    userType: UserType;
+    phone: string;
+    province: string;
+    district: string;
 }
 
 interface AuthTokens {

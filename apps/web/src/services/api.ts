@@ -1,4 +1,4 @@
-import { useAuthStore } from '@/stores/authStore';
+import { useAuthStore, UserType } from '@/stores/authStore';
 
 const API_BASE = '/api';
 
@@ -177,6 +177,20 @@ export interface GeoParcel {
     area: number;
 }
 
+export interface Session {
+    id: string;
+    userAgent: string;
+    ipAddress: string;
+    deviceType: string;
+    browser: string;
+    os: string;
+    location: string;
+    isActive: boolean;
+    lastActivityAt: string;
+    expiresAt: string;
+    createdAt: string;
+}
+
 export interface GeoParcelDetail {
     polygon: number[][][];
     properties: {
@@ -324,20 +338,21 @@ export interface PaginatedResponse<T> {
 export const api = {
     // Auth endpoints
     register: (data: {
+        userType: UserType;
         fullName: string;
         email: string;
         password: string;
         phone: string;
         province: string;
         district: string;
-        farmerIdNumber?: string;
+        farmerIdNumber: string;
     }) => request<{ message: string; email: string }>('/auth/register', {
         method: 'POST',
         body: JSON.stringify(data),
     }),
 
     login: (data: { email: string; password: string; rememberMe?: boolean }) =>
-        request<{ accessToken: string; refreshToken: string; user: { id: string; email: string; fullName: string } }>(
+        request<{ accessToken: string; refreshToken: string; user: { id: string; email: string; fullName: string; userType: 'land_owner' | 'worker' | 'self_farmer'; phone: string; province: string; district: string } }>(
             '/auth/login',
             { method: 'POST', body: JSON.stringify(data) }
         ),
@@ -387,6 +402,20 @@ export const api = {
         request<{ message: string }>('/auth/delete-account', {
             method: 'POST',
             body: JSON.stringify({ token }),
+        }),
+
+    // Session endpoints
+    getSessions: () =>
+        request<Session[]>('/auth/sessions'),
+
+    revokeSession: (sessionId: string) =>
+        request<{ message: string }>(`/auth/sessions/${sessionId}`, {
+            method: 'DELETE',
+        }),
+
+    revokeAllSessions: () =>
+        request<{ message: string }>('/auth/sessions', {
+            method: 'DELETE',
         }),
 
     // Geo endpoints
@@ -536,4 +565,36 @@ export const api = {
     unsubscribeFromTopic: (topicId: string) =>
         request<void>(`/forum/topics/${topicId}/unsubscribe`, { method: 'POST' }),
     getUserSubscriptions: () => request<ForumSubscription[]>('/forum/subscriptions'),
+
+    // Users
+    searchUser: (query: string, type: 'tc' | 'phone') =>
+        request<{ id: string; fullName: string; userType: string }>(
+            `/users/search?query=${encodeURIComponent(query)}&type=${type}`
+        ),
+
+    // Uploads
+    uploadImage: async (file: File): Promise<ApiResponse<{ url: string; filename: string }>> => {
+        const authStore = useAuthStore();
+        const token = authStore.accessToken;
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await fetch(`${API_BASE}/uploads/image`, {
+                method: 'POST',
+                headers: {
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: formData,
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                return { error: { message: data.message || 'Dosya yuklenemedi', statusCode: response.status } };
+            }
+            return { data };
+        } catch {
+            return { error: { message: 'Dosya yuklenirken hata olustu', statusCode: 0 } };
+        }
+    },
 };

@@ -6,7 +6,7 @@ import {
     UpdateDateColumn,
     Index,
 } from 'typeorm';
-import { Role } from '@/auth/enums';
+import { Role, UserType } from '@/auth/enums';
 
 @Entity('users')
 export class User {
@@ -23,6 +23,7 @@ export class User {
     @Column({ type: 'varchar', length: 255 })
     password: string;
 
+    @Index({ unique: true })
     @Column({ type: 'varchar', length: 20 })
     phone: string;
 
@@ -32,8 +33,16 @@ export class User {
     @Column({ type: 'varchar', length: 100 })
     district: string;
 
+    @Index({ unique: true })
     @Column({ type: 'varchar', length: 11, nullable: true })
     farmerIdNumber: string | null;
+
+    @Column({
+        type: 'enum',
+        enum: UserType,
+        default: UserType.SELF_FARMER,
+    })
+    userType: UserType;
 
     @Column({
         type: 'enum',
