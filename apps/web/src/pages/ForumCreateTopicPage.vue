@@ -122,7 +122,7 @@ const titleCharClass = computed(() => {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
                     Forum
                 </router-link>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
                 <span class="bc-current">Yeni Konu</span>
             </nav>
 
@@ -190,7 +190,7 @@ const titleCharClass = computed(() => {
                 <!-- Guidelines -->
                 <div class="guidelines">
                     <div class="guidelines-header">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
                         <span>Gonderi Yonergeleri</span>
                     </div>
                     <ul>
@@ -248,14 +248,14 @@ const titleCharClass = computed(() => {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    color: #64748b;
+    color: var(--color-text-muted);
     text-decoration: none;
     transition: color 0.15s;
 }
 
-.bc-link:hover { color: #10b981; }
+.bc-link:hover { color: var(--color-primary); }
 
-.bc-current { color: #94a3b8; font-weight: 500; }
+.bc-current { color: var(--color-text-secondary); font-weight: 500; }
 
 /* Header */
 .page-header {
@@ -273,7 +273,7 @@ const titleCharClass = computed(() => {
     justify-content: center;
     background: rgba(16, 185, 129, 0.1);
     border-radius: 12px;
-    color: #10b981;
+    color: var(--color-primary);
     flex-shrink: 0;
 }
 
@@ -281,20 +281,20 @@ const titleCharClass = computed(() => {
     margin: 0;
     font-size: 24px;
     font-weight: 700;
-    color: #f1f5f9;
+    color: var(--color-text-primary);
     letter-spacing: -0.5px;
 }
 
 .subtitle {
     margin: 4px 0 0;
     font-size: 14px;
-    color: #64748b;
+    color: var(--color-text-muted);
 }
 
 /* Form */
 .topic-form {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--color-card-bg);
+    border: 1px solid var(--color-card-border);
     border-radius: 16px;
     padding: 28px;
 }
@@ -308,20 +308,20 @@ const titleCharClass = computed(() => {
     margin-bottom: 8px;
     font-size: 13px;
     font-weight: 600;
-    color: #e2e8f0;
+    color: var(--color-text-primary);
 }
 
 .required {
-    color: #ef4444;
+    color: var(--color-danger);
 }
 
 .form-input {
     width: 100%;
     padding: 12px 16px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--color-input-bg);
+    border: 1px solid var(--color-input-border);
     border-radius: 10px;
-    color: #fff;
+    color: var(--color-text-primary);
     font-size: 15px;
     font-family: inherit;
     transition: all 0.2s;
@@ -329,16 +329,16 @@ const titleCharClass = computed(() => {
 
 .form-input:focus {
     outline: none;
-    border-color: #10b981;
-    background: rgba(0, 0, 0, 0.4);
+    border-color: var(--color-primary);
+    background: var(--color-input-bg-focus);
 }
 
 .form-input.error {
-    border-color: #ef4444;
+    border-color: var(--color-danger);
 }
 
 .form-input::placeholder {
-    color: #4a5568;
+    color: var(--color-text-muted);
 }
 
 .input-meta {
@@ -351,23 +351,23 @@ const titleCharClass = computed(() => {
 
 .error-message {
     margin: 0;
-    color: #ef4444;
+    color: var(--color-danger);
     font-size: 13px;
 }
 
 .char-count {
     margin: 0;
     font-size: 12px;
-    color: #4a5568;
+    color: var(--color-text-muted);
     margin-left: auto;
 }
 
 .char-count.warn {
-    color: #f59e0b;
+    color: var(--color-warning);
 }
 
 .char-count.over {
-    color: #ef4444;
+    color: var(--color-danger);
     font-weight: 600;
 }
 
@@ -387,7 +387,7 @@ const titleCharClass = computed(() => {
     margin-bottom: 8px;
     font-size: 13px;
     font-weight: 600;
-    color: #10b981;
+    color: var(--color-primary);
 }
 
 .guidelines ul {
@@ -396,7 +396,7 @@ const titleCharClass = computed(() => {
 }
 
 .guidelines li {
-    color: #64748b;
+    color: var(--color-text-muted);
     font-size: 12px;
     line-height: 1.7;
     margin-bottom: 3px;
@@ -422,7 +422,7 @@ const titleCharClass = computed(() => {
     align-items: center;
     gap: 6px;
     padding: 10px 22px;
-    background: linear-gradient(135deg, #10b981, #059669);
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
     color: #fff;
     border: none;
     border-radius: 10px;
@@ -452,9 +452,9 @@ const titleCharClass = computed(() => {
     align-items: center;
     gap: 6px;
     padding: 10px 22px;
-    background: rgba(255, 255, 255, 0.04);
-    color: #94a3b8;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--color-card-bg-hover);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-overlay-lighter);
     border-radius: 10px;
     font-size: 14px;
     font-weight: 500;
@@ -463,8 +463,8 @@ const titleCharClass = computed(() => {
 }
 
 .btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #e2e8f0;
+    background: var(--color-overlay-lighter);
+    color: var(--color-text-primary);
 }
 
 .spinner-sm {

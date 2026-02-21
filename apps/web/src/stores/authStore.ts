@@ -11,6 +11,7 @@ interface User {
     phone: string;
     province: string;
     district: string;
+    avatarUrl?: string | null;
 }
 
 interface AuthTokens {

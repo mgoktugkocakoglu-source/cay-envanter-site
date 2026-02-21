@@ -5,8 +5,10 @@ import { useAuthStore } from '@/stores/authStore';
 import { useFieldsStore } from '@/stores/fieldsStore';
 import { useHarvestsStore } from '@/stores/harvestsStore';
 import { usePaymentsStore } from '@/stores/paymentsStore';
+import { useWeather } from '@/composables/useWeather';
 import { api, type YearlySummary, type MonthlyData, type FieldProfitability } from '@/services/api';
 import AppLayout from '@/layouts/AppLayout.vue';
+import WeatherWidget from '@/components/ui/WeatherWidget.vue';
 
 const authStore = useAuthStore();
 const fieldsStore = useFieldsStore();
@@ -20,6 +22,33 @@ const monthlyData = ref<MonthlyData[]>([]);
 const fieldProfitability = ref<FieldProfitability[]>([]);
 
 const currentYear = new Date().getFullYear();
+
+// ── Weather Widget ──
+// Compute centroid from first field's polygon, fallback to Rize (tea capital)
+const RIZE_LAT = 41.0208;
+const RIZE_LON = 40.5219;
+
+const weatherLat = computed(() => {
+  const field = fieldsStore.fields[0];
+  if (!field?.coordinates?.[0]?.length) return RIZE_LAT;
+  const ring = field.coordinates[0];
+  return ring.reduce((sum, coord) => sum + coord[1], 0) / ring.length;
+});
+
+const weatherLon = computed(() => {
+  const field = fieldsStore.fields[0];
+  if (!field?.coordinates?.[0]?.length) return RIZE_LON;
+  const ring = field.coordinates[0];
+  return ring.reduce((sum, coord) => sum + coord[0], 0) / ring.length;
+});
+
+const weatherLocationName = computed(() => {
+  const field = fieldsStore.fields[0];
+  if (!field) return 'Rize';
+  return field.province || 'Konum';
+});
+
+const { currentWeather, hourlyForecast, alerts: weatherAlerts, isLoading: weatherLoading, error: weatherError, lastUpdated: weatherLastUpdated, fetchWeather } = useWeather(weatherLat, weatherLon);
 
 const greetingText = computed(() => {
   const hour = new Date().getHours();
@@ -216,6 +245,20 @@ onMounted(loadDashboardData);
             </template>
           </div>
         </header>
+
+        <!-- Weather Widget -->
+        <section class="weather-section">
+          <WeatherWidget
+            :current="currentWeather"
+            :hourly="hourlyForecast"
+            :alerts="weatherAlerts"
+            :is-loading="weatherLoading"
+            :error="weatherError"
+            :last-updated="weatherLastUpdated"
+            :location-name="weatherLocationName"
+            @retry="fetchWeather"
+          />
+        </section>
 
         <!-- Stats Cards -->
         <section class="stats-grid">
@@ -452,6 +495,11 @@ onMounted(loadDashboardData);
   max-width: 1200px;
   margin: 0 auto;
   padding: var(--space-6) var(--space-6) var(--space-12);
+}
+
+/* ── Weather ── */
+.weather-section {
+  margin-bottom: var(--space-6);
 }
 
 /* ── Greeting ── */

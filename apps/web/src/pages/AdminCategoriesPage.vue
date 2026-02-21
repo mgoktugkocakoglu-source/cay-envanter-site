@@ -347,20 +347,20 @@ function moveCategory(category: typeof forumStore.categories[0], direction: 'up'
 }
 
 .breadcrumb-link {
-    color: #10b981;
+    color: var(--color-primary);
     text-decoration: none;
 }
 
 .breadcrumb-link:hover {
-    color: #059669;
+    color: var(--color-primary-hover);
 }
 
 .breadcrumb-separator {
-    color: #64748b;
+    color: var(--color-text-muted);
 }
 
 .breadcrumb-current {
-    color: #94a3b8;
+    color: var(--color-text-secondary);
 }
 
 .page-header h1 {
@@ -375,7 +375,7 @@ function moveCategory(category: typeof forumStore.categories[0], direction: 'up'
     align-items: center;
     gap: 8px;
     padding: 12px 20px;
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
     color: white;
     border: none;
     border-radius: 10px;
@@ -402,7 +402,7 @@ function moveCategory(category: typeof forumStore.categories[0], direction: 'up'
     width: 40px;
     height: 40px;
     border: 4px solid rgba(255, 255, 255, 0.1);
-    border-top-color: #10b981;
+    border-top-color: var(--color-primary);
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
@@ -413,7 +413,7 @@ function moveCategory(category: typeof forumStore.categories[0], direction: 'up'
 
 .loading-state p {
     margin-top: 16px;
-    color: #94a3b8;
+    color: var(--color-text-secondary);
 }
 
 /* Categories List */
@@ -468,7 +468,7 @@ function moveCategory(category: typeof forumStore.categories[0], direction: 'up'
 .category-info p {
     margin: 6px 0 0;
     font-size: 14px;
-    color: #64748b;
+    color: var(--color-text-muted);
 }
 
 .category-meta {
@@ -480,7 +480,7 @@ function moveCategory(category: typeof forumStore.categories[0], direction: 'up'
 
 .meta-item {
     font-size: 13px;
-    color: #94a3b8;
+    color: var(--color-text-secondary);
 }
 
 .status-badge {
@@ -492,12 +492,12 @@ function moveCategory(category: typeof forumStore.categories[0], direction: 'up'
 
 .status-badge.active {
     background: rgba(16, 185, 129, 0.2);
-    color: #10b981;
+    color: var(--color-primary);
 }
 
 .status-badge.inactive {
     background: rgba(148, 163, 184, 0.2);
-    color: #94a3b8;
+    color: var(--color-text-secondary);
 }
 
 .category-actions {
@@ -578,7 +578,7 @@ function moveCategory(category: typeof forumStore.categories[0], direction: 'up'
 
 .empty-state p {
     margin: 0 0 20px;
-    color: #64748b;
+    color: var(--color-text-muted);
     font-size: 16px;
 }
 
@@ -598,7 +598,7 @@ function moveCategory(category: typeof forumStore.categories[0], direction: 'up'
 }
 
 .modal {
-    background: #1e293b;
+    background: var(--color-bg-secondary);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 16px;
     width: 100%;
@@ -624,7 +624,7 @@ function moveCategory(category: typeof forumStore.categories[0], direction: 'up'
 .close-btn {
     background: none;
     border: none;
-    color: #64748b;
+    color: var(--color-text-muted);
     font-size: 20px;
     cursor: pointer;
 }
@@ -646,7 +646,7 @@ function moveCategory(category: typeof forumStore.categories[0], direction: 'up'
     margin-bottom: 8px;
     font-size: 14px;
     font-weight: 500;
-    color: #e2e8f0;
+    color: var(--color-text-primary);
 }
 
 .form-input,
@@ -664,12 +664,12 @@ function moveCategory(category: typeof forumStore.categories[0], direction: 'up'
 .form-input:focus,
 .form-textarea:focus {
     outline: none;
-    border-color: #10b981;
+    border-color: var(--color-primary);
 }
 
 .form-input::placeholder,
 .form-textarea::placeholder {
-    color: #64748b;
+    color: var(--color-text-muted);
 }
 
 .form-textarea {
@@ -699,7 +699,7 @@ function moveCategory(category: typeof forumStore.categories[0], direction: 'up'
 }
 
 .icon-option.selected {
-    border-color: #10b981;
+    border-color: var(--color-primary);
     background: rgba(16, 185, 129, 0.2);
 }
 
@@ -710,7 +710,7 @@ function moveCategory(category: typeof forumStore.categories[0], direction: 'up'
     gap: 12px;
     cursor: pointer;
     font-size: 14px;
-    color: #e2e8f0;
+    color: var(--color-text-primary);
 }
 
 .toggle-input {
@@ -739,7 +739,7 @@ function moveCategory(category: typeof forumStore.categories[0], direction: 'up'
 }
 
 .toggle-input:checked + .toggle-switch {
-    background: #10b981;
+    background: var(--color-primary);
 }
 
 .toggle-input:checked + .toggle-switch::after {
@@ -770,7 +770,7 @@ function moveCategory(category: typeof forumStore.categories[0], direction: 'up'
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
     color: white;
 }
 

@@ -21,10 +21,7 @@ export class ReactionStatsDto {
     likeCount: number;
 
     @ApiProperty()
-    helpfulCount: number;
-
-    @ApiProperty()
-    thanksCount: number;
+    dislikeCount: number;
 
     @ApiProperty({ description: 'Current user reactions', type: [String] })
     userReactions: ReactionType[];

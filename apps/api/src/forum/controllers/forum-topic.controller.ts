@@ -62,8 +62,7 @@ export class ForumTopicController {
         const reactionStats = await this.reactionService.getStats(ReactionTargetType.TOPIC, topic.id, userId);
         enrichedTopic.reactions = {
             like: reactionStats.likeCount,
-            helpful: reactionStats.helpfulCount,
-            thanks: reactionStats.thanksCount,
+            dislike: reactionStats.dislikeCount,
             userReaction: reactionStats.userReactions.length > 0 ? reactionStats.userReactions[0] : null,
         };
 

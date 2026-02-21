@@ -404,8 +404,7 @@ export const useForumStore = defineStore('forum', () => {
     function mapReactionStats(stats: any): ForumReactionStats {
         return {
             like: stats.likeCount ?? stats.like ?? 0,
-            helpful: stats.helpfulCount ?? stats.helpful ?? 0,
-            thanks: stats.thanksCount ?? stats.thanks ?? 0,
+            dislike: stats.dislikeCount ?? stats.dislike ?? 0,
             userReaction: Array.isArray(stats.userReactions) && stats.userReactions.length > 0
                 ? stats.userReactions[0]
                 : (stats.userReaction ?? null),

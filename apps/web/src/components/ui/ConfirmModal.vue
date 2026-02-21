@@ -106,24 +106,24 @@ function handleCancel() {
 
 .confirm-icon--danger {
     background: rgba(239, 68, 68, 0.12);
-    color: #ef4444;
+    color: var(--color-danger);
 }
 
 .confirm-icon--warning {
     background: rgba(251, 191, 36, 0.12);
-    color: #fbbf24;
+    color: var(--color-warning);
 }
 
 .confirm-icon--info {
     background: rgba(59, 130, 246, 0.12);
-    color: #3b82f6;
+    color: var(--color-info);
 }
 
 .confirm-message {
     margin: 0;
     font-size: 15px;
     line-height: 1.6;
-    color: var(--color-text-secondary, #94a3b8);
+    color: var(--color-text-secondary);
 }
 
 .confirm-btn {
@@ -137,43 +137,43 @@ function handleCancel() {
 }
 
 .confirm-btn--cancel {
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--color-text-secondary, #94a3b8);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
 }
 
 .confirm-btn--cancel:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--color-text-primary, #e2e8f0);
+    background: var(--color-bg-elevated);
+    color: var(--color-text-primary);
 }
 
 .confirm-btn--danger {
-    background: #ef4444;
+    background: var(--color-danger);
     color: #fff;
 }
 
 .confirm-btn--danger:hover {
-    background: #dc2626;
+    opacity: 0.9;
     box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
 .confirm-btn--warning {
-    background: #f59e0b;
+    background: var(--color-warning);
     color: #fff;
 }
 
 .confirm-btn--warning:hover {
-    background: #d97706;
+    opacity: 0.9;
     box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
 }
 
 .confirm-btn--info {
-    background: #3b82f6;
+    background: var(--color-info);
     color: #fff;
 }
 
 .confirm-btn--info:hover {
-    background: #2563eb;
+    opacity: 0.9;
     box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 </style>

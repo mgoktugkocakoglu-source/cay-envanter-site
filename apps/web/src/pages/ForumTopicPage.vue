@@ -7,7 +7,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import RichTextEditor from '@/components/forum/RichTextEditor.vue';
 import RichContent from '@/components/forum/RichContent.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
-import type { ReactionType } from '@/services/api';
+
 
 const route = useRoute();
 const router = useRouter();
@@ -33,12 +33,12 @@ const isTopicAuthor = computed(() => {
     return forumStore.currentTopic?.authorId === authStore.user?.id;
 });
 
-async function handleReact(type: ReactionType) {
+async function handleReact(type: 'like' | 'dislike') {
     if (!authStore.isAuthenticated || !forumStore.currentTopic) return;
     await forumStore.toggleReaction('topic', forumStore.currentTopic.id, type);
 }
 
-async function handleReplyReact(replyId: string, type: ReactionType) {
+async function handleReplyReact(replyId: string, type: 'like' | 'dislike') {
     if (!authStore.isAuthenticated) return;
     await forumStore.toggleReaction('reply', replyId, type);
 }
@@ -131,16 +131,6 @@ function formatDate(dateString: string) {
     return date.toLocaleDateString('tr-TR', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function getReactionIcon(type: ReactionType) {
-    const icons = { like: '👍', helpful: '💡', thanks: '🙏' };
-    return icons[type];
-}
-
-function getReactionLabel(type: ReactionType) {
-    const labels = { like: 'Begeni', helpful: 'Yardimci', thanks: 'Tesekkur' };
-    return labels[type];
-}
-
 function isReplyAuthor(authorId: string) {
     return authorId === authStore.user?.id;
 }
@@ -168,13 +158,13 @@ function getInitials(name?: string) {
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
                         Forum
                     </router-link>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
                     <router-link
                         v-if="forumStore.currentTopic.category"
                         :to="`/forum/category/${forumStore.currentTopic.category.slug}`"
                         class="bc-link"
                     >{{ forumStore.currentTopic.category.name }}</router-link>
-                    <svg v-if="forumStore.currentTopic.category" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                    <svg v-if="forumStore.currentTopic.category" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
                     <span class="bc-current">{{ forumStore.currentTopic.title }}</span>
                 </nav>
 
@@ -228,17 +218,26 @@ function getInitials(name?: string) {
                     <div class="topic-footer">
                         <div class="reactions">
                             <button
-                                v-for="type in (['like', 'helpful', 'thanks'] as ReactionType[])"
-                                :key="type"
-                                :class="{ active: forumStore.currentTopic.reactions?.userReaction === type }"
+                                :class="{ active: forumStore.currentTopic.reactions?.userReaction === 'like' }"
                                 :disabled="!authStore.isAuthenticated"
                                 class="react-btn"
-                                :title="getReactionLabel(type)"
-                                @click="handleReact(type)"
+                                title="Begen"
+                                @click="handleReact('like')"
                             >
-                                <span class="react-emoji">{{ getReactionIcon(type) }}</span>
-                                <span class="react-label">{{ getReactionLabel(type) }}</span>
-                                <span v-if="(forumStore.currentTopic.reactions?.[type] || 0) > 0" class="react-count">{{ forumStore.currentTopic.reactions?.[type] }}</span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" :fill="forumStore.currentTopic.reactions?.userReaction === 'like' ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+                                <span class="react-label">Begen</span>
+                                <span v-if="(forumStore.currentTopic.reactions?.like || 0) > 0" class="react-count">{{ forumStore.currentTopic.reactions?.like }}</span>
+                            </button>
+                            <button
+                                :class="{ active: forumStore.currentTopic.reactions?.userReaction === 'dislike' }"
+                                :disabled="!authStore.isAuthenticated"
+                                class="react-btn react-btn-dislike"
+                                title="Begenme"
+                                @click="handleReact('dislike')"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" :fill="forumStore.currentTopic.reactions?.userReaction === 'dislike' ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>
+                                <span class="react-label">Begenme</span>
+                                <span v-if="(forumStore.currentTopic.reactions?.dislike || 0) > 0" class="react-count">{{ forumStore.currentTopic.reactions?.dislike }}</span>
                             </button>
                         </div>
                         <button
@@ -316,16 +315,24 @@ function getInitials(name?: string) {
                         <div class="reply-foot">
                             <div class="reactions reactions-sm">
                                 <button
-                                    v-for="type in (['like', 'helpful', 'thanks'] as ReactionType[])"
-                                    :key="type"
-                                    :class="{ active: reply.reactions?.userReaction === type }"
+                                    :class="{ active: reply.reactions?.userReaction === 'like' }"
                                     :disabled="!authStore.isAuthenticated"
                                     class="react-btn react-btn-sm"
-                                    :title="getReactionLabel(type)"
-                                    @click="handleReplyReact(reply.id, type)"
+                                    title="Begen"
+                                    @click="handleReplyReact(reply.id, 'like')"
                                 >
-                                    <span>{{ getReactionIcon(type) }}</span>
-                                    <span v-if="(reply.reactions?.[type] || 0) > 0" class="react-count">{{ reply.reactions?.[type] }}</span>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" :fill="reply.reactions?.userReaction === 'like' ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+                                    <span v-if="(reply.reactions?.like || 0) > 0" class="react-count">{{ reply.reactions?.like }}</span>
+                                </button>
+                                <button
+                                    :class="{ active: reply.reactions?.userReaction === 'dislike' }"
+                                    :disabled="!authStore.isAuthenticated"
+                                    class="react-btn react-btn-sm react-btn-dislike"
+                                    title="Begenme"
+                                    @click="handleReplyReact(reply.id, 'dislike')"
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" :fill="reply.reactions?.userReaction === 'dislike' ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>
+                                    <span v-if="(reply.reactions?.dislike || 0) > 0" class="react-count">{{ reply.reactions?.dislike }}</span>
                                 </button>
                             </div>
                         </div>
@@ -360,15 +367,24 @@ function getInitials(name?: string) {
                                 <div class="reply-foot">
                                     <div class="reactions reactions-sm">
                                         <button
-                                            v-for="type in (['like', 'helpful', 'thanks'] as ReactionType[])"
-                                            :key="type"
-                                            :class="{ active: child.reactions?.userReaction === type }"
+                                            :class="{ active: child.reactions?.userReaction === 'like' }"
                                             :disabled="!authStore.isAuthenticated"
                                             class="react-btn react-btn-sm"
-                                            @click="handleReplyReact(child.id, type)"
+                                            title="Begen"
+                                            @click="handleReplyReact(child.id, 'like')"
                                         >
-                                            <span>{{ getReactionIcon(type) }}</span>
-                                            <span v-if="(child.reactions?.[type] || 0) > 0" class="react-count">{{ child.reactions?.[type] }}</span>
+                                            <svg width="14" height="14" viewBox="0 0 24 24" :fill="child.reactions?.userReaction === 'like' ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+                                            <span v-if="(child.reactions?.like || 0) > 0" class="react-count">{{ child.reactions?.like }}</span>
+                                        </button>
+                                        <button
+                                            :class="{ active: child.reactions?.userReaction === 'dislike' }"
+                                            :disabled="!authStore.isAuthenticated"
+                                            class="react-btn react-btn-sm react-btn-dislike"
+                                            title="Begenme"
+                                            @click="handleReplyReact(child.id, 'dislike')"
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" :fill="child.reactions?.userReaction === 'dislike' ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>
+                                            <span v-if="(child.reactions?.dislike || 0) > 0" class="react-count">{{ child.reactions?.dislike }}</span>
                                         </button>
                                     </div>
                                 </div>
@@ -377,7 +393,7 @@ function getInitials(name?: string) {
                     </div>
 
                     <div v-if="forumStore.replies.length === 0 && !forumStore.loading" class="state-box state-sm">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4a5568" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
                         <p>Henuz cevap yok. Ilk cevaplayan siz olun!</p>
                     </div>
                 </section>
@@ -454,16 +470,16 @@ function getInitials(name?: string) {
 
 /* State */
 .state-box { display: flex; flex-direction: column; align-items: center; padding: 60px 20px; text-align: center; }
-.state-box p { margin: 8px 0 0; color: #64748b; font-size: 14px; }
+.state-box p { margin: 8px 0 0; color: var(--color-text-muted); font-size: 14px; }
 .state-sm { padding: 40px 20px; }
 
 .error-icon {
     width: 48px; height: 48px;
     display: flex; align-items: center; justify-content: center;
-    background: rgba(239, 68, 68, 0.1); border-radius: 14px; color: #ef4444;
+    background: rgba(239, 68, 68, 0.1); border-radius: 14px; color: var(--color-danger);
 }
 
-.spinner { width: 36px; height: 36px; border: 3px solid rgba(255, 255, 255, 0.06); border-top-color: #10b981; border-radius: 50%; animation: spin 0.7s linear infinite; }
+.spinner { width: 36px; height: 36px; border: 3px solid var(--color-spinner-track); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 @keyframes fadeInUp {
@@ -473,25 +489,25 @@ function getInitials(name?: string) {
 
 .btn-ghost {
     margin-top: 16px; padding: 7px 16px;
-    background: rgba(255, 255, 255, 0.05); color: #e2e8f0;
-    border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 7px;
+    background: var(--color-overlay-light); color: var(--color-text-primary);
+    border: 1px solid var(--color-overlay-lighter); border-radius: 7px;
     font-size: 13px; cursor: pointer; transition: all 0.15s;
 }
-.btn-ghost:hover { background: rgba(255, 255, 255, 0.08); }
+.btn-ghost:hover { background: var(--color-overlay-lighter); }
 
 /* Breadcrumb */
 .breadcrumb { display: flex; align-items: center; gap: 6px; margin-bottom: 20px; font-size: 13px; flex-wrap: wrap; }
 .bc-link {
     display: inline-flex; align-items: center; gap: 4px;
-    color: #64748b; text-decoration: none; transition: color 0.15s;
+    color: var(--color-text-muted); text-decoration: none; transition: color 0.15s;
 }
-.bc-link:hover { color: #10b981; }
-.bc-current { color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; font-weight: 500; }
+.bc-link:hover { color: var(--color-primary); }
+.bc-current { color: var(--color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; font-weight: 500; }
 
 /* Topic Card */
 .topic-card {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--color-card-bg);
+    border: 1px solid var(--color-card-border);
     border-radius: 16px;
     padding: 24px;
     margin-bottom: 28px;
@@ -503,16 +519,16 @@ function getInitials(name?: string) {
     padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
     text-transform: uppercase; letter-spacing: 0.3px;
 }
-.tag-pinned { background: rgba(251, 191, 36, 0.12); color: #fbbf24; }
-.tag-solved { background: rgba(16, 185, 129, 0.12); color: #10b981; }
-.tag-locked { background: rgba(100, 116, 139, 0.12); color: #94a3b8; }
+.tag-pinned { background: rgba(251, 191, 36, 0.12); color: var(--color-warning); }
+.tag-solved { background: rgba(16, 185, 129, 0.12); color: var(--color-primary); }
+.tag-locked { background: rgba(100, 116, 139, 0.12); color: var(--color-text-secondary); }
 
-.topic-title { margin: 0 0 16px; font-size: 24px; font-weight: 700; color: #f1f5f9; line-height: 1.3; }
+.topic-title { margin: 0 0 16px; font-size: 24px; font-weight: 700; color: var(--color-text-primary); line-height: 1.3; }
 
 /* Author Row */
 .author-row {
     display: flex; justify-content: space-between; align-items: center;
-    padding-bottom: 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 16px; border-bottom: 1px solid var(--color-divider);
     margin-bottom: 20px; flex-wrap: wrap; gap: 10px;
 }
 
@@ -520,18 +536,18 @@ function getInitials(name?: string) {
 
 .avatar {
     width: 36px; height: 36px; border-radius: 10px;
-    background: linear-gradient(135deg, #10b981, #059669);
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
     display: flex; align-items: center; justify-content: center;
     font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
 }
 .avatar-sm { width: 30px; height: 30px; font-size: 10px; border-radius: 8px; }
 .avatar-xs { width: 26px; height: 26px; font-size: 9px; border-radius: 7px; }
 
-.author-name { display: block; color: #e2e8f0; font-weight: 600; font-size: 13px; }
-.author-date { display: block; color: #4a5568; font-size: 12px; margin-top: 1px; }
+.author-name { display: block; color: var(--color-text-primary); font-weight: 600; font-size: 13px; }
+.author-date { display: block; color: var(--color-text-muted); font-size: 12px; margin-top: 1px; }
 
 .stats-row { display: flex; gap: 12px; }
-.stat-item { display: flex; align-items: center; gap: 4px; color: #4a5568; font-size: 12px; }
+.stat-item { display: flex; align-items: center; gap: 4px; color: var(--color-text-muted); font-size: 12px; }
 .stat-item svg { opacity: 0.6; }
 
 /* Topic Body */
@@ -540,7 +556,7 @@ function getInitials(name?: string) {
 /* Footer */
 .topic-footer {
     display: flex; justify-content: space-between; align-items: center;
-    padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 16px; border-top: 1px solid var(--color-divider);
     flex-wrap: wrap; gap: 10px;
 }
 
@@ -548,54 +564,55 @@ function getInitials(name?: string) {
 
 .react-btn {
     display: inline-flex; align-items: center; gap: 5px;
-    padding: 6px 14px; background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 20px; color: #94a3b8; font-size: 13px;
+    padding: 6px 14px; background: var(--color-subtle-bg);
+    border: 1px solid var(--color-card-border);
+    border-radius: 20px; color: var(--color-text-secondary); font-size: 13px;
     cursor: pointer; transition: all 0.2s; white-space: nowrap;
 }
-.react-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.12); transform: translateY(-1px); }
+.react-btn:hover:not(:disabled) { background: var(--color-overlay-light); border-color: var(--color-card-border-hover); transform: translateY(-1px); }
 .react-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.react-btn.active { background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); color: #10b981; }
+.react-btn.active { background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); color: var(--color-primary); }
+.react-btn-dislike.active { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); color: #ef4444; }
 
 .react-btn-sm { padding: 3px 10px; font-size: 12px; gap: 4px; border-radius: 16px; }
 
-.react-emoji { font-size: 14px; }
 .react-label { font-size: 12px; }
-.react-count { font-weight: 700; font-size: 11px; background: rgba(255, 255, 255, 0.06); padding: 0 5px; border-radius: 8px; }
+.react-count { font-weight: 700; font-size: 11px; background: var(--color-overlay-light); padding: 0 5px; border-radius: 8px; }
 .react-btn.active .react-count { background: rgba(16, 185, 129, 0.15); }
+.react-btn-dislike.active .react-count { background: rgba(239, 68, 68, 0.15); }
 
 .subscribe-btn {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 6px 14px;
-    background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 8px; color: #64748b; cursor: pointer; transition: all 0.15s;
+    background: var(--color-card-bg-hover); border: 1px solid var(--color-card-border);
+    border-radius: 8px; color: var(--color-text-muted); cursor: pointer; transition: all 0.15s;
     font-size: 12px; font-weight: 500;
 }
-.subscribe-btn:hover { background: rgba(255, 255, 255, 0.08); color: #e2e8f0; }
-.subscribe-btn.active { background: rgba(16, 185, 129, 0.12); border-color: rgba(16, 185, 129, 0.25); color: #10b981; }
+.subscribe-btn:hover { background: var(--color-overlay-lighter); color: var(--color-text-primary); }
+.subscribe-btn.active { background: rgba(16, 185, 129, 0.12); border-color: rgba(16, 185, 129, 0.25); color: var(--color-primary); }
 .subscribe-text { }
 
 /* Admin Controls */
 .admin-controls {
     display: flex; align-items: center; gap: 6px; padding-top: 14px; margin-top: 14px;
-    border-top: 1px solid rgba(255, 255, 255, 0.04); flex-wrap: wrap;
+    border-top: 1px solid var(--color-divider); flex-wrap: wrap;
 }
 
 .admin-label {
     display: inline-flex; align-items: center; gap: 4px;
-    font-size: 10px; font-weight: 700; color: #4a5568;
+    font-size: 10px; font-weight: 700; color: var(--color-text-muted);
     text-transform: uppercase; letter-spacing: 0.5px;
     margin-right: 4px;
 }
 
 .admin-controls button {
     display: inline-flex; align-items: center; gap: 4px;
-    padding: 5px 12px; background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 6px;
-    color: #64748b; font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.15s;
+    padding: 5px 12px; background: var(--color-subtle-bg);
+    border: 1px solid var(--color-card-border); border-radius: 6px;
+    color: var(--color-text-muted); font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.15s;
 }
-.admin-controls button:hover { background: rgba(255, 255, 255, 0.06); color: #e2e8f0; }
-.admin-controls button.btn-active { background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.15); color: #10b981; }
+.admin-controls button:hover { background: var(--color-overlay-light); color: var(--color-text-primary); }
+.admin-controls button.btn-active { background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.15); color: var(--color-primary); }
 
 /* Replies Section */
 .replies-section { margin-bottom: 24px; }
@@ -603,39 +620,39 @@ function getInitials(name?: string) {
 .replies-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
 .replies-header h2 {
     display: inline-flex; align-items: center; gap: 8px;
-    margin: 0; font-size: 18px; font-weight: 700; color: #f1f5f9;
+    margin: 0; font-size: 18px; font-weight: 700; color: var(--color-text-primary);
 }
 
 .reply-badge {
     display: inline-flex; align-items: center; justify-content: center;
     min-width: 22px; height: 22px; padding: 0 6px;
-    background: rgba(16, 185, 129, 0.12); color: #10b981;
+    background: rgba(16, 185, 129, 0.12); color: var(--color-primary);
     border-radius: 10px; font-size: 12px; font-weight: 700;
 }
 
 /* Reply Card */
 .reply-card {
     position: relative;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--color-card-bg);
+    border: 1px solid var(--color-card-border);
     border-radius: 12px;
     padding: 18px 20px;
     margin-bottom: 8px;
     transition: all 0.2s;
     animation: fadeInUp 0.3s ease both;
 }
-.reply-card:hover { border-color: rgba(255, 255, 255, 0.1); }
+.reply-card:hover { border-color: var(--color-card-border-hover); }
 .reply-card.solution { border-color: rgba(16, 185, 129, 0.25); background: rgba(16, 185, 129, 0.02); }
 
 .solution-tag {
     position: absolute; top: 12px; right: 14px;
     display: inline-flex; align-items: center; gap: 4px;
     padding: 2px 10px; background: rgba(16, 185, 129, 0.15);
-    color: #10b981; border-radius: 5px;
+    color: var(--color-primary); border-radius: 5px;
     font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
 }
 
-.reply-nested { background: rgba(255, 255, 255, 0.01); border-color: rgba(255, 255, 255, 0.04); padding: 14px 16px; margin-bottom: 6px; }
+.reply-nested { background: transparent; border-color: var(--color-card-border); padding: 14px 16px; margin-bottom: 6px; }
 .reply-nested:last-child { margin-bottom: 0; }
 
 .reply-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 6px; }
@@ -645,13 +662,13 @@ function getInitials(name?: string) {
 
 .action-btn {
     display: inline-flex; align-items: center; gap: 4px;
-    background: none; border: none; color: #4a5568;
+    background: none; border: none; color: var(--color-text-muted);
     font-size: 12px; font-weight: 500; cursor: pointer;
     padding: 4px 8px; border-radius: 6px; transition: all 0.15s;
 }
-.action-btn:hover { background: rgba(255, 255, 255, 0.06); color: #e2e8f0; }
-.action-green:hover { color: #10b981; background: rgba(16, 185, 129, 0.08); }
-.action-red:hover { color: #ef4444; background: rgba(239, 68, 68, 0.08); }
+.action-btn:hover { background: var(--color-overlay-light); color: var(--color-text-primary); }
+.action-green:hover { color: var(--color-primary); background: rgba(16, 185, 129, 0.08); }
+.action-red:hover { color: var(--color-danger); background: rgba(239, 68, 68, 0.08); }
 
 .reply-body { margin-bottom: 10px; }
 .reply-foot { padding-top: 6px; }
@@ -661,32 +678,32 @@ function getInitials(name?: string) {
 
 /* Reply Form */
 .reply-form {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--color-card-bg);
+    border: 1px solid var(--color-card-border);
     border-radius: 16px;
     padding: 22px;
 }
 
 .reply-form h3 {
     display: inline-flex; align-items: center; gap: 8px;
-    margin: 0 0 14px; font-size: 16px; font-weight: 600; color: #f1f5f9;
+    margin: 0 0 14px; font-size: 16px; font-weight: 600; color: var(--color-text-primary);
 }
 
 .reply-to-bar {
     display: flex; justify-content: space-between; align-items: center;
     padding: 8px 14px; background: rgba(16, 185, 129, 0.06);
     border: 1px solid rgba(16, 185, 129, 0.12); border-radius: 8px;
-    margin-bottom: 12px; font-size: 13px; color: #10b981;
+    margin-bottom: 12px; font-size: 13px; color: var(--color-primary);
 }
 .reply-to-bar span { display: flex; align-items: center; gap: 6px; }
-.reply-to-bar button { background: none; border: none; color: #64748b; cursor: pointer; padding: 2px; display: flex; transition: color 0.15s; }
-.reply-to-bar button:hover { color: #e2e8f0; }
+.reply-to-bar button { background: none; border: none; color: var(--color-text-muted); cursor: pointer; padding: 2px; display: flex; transition: color 0.15s; }
+.reply-to-bar button:hover { color: var(--color-text-primary); }
 
 .form-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
 
 .btn-submit {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 10px 22px; background: linear-gradient(135deg, #10b981, #059669); color: #fff;
+    padding: 10px 22px; background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover)); color: #fff;
     border: none; border-radius: 10px; font-size: 13px; font-weight: 600;
     cursor: pointer; transition: all 0.2s;
 }
@@ -705,17 +722,17 @@ function getInitials(name?: string) {
     display: flex; align-items: center; justify-content: center; gap: 8px;
     padding: 18px; background: rgba(100, 116, 139, 0.06);
     border: 1px solid rgba(100, 116, 139, 0.1); border-radius: 12px;
-    color: #94a3b8; font-size: 13px;
+    color: var(--color-text-muted); font-size: 13px;
 }
 
 .login-prompt {
     display: flex; align-items: center; justify-content: center; gap: 6px;
     padding: 18px; background: rgba(16, 185, 129, 0.04);
     border: 1px solid rgba(16, 185, 129, 0.1); border-radius: 12px;
-    text-align: center; color: #94a3b8; font-size: 14px;
+    text-align: center; color: var(--color-text-muted); font-size: 14px;
 }
 .login-prompt svg { opacity: 0.5; }
-.login-prompt a { color: #10b981; text-decoration: none; font-weight: 600; }
+.login-prompt a { color: var(--color-primary); text-decoration: none; font-weight: 600; }
 .login-prompt a:hover { text-decoration: underline; }
 
 /* Responsive */

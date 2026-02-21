@@ -34,6 +34,7 @@ export interface AuthResponse {
         phone: string;
         province: string;
         district: string;
+        avatarUrl: string | null;
     };
 }
 
@@ -200,6 +201,7 @@ export class AuthService {
                 phone: user.phone,
                 province: user.province,
                 district: user.district,
+                avatarUrl: user.avatarUrl,
             },
         };
     }
@@ -474,6 +476,7 @@ export class AuthService {
         phone: string;
         province: string;
         district: string;
+        avatarUrl: string | null;
     } | null> {
         const user = await this.usersService.findById(userId);
 
@@ -489,6 +492,7 @@ export class AuthService {
             phone: user.phone,
             province: user.province,
             district: user.district,
+            avatarUrl: user.avatarUrl,
         };
     }
 

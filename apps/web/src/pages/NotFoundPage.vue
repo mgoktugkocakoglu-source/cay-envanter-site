@@ -30,7 +30,7 @@ const router = useRouter();
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-bg-primary, #f9fafb);
+  background: var(--color-bg-primary);
   padding: 24px;
 }
 
@@ -42,7 +42,7 @@ const router = useRouter();
 .not-found-code {
   font-size: 120px;
   font-weight: 800;
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -53,12 +53,12 @@ const router = useRouter();
 .not-found-title {
   font-size: 24px;
   font-weight: 700;
-  color: var(--color-text-primary, #1a1a2e);
+  color: var(--color-text-primary);
   margin: 16px 0 8px 0;
 }
 
 .not-found-message {
-  color: var(--color-text-secondary, #6b7280);
+  color: var(--color-text-secondary);
   font-size: 16px;
   margin: 0 0 32px 0;
 }
@@ -70,7 +70,7 @@ const router = useRouter();
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
   color: white;
   border: none;
   padding: 12px 24px;
@@ -86,8 +86,8 @@ const router = useRouter();
 }
 
 .btn-secondary {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
   border: none;
   padding: 12px 24px;
   border-radius: 12px;
@@ -97,7 +97,7 @@ const router = useRouter();
 }
 
 .btn-secondary:hover {
-  background: #e5e7eb;
+  background: var(--color-bg-elevated);
 }
 
 @media (max-width: 480px) {

@@ -7,7 +7,7 @@ const router = createRouter({
         {
             path: '/',
             name: 'home',
-            component: () => import('@/pages/HomePage.vue'),
+            redirect: '/dashboard',
         },
         {
             path: '/register',
@@ -70,6 +70,18 @@ const router = createRouter({
             path: '/fields/:id',
             name: 'field-detail',
             component: () => import('@/pages/FieldDetailPage.vue'),
+            meta: { requiresAuth: true },
+        },
+        {
+            path: '/firms',
+            name: 'firms',
+            component: () => import('@/pages/FirmsPage.vue'),
+            meta: { requiresAuth: true },
+        },
+        {
+            path: '/firms/:id',
+            name: 'firm-detail',
+            component: () => import('@/pages/FirmDetailPage.vue'),
             meta: { requiresAuth: true },
         },
         {

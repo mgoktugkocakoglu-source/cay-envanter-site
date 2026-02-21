@@ -51,6 +51,9 @@ export class User {
     })
     role: Role;
 
+    @Column({ type: 'varchar', length: 500, nullable: true })
+    avatarUrl: string | null;
+
     @Column({ type: 'boolean', default: false })
     emailVerified: boolean;
 

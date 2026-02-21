@@ -240,6 +240,63 @@ export interface FieldProfitability {
     performanceScore: number;
 }
 
+// Firm Types
+export interface Firm {
+    id: string;
+    name: string;
+    description: string | null;
+    logoUrl: string | null;
+    phone: string | null;
+    email: string | null;
+    address: string | null;
+    isActive: boolean;
+    tariffs?: FirmTariff[];
+    collectionPoints?: FirmCollectionPoint[];
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface FirmTariff {
+    id: string;
+    firmId: string;
+    quality: 'shoot' | 'leaf' | 'mixed';
+    pricePerKg: number;
+    effectiveDate: string;
+    endDate: string | null;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface FirmCollectionPoint {
+    id: string;
+    firmId: string;
+    name: string;
+    province: string;
+    district: string;
+    address: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    collectorName: string | null;
+    collectorPhone: string | null;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface FirmWithCurrentTariffs {
+    id: string;
+    name: string;
+    description: string | null;
+    logoUrl: string | null;
+    isActive: boolean;
+    currentTariffs: {
+        quality: 'shoot' | 'leaf' | 'mixed';
+        pricePerKg: number;
+        effectiveDate: string;
+    }[];
+}
+
 // Forum Types
 export interface ForumCategory {
     id: string;
@@ -298,12 +355,11 @@ export interface ForumReply {
     reactions?: ForumReactionStats;
 }
 
-export type ReactionType = 'like' | 'helpful' | 'thanks';
+export type ReactionType = 'like' | 'dislike';
 
 export interface ForumReactionStats {
     like: number;
-    helpful: number;
-    thanks: number;
+    dislike: number;
     userReaction?: ReactionType | null;
 }
 
@@ -352,7 +408,7 @@ export const api = {
     }),
 
     login: (data: { email: string; password: string; rememberMe?: boolean }) =>
-        request<{ accessToken: string; refreshToken: string; user: { id: string; email: string; fullName: string; userType: 'land_owner' | 'worker' | 'self_farmer'; phone: string; province: string; district: string } }>(
+        request<{ accessToken: string; refreshToken: string; user: { id: string; email: string; fullName: string; userType: 'land_owner' | 'worker' | 'self_farmer'; phone: string; province: string; district: string; avatarUrl: string | null } }>(
             '/auth/login',
             { method: 'POST', body: JSON.stringify(data) }
         ),
@@ -402,6 +458,39 @@ export const api = {
         request<{ message: string }>('/auth/delete-account', {
             method: 'POST',
             body: JSON.stringify({ token }),
+        }),
+
+    // Avatar endpoints
+    uploadAvatar: async (file: File): Promise<ApiResponse<{ avatarUrl: string }>> => {
+        const authStore = useAuthStore();
+        const token = authStore.accessToken;
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await fetch(`${API_BASE}/auth/avatar`, {
+                method: 'PATCH',
+                headers: {
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: formData,
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                return { error: { message: data.message || 'Avatar yuklenemedi', statusCode: response.status } };
+            }
+
+            return { data };
+        } catch {
+            return { error: { message: 'Baglanti hatasi', statusCode: 0 } };
+        }
+    },
+
+    removeAvatar: () =>
+        request<{ message: string }>('/auth/avatar', {
+            method: 'DELETE',
         }),
 
     // Session endpoints
@@ -481,6 +570,37 @@ export const api = {
     getBrokerFirms: () => request<BrokerFirm[]>('/broker-firms'),
     createBrokerFirm: (firmName: string) =>
         request<BrokerFirm>('/broker-firms', { method: 'POST', body: JSON.stringify({ firmName }) }),
+
+    // Firms endpoints
+    getFirms: (params?: { search?: string; isActive?: boolean }) => {
+        const query = new URLSearchParams(params as Record<string, string>).toString();
+        return request<Firm[]>(`/firms${query ? `?${query}` : ''}`);
+    },
+    getFirm: (id: string) => request<Firm>(`/firms/${id}`),
+    getFirmsWithTariffs: () => request<FirmWithCurrentTariffs[]>('/firms/with-tariffs'),
+    getFirmTariffs: (firmId: string) => request<FirmTariff[]>(`/firms/${firmId}/tariffs`),
+    getFirmCurrentTariffs: (firmId: string) => request<FirmTariff[]>(`/firms/${firmId}/tariffs/current`),
+    getFirmCollectionPoints: (firmId: string, params?: { province?: string; district?: string }) => {
+        const query = new URLSearchParams(params as Record<string, string>).toString();
+        return request<FirmCollectionPoint[]>(`/firms/${firmId}/collection-points${query ? `?${query}` : ''}`);
+    },
+    createFirm: (data: Partial<Firm>) =>
+        request<Firm>('/firms', { method: 'POST', body: JSON.stringify(data) }),
+    updateFirm: (id: string, data: Partial<Firm>) =>
+        request<Firm>(`/firms/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    deleteFirm: (id: string) => request<void>(`/firms/${id}`, { method: 'DELETE' }),
+    createFirmTariff: (firmId: string, data: Partial<FirmTariff>) =>
+        request<FirmTariff>(`/firms/${firmId}/tariffs`, { method: 'POST', body: JSON.stringify(data) }),
+    updateFirmTariff: (firmId: string, tariffId: string, data: Partial<FirmTariff>) =>
+        request<FirmTariff>(`/firms/${firmId}/tariffs/${tariffId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    deleteFirmTariff: (firmId: string, tariffId: string) =>
+        request<void>(`/firms/${firmId}/tariffs/${tariffId}`, { method: 'DELETE' }),
+    createFirmCollectionPoint: (firmId: string, data: Partial<FirmCollectionPoint>) =>
+        request<FirmCollectionPoint>(`/firms/${firmId}/collection-points`, { method: 'POST', body: JSON.stringify(data) }),
+    updateFirmCollectionPoint: (firmId: string, pointId: string, data: Partial<FirmCollectionPoint>) =>
+        request<FirmCollectionPoint>(`/firms/${firmId}/collection-points/${pointId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    deleteFirmCollectionPoint: (firmId: string, pointId: string) =>
+        request<void>(`/firms/${firmId}/collection-points/${pointId}`, { method: 'DELETE' }),
 
     // Reports endpoints
     getYearlySummary: (year?: number) => {

@@ -20,7 +20,7 @@ const sanitizedContent = computed(() => {
 
 <style scoped>
 .rich-content {
-    color: #e2e8f0;
+    color: var(--color-text-primary);
     font-size: 15px;
     line-height: 1.75;
     word-break: break-word;
@@ -32,21 +32,21 @@ const sanitizedContent = computed(() => {
 .rich-content :deep(h2) {
     font-size: 22px;
     font-weight: 700;
-    color: #fff;
+    color: var(--color-text-primary);
     margin: 20px 0 10px 0;
 }
 
 .rich-content :deep(h3) {
     font-size: 18px;
     font-weight: 600;
-    color: #fff;
+    color: var(--color-text-primary);
     margin: 16px 0 8px 0;
 }
 
-.rich-content :deep(strong) { color: #fff; }
+.rich-content :deep(strong) { color: var(--color-text-primary); }
 
 .rich-content :deep(em) {
-    color: #cbd5e1;
+    color: var(--color-text-secondary);
 }
 
 .rich-content :deep(ul),
@@ -58,16 +58,16 @@ const sanitizedContent = computed(() => {
 .rich-content :deep(li) { margin-bottom: 6px; }
 
 .rich-content :deep(li::marker) {
-    color: #10b981;
+    color: var(--color-primary);
 }
 
 .rich-content :deep(blockquote) {
-    border-left: 3px solid #10b981;
+    border-left: 3px solid var(--color-primary);
     padding: 12px 16px;
     margin: 16px 0;
-    color: #94a3b8;
+    color: var(--color-text-secondary);
     font-style: italic;
-    background: rgba(16, 185, 129, 0.04);
+    background: var(--color-primary-light);
     border-radius: 0 8px 8px 0;
 }
 
@@ -76,21 +76,21 @@ const sanitizedContent = computed(() => {
 }
 
 .rich-content :deep(pre) {
-    background: rgba(0, 0, 0, 0.4);
+    background: var(--color-bg-primary);
     border-radius: 10px;
     padding: 16px;
     margin: 16px 0;
     overflow-x: auto;
     font-family: 'Fira Code', monospace;
     font-size: 13px;
-    color: #e2e8f0;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
     -webkit-overflow-scrolling: touch;
 }
 
 .rich-content :deep(code) {
-    background: rgba(16, 185, 129, 0.12);
-    color: #10b981;
+    background: var(--color-primary-light);
+    color: var(--color-primary);
     padding: 2px 6px;
     border-radius: 4px;
     font-size: 13px;
@@ -108,7 +108,7 @@ const sanitizedContent = computed(() => {
     max-width: 100%;
     border-radius: 10px;
     margin: 16px 0;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--color-border);
     transition: all 0.2s;
     cursor: zoom-in;
 }
@@ -120,15 +120,15 @@ const sanitizedContent = computed(() => {
 
 /* Links */
 .rich-content :deep(a) {
-    color: #10b981;
+    color: var(--color-primary);
     text-decoration: none;
     border-bottom: 1px solid rgba(16, 185, 129, 0.3);
     transition: all 0.2s;
 }
 
 .rich-content :deep(a:hover) {
-    color: #34d399;
-    border-bottom-color: #34d399;
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
 }
 
 /* YouTube Embeds */
@@ -136,7 +136,7 @@ const sanitizedContent = computed(() => {
     border-radius: 10px;
     max-width: 100%;
     margin: 16px 0;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--color-border);
 }
 
 .rich-content :deep(div[data-youtube-video]) {
@@ -146,7 +146,7 @@ const sanitizedContent = computed(() => {
     height: 0;
     overflow: hidden;
     border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--color-border);
 }
 
 .rich-content :deep(div[data-youtube-video] iframe) {
@@ -162,7 +162,7 @@ const sanitizedContent = computed(() => {
 
 .rich-content :deep(hr) {
     border: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid var(--color-border);
     margin: 20px 0;
 }
 
@@ -177,14 +177,14 @@ const sanitizedContent = computed(() => {
 .rich-content :deep(th),
 .rich-content :deep(td) {
     padding: 8px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--color-border);
     text-align: left;
 }
 
 .rich-content :deep(th) {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--color-bg-tertiary);
     font-weight: 600;
-    color: #f1f5f9;
+    color: var(--color-text-primary);
 }
 
 /* Selection highlight */

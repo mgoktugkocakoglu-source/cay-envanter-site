@@ -106,7 +106,7 @@ const paginationPages = computed(() => {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
                     Forum
                 </router-link>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
                 <span class="bc-current">{{ forumStore.currentCategory?.name }}</span>
             </nav>
 
@@ -287,12 +287,12 @@ const paginationPages = computed(() => {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    color: #64748b;
+    color: var(--color-text-muted);
     text-decoration: none;
     transition: color 0.15s;
 }
-.bc-link:hover { color: #10b981; }
-.bc-current { color: #94a3b8; font-weight: 500; }
+.bc-link:hover { color: var(--color-primary); }
+.bc-current { color: var(--color-text-secondary); font-weight: 500; }
 
 /* Category Header */
 .cat-header {
@@ -322,15 +322,15 @@ const paginationPages = computed(() => {
     flex-shrink: 0;
 }
 
-.cat-header h1 { margin: 0; font-size: 22px; font-weight: 700; color: #f1f5f9; }
-.cat-header p { margin: 2px 0 0; font-size: 13px; color: #64748b; }
+.cat-header h1 { margin: 0; font-size: 22px; font-weight: 700; color: var(--color-text-primary); }
+.cat-header p { margin: 2px 0 0; font-size: 13px; color: var(--color-text-muted); }
 
 .btn-new {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     padding: 10px 20px;
-    background: linear-gradient(135deg, #10b981, #059669);
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
     color: #fff;
     border: none;
     border-radius: 10px;
@@ -349,8 +349,8 @@ const paginationPages = computed(() => {
     justify-content: space-between;
     align-items: center;
     padding: 10px 14px;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: var(--color-card-bg);
+    border: 1px solid var(--color-subtle-border);
     border-radius: 10px;
     margin-bottom: 12px;
     flex-wrap: wrap;
@@ -362,7 +362,7 @@ const paginationPages = computed(() => {
     align-items: center;
     gap: 5px;
     font-size: 12px;
-    color: #64748b;
+    color: var(--color-text-muted);
     font-weight: 500;
 }
 
@@ -376,7 +376,7 @@ const paginationPages = computed(() => {
     gap: 5px;
     padding: 6px 12px;
     background: transparent;
-    color: #64748b;
+    color: var(--color-text-muted);
     border: none;
     border-radius: 6px;
     font-size: 12px;
@@ -384,13 +384,13 @@ const paginationPages = computed(() => {
     cursor: pointer;
     transition: all 0.15s;
 }
-.sort-tabs button:hover { color: #e2e8f0; background: rgba(255, 255, 255, 0.04); }
-.sort-tabs button.active { background: rgba(16, 185, 129, 0.12); color: #10b981; }
+.sort-tabs button:hover { color: var(--color-text-primary); background: var(--color-card-bg-hover); }
+.sort-tabs button.active { background: rgba(16, 185, 129, 0.12); color: var(--color-primary); }
 
 /* Loading & States */
 .state-box { display: flex; flex-direction: column; align-items: center; padding: 60px 20px; text-align: center; }
-.state-box h3 { margin: 14px 0 4px; font-size: 16px; font-weight: 600; color: #94a3b8; }
-.state-box p { margin: 0; color: #64748b; font-size: 14px; }
+.state-box h3 { margin: 14px 0 4px; font-size: 16px; font-weight: 600; color: var(--color-text-secondary); }
+.state-box p { margin: 0; color: var(--color-text-muted); font-size: 14px; }
 
 .empty-icon {
     width: 48px;
@@ -398,12 +398,12 @@ const paginationPages = computed(() => {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--color-card-bg-hover);
     border-radius: 14px;
-    color: #4a5568;
+    color: var(--color-text-muted);
 }
 
-.spinner { width: 36px; height: 36px; border: 3px solid rgba(255, 255, 255, 0.06); border-top-color: #10b981; border-radius: 50%; animation: spin 0.7s linear infinite; }
+.spinner { width: 36px; height: 36px; border: 3px solid var(--color-spinner-track); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 @keyframes fadeInUp {
@@ -420,7 +420,7 @@ const paginationPages = computed(() => {
     gap: 5px;
     font-size: 10px;
     font-weight: 700;
-    color: #4a5568;
+    color: var(--color-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.8px;
     padding: 10px 0 2px;
@@ -434,14 +434,14 @@ const paginationPages = computed(() => {
     align-items: center;
     gap: 14px;
     padding: 14px 16px;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: var(--color-card-bg);
+    border: 1px solid var(--color-subtle-border);
     border-radius: 10px;
     cursor: pointer;
     transition: all 0.2s;
     animation: fadeInUp 0.3s ease both;
 }
-.topic-row:hover { background: rgba(255, 255, 255, 0.04); border-color: rgba(16, 185, 129, 0.2); transform: translateX(2px); }
+.topic-row:hover { background: var(--color-card-bg-hover); border-color: rgba(16, 185, 129, 0.2); transform: translateX(2px); }
 .topic-row.pinned { border-color: rgba(251, 191, 36, 0.12); background: rgba(251, 191, 36, 0.02); }
 .topic-row.pinned:hover { border-color: rgba(251, 191, 36, 0.25); }
 
@@ -449,7 +449,7 @@ const paginationPages = computed(() => {
 
 .avatar {
     width: 36px; height: 36px; border-radius: 10px;
-    background: linear-gradient(135deg, #10b981, #059669);
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
     display: flex; align-items: center; justify-content: center;
     font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
     transition: transform 0.15s;
@@ -462,36 +462,36 @@ const paginationPages = computed(() => {
 .topic-title-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
 .topic-title-line h3 {
-    margin: 0; font-size: 14px; font-weight: 600; color: #f1f5f9;
+    margin: 0; font-size: 14px; font-weight: 600; color: var(--color-text-primary);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 380px;
     transition: color 0.15s;
 }
 
-.topic-row:hover .topic-title-line h3 { color: #10b981; }
+.topic-row:hover .topic-title-line h3 { color: var(--color-primary); }
 
 .pin-badge {
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    font-size: 9px; font-weight: 800; color: #fbbf24;
+    font-size: 9px; font-weight: 800; color: var(--color-warning);
     background: rgba(251, 191, 36, 0.12); padding: 2px 6px;
     border-radius: 4px; letter-spacing: 0.5px;
 }
 
 .tag { display: inline-flex; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; white-space: nowrap; }
-.tag-solved { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-.tag-locked { background: rgba(100, 116, 139, 0.1); color: #94a3b8; }
+.tag-solved { background: rgba(16, 185, 129, 0.1); color: var(--color-primary); }
+.tag-locked { background: rgba(100, 116, 139, 0.1); color: var(--color-text-secondary); }
 
 .topic-meta {
     display: flex;
     align-items: center;
     gap: 4px;
     font-size: 11px;
-    color: #4a5568;
+    color: var(--color-text-muted);
     margin-top: 3px;
 }
 
-.meta-author { color: #64748b; font-weight: 500; }
+.meta-author { color: var(--color-text-muted); font-weight: 500; }
 .meta-sep { opacity: 0.5; }
 
 .topic-stats { display: flex; gap: 12px; flex-shrink: 0; }
@@ -500,15 +500,15 @@ const paginationPages = computed(() => {
     display: flex;
     align-items: center;
     gap: 5px;
-    color: #4a5568;
+    color: var(--color-text-muted);
     transition: color 0.15s;
 }
 
 .stat svg { opacity: 0.5; }
-.stat-val { font-size: 13px; font-weight: 600; color: #64748b; }
+.stat-val { font-size: 13px; font-weight: 600; color: var(--color-text-muted); }
 
-.topic-row:hover .stat { color: #64748b; }
-.topic-row:hover .stat-val { color: #94a3b8; }
+.topic-row:hover .stat { color: var(--color-text-muted); }
+.topic-row:hover .stat-val { color: var(--color-text-secondary); }
 
 /* Pagination */
 .pagination {
@@ -528,24 +528,24 @@ const paginationPages = computed(() => {
 .page-btn {
     display: flex; align-items: center; justify-content: center;
     width: 34px; height: 34px;
-    background: rgba(255, 255, 255, 0.04); color: #e2e8f0;
-    border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px;
+    background: var(--color-card-bg-hover); color: var(--color-text-secondary);
+    border: 1px solid var(--color-card-border); border-radius: 8px;
     cursor: pointer; transition: all 0.15s;
 }
-.page-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); border-color: rgba(16, 185, 129, 0.25); }
+.page-btn:hover:not(:disabled) { background: var(--color-overlay-lighter); border-color: rgba(16, 185, 129, 0.25); }
 .page-btn:disabled { opacity: 0.25; cursor: not-allowed; }
 
 .page-num {
     display: flex; align-items: center; justify-content: center;
     min-width: 34px; height: 34px; padding: 0 8px;
-    background: rgba(255, 255, 255, 0.03); color: #94a3b8;
-    border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px;
+    background: var(--color-subtle-bg); color: var(--color-text-muted);
+    border: 1px solid var(--color-subtle-border); border-radius: 8px;
     cursor: pointer; transition: all 0.15s; font-size: 13px; font-weight: 500;
 }
-.page-num:hover { background: rgba(255, 255, 255, 0.06); color: #e2e8f0; }
-.page-num.active { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); color: #10b981; font-weight: 700; }
+.page-num:hover { background: var(--color-overlay-light); color: var(--color-text-primary); }
+.page-num.active { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); color: var(--color-primary); font-weight: 700; }
 
-.page-dots { color: #4a5568; font-size: 12px; padding: 0 4px; }
+.page-dots { color: var(--color-text-muted); font-size: 12px; padding: 0 4px; }
 
 /* Responsive */
 @media (max-width: 640px) {
@@ -555,7 +555,7 @@ const paginationPages = computed(() => {
     .toolbar { flex-direction: column; align-items: stretch; }
     .sort-tabs { justify-content: center; }
     .topic-row { flex-direction: column; align-items: stretch; }
-    .topic-stats { flex-direction: row; gap: 16px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.04); }
+    .topic-stats { flex-direction: row; gap: 16px; padding-top: 8px; border-top: 1px solid var(--color-card-border); }
     .topic-title-line h3 { max-width: 100%; }
 }
 </style>

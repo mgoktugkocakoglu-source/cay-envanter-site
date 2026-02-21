@@ -3,24 +3,34 @@ import {
     Post,
     Get,
     Delete,
+    Patch,
     Body,
     Query,
     Param,
     Req,
     UseGuards,
+    UseInterceptors,
+    UploadedFile,
     HttpCode,
     HttpStatus,
     UnauthorizedException,
+    BadRequestException,
 } from '@nestjs/common';
 import {
     ApiTags,
     ApiOperation,
     ApiResponse,
     ApiBearerAuth,
+    ApiConsumes,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
+import { v4 as uuid } from 'uuid';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { AuthService, AuthResponse } from '@/auth/auth.service';
+import { UsersService } from '@/users/users.service';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { CurrentUser, AuthenticatedUser } from '@/auth/decorators';
 import {
@@ -33,10 +43,52 @@ import {
     ConfirmDeletionDto,
 } from '@/auth/dto';
 
+const UPLOAD_DIR = join(process.cwd(), 'uploads');
+
+/** Multer storage configuration for avatar uploads */
+const avatarStorage = diskStorage({
+    destination: (
+        _req: Request,
+        _file: Express.Multer.File,
+        cb: (error: Error | null, destination: string) => void,
+    ): void => {
+        const { mkdirSync } = require('fs');
+        mkdirSync(UPLOAD_DIR, { recursive: true });
+        cb(null, UPLOAD_DIR);
+    },
+    filename: (
+        _req: Request,
+        file: Express.Multer.File,
+        cb: (error: Error | null, filename: string) => void,
+    ): void => {
+        const uniqueName = `avatar-${uuid()}${extname(file.originalname)}`;
+        cb(null, uniqueName);
+    },
+});
+
+/** File filter allowing only image MIME types */
+const avatarFileFilter = (
+    _req: Request,
+    file: Express.Multer.File,
+    callback: (error: Error | null, acceptFile: boolean) => void,
+): void => {
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedMimes.includes(file.mimetype)) {
+        return callback(
+            new BadRequestException('Sadece JPEG, PNG, GIF ve WebP dosyalari yuklenebilir.'),
+            false,
+        );
+    }
+    callback(null, true);
+};
+
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-    constructor(private readonly authService: AuthService) { }
+    constructor(
+        private readonly authService: AuthService,
+        private readonly usersService: UsersService,
+    ) { }
 
     @Post('register')
     @ApiOperation({ summary: 'Register a new user' })
@@ -187,6 +239,46 @@ export class AuthController {
     @ApiResponse({ status: 401, description: 'Not authenticated' })
     async getCurrentUser(@CurrentUser('id') userId: string) {
         return this.authService.getCurrentUser(userId);
+    }
+
+    // ===== AVATAR MANAGEMENT ENDPOINTS =====
+
+    @Patch('avatar')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Upload or update avatar' })
+    @ApiConsumes('multipart/form-data')
+    @ApiResponse({ status: 200, description: 'Avatar updated successfully' })
+    @ApiResponse({ status: 400, description: 'Invalid file' })
+    @UseInterceptors(
+        FileInterceptor('file', {
+            storage: avatarStorage,
+            fileFilter: avatarFileFilter,
+            limits: { fileSize: 2 * 1024 * 1024 }, // 2MB for avatars
+        }),
+    )
+    async uploadAvatar(
+        @CurrentUser('id') userId: string,
+        @UploadedFile() file: Express.Multer.File,
+    ) {
+        if (!file) {
+            throw new BadRequestException('Dosya yuklenemedi.');
+        }
+
+        const avatarUrl = `/api/uploads/file/${file.filename}`;
+        await this.usersService.update(userId, { avatarUrl });
+
+        return { avatarUrl };
+    }
+
+    @Delete('avatar')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Remove avatar' })
+    @ApiResponse({ status: 200, description: 'Avatar removed' })
+    async removeAvatar(@CurrentUser('id') userId: string) {
+        await this.usersService.update(userId, { avatarUrl: null });
+        return { message: 'Avatar kaldirildi' };
     }
 
     // ===== SESSION MANAGEMENT ENDPOINTS =====

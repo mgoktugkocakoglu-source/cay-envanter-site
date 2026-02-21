@@ -410,21 +410,21 @@ onBeforeUnmount(() => {
 
 /* Light variant - white background */
 .app-select-trigger.variant-light {
-  background: #ffffff;
+  background: var(--color-bg-elevated);
   color: var(--color-text-primary);
   border-color: var(--color-border);
 }
 
 .app-select-trigger.variant-light .app-select-placeholder {
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .app-select-trigger.variant-light .app-select-value {
-  color: #1f2937;
+  color: var(--color-text-primary);
 }
 
 .app-select-trigger.variant-light .app-select-arrow {
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .app-select-trigger.has-error {

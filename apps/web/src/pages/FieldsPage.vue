@@ -952,7 +952,7 @@ function getFieldInitial(name: string) {
 }
 
 .btn-modal-danger:hover:not(:disabled) {
-    background: #dc2626;
+    opacity: 0.9;
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
 }

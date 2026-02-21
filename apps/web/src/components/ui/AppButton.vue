@@ -124,7 +124,8 @@ const buttonClasses = computed(() => [
 }
 
 .app-btn--danger:hover:not(:disabled) {
-  background: #DC2626;
+  opacity: 0.9;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
 .app-btn--link {

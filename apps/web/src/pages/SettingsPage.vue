@@ -3,11 +3,13 @@ import { ref, computed, onMounted } from 'vue';
 import { api } from '@/services/api';
 import type { Session } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
+import { useThemeStore } from '@/stores/themeStore';
 import AppLayout from '@/layouts/AppLayout.vue';
 
 const authStore = useAuthStore();
+const themeStore = useThemeStore();
 
-const activeTab = ref<'profile' | 'security' | 'sessions' | 'account'>('profile');
+const activeTab = ref<'profile' | 'security' | 'sessions' | 'appearance' | 'account'>('profile');
 
 // Profile form
 const profileForm = ref({
@@ -46,6 +48,11 @@ const deleteError = ref('');
 const deleteLoading = ref(false);
 const deleteSuccess = ref(false);
 
+// Avatar upload
+const avatarFileInput = ref<HTMLInputElement | null>(null);
+const avatarLoading = ref(false);
+const avatarError = ref('');
+
 // Initialize profile form with user data
 onMounted(() => {
   if (authStore.user) {
@@ -82,6 +89,67 @@ async function handleProfileSave() {
     authStore.user.phone = profileForm.value.phone;
     authStore.user.province = profileForm.value.province;
     authStore.user.district = profileForm.value.district;
+  }
+}
+
+/** Open the hidden file input when the avatar is clicked */
+function handleAvatarClick() {
+  avatarFileInput.value?.click();
+}
+
+/** Handle avatar file selection and upload */
+async function handleAvatarUpload(event: Event) {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (!file) return;
+
+  // Validate client-side
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (!allowedTypes.includes(file.type)) {
+    avatarError.value = 'Sadece JPEG, PNG, GIF ve WebP dosyalari yuklenebilir.';
+    return;
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    avatarError.value = 'Dosya boyutu en fazla 2MB olabilir.';
+    return;
+  }
+
+  avatarError.value = '';
+  avatarLoading.value = true;
+
+  const result = await api.uploadAvatar(file);
+
+  avatarLoading.value = false;
+
+  if (result.error) {
+    avatarError.value = result.error.message;
+    return;
+  }
+
+  if (authStore.user && result.data) {
+    authStore.user.avatarUrl = result.data.avatarUrl;
+  }
+
+  // Reset file input
+  target.value = '';
+}
+
+/** Remove the current avatar */
+async function handleAvatarRemove() {
+  avatarError.value = '';
+  avatarLoading.value = true;
+
+  const result = await api.removeAvatar();
+
+  avatarLoading.value = false;
+
+  if (result.error) {
+    avatarError.value = result.error.message;
+    return;
+  }
+
+  if (authStore.user) {
+    authStore.user.avatarUrl = null;
   }
 }
 
@@ -282,8 +350,41 @@ function switchTab(tab: typeof activeTab.value) {
       <main class="settings-content">
         <!-- Header -->
         <div class="settings-header-section">
-          <div class="settings-avatar">
-            <span>{{ authStore.user?.fullName?.charAt(0)?.toUpperCase() || 'U' }}</span>
+          <div class="settings-avatar-wrapper">
+            <div class="settings-avatar" @click="handleAvatarClick" :class="{ 'has-avatar': authStore.user?.avatarUrl }">
+              <img
+                v-if="authStore.user?.avatarUrl"
+                :src="authStore.user.avatarUrl"
+                alt="Avatar"
+                class="avatar-image"
+              />
+              <span v-else>{{ authStore.user?.fullName?.charAt(0)?.toUpperCase() || 'U' }}</span>
+              <div class="avatar-overlay" v-if="!avatarLoading">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
+                </svg>
+              </div>
+              <div class="avatar-loading" v-if="avatarLoading">
+                <span class="spinner-sm"></span>
+              </div>
+            </div>
+            <input
+              ref="avatarFileInput"
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              class="avatar-file-input"
+              @change="handleAvatarUpload"
+            />
+            <button
+              v-if="authStore.user?.avatarUrl"
+              class="avatar-remove-btn"
+              @click="handleAvatarRemove"
+              :disabled="avatarLoading"
+            >
+              Kaldir
+            </button>
+            <p v-if="avatarError" class="avatar-error">{{ avatarError }}</p>
           </div>
           <div class="settings-header-info">
             <h1 class="settings-title">Hesap Ayarlari</h1>
@@ -316,6 +417,14 @@ function switchTab(tab: typeof activeTab.value) {
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
             Oturumlar
+          </button>
+          <button
+            class="tab-btn"
+            :class="{ active: activeTab === 'appearance' }"
+            @click="switchTab('appearance')"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            Gorunum
           </button>
           <button
             class="tab-btn"
@@ -591,6 +700,62 @@ function switchTab(tab: typeof activeTab.value) {
           </div>
         </div>
 
+        <!-- ═══════ Appearance Tab ═══════ -->
+        <div v-if="activeTab === 'appearance'" class="tab-content">
+          <div class="card">
+            <div class="card-header">
+              <h2>Tema Ayarlari</h2>
+            </div>
+            <p class="card-description">
+              Uygulamanin gorunumunu tercihlerinize gore ayarlayin.
+            </p>
+
+            <div class="theme-selector">
+              <button
+                class="theme-option"
+                :class="{ active: themeStore.theme === 'dark' }"
+                @click="themeStore.setTheme('dark')"
+              >
+                <div class="theme-preview theme-preview-dark">
+                  <div class="preview-header"></div>
+                  <div class="preview-body">
+                    <div class="preview-sidebar"></div>
+                    <div class="preview-content">
+                      <div class="preview-line"></div>
+                      <div class="preview-line short"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="theme-option-info">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                  <span>Koyu Tema</span>
+                </div>
+              </button>
+
+              <button
+                class="theme-option"
+                :class="{ active: themeStore.theme === 'light' }"
+                @click="themeStore.setTheme('light')"
+              >
+                <div class="theme-preview theme-preview-light">
+                  <div class="preview-header"></div>
+                  <div class="preview-body">
+                    <div class="preview-sidebar"></div>
+                    <div class="preview-content">
+                      <div class="preview-line"></div>
+                      <div class="preview-line short"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="theme-option-info">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                  <span>Acik Tema</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- ═══════ Account Tab ═══════ -->
         <div v-if="activeTab === 'account'" class="tab-content">
           <!-- Account Info -->
@@ -704,11 +869,19 @@ function switchTab(tab: typeof activeTab.value) {
   margin-bottom: var(--space-6);
 }
 
+.settings-avatar-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
 .settings-avatar {
-  width: 52px;
-  height: 52px;
+  width: 56px;
+  height: 56px;
   border-radius: var(--radius-full);
-  background: linear-gradient(135deg, var(--color-primary), #059669);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
   color: white;
   display: flex;
   align-items: center;
@@ -716,6 +889,83 @@ function switchTab(tab: typeof activeTab.value) {
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold);
   flex-shrink: 0;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease;
+}
+
+.settings-avatar:hover {
+  box-shadow: 0 0 0 3px var(--color-primary-alpha, rgba(34, 197, 94, 0.25));
+}
+
+.settings-avatar.has-avatar {
+  background: var(--color-bg-tertiary);
+}
+
+.avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--radius-full);
+}
+
+.avatar-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: var(--radius-full);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  color: white;
+}
+
+.settings-avatar:hover .avatar-overlay {
+  opacity: 1;
+}
+
+.avatar-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: var(--radius-full);
+}
+
+.avatar-file-input {
+  display: none;
+}
+
+.avatar-remove-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  padding: 2px 4px;
+  transition: color 0.15s ease;
+}
+
+.avatar-remove-btn:hover {
+  color: var(--color-error, #ef4444);
+}
+
+.avatar-remove-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.avatar-error {
+  color: var(--color-error, #ef4444);
+  font-size: var(--font-size-xs);
+  margin-top: 2px;
+  text-align: center;
+  max-width: 120px;
 }
 
 .settings-title {
@@ -1338,6 +1588,133 @@ function switchTab(tab: typeof activeTab.value) {
   }
 }
 
+/* ── Theme Selector ── */
+.theme-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.theme-option {
+  background: var(--color-bg-tertiary);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.theme-option:hover {
+  border-color: var(--color-text-muted);
+}
+
+.theme-option.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.theme-preview {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: var(--space-3);
+  height: 80px;
+}
+
+.theme-preview-dark {
+  background: #0F172A;
+  border: 1px solid #334155;
+}
+
+.theme-preview-dark .preview-header {
+  height: 16px;
+  background: #1E293B;
+  border-bottom: 1px solid #334155;
+}
+
+.theme-preview-dark .preview-body {
+  display: flex;
+  height: calc(100% - 16px);
+}
+
+.theme-preview-dark .preview-sidebar {
+  width: 24px;
+  background: #1E293B;
+  border-right: 1px solid #334155;
+}
+
+.theme-preview-dark .preview-content {
+  flex: 1;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.theme-preview-dark .preview-line {
+  height: 6px;
+  background: #334155;
+  border-radius: 3px;
+}
+
+.theme-preview-dark .preview-line.short {
+  width: 60%;
+}
+
+.theme-preview-light {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+}
+
+.theme-preview-light .preview-header {
+  height: 16px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.theme-preview-light .preview-body {
+  display: flex;
+  height: calc(100% - 16px);
+}
+
+.theme-preview-light .preview-sidebar {
+  width: 24px;
+  background: #FFFFFF;
+  border-right: 1px solid #E2E8F0;
+}
+
+.theme-preview-light .preview-content {
+  flex: 1;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.theme-preview-light .preview-line {
+  height: 6px;
+  background: #E2E8F0;
+  border-radius: 3px;
+}
+
+.theme-preview-light .preview-line.short {
+  width: 60%;
+}
+
+.theme-option-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+.theme-option.active .theme-option-info {
+  color: var(--color-primary);
+}
+
 @media (max-width: 480px) {
   .card {
     padding: var(--space-4);
@@ -1345,6 +1722,10 @@ function switchTab(tab: typeof activeTab.value) {
 
   .modal {
     padding: var(--space-4);
+  }
+
+  .theme-selector {
+    grid-template-columns: 1fr;
   }
 }
 </style>

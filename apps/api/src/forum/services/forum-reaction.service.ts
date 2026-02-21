@@ -28,6 +28,24 @@ export class ForumReactionService {
             return { added: false };
         }
 
+        // Remove the opposite reaction before adding
+        const oppositeType = dto.reactionType === ReactionType.LIKE
+            ? ReactionType.DISLIKE
+            : ReactionType.LIKE;
+
+        const oppositeReaction = await this.reactionRepository.findOne({
+            where: {
+                userId,
+                targetType: dto.targetType,
+                targetId: dto.targetId,
+                reactionType: oppositeType,
+            },
+        });
+
+        if (oppositeReaction) {
+            await this.reactionRepository.remove(oppositeReaction);
+        }
+
         await this.reactionRepository.save({
             userId,
             ...dto,
@@ -48,8 +66,7 @@ export class ForumReactionService {
 
         const stats: ReactionStatsDto = {
             likeCount: 0,
-            helpfulCount: 0,
-            thanksCount: 0,
+            dislikeCount: 0,
             userReactions: [],
         };
 
@@ -58,11 +75,8 @@ export class ForumReactionService {
                 case ReactionType.LIKE:
                     stats.likeCount = parseInt(row.count, 10);
                     break;
-                case ReactionType.HELPFUL:
-                    stats.helpfulCount = parseInt(row.count, 10);
-                    break;
-                case ReactionType.THANKS:
-                    stats.thanksCount = parseInt(row.count, 10);
+                case ReactionType.DISLIKE:
+                    stats.dislikeCount = parseInt(row.count, 10);
                     break;
             }
         }

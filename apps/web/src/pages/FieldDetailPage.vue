@@ -44,10 +44,10 @@ function initializeMap() {
         dragging: true
     }).setView([39.0, 35.0], 6);
 
-    // Light theme tile layer
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-        maxZoom: 20,
+    // Satellite imagery tile layer
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '&copy; <a href="https://www.esri.com/">Esri</a> &mdash; Source: Esri, Maxar, Earthstar Geographics',
+        maxZoom: 19,
     }).addTo(map);
 
     L.control.zoom({ position: 'topright' }).addTo(map);
@@ -57,6 +57,12 @@ function initializeMap() {
     if (field && field.coordinates && field.coordinates.length > 0) {
         displayFieldOnMap(field.coordinates);
     }
+}
+
+
+
+function getCssVar(name: string, fallback: string): string {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
 function displayFieldOnMap(coordinates: number[][][]) {
@@ -73,10 +79,10 @@ function displayFieldOnMap(coordinates: number[][][]) {
 
     fieldLayer = L.geoJSON(geoJson, {
         style: {
-            color: '#059669',
+            color: getCssVar('--color-primary-hover', '#059669'),
             weight: 3,
             fillOpacity: 0.2,
-            fillColor: '#10b981'
+            fillColor: getCssVar('--color-primary', '#10b981')
         }
     }).addTo(map);
 
@@ -490,7 +496,7 @@ function goBack() {
 }
 
 .stat-area .stat-icon {
-    background: rgba(16, 185, 129, 0.1);
+    background: var(--color-primary-light);
     color: var(--color-primary);
 }
 
@@ -568,7 +574,7 @@ function goBack() {
 }
 
 .location-icon {
-    background: rgba(16, 185, 129, 0.1);
+    background: var(--color-primary-light);
     color: var(--color-primary);
 }
 
@@ -604,7 +610,7 @@ function goBack() {
     justify-content: space-between;
     align-items: center;
     padding: var(--space-3) 0;
-    border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+    border-bottom: 1px solid var(--color-border);
 }
 
 .detail-row:last-child {
@@ -638,7 +644,7 @@ function goBack() {
     justify-content: space-between;
     align-items: center;
     padding: var(--space-3) 0;
-    border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+    border-bottom: 1px solid var(--color-border);
 }
 
 .partner-item:last-child {
@@ -690,14 +696,14 @@ function goBack() {
 .primary-badge {
     display: inline-flex;
     align-items: center;
-    background: rgba(16, 185, 129, 0.1);
+    background: var(--color-primary-light);
     color: var(--color-primary);
     font-size: 10px;
     padding: 1px 8px;
     border-radius: var(--radius-full);
     font-weight: var(--font-weight-semibold);
     width: fit-content;
-    border: 1px solid rgba(16, 185, 129, 0.2);
+    border: 1px solid var(--color-primary-light);
 }
 
 .partner-share-wrap {

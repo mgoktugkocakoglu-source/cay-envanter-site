@@ -12,6 +12,7 @@ import { FieldsModule } from '@/fields/fields.module';
 import { HarvestsModule } from '@/harvests/harvests.module';
 import { PaymentsModule } from '@/payments/payments.module';
 import { ReportsModule } from '@/reports/reports.module';
+import { FirmsModule } from '@/firms/firms.module';
 import { ForumModule } from '@/forum/forum.module';
 import { UploadsModule } from '@/uploads/uploads.module';
 
@@ -67,6 +68,7 @@ import { UploadsModule } from '@/uploads/uploads.module';
         MailModule,
         GeoModule,
         FieldsModule,
+        FirmsModule,
         HarvestsModule,
         PaymentsModule,
         ReportsModule,

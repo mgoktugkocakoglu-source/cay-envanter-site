@@ -438,10 +438,10 @@ function handlePaste(e: ClipboardEvent) {
 
 <style scoped>
 .rich-editor {
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--color-border);
     border-radius: 12px;
     overflow: hidden;
-    background: rgba(0, 0, 0, 0.25);
+    background: var(--color-bg-tertiary);
     transition: border-color 0.2s;
 }
 
@@ -455,8 +455,8 @@ function handlePaste(e: ClipboardEvent) {
     align-items: center;
     gap: 2px;
     padding: 8px 10px;
-    background: rgba(255, 255, 255, 0.03);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--color-bg-tertiary);
+    border-bottom: 1px solid var(--color-border);
     flex-wrap: wrap;
 }
 
@@ -468,7 +468,7 @@ function handlePaste(e: ClipboardEvent) {
 .toolbar-sep {
     width: 1px;
     height: 20px;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--color-border);
     margin: 0 6px;
 }
 
@@ -481,19 +481,19 @@ function handlePaste(e: ClipboardEvent) {
     background: transparent;
     border: none;
     border-radius: 7px;
-    color: #64748b;
+    color: var(--color-text-muted);
     cursor: pointer;
     transition: all 0.15s;
 }
 
 .toolbar button:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.06);
-    color: #e2e8f0;
+    background: var(--color-border);
+    color: var(--color-text-primary);
 }
 
 .toolbar button.active {
-    background: rgba(16, 185, 129, 0.15);
-    color: #10b981;
+    background: var(--color-primary-light);
+    color: var(--color-primary);
 }
 
 .toolbar button:disabled {
@@ -502,12 +502,12 @@ function handlePaste(e: ClipboardEvent) {
 }
 
 .toolbar button.media-btn {
-    color: #94a3b8;
+    color: var(--color-text-secondary);
 }
 
 .toolbar button.media-btn:hover:not(:disabled) {
-    color: #10b981;
-    background: rgba(16, 185, 129, 0.08);
+    color: var(--color-primary);
+    background: var(--color-primary-light);
 }
 
 .btn-text {
@@ -522,9 +522,9 @@ function handlePaste(e: ClipboardEvent) {
     align-items: center;
     gap: 8px;
     padding: 8px 16px;
-    background: rgba(16, 185, 129, 0.06);
-    border-bottom: 1px solid rgba(16, 185, 129, 0.1);
-    color: #10b981;
+    background: var(--color-primary-light);
+    border-bottom: 1px solid var(--color-primary-light);
+    color: var(--color-primary);
     font-size: 13px;
 }
 
@@ -532,7 +532,7 @@ function handlePaste(e: ClipboardEvent) {
     width: 14px;
     height: 14px;
     border: 2px solid rgba(16, 185, 129, 0.2);
-    border-top-color: #10b981;
+    border-top-color: var(--color-primary);
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
 }
@@ -544,31 +544,31 @@ function handlePaste(e: ClipboardEvent) {
 /* Editor Content */
 .editor-content {
     padding: 16px;
-    color: #e2e8f0;
+    color: var(--color-text-primary);
     font-size: 15px;
     line-height: 1.7;
 }
 
 .editor-content :deep(.tiptap) { outline: none; min-height: inherit; }
 .editor-content :deep(.tiptap p.is-editor-empty:first-child::before) {
-    content: attr(data-placeholder); float: left; color: #4a5568; pointer-events: none; height: 0;
+    content: attr(data-placeholder); float: left; color: var(--color-text-muted); pointer-events: none; height: 0;
 }
 .editor-content :deep(.tiptap p) { margin: 0 0 8px 0; }
-.editor-content :deep(.tiptap h2) { font-size: 22px; font-weight: 700; color: #fff; margin: 16px 0 8px 0; }
-.editor-content :deep(.tiptap h3) { font-size: 18px; font-weight: 600; color: #fff; margin: 12px 0 6px 0; }
-.editor-content :deep(.tiptap strong) { color: #fff; }
+.editor-content :deep(.tiptap h2) { font-size: 22px; font-weight: 700; color: var(--color-text-primary); margin: 16px 0 8px 0; }
+.editor-content :deep(.tiptap h3) { font-size: 18px; font-weight: 600; color: var(--color-text-primary); margin: 12px 0 6px 0; }
+.editor-content :deep(.tiptap strong) { color: var(--color-text-primary); }
 .editor-content :deep(.tiptap ul), .editor-content :deep(.tiptap ol) { padding-left: 24px; margin: 8px 0; }
 .editor-content :deep(.tiptap li) { margin-bottom: 4px; }
-.editor-content :deep(.tiptap blockquote) { border-left: 3px solid #10b981; padding-left: 16px; margin: 12px 0; color: #94a3b8; font-style: italic; }
-.editor-content :deep(.tiptap pre) { background: rgba(0, 0, 0, 0.4); border-radius: 8px; padding: 16px; margin: 12px 0; overflow-x: auto; font-family: 'Fira Code', monospace; font-size: 14px; color: #e2e8f0; }
-.editor-content :deep(.tiptap code) { background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 2px 6px; border-radius: 4px; font-size: 14px; }
+.editor-content :deep(.tiptap blockquote) { border-left: 3px solid var(--color-primary); padding-left: 16px; margin: 12px 0; color: var(--color-text-secondary); font-style: italic; }
+.editor-content :deep(.tiptap pre) { background: var(--color-bg-primary); border-radius: 8px; padding: 16px; margin: 12px 0; overflow-x: auto; font-family: 'Fira Code', monospace; font-size: 14px; color: var(--color-text-primary); }
+.editor-content :deep(.tiptap code) { background: var(--color-primary-light); color: var(--color-primary); padding: 2px 6px; border-radius: 4px; font-size: 14px; }
 .editor-content :deep(.tiptap pre code) { background: none; color: inherit; padding: 0; }
 .editor-content :deep(.tiptap img) { max-width: 100%; border-radius: 8px; margin: 12px 0; cursor: pointer; }
-.editor-content :deep(.tiptap a) { color: #10b981; text-decoration: underline; }
-.editor-content :deep(.tiptap a:hover) { color: #059669; }
+.editor-content :deep(.tiptap a) { color: var(--color-primary); text-decoration: underline; }
+.editor-content :deep(.tiptap a:hover) { color: var(--color-primary-hover); }
 .editor-content :deep(div[data-youtube-video]) { margin: 12px 0; }
 .editor-content :deep(div[data-youtube-video] iframe) { border-radius: 8px; max-width: 100%; }
-.editor-content :deep(.tiptap hr) { border: none; border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 16px 0; }
+.editor-content :deep(.tiptap hr) { border: none; border-top: 1px solid var(--color-border); margin: 16px 0; }
 
 /* Modal Transition */
 .modal-enter-active { transition: opacity 0.2s ease; }
@@ -594,8 +594,8 @@ function handlePaste(e: ClipboardEvent) {
 }
 
 .modal-box {
-    background: #1e293b;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
     border-radius: 16px;
     width: 100%;
     max-width: 480px;
@@ -608,7 +608,7 @@ function handlePaste(e: ClipboardEvent) {
     justify-content: space-between;
     align-items: center;
     padding: 18px 22px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid var(--color-border);
 }
 
 .modal-header h3 {
@@ -618,15 +618,15 @@ function handlePaste(e: ClipboardEvent) {
     margin: 0;
     font-size: 16px;
     font-weight: 600;
-    color: #f1f5f9;
+    color: var(--color-text-primary);
 }
 
-.modal-header h3 svg { color: #10b981; }
+.modal-header h3 svg { color: var(--color-primary); }
 
 .modal-close {
     background: none;
     border: none;
-    color: #64748b;
+    color: var(--color-text-muted);
     cursor: pointer;
     padding: 4px;
     border-radius: 6px;
@@ -635,15 +635,15 @@ function handlePaste(e: ClipboardEvent) {
 }
 
 .modal-close:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: #e2e8f0;
+    background: var(--color-border);
+    color: var(--color-text-primary);
 }
 
 .modal-tabs {
     display: flex;
     padding: 0 22px;
     gap: 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid var(--color-border);
 }
 
 .modal-tabs button {
@@ -656,7 +656,7 @@ function handlePaste(e: ClipboardEvent) {
     background: none;
     border: none;
     border-bottom: 2px solid transparent;
-    color: #64748b;
+    color: var(--color-text-muted);
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
@@ -664,12 +664,12 @@ function handlePaste(e: ClipboardEvent) {
 }
 
 .modal-tabs button:hover {
-    color: #e2e8f0;
+    color: var(--color-text-primary);
 }
 
 .modal-tabs button.active {
-    color: #10b981;
-    border-bottom-color: #10b981;
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
 }
 
 .modal-body {
@@ -681,33 +681,33 @@ function handlePaste(e: ClipboardEvent) {
     margin-bottom: 8px;
     font-size: 13px;
     font-weight: 500;
-    color: #94a3b8;
+    color: var(--color-text-secondary);
 }
 
 .modal-body input {
     width: 100%;
     padding: 10px 14px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
     border-radius: 8px;
-    color: #e2e8f0;
+    color: var(--color-text-primary);
     font-size: 14px;
     transition: border-color 0.2s;
 }
 
 .modal-body input:focus {
     outline: none;
-    border-color: #10b981;
+    border-color: var(--color-primary);
 }
 
 .modal-body input::placeholder {
-    color: #4a5568;
+    color: var(--color-text-muted);
 }
 
 .input-hint {
     margin: 8px 0 0;
     font-size: 12px;
-    color: #4a5568;
+    color: var(--color-text-muted);
 }
 
 /* Upload Area */
@@ -717,37 +717,37 @@ function handlePaste(e: ClipboardEvent) {
     align-items: center;
     justify-content: center;
     padding: 36px 20px;
-    border: 2px dashed rgba(255, 255, 255, 0.1);
+    border: 2px dashed var(--color-border);
     border-radius: 12px;
     cursor: pointer;
     transition: all 0.2s;
     text-align: center;
-    color: #4a5568;
+    color: var(--color-text-muted);
 }
 
 .upload-area:hover {
     border-color: rgba(16, 185, 129, 0.3);
-    background: rgba(16, 185, 129, 0.03);
-    color: #10b981;
+    background: var(--color-primary-light);
+    color: var(--color-primary);
 }
 
 .upload-text {
     margin: 12px 0 4px;
     font-size: 14px;
-    color: #e2e8f0;
+    color: var(--color-text-primary);
     font-weight: 500;
 }
 
 .upload-hint {
     margin: 0;
     font-size: 12px;
-    color: #4a5568;
+    color: var(--color-text-muted);
 }
 
 .upload-error {
     margin: 8px 0 0;
     font-size: 13px;
-    color: #ef4444;
+    color: var(--color-danger);
 }
 
 .url-input-area {
@@ -761,12 +761,12 @@ function handlePaste(e: ClipboardEvent) {
     justify-content: flex-end;
     gap: 8px;
     padding: 16px 22px;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-top: 1px solid var(--color-border);
 }
 
 .modal-btn-primary {
     padding: 8px 18px;
-    background: linear-gradient(135deg, #10b981, #059669);
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
     color: #fff;
     border: none;
     border-radius: 8px;
@@ -787,9 +787,9 @@ function handlePaste(e: ClipboardEvent) {
 
 .modal-btn-secondary {
     padding: 8px 18px;
-    background: rgba(255, 255, 255, 0.05);
-    color: #94a3b8;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
     border-radius: 8px;
     font-size: 13px;
     font-weight: 500;
@@ -798,14 +798,14 @@ function handlePaste(e: ClipboardEvent) {
 }
 
 .modal-btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #e2e8f0;
+    background: var(--color-bg-elevated);
+    color: var(--color-text-primary);
 }
 
 .modal-btn-danger {
     padding: 8px 18px;
     background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
+    color: var(--color-danger);
     border: 1px solid rgba(239, 68, 68, 0.2);
     border-radius: 8px;
     font-size: 13px;

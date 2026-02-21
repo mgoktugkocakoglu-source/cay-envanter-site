@@ -115,7 +115,7 @@ const authStore = useAuthStore();
 }
 
 .hero-highlight {
-  background: linear-gradient(135deg, var(--color-primary) 0%, #34D399 100%);
+  background: linear-gradient(135deg, var(--color-primary-hover) 0%, var(--color-primary) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;

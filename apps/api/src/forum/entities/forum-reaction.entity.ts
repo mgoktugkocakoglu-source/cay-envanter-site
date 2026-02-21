@@ -17,8 +17,7 @@ export enum ReactionTargetType {
 
 export enum ReactionType {
     LIKE = 'like',
-    HELPFUL = 'helpful',
-    THANKS = 'thanks',
+    DISLIKE = 'dislike',
 }
 
 @Entity('forum_reactions')

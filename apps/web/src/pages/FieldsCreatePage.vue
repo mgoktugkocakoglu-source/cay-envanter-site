@@ -37,6 +37,13 @@ const isLoadingParcel = ref(false);
 const TURKEY_CENTER: L.LatLngExpression = [39.0, 35.0];
 const TURKEY_ZOOM = 6;
 
+// Theme-aware color helper for Leaflet
+function getCssVar(name: string, fallback: string): string {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
+
+
 // ═══════ WIZARD STEP MANAGEMENT ═══════
 // activeStep is manually controlled - only changes via user action or goToStep
 const activeStep = ref(1);
@@ -166,9 +173,9 @@ onMounted(async () => {
 
         L.control.zoom({ position: 'topright' }).addTo(map);
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-            maxZoom: 20,
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '&copy; <a href="https://www.esri.com/">Esri</a> &mdash; Source: Esri, Maxar, Earthstar Geographics',
+            maxZoom: 19,
         }).addTo(map);
 
         map.on('click', handleMapClick);
@@ -218,8 +225,9 @@ function zoomToBounds(coordinates: number[][][]) {
         geometry: { type: 'Polygon', coordinates }
     };
 
+    const primary = getCssVar('--color-primary', '#10b981');
     currentLayer = L.geoJSON(geoJson, {
-        style: { color: '#10b981', weight: 2, fillOpacity: 0.08, fillColor: '#10b981' }
+        style: { color: primary, weight: 2, fillOpacity: 0.08, fillColor: primary }
     }).addTo(map);
 
     map.fitBounds(currentLayer.getBounds(), { padding: [20, 20] });
@@ -235,22 +243,26 @@ function displayParcels(parcels: typeof geoStore.parcels) {
         geometry: { type: 'Polygon', coordinates: parcel.polygon }
     }));
 
+    const primaryColor = getCssVar('--color-primary', '#10b981');
+    const mutedColor = getCssVar('--color-text-muted', '#64748b');
     parcelLayers = L.geoJSON({ type: 'FeatureCollection', features }, {
         style: (feature) => ({
-            color: feature?.properties?.id === geoStore.selectedParcelId ? '#10b981' : '#64748b',
+            color: feature?.properties?.id === geoStore.selectedParcelId ? primaryColor : mutedColor,
             weight: feature?.properties?.id === geoStore.selectedParcelId ? 3 : 1,
             fillOpacity: feature?.properties?.id === geoStore.selectedParcelId ? 0.25 : 0.08,
-            fillColor: feature?.properties?.id === geoStore.selectedParcelId ? '#10b981' : '#64748b',
+            fillColor: feature?.properties?.id === geoStore.selectedParcelId ? primaryColor : mutedColor,
         }),
         onEachFeature: (feature, layer) => {
             layer.on('click', () => {
                 geoStore.selectParcel(feature.properties?.id || null);
                 if (parcelLayers) {
+                    const pc = getCssVar('--color-primary', '#10b981');
+                    const mc = getCssVar('--color-text-muted', '#64748b');
                     parcelLayers.setStyle((f) => ({
-                        color: f?.properties?.id === geoStore.selectedParcelId ? '#10b981' : '#64748b',
+                        color: f?.properties?.id === geoStore.selectedParcelId ? pc : mc,
                         weight: f?.properties?.id === geoStore.selectedParcelId ? 3 : 1,
                         fillOpacity: f?.properties?.id === geoStore.selectedParcelId ? 0.25 : 0.08,
-                        fillColor: f?.properties?.id === geoStore.selectedParcelId ? '#10b981' : '#64748b',
+                        fillColor: f?.properties?.id === geoStore.selectedParcelId ? pc : mc,
                     }));
                 }
             });
@@ -294,14 +306,14 @@ function displayClickedParcel(parcel: GeoParcelDetail) {
         properties: { parselNo: parcel.properties.parselNo, alan: parcel.properties.alan, ozet: parcel.properties.ozet },
         geometry: { type: 'Polygon', coordinates: parcel.polygon }
     }, {
-        style: { color: '#f59e0b', weight: 3, fillOpacity: 0.2, fillColor: '#f59e0b', dashArray: '6 4' }
+        style: { color: getCssVar('--color-warning', '#f59e0b'), weight: 3, fillOpacity: 0.2, fillColor: getCssVar('--color-warning', '#f59e0b'), dashArray: '6 4' }
     }).addTo(map);
 
     clickedParcelLayer.bindPopup(`
         <div style="font-family: Inter, sans-serif; font-size: 13px; line-height: 1.5;">
             <strong>${parcel.properties.ozet}</strong><br>
-            <span style="color: #64748b;">Alan:</span> ${parcel.properties.alan} m&sup2;<br>
-            <span style="color: #64748b;">Nitelik:</span> ${parcel.properties.nitelik}
+            <span style="color: var(--color-text-muted);">Alan:</span> ${parcel.properties.alan} m&sup2;<br>
+            <span style="color: var(--color-text-muted);">Nitelik:</span> ${parcel.properties.nitelik}
         </div>
     `).openPopup();
 

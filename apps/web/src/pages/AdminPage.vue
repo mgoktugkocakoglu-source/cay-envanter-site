@@ -218,13 +218,13 @@ function getActivityIcon(type: string) {
     margin: 0;
     font-size: 28px;
     font-weight: 700;
-    color: #ffffff;
+    color: var(--color-text-primary);
 }
 
 .subtitle {
     margin: 8px 0 0 0;
     font-size: 15px;
-    color: #94a3b8;
+    color: var(--color-text-secondary);
 }
 
 /* Layout */
@@ -255,7 +255,7 @@ function getActivityIcon(type: string) {
     background: transparent;
     border: none;
     border-radius: 10px;
-    color: #94a3b8;
+    color: var(--color-text-secondary);
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
@@ -265,12 +265,12 @@ function getActivityIcon(type: string) {
 
 .nav-item:hover {
     background: rgba(255, 255, 255, 0.05);
-    color: #ffffff;
+    color: var(--color-text-primary);
 }
 
 .nav-item.active {
     background: rgba(16, 185, 129, 0.2);
-    color: #10b981;
+    color: var(--color-primary);
 }
 
 .nav-icon {
@@ -336,12 +336,12 @@ function getActivityIcon(type: string) {
 .stat-value {
     font-size: 28px;
     font-weight: 700;
-    color: #ffffff;
+    color: var(--color-text-primary);
 }
 
 .stat-label {
     font-size: 13px;
-    color: #64748b;
+    color: var(--color-text-muted);
     margin-top: 4px;
 }
 
@@ -354,7 +354,7 @@ function getActivityIcon(type: string) {
     margin: 0 0 16px 0;
     font-size: 18px;
     font-weight: 600;
-    color: #ffffff;
+    color: var(--color-text-primary);
 }
 
 /* Quick Actions */
@@ -372,7 +372,7 @@ function getActivityIcon(type: string) {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 10px;
-    color: #ffffff;
+    color: var(--color-text-primary);
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
@@ -433,18 +433,18 @@ function getActivityIcon(type: string) {
 
 .activity-action {
     font-size: 14px;
-    color: #e2e8f0;
+    color: var(--color-border);
 }
 
 .activity-user {
     font-size: 12px;
-    color: #64748b;
+    color: var(--color-text-muted);
     margin-top: 2px;
 }
 
 .activity-time {
     font-size: 12px;
-    color: #64748b;
+    color: var(--color-text-muted);
 }
 
 /* Categories Table */
@@ -468,7 +468,7 @@ function getActivityIcon(type: string) {
     background: rgba(0, 0, 0, 0.2);
     font-size: 12px;
     font-weight: 600;
-    color: #64748b;
+    color: var(--color-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -476,7 +476,7 @@ function getActivityIcon(type: string) {
 .table-row {
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     font-size: 14px;
-    color: #e2e8f0;
+    color: var(--color-text-primary);
 }
 
 .table-row:last-child {
@@ -498,7 +498,7 @@ function getActivityIcon(type: string) {
 
 .col-topics {
     text-align: center;
-    color: #10b981;
+    color: var(--color-primary);
     font-weight: 600;
 }
 
@@ -509,7 +509,7 @@ function getActivityIcon(type: string) {
 .status-active {
     padding: 4px 10px;
     background: rgba(16, 185, 129, 0.2);
-    color: #10b981;
+    color: var(--color-primary);
     border-radius: 6px;
     font-size: 12px;
     font-weight: 500;
@@ -518,7 +518,7 @@ function getActivityIcon(type: string) {
 .status-inactive {
     padding: 4px 10px;
     background: rgba(148, 163, 184, 0.2);
-    color: #94a3b8;
+    color: var(--color-text-secondary);
     border-radius: 6px;
     font-size: 12px;
     font-weight: 500;
@@ -548,7 +548,7 @@ function getActivityIcon(type: string) {
 .empty-table {
     padding: 40px;
     text-align: center;
-    color: #64748b;
+    color: var(--color-text-muted);
     font-size: 14px;
 }
 

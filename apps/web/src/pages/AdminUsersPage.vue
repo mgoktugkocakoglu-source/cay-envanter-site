@@ -352,20 +352,20 @@ function formatDate(dateString: string) {
 }
 
 .breadcrumb-link {
-    color: #10b981;
+    color: var(--color-primary);
     text-decoration: none;
 }
 
 .breadcrumb-link:hover {
-    color: #059669;
+    color: var(--color-primary-hover);
 }
 
 .breadcrumb-separator {
-    color: #64748b;
+    color: var(--color-text-muted);
 }
 
 .breadcrumb-current {
-    color: #94a3b8;
+    color: var(--color-text-secondary);
 }
 
 .page-header h1 {
@@ -409,11 +409,11 @@ function formatDate(dateString: string) {
 
 .search-input:focus {
     outline: none;
-    border-color: #10b981;
+    border-color: var(--color-primary);
 }
 
 .search-input::placeholder {
-    color: #64748b;
+    color: var(--color-text-muted);
 }
 
 .filter-select {
@@ -429,11 +429,11 @@ function formatDate(dateString: string) {
 
 .filter-select:focus {
     outline: none;
-    border-color: #10b981;
+    border-color: var(--color-primary);
 }
 
 .filter-select option {
-    background: #1e293b;
+    background: var(--color-bg-secondary);
 }
 
 /* Loading */
@@ -448,7 +448,7 @@ function formatDate(dateString: string) {
     width: 40px;
     height: 40px;
     border: 4px solid rgba(255, 255, 255, 0.1);
-    border-top-color: #10b981;
+    border-top-color: var(--color-primary);
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
@@ -459,7 +459,7 @@ function formatDate(dateString: string) {
 
 .loading-state p {
     margin-top: 16px;
-    color: #94a3b8;
+    color: var(--color-text-secondary);
 }
 
 /* Users Table */
@@ -483,7 +483,7 @@ function formatDate(dateString: string) {
     background: rgba(0, 0, 0, 0.2);
     font-size: 12px;
     font-weight: 600;
-    color: #64748b;
+    color: var(--color-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -510,7 +510,7 @@ function formatDate(dateString: string) {
 .user-avatar {
     width: 40px;
     height: 40px;
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
     border-radius: 10px;
     display: flex;
     align-items: center;
@@ -533,7 +533,7 @@ function formatDate(dateString: string) {
 
 .user-email {
     font-size: 12px;
-    color: #64748b;
+    color: var(--color-text-muted);
 }
 
 /* Role Badge */
@@ -546,12 +546,12 @@ function formatDate(dateString: string) {
 
 .role-user {
     background: rgba(148, 163, 184, 0.2);
-    color: #94a3b8;
+    color: var(--color-text-secondary);
 }
 
 .role-mod {
     background: rgba(59, 130, 246, 0.2);
-    color: #3b82f6;
+    color: var(--color-info);
 }
 
 .role-admin {
@@ -567,29 +567,29 @@ function formatDate(dateString: string) {
 
 .stat-item {
     font-size: 13px;
-    color: #94a3b8;
+    color: var(--color-text-secondary);
 }
 
 /* Status */
 .status-active {
-    color: #10b981;
+    color: var(--color-primary);
     font-size: 13px;
 }
 
 .status-inactive {
-    color: #64748b;
+    color: var(--color-text-muted);
     font-size: 13px;
 }
 
 .status-banned {
-    color: #ef4444;
+    color: var(--color-danger);
     font-size: 13px;
 }
 
 /* Date */
 .col-date {
     font-size: 13px;
-    color: #94a3b8;
+    color: var(--color-text-secondary);
 }
 
 /* Actions */
@@ -640,7 +640,7 @@ function formatDate(dateString: string) {
     position: absolute;
     top: 100%;
     right: 0;
-    background: #1e293b;
+    background: var(--color-bg-secondary);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     padding: 4px;
@@ -659,7 +659,7 @@ function formatDate(dateString: string) {
     padding: 8px 12px;
     background: none;
     border: none;
-    color: #e2e8f0;
+    color: var(--color-text-primary);
     font-size: 13px;
     text-align: left;
     cursor: pointer;
@@ -684,7 +684,7 @@ function formatDate(dateString: string) {
 
 .empty-state p {
     margin: 0;
-    color: #64748b;
+    color: var(--color-text-muted);
 }
 
 /* Modal */
@@ -703,7 +703,7 @@ function formatDate(dateString: string) {
 }
 
 .modal {
-    background: #1e293b;
+    background: var(--color-bg-secondary);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 16px;
     width: 100%;
@@ -727,7 +727,7 @@ function formatDate(dateString: string) {
 .close-btn {
     background: none;
     border: none;
-    color: #64748b;
+    color: var(--color-text-muted);
     font-size: 20px;
     cursor: pointer;
 }
@@ -750,7 +750,7 @@ function formatDate(dateString: string) {
 .profile-avatar {
     width: 64px;
     height: 64px;
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
     border-radius: 16px;
     display: flex;
     align-items: center;
@@ -769,7 +769,7 @@ function formatDate(dateString: string) {
 .profile-info p {
     margin: 4px 0 8px;
     font-size: 14px;
-    color: #64748b;
+    color: var(--color-text-muted);
 }
 
 .detail-grid {
@@ -786,13 +786,13 @@ function formatDate(dateString: string) {
 
 .detail-label {
     font-size: 12px;
-    color: #64748b;
+    color: var(--color-text-muted);
     text-transform: uppercase;
 }
 
 .detail-value {
     font-size: 15px;
-    color: #e2e8f0;
+    color: var(--color-text-primary);
     font-weight: 500;
 }
 
@@ -821,12 +821,12 @@ function formatDate(dateString: string) {
 
 .btn-danger {
     background: rgba(239, 68, 68, 0.2);
-    color: #ef4444;
+    color: var(--color-danger);
 }
 
 .btn-success {
     background: rgba(16, 185, 129, 0.2);
-    color: #10b981;
+    color: var(--color-primary);
 }
 
 .btn:hover {
