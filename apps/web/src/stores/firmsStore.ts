@@ -97,6 +97,66 @@ export const useFirmsStore = defineStore('firms', () => {
         }
     }
 
+    async function createFirm(data: Partial<Firm>): Promise<boolean> {
+        isLoading.value = true;
+        error.value = null;
+        try {
+            const response = await api.createFirm(data);
+            if (response.data) {
+                await fetchFirms();
+                return true;
+            } else if (response.error) {
+                error.value = response.error.message;
+            }
+            return false;
+        } catch (e) {
+            error.value = 'Firma olusturulurken hata olustu';
+            return false;
+        } finally {
+            isLoading.value = false;
+        }
+    }
+
+    async function updateFirm(id: string, data: Partial<Firm>): Promise<boolean> {
+        isLoading.value = true;
+        error.value = null;
+        try {
+            const response = await api.updateFirm(id, data);
+            if (response.data) {
+                await fetchFirms();
+                return true;
+            } else if (response.error) {
+                error.value = response.error.message;
+            }
+            return false;
+        } catch (e) {
+            error.value = 'Firma guncellenirken hata olustu';
+            return false;
+        } finally {
+            isLoading.value = false;
+        }
+    }
+
+    async function deleteFirm(id: string): Promise<boolean> {
+        isLoading.value = true;
+        error.value = null;
+        try {
+            const response = await api.deleteFirm(id);
+            if (!response.error) {
+                await fetchFirms();
+                return true;
+            } else {
+                error.value = response.error.message;
+            }
+            return false;
+        } catch (e) {
+            error.value = 'Firma silinirken hata olustu';
+            return false;
+        } finally {
+            isLoading.value = false;
+        }
+    }
+
     function clearError() {
         error.value = null;
     }
@@ -116,6 +176,9 @@ export const useFirmsStore = defineStore('firms', () => {
         fetchCurrentTariffs,
         fetchCollectionPoints,
         fetchFirmsWithTariffs,
+        createFirm,
+        updateFirm,
+        deleteFirm,
         clearError,
     };
 });

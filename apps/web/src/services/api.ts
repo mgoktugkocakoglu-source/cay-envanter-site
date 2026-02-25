@@ -297,98 +297,76 @@ export interface FirmWithCurrentTariffs {
     }[];
 }
 
-// Forum Types
-export interface ForumCategory {
+// Community Types
+export type CommunityPostType = 'text' | 'photo' | 'video';
+export type CommunityReactionType = 'like' | 'dislike';
+
+export interface CommunityTag {
     id: string;
     name: string;
-    slug: string;
-    description: string | null;
-    icon: string | null;
-    displayOrder: number;
-    isActive: boolean;
-    topicCount?: number;
-    latestTopic?: {
-        id: string;
-        title: string;
-        createdAt: string;
-        author: { id: string; fullName: string };
-    };
-}
-
-export interface ForumTopic {
-    id: string;
-    title: string;
-    slug: string;
-    content: string;
-    viewCount: number;
-    replyCount: number;
-    isPinned: boolean;
-    isLocked: boolean;
-    isSolved: boolean;
-    categoryId: string;
-    category?: { id: string; name: string; slug: string };
-    authorId: string;
-    author?: { id: string; fullName: string };
+    displayName: string;
+    usageCount: number;
+    isSystem: boolean;
     createdAt: string;
-    updatedAt: string;
-    latestReply?: {
-        id: string;
-        content: string;
-        createdAt: string;
-        author: { id: string; fullName: string };
-    };
-    reactions?: ForumReactionStats;
-    isSubscribed?: boolean;
 }
 
-export interface ForumReply {
+export interface CommunityPost {
     id: string;
-    content: string;
-    isSolution: boolean;
-    topicId: string;
-    authorId: string;
-    author?: { id: string; fullName: string };
-    parentId: string | null;
-    replies?: ForumReply[];
-    createdAt: string;
-    updatedAt: string;
-    reactions?: ForumReactionStats;
-}
-
-export type ReactionType = 'like' | 'dislike';
-
-export interface ForumReactionStats {
-    like: number;
-    dislike: number;
-    userReaction?: ReactionType | null;
-}
-
-export interface ForumSubscription {
-    id: string;
-    topicId: string;
     userId: string;
+    content: string | null;
+    type: CommunityPostType;
+    mediaUrls: string[];
+    likeCount: number;
+    dislikeCount: number;
+    commentCount: number;
+    user: {
+        id: string;
+        fullName: string;
+        avatarUrl: string | null;
+        userType: string;
+    };
+    tags: CommunityTag[];
+    userReaction?: CommunityReactionType | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CommunityComment {
+    id: string;
+    postId: string;
+    userId: string;
+    content: string;
+    likeCount: number;
+    dislikeCount: number;
+    user: {
+        id: string;
+        fullName: string;
+        avatarUrl: string | null;
+    };
     createdAt: string;
 }
 
-export interface ForumTopicListQuery {
-    page?: number;
-    limit?: number;
-    categoryId?: string;
-    authorId?: string;
-    search?: string;
-    sortBy?: 'createdAt' | 'updatedAt' | 'lastActivityAt' | 'viewCount' | 'replyCount';
-    isPinned?: boolean;
-    isSolved?: boolean;
+export interface CommunityFeedResponse {
+    items: CommunityPost[];
+    nextCursor: string | null;
+    hasMore: boolean;
+    userReactions: Record<string, CommunityReactionType>;
 }
 
-export interface PaginatedResponse<T> {
-    data: T[];
-    meta: {
-        total: number;
-        page: number;
-        limit: number;
-        totalPages: number;
-    };
+export interface CommunityPostQuery {
+    cursor?: string;
+    limit?: number;
+    type?: CommunityPostType;
+    tag?: string;
+    userId?: string;
+    search?: string;
+}
+
+export interface CreateCommunityPostData {
+    content?: string;
+    type: CommunityPostType;
+    mediaUrls?: string[];
+    tagNames?: string[];
 }
 
 export const api = {
@@ -624,68 +602,6 @@ export const api = {
         return request<unknown[]>(`/reports/year-comparison${query}`);
     },
 
-    // Forum Categories
-    getForumCategories: () => request<ForumCategory[]>('/forum/categories'),
-    getForumCategory: (id: string) => request<ForumCategory>(`/forum/categories/${id}`),
-    createForumCategory: (data: { name: string; description?: string; icon?: string; displayOrder?: number }) =>
-        request<ForumCategory>('/forum/categories', { method: 'POST', body: JSON.stringify(data) }),
-    updateForumCategory: (id: string, data: { name?: string; description?: string; icon?: string; displayOrder?: number; isActive?: boolean }) =>
-        request<ForumCategory>(`/forum/categories/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-    deleteForumCategory: (id: string) => request<void>(`/forum/categories/${id}`, { method: 'DELETE' }),
-
-    // Forum Topics
-    getForumTopics: (query?: ForumTopicListQuery) => {
-        const params = new URLSearchParams();
-        if (query?.page) params.append('page', query.page.toString());
-        if (query?.limit) params.append('limit', query.limit.toString());
-        if (query?.categoryId) params.append('categoryId', query.categoryId);
-        if (query?.authorId) params.append('authorId', query.authorId);
-        if (query?.search) params.append('search', query.search);
-        if (query?.sortBy) params.append('sortBy', query.sortBy);
-        if (query?.isPinned !== undefined) params.append('isPinned', query.isPinned.toString());
-        if (query?.isSolved !== undefined) params.append('isSolved', query.isSolved.toString());
-        const queryString = params.toString();
-        return request<PaginatedResponse<ForumTopic>>(`/forum/topics${queryString ? `?${queryString}` : ''}`);
-    },
-    getForumTopic: (id: string) => request<ForumTopic>(`/forum/topics/${id}`),
-    createForumTopic: (data: { title: string; content: string; categoryId: string }) =>
-        request<ForumTopic>('/forum/topics', { method: 'POST', body: JSON.stringify(data) }),
-    updateForumTopic: (id: string, data: { title?: string; content?: string }) =>
-        request<ForumTopic>(`/forum/topics/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-    deleteForumTopic: (id: string) => request<void>(`/forum/topics/${id}`, { method: 'DELETE' }),
-    pinForumTopic: (id: string) => request<ForumTopic>(`/forum/topics/${id}/pin`, { method: 'PATCH' }),
-    lockForumTopic: (id: string) => request<ForumTopic>(`/forum/topics/${id}/lock`, { method: 'PATCH' }),
-    solveForumTopic: (id: string) => request<ForumTopic>(`/forum/topics/${id}/solve`, { method: 'PATCH' }),
-
-    // Forum Replies
-    getForumReplies: (topicId: string) => request<ForumReply[]>(`/forum/topics/${topicId}/replies`),
-    createForumReply: (topicId: string, data: { content: string; parentReplyId?: string }) =>
-        request<ForumReply>(`/forum/topics/${topicId}/replies`, { method: 'POST', body: JSON.stringify(data) }),
-    updateForumReply: (id: string, content: string) =>
-        request<ForumReply>(`/forum/replies/${id}`, { method: 'PATCH', body: JSON.stringify({ content }) }),
-    deleteForumReply: (id: string) => request<void>(`/forum/replies/${id}`, { method: 'DELETE' }),
-    markReplyAsSolution: (id: string) =>
-        request<ForumReply>(`/forum/replies/${id}/solution`, { method: 'PATCH' }),
-
-    // Forum Reactions
-    toggleForumReaction: (data: { targetType: 'topic' | 'reply'; targetId: string; reactionType: ReactionType }) =>
-        request<{ added: boolean }>('/forum/reactions', {
-            method: 'POST',
-            body: JSON.stringify(data),
-        }),
-    getForumReactionStats: (targetType: 'topic' | 'reply', targetId: string) =>
-        request<ForumReactionStats>(`/forum/reactions/stats?targetType=${targetType}&targetId=${targetId}`),
-
-    // Forum Subscriptions
-    subscribeToTopic: (topicId: string) =>
-        request<ForumSubscription>(`/forum/topics/${topicId}/subscribe`, {
-            method: 'POST',
-            body: JSON.stringify({ topicId }),
-        }),
-    unsubscribeFromTopic: (topicId: string) =>
-        request<void>(`/forum/topics/${topicId}/unsubscribe`, { method: 'POST' }),
-    getUserSubscriptions: () => request<ForumSubscription[]>('/forum/subscriptions'),
-
     // Users
     searchUser: (query: string, type: 'tc' | 'phone') =>
         request<{ id: string; fullName: string; userType: string }>(
@@ -715,6 +631,82 @@ export const api = {
             return { data };
         } catch {
             return { error: { message: 'Dosya yuklenirken hata olustu', statusCode: 0 } };
+        }
+    },
+
+    // Community Posts
+    getCommunityFeed: (query?: CommunityPostQuery) => {
+        const params = new URLSearchParams();
+        if (query?.cursor) params.append('cursor', query.cursor);
+        if (query?.limit) params.append('limit', query.limit.toString());
+        if (query?.type) params.append('type', query.type);
+        if (query?.tag) params.append('tag', query.tag);
+        if (query?.userId) params.append('userId', query.userId);
+        if (query?.search) params.append('search', query.search);
+        const queryString = params.toString();
+        return request<CommunityFeedResponse>(`/community/posts${queryString ? `?${queryString}` : ''}`);
+    },
+    getCommunityPost: (id: string) => request<CommunityPost>(`/community/posts/${id}`),
+    createCommunityPost: (data: CreateCommunityPostData) =>
+        request<CommunityPost>('/community/posts', { method: 'POST', body: JSON.stringify(data) }),
+    deleteCommunityPost: (id: string) =>
+        request<{ message: string }>(`/community/posts/${id}`, { method: 'DELETE' }),
+
+    // Community Tags
+    getCommunityTags: () => request<CommunityTag[]>('/community/tags'),
+    getTrendingTags: (limit?: number) =>
+        request<CommunityTag[]>(`/community/tags/trending${limit ? `?limit=${limit}` : ''}`),
+
+    // Community Comments
+    getCommunityComments: (postId: string) =>
+        request<CommunityComment[]>(`/community/posts/${postId}/comments`),
+    createCommunityComment: (postId: string, content: string) =>
+        request<CommunityComment>(`/community/posts/${postId}/comments`, {
+            method: 'POST', body: JSON.stringify({ content }),
+        }),
+    deleteCommunityComment: (id: string) =>
+        request<{ message: string }>(`/community/comments/${id}`, { method: 'DELETE' }),
+
+    // Community Reactions
+    toggleCommunityReaction: (data: { targetType: 'post' | 'comment'; targetId: string; reactionType: CommunityReactionType }) =>
+        request<{ action: string; reactionType: CommunityReactionType }>('/community/reactions', {
+            method: 'POST', body: JSON.stringify(data),
+        }),
+
+    // Community Media Upload
+    uploadCommunityMedia: async (file: File): Promise<ApiResponse<{ url: string; filename: string }>> => {
+        const authStore = useAuthStore();
+        const token = authStore.accessToken;
+        const formData = new FormData();
+        formData.append('file', file);
+
+        /** Use /uploads/video for video files, /uploads/image for images */
+        const isVideo = file.type.startsWith('video/');
+        const endpoint = isVideo ? '/uploads/video' : '/uploads/image';
+
+        console.log('[uploadCommunityMedia] file:', file.name, 'type:', file.type, 'size:', file.size, 'isVideo:', isVideo, 'endpoint:', endpoint);
+
+        try {
+            const url = `${API_BASE}${endpoint}`;
+            console.log('[uploadCommunityMedia] Sending fetch to:', url);
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: formData,
+            });
+
+            console.log('[uploadCommunityMedia] Response status:', response.status);
+            const data = await response.json();
+            console.log('[uploadCommunityMedia] Response data:', data);
+            if (!response.ok) {
+                return { error: { message: data.message || 'Media upload failed', statusCode: response.status } };
+            }
+            return { data };
+        } catch (err) {
+            console.error('[uploadCommunityMedia] Error:', err);
+            return { error: { message: 'Network error during media upload', statusCode: 0 } };
         }
     },
 };

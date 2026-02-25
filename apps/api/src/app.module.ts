@@ -13,8 +13,8 @@ import { HarvestsModule } from '@/harvests/harvests.module';
 import { PaymentsModule } from '@/payments/payments.module';
 import { ReportsModule } from '@/reports/reports.module';
 import { FirmsModule } from '@/firms/firms.module';
-import { ForumModule } from '@/forum/forum.module';
 import { UploadsModule } from '@/uploads/uploads.module';
+import { CommunityModule } from '@/community/community.module';
 
 @Module({
     imports: [
@@ -42,6 +42,7 @@ import { UploadsModule } from '@/uploads/uploads.module';
                 JWT_REFRESH_SECRET: Joi.string().required(),
                 JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
                 APP_URL: Joi.string().required(),
+                GROQ_API_KEY: Joi.string().optional().default(''),
             }),
         }),
 
@@ -72,8 +73,8 @@ import { UploadsModule } from '@/uploads/uploads.module';
         HarvestsModule,
         PaymentsModule,
         ReportsModule,
-        ForumModule,
         UploadsModule,
+        CommunityModule,
     ],
     providers: [
         {

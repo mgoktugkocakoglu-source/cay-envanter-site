@@ -34,6 +34,21 @@ const imageFileFilter = (
     callback(null, true);
 };
 
+const videoFileFilter = (
+    _req: Request,
+    file: Express.Multer.File,
+    callback: (error: Error | null, acceptFile: boolean) => void,
+): void => {
+    const allowedMimes = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo'];
+    if (!allowedMimes.includes(file.mimetype)) {
+        return callback(
+            new BadRequestException('Sadece MP4, WebM, MOV ve AVI video dosyalari yuklenebilir.'),
+            false,
+        );
+    }
+    callback(null, true);
+};
+
 const storage = diskStorage({
     destination: (
         _req: Request,
@@ -68,6 +83,27 @@ export class UploadsController {
     uploadImage(@UploadedFile() file: Express.Multer.File) {
         if (!file) {
             throw new BadRequestException('Dosya yuklenemedi.');
+        }
+        return {
+            url: `/api/uploads/file/${file.filename}`,
+            filename: file.filename,
+            originalName: file.originalname,
+            size: file.size,
+        };
+    }
+
+    @Post('video')
+    @UseGuards(JwtAuthGuard)
+    @UseInterceptors(
+        FileInterceptor('file', {
+            storage,
+            fileFilter: videoFileFilter,
+            limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+        }),
+    )
+    uploadVideo(@UploadedFile() file: Express.Multer.File) {
+        if (!file) {
+            throw new BadRequestException('Video yuklenemedi.');
         }
         return {
             url: `/api/uploads/file/${file.filename}`,

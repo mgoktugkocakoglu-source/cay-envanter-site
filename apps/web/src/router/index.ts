@@ -97,25 +97,14 @@ const router = createRouter({
             meta: { requiresAuth: true },
         },
         {
-            path: '/forum',
-            name: 'forum',
-            component: () => import('@/pages/ForumPage.vue'),
+            path: '/community',
+            name: 'community',
+            component: () => import('@/pages/CommunityFeedPage.vue'),
         },
         {
-            path: '/forum/category/:slug',
-            name: 'forum-category',
-            component: () => import('@/pages/ForumCategoryPage.vue'),
-        },
-        {
-            path: '/forum/topic/:slug',
-            name: 'forum-topic',
-            component: () => import('@/pages/ForumTopicPage.vue'),
-        },
-        {
-            path: '/forum/create',
-            name: 'forum-create',
-            component: () => import('@/pages/ForumCreateTopicPage.vue'),
-            meta: { requiresAuth: true },
+            path: '/community/post/:id',
+            name: 'community-post',
+            component: () => import('@/pages/CommunityPostPage.vue'),
         },
         // Admin Routes
         {
@@ -128,12 +117,6 @@ const router = createRouter({
             path: '/admin/users',
             name: 'admin-users',
             component: () => import('@/pages/AdminUsersPage.vue'),
-            meta: { requiresAuth: true },
-        },
-        {
-            path: '/admin/categories',
-            name: 'admin-categories',
-            component: () => import('@/pages/AdminCategoriesPage.vue'),
             meta: { requiresAuth: true },
         },
         // 404 catch-all route

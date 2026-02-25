@@ -75,7 +75,7 @@ function closeMobileMenu() {
         <RouterLink to="/firms" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Firmalar</RouterLink>
         <RouterLink to="/harvests" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Hasatlarım</RouterLink>
         <RouterLink to="/payments" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Ödemeler</RouterLink>
-        <RouterLink to="/forum" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Forum</RouterLink>
+        <RouterLink to="/community" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Topluluk</RouterLink>
         <RouterLink to="/settings" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Ayarlar</RouterLink>
         <button class="btn btn-secondary" @click="handleLogout">
           Çıkış Yap
