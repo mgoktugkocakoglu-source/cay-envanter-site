@@ -2,12 +2,14 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 
 export type UserType = 'land_owner' | 'worker' | 'self_farmer';
+export type UserRole = 'user' | 'admin' | 'moderator';
 
 interface User {
     id: string;
     email: string;
     fullName: string;
     userType: UserType;
+    role: UserRole;
     phone: string;
     province: string;
     district: string;
@@ -40,6 +42,7 @@ export const useAuthStore = defineStore('auth', () => {
     // Computed
     const isAuthenticated = computed(() => !!accessToken.value);
     const hasRefreshToken = computed(() => !!refreshToken.value);
+    const isAdmin = computed(() => user.value?.role === 'admin');
 
     // Initialize - try to get user if we have a refresh token
     // Uses a shared promise to prevent race conditions from multiple callers
@@ -234,6 +237,7 @@ export const useAuthStore = defineStore('auth', () => {
         // Computed
         isAuthenticated,
         hasRefreshToken,
+        isAdmin,
         // Actions
         initialize,
         setAuth,

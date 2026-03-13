@@ -256,13 +256,26 @@ export interface Firm {
     updatedAt: string;
 }
 
+export type PaymentTerm = 'cash' | 'weekly' | 'monthly' | 'custom';
+
+export interface TariffSplitDetail {
+    percentage: number;
+    paymentTerm: PaymentTerm;
+    deferredMonths?: number;
+    customPaymentDate?: string;
+    pricePerKg: number;
+}
+
 export interface FirmTariff {
     id: string;
     firmId: string;
-    quality: 'shoot' | 'leaf' | 'mixed';
+    paymentTerm: PaymentTerm;
     pricePerKg: number;
     effectiveDate: string;
     endDate: string | null;
+    customPaymentDate: string | null;
+    isSplitPayment: boolean;
+    splitDetails: TariffSplitDetail[] | null;
     isActive: boolean;
     createdAt: string;
     updatedAt: string;
@@ -275,6 +288,7 @@ export interface FirmCollectionPoint {
     province: string;
     district: string;
     address: string | null;
+    description: string | null;
     latitude: number | null;
     longitude: number | null;
     collectorName: string | null;
@@ -291,9 +305,11 @@ export interface FirmWithCurrentTariffs {
     logoUrl: string | null;
     isActive: boolean;
     currentTariffs: {
-        quality: 'shoot' | 'leaf' | 'mixed';
+        paymentTerm: PaymentTerm;
         pricePerKg: number;
         effectiveDate: string;
+        isSplitPayment: boolean;
+        splitDetails: TariffSplitDetail[] | null;
     }[];
 }
 

@@ -157,6 +157,110 @@ export const useFirmsStore = defineStore('firms', () => {
         }
     }
 
+    // ─── Tariff CRUD ───
+    async function createTariff(firmId: string, data: Partial<FirmTariff>): Promise<boolean> {
+        error.value = null;
+        try {
+            const response = await api.createFirmTariff(firmId, data);
+            if (response.data) {
+                await fetchCurrentTariffs(firmId);
+                return true;
+            } else if (response.error) {
+                error.value = response.error.message;
+            }
+            return false;
+        } catch (e) {
+            error.value = 'Tarife olusturulurken hata olustu';
+            return false;
+        }
+    }
+
+    async function updateTariff(firmId: string, tariffId: string, data: Partial<FirmTariff>): Promise<boolean> {
+        error.value = null;
+        try {
+            const response = await api.updateFirmTariff(firmId, tariffId, data);
+            if (response.data) {
+                await fetchCurrentTariffs(firmId);
+                return true;
+            } else if (response.error) {
+                error.value = response.error.message;
+            }
+            return false;
+        } catch (e) {
+            error.value = 'Tarife guncellenirken hata olustu';
+            return false;
+        }
+    }
+
+    async function deleteTariff(firmId: string, tariffId: string): Promise<boolean> {
+        error.value = null;
+        try {
+            const response = await api.deleteFirmTariff(firmId, tariffId);
+            if (!response.error) {
+                currentTariffs.value = currentTariffs.value.filter(t => t.id !== tariffId);
+                return true;
+            } else {
+                error.value = response.error.message;
+            }
+            return false;
+        } catch (e) {
+            error.value = 'Tarife silinirken hata olustu';
+            return false;
+        }
+    }
+
+    // ─── Collection Point CRUD ───
+    async function createCollectionPoint(firmId: string, data: Partial<FirmCollectionPoint>): Promise<boolean> {
+        error.value = null;
+        try {
+            const response = await api.createFirmCollectionPoint(firmId, data);
+            if (response.data) {
+                await fetchCollectionPoints(firmId);
+                return true;
+            } else if (response.error) {
+                error.value = response.error.message;
+            }
+            return false;
+        } catch (e) {
+            error.value = 'Toplama noktasi olusturulurken hata olustu';
+            return false;
+        }
+    }
+
+    async function updateCollectionPoint(firmId: string, pointId: string, data: Partial<FirmCollectionPoint>): Promise<boolean> {
+        error.value = null;
+        try {
+            const response = await api.updateFirmCollectionPoint(firmId, pointId, data);
+            if (response.data) {
+                await fetchCollectionPoints(firmId);
+                return true;
+            } else if (response.error) {
+                error.value = response.error.message;
+            }
+            return false;
+        } catch (e) {
+            error.value = 'Toplama noktasi guncellenirken hata olustu';
+            return false;
+        }
+    }
+
+    async function deleteCollectionPoint(firmId: string, pointId: string): Promise<boolean> {
+        error.value = null;
+        try {
+            const response = await api.deleteFirmCollectionPoint(firmId, pointId);
+            if (!response.error) {
+                collectionPoints.value = collectionPoints.value.filter(cp => cp.id !== pointId);
+                return true;
+            } else {
+                error.value = response.error.message;
+            }
+            return false;
+        } catch (e) {
+            error.value = 'Toplama noktasi silinirken hata olustu';
+            return false;
+        }
+    }
+
     function clearError() {
         error.value = null;
     }
@@ -179,6 +283,12 @@ export const useFirmsStore = defineStore('firms', () => {
         createFirm,
         updateFirm,
         deleteFirm,
+        createTariff,
+        updateTariff,
+        deleteTariff,
+        createCollectionPoint,
+        updateCollectionPoint,
+        deleteCollectionPoint,
         clearError,
     };
 });

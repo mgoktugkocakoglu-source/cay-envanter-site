@@ -4,7 +4,7 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThanOrEqual, MoreThanOrEqual, IsNull, Or } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Firm, FirmTariff, FirmCollectionPoint } from '@/firms/entities';
 import {
     CreateFirmDto,
@@ -106,7 +106,7 @@ export class FirmsService {
         await this.ensureFirmExists(firmId);
         return this.tariffRepository.find({
             where: { firmId },
-            order: { effectiveDate: 'DESC', quality: 'ASC' },
+            order: { effectiveDate: 'DESC', paymentTerm: 'ASC' },
         });
     }
 
@@ -120,7 +120,7 @@ export class FirmsService {
             .andWhere('tariff.effective_date <= :today', { today })
             .andWhere('(tariff.end_date IS NULL OR tariff.end_date >= :today)', { today })
             .andWhere('tariff.isActive = :isActive', { isActive: true })
-            .orderBy('tariff.quality', 'ASC')
+            .orderBy('tariff.payment_term', 'ASC')
             .getMany();
     }
 
@@ -129,10 +129,13 @@ export class FirmsService {
 
         const tariff = this.tariffRepository.create({
             firmId,
-            quality: dto.quality,
+            paymentTerm: dto.paymentTerm,
             pricePerKg: dto.pricePerKg,
             effectiveDate: new Date(dto.effectiveDate),
             endDate: dto.endDate ? new Date(dto.endDate) : null,
+            customPaymentDate: dto.customPaymentDate ? new Date(dto.customPaymentDate) : null,
+            isSplitPayment: dto.isSplitPayment ?? false,
+            splitDetails: dto.splitDetails || null,
             isActive: dto.isActive ?? true,
         });
 
@@ -152,10 +155,13 @@ export class FirmsService {
             throw new NotFoundException('Tariff not found');
         }
 
-        if (dto.quality !== undefined) tariff.quality = dto.quality;
+        if (dto.paymentTerm !== undefined) tariff.paymentTerm = dto.paymentTerm;
         if (dto.pricePerKg !== undefined) tariff.pricePerKg = dto.pricePerKg;
         if (dto.effectiveDate !== undefined) tariff.effectiveDate = new Date(dto.effectiveDate);
         if (dto.endDate !== undefined) tariff.endDate = dto.endDate ? new Date(dto.endDate) : null;
+        if (dto.customPaymentDate !== undefined) tariff.customPaymentDate = dto.customPaymentDate ? new Date(dto.customPaymentDate) : null;
+        if (dto.isSplitPayment !== undefined) tariff.isSplitPayment = dto.isSplitPayment;
+        if (dto.splitDetails !== undefined) tariff.splitDetails = dto.splitDetails || null;
         if (dto.isActive !== undefined) tariff.isActive = dto.isActive;
 
         await this.tariffRepository.save(tariff);
@@ -211,6 +217,7 @@ export class FirmsService {
             province: dto.province,
             district: dto.district,
             address: dto.address || null,
+            description: dto.description || null,
             latitude: dto.latitude || null,
             longitude: dto.longitude || null,
             collectorName: dto.collectorName || null,
@@ -242,6 +249,7 @@ export class FirmsService {
         if (dto.province !== undefined) point.province = dto.province;
         if (dto.district !== undefined) point.district = dto.district;
         if (dto.address !== undefined) point.address = dto.address;
+        if (dto.description !== undefined) point.description = dto.description;
         if (dto.latitude !== undefined) point.latitude = dto.latitude;
         if (dto.longitude !== undefined) point.longitude = dto.longitude;
         if (dto.collectorName !== undefined) point.collectorName = dto.collectorName;
@@ -287,7 +295,7 @@ export class FirmsService {
                 .andWhere('tariff.effective_date <= :today', { today })
                 .andWhere('(tariff.end_date IS NULL OR tariff.end_date >= :today)', { today })
                 .andWhere('tariff.isActive = :isActive', { isActive: true })
-                .orderBy('tariff.quality', 'ASC')
+                .orderBy('tariff.payment_term', 'ASC')
                 .getMany();
 
             result.push({
@@ -297,9 +305,11 @@ export class FirmsService {
                 logoUrl: firm.logoUrl,
                 isActive: firm.isActive,
                 currentTariffs: tariffs.map((t) => ({
-                    quality: t.quality,
+                    paymentTerm: t.paymentTerm,
                     pricePerKg: t.pricePerKg,
                     effectiveDate: t.effectiveDate,
+                    isSplitPayment: t.isSplitPayment,
+                    splitDetails: t.splitDetails,
                 })),
             });
         }

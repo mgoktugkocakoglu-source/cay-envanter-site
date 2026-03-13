@@ -2,12 +2,10 @@
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
-import { useForumStore } from '@/stores/forumStore';
 import AppLayout from '@/layouts/AppLayout.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
-const forumStore = useForumStore();
 
 // Redirect if not admin/moderator
 onMounted(() => {
@@ -15,9 +13,6 @@ onMounted(() => {
         router.push('/login');
         return;
     }
-    // In a real app, check role from user object
-    // For now, we'll assume authenticated users can view
-    forumStore.fetchCategories();
 });
 
 // Stats (mock data - would come from API)
@@ -42,7 +37,7 @@ const recentActivity = ref([
 const navItems = [
     { name: 'Gösterge Paneli', icon: '📊', route: '/admin', active: true },
     { name: 'Kullanıcılar', icon: '👥', route: '/admin/users', active: false },
-    { name: 'Forum Kategorileri', icon: '📂', route: '/admin/categories', active: false },
+    { name: 'Topluluk Yönetimi', icon: '📂', route: '/admin/categories', active: false },
     { name: 'Konular', icon: '💬', route: '/admin/topics', active: false },
     { name: 'Raporlar', icon: '🚨', route: '/admin/reports', active: false },
 ];
@@ -69,7 +64,7 @@ function getActivityIcon(type: string) {
             <div class="admin-header">
                 <div class="header-content">
                     <h1>🛡️ Admin Panel</h1>
-                    <p class="subtitle">Forum yönetimi ve moderasyon</p>
+                    <p class="subtitle">Topluluk yönetimi ve moderasyon</p>
                 </div>
             </div>
 
@@ -140,9 +135,9 @@ function getActivityIcon(type: string) {
                                 <span class="action-icon">📋</span>
                                 <span>Raporları Gör</span>
                             </button>
-                            <button class="action-btn" @click="navigateTo('/forum')">
+                            <button class="action-btn" @click="navigateTo('/community')">
                                 <span class="action-icon">🌐</span>
-                                <span>Foruma Git</span>
+                                <span>Topluluğa Git</span>
                             </button>
                         </div>
                     </div>
@@ -162,40 +157,7 @@ function getActivityIcon(type: string) {
                         </div>
                     </div>
 
-                    <!-- Categories Overview -->
-                    <div class="section">
-                        <h2 class="section-title">Kategori Özeti</h2>
-                        <div class="categories-table">
-                            <div class="table-header">
-                                <span class="col-icon"></span>
-                                <span class="col-name">Kategori</span>
-                                <span class="col-topics">Konu</span>
-                                <span class="col-status">Durum</span>
-                                <span class="col-actions">İşlemler</span>
-                            </div>
-                            <div
-                                v-for="category in forumStore.categories"
-                                :key="category.id"
-                                class="table-row"
-                            >
-                                <span class="col-icon">{{ category.icon || '📁' }}</span>
-                                <span class="col-name">{{ category.name }}</span>
-                                <span class="col-topics">{{ category.topicCount || 0 }}</span>
-                                <span class="col-status">
-                                    <span :class="category.isActive ? 'status-active' : 'status-inactive'">
-                                        {{ category.isActive ? 'Aktif' : 'Pasif' }}
-                                    </span>
-                                </span>
-                                <span class="col-actions">
-                                    <button class="icon-btn" title="Düzenle">✏️</button>
-                                    <button class="icon-btn" title="Sil">🗑️</button>
-                                </span>
-                            </div>
-                            <div v-if="forumStore.categories.length === 0" class="empty-table">
-                                Henüz kategori eklenmemiş
-                            </div>
-                        </div>
-                    </div>
+
                 </main>
             </div>
         </div>

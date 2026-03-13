@@ -35,6 +35,9 @@ export class FirmCollectionPoint {
     @Column({ type: 'varchar', length: 500, nullable: true })
     address: string | null;
 
+    @Column({ type: 'text', nullable: true })
+    description: string | null;
+
     @Column({ type: 'decimal', precision: 10, scale: 7, nullable: true })
     latitude: number | null;
 

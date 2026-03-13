@@ -6,12 +6,15 @@ import {
     IsEnum,
     IsBoolean,
     IsEmail,
+    IsArray,
+    ValidateNested,
     MaxLength,
     Min,
+    Max,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { TeaQuality } from '@/firms/entities/firm-tariff.entity';
+import { PaymentTerm } from '@/firms/entities/firm-tariff.entity';
 
 // ─── Firm DTOs ───
 
@@ -113,12 +116,42 @@ export class FirmQueryDto {
     isActive?: boolean;
 }
 
+// ─── Tariff Split Detail ───
+
+export class TariffSplitDetailDto {
+    @ApiProperty({ description: 'Percentage of this split (e.g. 50)' })
+    @IsNumber()
+    @Min(1)
+    @Max(100)
+    percentage: number;
+
+    @ApiProperty({ description: 'Payment term for this split', enum: ['cash', 'weekly', 'monthly', 'custom'] })
+    @IsEnum(['cash', 'weekly', 'monthly', 'custom'])
+    paymentTerm: PaymentTerm;
+
+    @ApiPropertyOptional({ description: 'Deferred months (e.g. 2 for "2 ay sonra")' })
+    @IsOptional()
+    @IsNumber()
+    @Min(1)
+    deferredMonths?: number;
+
+    @ApiPropertyOptional({ description: 'Custom payment date (YYYY-MM-DD)' })
+    @IsOptional()
+    @IsDateString()
+    customPaymentDate?: string;
+
+    @ApiProperty({ description: 'Price per kg in TL for this split' })
+    @IsNumber()
+    @Min(0.01)
+    pricePerKg: number;
+}
+
 // ─── Tariff DTOs ───
 
 export class CreateFirmTariffDto {
-    @ApiProperty({ description: 'Tea quality type', enum: ['shoot', 'leaf', 'mixed'] })
-    @IsEnum(['shoot', 'leaf', 'mixed'])
-    quality: TeaQuality;
+    @ApiProperty({ description: 'Payment term', enum: ['cash', 'weekly', 'monthly', 'custom'] })
+    @IsEnum(['cash', 'weekly', 'monthly', 'custom'])
+    paymentTerm: PaymentTerm;
 
     @ApiProperty({ description: 'Price per kg in TL' })
     @IsNumber()
@@ -134,6 +167,23 @@ export class CreateFirmTariffDto {
     @IsDateString()
     endDate?: string;
 
+    @ApiPropertyOptional({ description: 'Custom payment date (YYYY-MM-DD), used when paymentTerm is custom' })
+    @IsOptional()
+    @IsDateString()
+    customPaymentDate?: string;
+
+    @ApiPropertyOptional({ description: 'Whether this is a split payment', default: false })
+    @IsOptional()
+    @IsBoolean()
+    isSplitPayment?: boolean;
+
+    @ApiPropertyOptional({ description: 'Split payment details', type: [TariffSplitDetailDto] })
+    @IsOptional()
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => TariffSplitDetailDto)
+    splitDetails?: TariffSplitDetailDto[];
+
     @ApiPropertyOptional({ description: 'Active status', default: true })
     @IsOptional()
     @IsBoolean()
@@ -141,10 +191,10 @@ export class CreateFirmTariffDto {
 }
 
 export class UpdateFirmTariffDto {
-    @ApiPropertyOptional({ description: 'Tea quality type', enum: ['shoot', 'leaf', 'mixed'] })
+    @ApiPropertyOptional({ description: 'Payment term', enum: ['cash', 'weekly', 'monthly', 'custom'] })
     @IsOptional()
-    @IsEnum(['shoot', 'leaf', 'mixed'])
-    quality?: TeaQuality;
+    @IsEnum(['cash', 'weekly', 'monthly', 'custom'])
+    paymentTerm?: PaymentTerm;
 
     @ApiPropertyOptional({ description: 'Price per kg in TL' })
     @IsOptional()
@@ -161,6 +211,23 @@ export class UpdateFirmTariffDto {
     @IsOptional()
     @IsDateString()
     endDate?: string;
+
+    @ApiPropertyOptional({ description: 'Custom payment date (YYYY-MM-DD)' })
+    @IsOptional()
+    @IsDateString()
+    customPaymentDate?: string;
+
+    @ApiPropertyOptional({ description: 'Whether this is a split payment' })
+    @IsOptional()
+    @IsBoolean()
+    isSplitPayment?: boolean;
+
+    @ApiPropertyOptional({ description: 'Split payment details', type: [TariffSplitDetailDto] })
+    @IsOptional()
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => TariffSplitDetailDto)
+    splitDetails?: TariffSplitDetailDto[];
 
     @ApiPropertyOptional({ description: 'Active status' })
     @IsOptional()
@@ -191,6 +258,12 @@ export class CreateFirmCollectionPointDto {
     @IsString()
     @MaxLength(500)
     address?: string;
+
+    @ApiPropertyOptional({ description: 'Description for users (e.g. landmark info)' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(1000)
+    description?: string;
 
     @ApiPropertyOptional({ description: 'Latitude' })
     @IsOptional()
@@ -245,6 +318,12 @@ export class UpdateFirmCollectionPointDto {
     @MaxLength(500)
     address?: string;
 
+    @ApiPropertyOptional({ description: 'Description for users' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(1000)
+    description?: string;
+
     @ApiPropertyOptional({ description: 'Latitude' })
     @IsOptional()
     @IsNumber()
@@ -294,8 +373,15 @@ export interface FirmWithCurrentTariffs {
     logoUrl: string | null;
     isActive: boolean;
     currentTariffs: {
-        quality: TeaQuality;
+        paymentTerm: PaymentTerm;
         pricePerKg: number;
         effectiveDate: Date;
+        isSplitPayment: boolean;
+        splitDetails: {
+            percentage: number;
+            paymentTerm: PaymentTerm;
+            deferredMonths?: number;
+            pricePerKg: number;
+        }[] | null;
     }[];
 }

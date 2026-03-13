@@ -199,9 +199,11 @@ export const useCommunityStore = defineStore('community', () => {
         if (action === 'added') {
             if (resultType === 'like') comment.likeCount++;
             else comment.dislikeCount++;
+            userReactions.value[commentId] = resultType;
         } else if (action === 'removed') {
             if (clickedType === 'like') comment.likeCount = Math.max(0, comment.likeCount - 1);
             else comment.dislikeCount = Math.max(0, comment.dislikeCount - 1);
+            delete userReactions.value[commentId];
         } else if (action === 'switched') {
             if (resultType === 'like') {
                 comment.likeCount++;
@@ -210,6 +212,7 @@ export const useCommunityStore = defineStore('community', () => {
                 comment.dislikeCount++;
                 comment.likeCount = Math.max(0, comment.likeCount - 1);
             }
+            userReactions.value[commentId] = resultType;
         }
     }
 

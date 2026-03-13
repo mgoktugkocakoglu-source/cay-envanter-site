@@ -35,6 +35,7 @@ export interface AuthResponse {
         province: string;
         district: string;
         avatarUrl: string | null;
+        role: string;
     };
 }
 
@@ -198,6 +199,7 @@ export class AuthService {
                 email: user.email,
                 fullName: user.fullName,
                 userType: user.userType,
+                role: user.role,
                 phone: user.phone,
                 province: user.province,
                 district: user.district,
@@ -477,6 +479,7 @@ export class AuthService {
         province: string;
         district: string;
         avatarUrl: string | null;
+        role: string;
     } | null> {
         const user = await this.usersService.findById(userId);
 
@@ -489,6 +492,7 @@ export class AuthService {
             email: user.email,
             fullName: user.fullName,
             userType: user.userType,
+            role: user.role,
             phone: user.phone,
             province: user.province,
             district: user.district,
