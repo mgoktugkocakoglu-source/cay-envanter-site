@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { useRoute, RouterLink } from 'vue-router';
 import { useFirmsStore } from '@/stores/firmsStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -7,7 +7,7 @@ import { useToast } from '@/composables/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
-import type { PaymentTerm } from '@/services/api';
+
 
 const route = useRoute();
 const firmsStore = useFirmsStore();
@@ -74,7 +74,6 @@ const showDeleteCPConfirm = ref(false);
 const deleteCPTargetId = ref('');
 
 // ─── Map Refs ───
-const mapContainers = ref<Record<string, HTMLElement>>({});
 const mapInstances = ref<Record<string, unknown>>({});
 
 const provinceFilterOptions = computed(() => [

@@ -4,6 +4,8 @@ import { RouterLink } from 'vue-router';
 import { api } from '@/services/api';
 import AppSelect from '@/components/ui/AppSelect.vue';
 
+import type { UserType } from '@/stores/authStore';
+
 // Tea-producing provinces data
 const provinces = [
   { name: 'Rize', plateCode: '53' },
@@ -14,7 +16,7 @@ const provinces = [
 ];
 
 // User type definitions
-const userTypes = [
+const userTypes: Array<{ value: UserType; label: string; description: string; icon: string }> = [
   {
     value: 'land_owner',
     label: 'Arazi Sahibi',
@@ -37,7 +39,7 @@ const userTypes = [
 
 // Form data
 const form = ref({
-  userType: '' as string,
+  userType: '' as UserType | '',
   fullName: '',
   email: '',
   phone: '',
@@ -95,7 +97,7 @@ const passwordStrength = computed(() => {
 });
 
 // User type selection
-function selectUserType(type: string) {
+function selectUserType(type: UserType) {
   form.value.userType = type;
   errors.value.userType = '';
 }
@@ -212,7 +214,7 @@ async function handleSubmit() {
   const cleanPhone = form.value.phone.replace(/\D/g, '');
 
   const result = await api.register({
-    userType: form.value.userType,
+    userType: form.value.userType as UserType,
     fullName: form.value.fullName,
     email: form.value.email,
     phone: cleanPhone,

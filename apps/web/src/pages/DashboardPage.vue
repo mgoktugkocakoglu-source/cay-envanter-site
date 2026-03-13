@@ -106,12 +106,7 @@ const maxMonthlyHarvest = computed(() => {
   return Math.max(...monthlyData.value.map(m => m.harvestKg), 1);
 });
 
-const topField = computed(() => {
-  if (!fieldProfitability.value.length) return null;
-  return fieldProfitability.value.reduce((best, f) =>
-    f.performanceScore > best.performanceScore ? f : best
-  , fieldProfitability.value[0]);
-});
+
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('tr-TR', {

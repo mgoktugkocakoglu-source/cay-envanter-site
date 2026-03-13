@@ -245,7 +245,7 @@ function displayParcels(parcels: typeof geoStore.parcels) {
 
     const primaryColor = getCssVar('--color-primary', '#10b981');
     const mutedColor = getCssVar('--color-text-muted', '#64748b');
-    parcelLayers = L.geoJSON({ type: 'FeatureCollection', features }, {
+    parcelLayers = L.geoJSON(({ type: 'FeatureCollection', features } as unknown) as GeoJSON.FeatureCollection, {
         style: (feature) => ({
             color: feature?.properties?.id === geoStore.selectedParcelId ? primaryColor : mutedColor,
             weight: feature?.properties?.id === geoStore.selectedParcelId ? 3 : 1,
@@ -301,11 +301,11 @@ function displayClickedParcel(parcel: GeoParcelDetail) {
     if (!map) return;
     clearClickedParcelLayer();
 
-    clickedParcelLayer = L.geoJSON({
+    clickedParcelLayer = L.geoJSON(({
         type: 'Feature',
         properties: { parselNo: parcel.properties.parselNo, alan: parcel.properties.alan, ozet: parcel.properties.ozet },
         geometry: { type: 'Polygon', coordinates: parcel.polygon }
-    }, {
+    } as unknown) as GeoJSON.Feature, {
         style: { color: getCssVar('--color-warning', '#f59e0b'), weight: 3, fillOpacity: 0.2, fillColor: getCssVar('--color-warning', '#f59e0b'), dashArray: '6 4' }
     }).addTo(map);
 

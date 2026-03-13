@@ -106,14 +106,15 @@ function openCreateModal() {
     showCreateModal.value = true;
 }
 
-function toggleHarvest(harvest: { id: string; fieldName?: string; remainingKg?: number }) {
+function toggleHarvest(harvest: { id: string; fieldId?: string; fieldName?: string; remainingKg?: number | string }) {
     const index = selectedHarvests.value.findIndex(h => h.harvestId === harvest.id);
     if (index === -1) {
+        const remaining = typeof harvest.remainingKg === 'string' ? parseFloat(harvest.remainingKg) : (harvest.remainingKg || 0);
         selectedHarvests.value.push({
             harvestId: harvest.id,
-            usedAmountKg: harvest.remainingKg || 0,
+            usedAmountKg: remaining,
             fieldName: harvest.fieldName || '',
-            remaining: harvest.remainingKg || 0
+            remaining: remaining
         });
     } else {
         selectedHarvests.value.splice(index, 1);
@@ -345,12 +346,12 @@ async function confirmDeletePayment() {
                                 <span class="date">{{ formatDate(harvest.harvestDate) }}</span>
                             </div>
                             <div class="harvest-amount">
-                                {{ formatKg(harvest.remainingKg || 0) }} mevcut
+                                {{ formatKg(Number(harvest.remainingKg) || 0) }} mevcut
                             </div>
                             <input
                                 v-if="isHarvestSelected(harvest.id)"
                                 type="number"
-                                :max="harvest.remainingKg"
+                                :max="Number(harvest.remainingKg) || 0"
                                 min="0.1"
                                 step="0.1"
                                 v-model.number="selectedHarvests.find(h => h.harvestId === harvest.id)!.usedAmountKg"

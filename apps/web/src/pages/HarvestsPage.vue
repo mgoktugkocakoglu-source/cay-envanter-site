@@ -57,11 +57,7 @@ const qualityLabels: Record<string, string> = {
     'mixed': 'Karışık'
 };
 
-const qualityIcons: Record<string, string> = {
-    'shoot': '🌱',
-    'leaf': '🍃',
-    'mixed': '🌿'
-};
+
 
 // ─── Computed Options ───
 const yearOptions = computed(() =>
@@ -179,7 +175,6 @@ async function completeSale() {
             fieldId: saleFieldId.value,
             harvestDate,
             amountKg: saleKg.value,
-            quality: selectedTariff.value.quality,
         });
 
         if (!harvest) {
@@ -208,7 +203,7 @@ async function completeSale() {
         if (payment) {
             saleSummary.value = {
                 firmName: selectedFirm.value.name,
-                tariffLabel: `${qualityLabels[selectedTariff.value.quality]} - ${formatPrice(selectedTariff.value.pricePerKg)}/kg`,
+                tariffLabel: `Standart Tarife - ${formatPrice(selectedTariff.value.pricePerKg)}/kg`,
                 kg: saleKg.value,
                 fieldName: selectedField.value?.name || '',
                 totalPrice,
@@ -255,7 +250,8 @@ function formatDate(dateStr: string) {
     });
 }
 
-function formatKg(kg: number | string) {
+function formatKg(kg?: number | string) {
+    if (kg === undefined || kg === null) return '-';
     const num = typeof kg === 'string' ? parseFloat(kg) : kg;
     return num.toLocaleString('tr-TR', { maximumFractionDigits: 1 }) + ' kg';
 }
@@ -491,8 +487,8 @@ async function confirmDeleteHarvest() {
                                 @click="selectTariff(tariff.id)"
                             >
                                 <div class="tariff-sel-header">
-                                    <span class="tariff-quality-icon">{{ qualityIcons[tariff.quality] || '🍃' }}</span>
-                                    <span class="tariff-quality-name">{{ qualityLabels[tariff.quality] || tariff.quality }}</span>
+                                    <span class="tariff-quality-icon">🍃</span>
+                                    <span class="tariff-quality-name">Standart Tarife</span>
                                 </div>
                                 <div class="tariff-sel-price">
                                     {{ formatPrice(tariff.pricePerKg) }}
@@ -518,7 +514,7 @@ async function confirmDeleteHarvest() {
                                     <h2>Satış bilgilerinizi girin</h2>
                                     <p>
                                         <strong>{{ selectedFirm?.name }}</strong> /
-                                        {{ qualityIcons[selectedTariff?.quality || ''] }} {{ qualityLabels[selectedTariff?.quality || ''] }} -
+                                        Standart Tarife -
                                         {{ selectedTariff ? formatPrice(selectedTariff.pricePerKg) : '' }}/kg
                                     </p>
                                 </div>
@@ -590,7 +586,7 @@ async function confirmDeleteHarvest() {
                                 </div>
                                 <div class="preview-row">
                                     <span>Tarife:</span>
-                                    <span>{{ qualityIcons[selectedTariff?.quality || ''] }} {{ qualityLabels[selectedTariff?.quality || ''] }} - {{ selectedTariff ? formatPrice(selectedTariff.pricePerKg) : '' }}/kg</span>
+                                    <span>Standart Tarife - {{ selectedTariff ? formatPrice(selectedTariff.pricePerKg) : '' }}/kg</span>
                                 </div>
                                 <div class="preview-row">
                                     <span>Miktar:</span>
