@@ -15,6 +15,7 @@ import { ReportsModule } from '@/reports/reports.module';
 import { FirmsModule } from '@/firms/firms.module';
 import { UploadsModule } from '@/uploads/uploads.module';
 import { CommunityModule } from '@/community/community.module';
+import { HealthModule } from '@/health/health.module';
 
 @Module({
     imports: [
@@ -75,6 +76,7 @@ import { CommunityModule } from '@/community/community.module';
         ReportsModule,
         UploadsModule,
         CommunityModule,
+        HealthModule,
     ],
     providers: [
         {
