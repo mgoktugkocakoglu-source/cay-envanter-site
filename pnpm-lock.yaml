@@ -165,6 +165,9 @@ importers:
       '@types/leaflet':
         specifier: ^1.9.21
         version: 1.9.21
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.30
       '@vitejs/plugin-vue':
         specifier: ^5.0.3
         version: 5.2.4(vite@5.4.21)(vue@3.5.27)
@@ -185,7 +188,7 @@ importers:
         version: 5.3.3
       vite:
         specifier: ^5.0.11
-        version: 5.4.21
+        version: 5.4.21(@types/node@20.19.30)
       vue-tsc:
         specifier: ^1.8.27
         version: 1.8.27(typescript@5.3.3)
@@ -1826,7 +1829,7 @@ packages:
       vite: ^5.0.0 || ^6.0.0
       vue: ^3.2.25
     dependencies:
-      vite: 5.4.21
+      vite: 5.4.21(@types/node@20.19.30)
       vue: 3.5.27(typescript@5.3.3)
     dev: true
 
@@ -5453,7 +5456,7 @@ packages:
     engines: {node: '>= 0.8'}
     dev: false
 
-  /vite@5.4.21:
+  /vite@5.4.21(@types/node@20.19.30):
     resolution: {integrity: sha512-o5a9xKjbtuhY6Bi5S3+HvbRERmouabWbyUcpXXUA1u+GNUKoROi9byOJ8M0nHbHYHkYICiMlqxkg1KkYmm25Sw==}
     engines: {node: ^18.0.0 || >=20.0.0}
     hasBin: true
@@ -5484,6 +5487,7 @@ packages:
       terser:
         optional: true
     dependencies:
+      '@types/node': 20.19.30
       esbuild: 0.21.5
       postcss: 8.5.6
       rollup: 4.55.2
