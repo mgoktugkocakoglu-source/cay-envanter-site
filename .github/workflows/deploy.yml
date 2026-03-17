@@ -77,10 +77,11 @@ jobs:
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
             DB_DATABASE=${{ secrets.DB_DATABASE }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
+            JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
             JWT_EXPIRES_IN=7d
-            MAILGUN_API_KEY=${{ secrets.MAILGUN_API_KEY }}
-            MAILGUN_DOMAIN=${{ secrets.MAILGUN_DOMAIN }}
-            MAILGUN_FROM=${{ secrets.MAILGUN_FROM }}
+            JWT_REFRESH_EXPIRES_IN=7d
+            RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
+            RESEND_FROM=${{ secrets.RESEND_FROM }}
             APP_URL=${{ secrets.APP_URL }}
             EOF
             
