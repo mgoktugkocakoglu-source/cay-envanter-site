@@ -11,17 +11,28 @@ interface EmailOptions {
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private readonly resend: Resend;
+  private readonly resend: Resend | null;
   private readonly from: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.resend = new Resend(this.configService.get<string>('RESEND_API_KEY', ''));
+    const apiKey = this.configService.get<string>('RESEND_API_KEY', '');
     this.from = this.configService.get<string>('RESEND_FROM', 'Çay Platformu <noreply@cayhesabim.com>');
 
-    this.logger.log(`Resend initialized with from: ${this.from}`);
+    if (apiKey) {
+      this.resend = new Resend(apiKey);
+      this.logger.log(`Resend initialized with from: ${this.from}`);
+    } else {
+      this.resend = null;
+      this.logger.warn('RESEND_API_KEY is not configured. Email sending is disabled.');
+    }
   }
 
   async sendEmail(options: EmailOptions): Promise<boolean> {
+    if (!this.resend) {
+      this.logger.warn(`Email to ${options.to} skipped: RESEND_API_KEY not configured.`);
+      return false;
+    }
+
     try {
       const { data, error } = await this.resend.emails.send({
         from: this.from,

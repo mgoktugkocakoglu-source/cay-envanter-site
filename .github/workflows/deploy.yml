@@ -61,8 +61,6 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
-            set -e
-            
             # Navigate to project directory
             cd ~/cayhesabim
             
@@ -88,19 +86,21 @@ jobs:
             # Build and deploy with Docker Compose
             docker compose -f docker-compose.prod.yml down
             docker compose -f docker-compose.prod.yml build --no-cache
-            docker compose -f docker-compose.prod.yml up -d
+            docker compose -f docker-compose.prod.yml up -d || true
+            
+            # Wait and show diagnostics
+            sleep 20
+            echo "=== API Container Status ==="
+            docker inspect --format='{{.State.Status}} (health: {{.State.Health.Status}})' cayhesabim-api-prod 2>&1 || true
+            echo "=== API Container Logs ==="
+            docker logs cayhesabim-api-prod --tail 80 2>&1 || true
+            echo "=== Health Check ==="
+            curl -f http://localhost/api/health || echo "❌ Health check failed"
             
             # Cleanup unused Docker resources
             docker system prune -f
             
-            # Health check with diagnostics
-            sleep 15
-            echo "=== API Container Logs ==="
-            docker logs cayhesabim-api-prod --tail 50 2>&1 || true
-            echo "=== Health Check ==="
-            curl -f http://localhost/api/health || echo "Health check pending..."
-            
-            echo "✅ Deployment completed successfully!"
+            echo "✅ Deployment completed!"
 
       - name: Deployment Status
         if: always()

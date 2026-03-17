@@ -14,6 +14,9 @@ RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 # identical to npm/yarn, which Node.js resolves without issues.
 RUN echo "node-linker=hoisted" > .npmrc
 
+# Make hoisted binaries (nest, tsc, etc.) available in PATH
+ENV PATH="/app/node_modules/.bin:$PATH"
+
 # Copy workspace config files
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 
@@ -27,9 +30,10 @@ RUN pnpm install --frozen-lockfile --filter @cayhesabim/api
 COPY apps/api ./apps/api
 COPY tsconfig.base.json ./
 
-# Build
+# Build — run nest build directly (bypasses pnpm's binary resolver
+# which doesn't find hoisted binaries from workspace subdirectories)
 WORKDIR /app/apps/api
-RUN pnpm build
+RUN nest build
 
 # ================================
 # Stage 2: Production Dependencies

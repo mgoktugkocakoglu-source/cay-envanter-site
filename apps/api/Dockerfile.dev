@@ -8,6 +8,10 @@ WORKDIR /app
 # Install pnpm globally
 RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 
+# Use hoisted node_modules layout for Docker compatibility.
+# pnpm's default symlinked structure breaks inside containers.
+RUN echo "node-linker=hoisted" > .npmrc
+
 # Copy all workspace files
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY apps/api/package.json ./apps/api/
@@ -22,8 +26,11 @@ COPY apps/api ./apps/api
 # Change to API directory
 WORKDIR /app/apps/api
 
+# Ensure hoisted binaries are in PATH
+ENV PATH="/app/node_modules/.bin:$PATH"
+
 # Expose port
 EXPOSE 3000
 
-# Run with pnpm from root (proper module resolution)
-CMD ["sh", "-c", "cd /app && pnpm --filter @cayhesabim/api dev"]
+# Run in dev mode with hot-reload
+CMD ["nest", "start", "--watch"]
