@@ -93,8 +93,11 @@ jobs:
             # Cleanup unused Docker resources
             docker system prune -f
             
-            # Health check
-            sleep 10
+            # Health check with diagnostics
+            sleep 15
+            echo "=== API Container Logs ==="
+            docker logs cayhesabim-api-prod --tail 50 2>&1 || true
+            echo "=== Health Check ==="
             curl -f http://localhost/api/health || echo "Health check pending..."
             
             echo "✅ Deployment completed successfully!"
