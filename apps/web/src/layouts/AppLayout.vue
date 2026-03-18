@@ -29,6 +29,18 @@ function closeMobileMenu() {
       <RouterLink to="/dashboard" class="app-logo">
         <img src="@/assets/images/logo.png" alt="Çay Hesabım Logo" class="app-logo-img" />
       </RouterLink>
+      <nav class="app-nav" :class="{ 'is-open': isMobileMenuOpen }">
+        <RouterLink to="/dashboard" class="nav-link" @click="closeMobileMenu" exact-active-class="router-link-active">Ana Sayfa</RouterLink>
+        <RouterLink to="/fields" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Tarlalarım</RouterLink>
+        <RouterLink to="/firms" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Firmalar</RouterLink>
+        <RouterLink to="/harvests" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Hasatlarım</RouterLink>
+        <RouterLink to="/payments" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Ödemeler</RouterLink>
+        <RouterLink to="/community" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Topluluk</RouterLink>
+        <RouterLink to="/settings" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Ayarlar</RouterLink>
+        <button class="btn btn-secondary" @click="handleLogout">
+          Çıkış Yap
+        </button>
+      </nav>
       <div class="header-right">
         <button
           class="theme-toggle"
@@ -69,18 +81,6 @@ function closeMobileMenu() {
           </svg>
         </button>
       </div>
-      <nav class="app-nav" :class="{ 'is-open': isMobileMenuOpen }">
-        <RouterLink to="/dashboard" class="nav-link" @click="closeMobileMenu" exact-active-class="router-link-active">Ana Sayfa</RouterLink>
-        <RouterLink to="/fields" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Tarlalarım</RouterLink>
-        <RouterLink to="/firms" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Firmalar</RouterLink>
-        <RouterLink to="/harvests" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Hasatlarım</RouterLink>
-        <RouterLink to="/payments" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Ödemeler</RouterLink>
-        <RouterLink to="/community" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Topluluk</RouterLink>
-        <RouterLink to="/settings" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Ayarlar</RouterLink>
-        <button class="btn btn-secondary" @click="handleLogout">
-          Çıkış Yap
-        </button>
-      </nav>
     </header>
 
     <main class="app-content">
@@ -237,6 +237,7 @@ function closeMobileMenu() {
     gap: 4px;
     padding-top: 12px;
     border-top: 1px solid var(--color-border);
+    order: 3;
   }
 
   .app-nav.is-open {
