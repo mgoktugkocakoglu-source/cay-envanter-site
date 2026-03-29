@@ -39,3 +39,7 @@ tmp/
 
 # Docker
 docker-compose.override.yml
+
+.gemini/
+gha-creds-*.json
+backup.dump

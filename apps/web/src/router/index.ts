@@ -96,6 +96,61 @@ const router = createRouter({
             component: () => import('@/pages/PaymentsPage.vue'),
             meta: { requiresAuth: true },
         },
+        // Job Listings Routes
+        {
+            path: '/job-listings',
+            name: 'job-listings',
+            component: () => import('@/pages/JobListingsPage.vue'),
+            meta: { requiresAuth: true },
+        },
+        {
+            path: '/job-listings/worker/create',
+            name: 'worker-listing-category',
+            component: () => import('@/pages/WorkerListingCategoryPage.vue'),
+            meta: { requiresAuth: true },
+        },
+        {
+            path: '/job-listings/job/create',
+            name: 'job-listing-category',
+            component: () => import('@/pages/JobListingCategoryPage.vue'),
+            meta: { requiresAuth: true },
+        },
+        {
+            path: '/job-listings/worker/create/tea-picking',
+            name: 'tea-picking-worker-create',
+            component: () => import('@/pages/TeaPickingWorkerCreatePage.vue'),
+            meta: { requiresAuth: true },
+        },
+        {
+            path: '/job-listings/job/create/tea-picking',
+            name: 'tea-picking-job-create',
+            component: () => import('@/pages/TeaPickingJobCreatePage.vue'),
+            meta: { requiresAuth: true },
+        },
+        {
+            path: '/job-listings/worker/create/tea-transport',
+            name: 'tea-transport-worker-create',
+            component: () => import('@/pages/TeaTransportWorkerCreatePage.vue'),
+            meta: { requiresAuth: true },
+        },
+        {
+            path: '/job-listings/job/create/tea-transport',
+            name: 'tea-transport-job-create',
+            component: () => import('@/pages/TeaTransportJobCreatePage.vue'),
+            meta: { requiresAuth: true },
+        },
+        {
+            path: '/job-listings/worker/create/daily-jobs',
+            name: 'daily-jobs-worker-create',
+            component: () => import('@/pages/DailyJobsWorkerCreatePage.vue'),
+            meta: { requiresAuth: true },
+        },
+        {
+            path: '/job-listings/job/create/daily-jobs',
+            name: 'daily-jobs-job-create',
+            component: () => import('@/pages/DailyJobsJobCreatePage.vue'),
+            meta: { requiresAuth: true },
+        },
         {
             path: '/community',
             name: 'community',

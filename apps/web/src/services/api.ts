@@ -618,6 +618,18 @@ export const api = {
         return request<unknown[]>(`/reports/year-comparison${query}`);
     },
 
+    // Job Listings
+    getJobListings: (params?: { type?: string; category?: string; status?: string; search?: string }) => {
+        const query = new URLSearchParams(params as Record<string, string>).toString();
+        return request<any[]>(`/job-listings${query ? `?${query}` : ''}`);
+    },
+    getJobListing: (id: string) => request<any>(`/job-listings/${id}`),
+    createJobListing: (data: any) =>
+        request<any>('/job-listings', { method: 'POST', body: JSON.stringify(data) }),
+    updateJobListing: (id: string, data: any) =>
+        request<any>(`/job-listings/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    deleteJobListing: (id: string) => request<void>(`/job-listings/${id}`, { method: 'DELETE' }),
+
     // Users
     searchUser: (query: string, type: 'tc' | 'phone') =>
         request<{ id: string; fullName: string; userType: string }>(
