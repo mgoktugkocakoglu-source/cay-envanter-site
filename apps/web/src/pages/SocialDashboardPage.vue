@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
-import { useAuthStore } from '@/stores/authStore';
 import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
 
 const router = useRouter();
-const authStore = useAuthStore();
 </script>
 
 <template>

@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/services/api';
 import AppSelect from '@/components/ui/AppSelect.vue';
-import AppLayout from '@/layouts/AppLayout.vue';
+import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -211,12 +211,12 @@ function goBack() {
 }
 
 function goToListings() {
-  router.push('/job-listings');
+  router.push('/social/job-listings');
 }
 </script>
 
 <template>
-  <AppLayout>
+  <SocialBusinessLayout>
     <div class="create-listing-page">
       <!-- ═══ SUCCESS STATE ═══ -->
       <div v-if="isSubmitted" class="success-state">
@@ -547,7 +547,7 @@ function goToListings() {
         </form>
       </template>
     </div>
-  </AppLayout>
+  </SocialBusinessLayout>
 </template>
 
 <style scoped>

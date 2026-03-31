@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useCommunityStore } from '@/stores/communityStore';
 import { useAuthStore } from '@/stores/authStore';
-import AppLayout from '@/layouts/AppLayout.vue';
+import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
 import type { CommunityPostType, CommunityReactionType } from '@/services/api';
 
 const store = useCommunityStore();
@@ -104,7 +104,7 @@ const hasActiveFilter = () => activeType.value || activeTag.value || searchQuery
 </script>
 
 <template>
-  <AppLayout>
+  <SocialBusinessLayout>
     <div class="cp">
       <div class="cp-grid">
         <!-- Left Sidebar - Facebook-like -->
@@ -323,7 +323,7 @@ const hasActiveFilter = () => activeType.value || activeTag.value || searchQuery
         </main>
       </div>
     </div>
-  </AppLayout>
+  </SocialBusinessLayout>
 </template>
 
 <style scoped>

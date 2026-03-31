@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useCommunityStore } from '@/stores/communityStore';
 import { useAuthStore } from '@/stores/authStore';
-import AppLayout from '@/layouts/AppLayout.vue';
+import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
 import type { CommunityReactionType } from '@/services/api';
 
 const store = useCommunityStore();
@@ -60,7 +60,7 @@ function userLabel(t: string) { return t === 'land_owner' ? 'Arazi Sahibi' : t =
 </script>
 
 <template>
-  <AppLayout>
+  <SocialBusinessLayout>
     <div class="pd">
       <button class="back-btn" @click="router.push('/community')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
@@ -181,7 +181,7 @@ function userLabel(t: string) { return t === 'land_owner' ? 'Arazi Sahibi' : t =
         </div>
       </template>
     </div>
-  </AppLayout>
+  </SocialBusinessLayout>
 </template>
 
 <style scoped>

@@ -371,7 +371,7 @@ onMounted(loadFirmData);
             <template v-else-if="firmsStore.currentFirm">
                 <!-- Breadcrumb -->
                 <nav class="breadcrumb">
-                    <RouterLink to="/firms" class="breadcrumb-link">Firmalar</RouterLink>
+                    <RouterLink to="/tea/firms" class="breadcrumb-link">Firmalar</RouterLink>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="9 18 15 12 9 6"/>
                     </svg>
@@ -590,7 +590,7 @@ onMounted(loadFirmData);
             <!-- Error -->
             <div v-else-if="firmsStore.error" class="error-state">
                 <p class="error-message">{{ firmsStore.error }}</p>
-                <RouterLink to="/firms" class="back-link">Firmalara Don</RouterLink>
+                <RouterLink to="/tea/firms" class="back-link">Firmalara Don</RouterLink>
             </div>
 
             <!-- ═══ Add Tariff Modal ═══ -->

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import AppLayout from '@/layouts/AppLayout.vue';
+import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
 import ListingCard, { type JobListing } from '@/components/job-listings/ListingCard.vue';
 import { api } from '@/services/api';
 
@@ -81,7 +81,7 @@ watch(searchQuery, () => {
 </script>
 
 <template>
-  <AppLayout>
+  <SocialBusinessLayout>
     <div class="job-listings-page">
       <header class="page-header">
         <div class="header-content">
@@ -94,7 +94,7 @@ watch(searchQuery, () => {
       </header>
 
       <section class="action-cards">
-        <button class="action-card action-card-worker" @click="router.push('/job-listings/worker/create')">
+        <button class="action-card action-card-worker" @click="router.push('/social/job-listings/worker/create')">
           <div class="action-card-icon">👷</div>
           <div class="action-card-body">
             <h2 class="action-card-title">İşçi İlanı Oluştur</h2>
@@ -103,7 +103,7 @@ watch(searchQuery, () => {
           <svg class="action-card-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
 
-        <button class="action-card action-card-job" @click="router.push('/job-listings/job/create')">
+        <button class="action-card action-card-job" @click="router.push('/social/job-listings/job/create')">
           <div class="action-card-icon">🌿</div>
           <div class="action-card-body">
             <h2 class="action-card-title">İş İlanı Oluştur</h2>
@@ -199,7 +199,7 @@ watch(searchQuery, () => {
       </section>
 
     </div>
-  </AppLayout>
+  </SocialBusinessLayout>
 </template>
 
 <style scoped>

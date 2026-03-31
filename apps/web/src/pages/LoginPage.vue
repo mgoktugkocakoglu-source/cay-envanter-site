@@ -81,7 +81,7 @@ async function handleSubmit() {
 
   if (result.data) {
     authStore.setAuth(result.data as any);
-    router.push('/dashboard');
+    router.push('/hub');
   }
 }
 

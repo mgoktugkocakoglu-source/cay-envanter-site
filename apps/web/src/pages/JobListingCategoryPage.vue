@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
-import AppLayout from '@/layouts/AppLayout.vue';
+import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
 
 const router = useRouter();
 
@@ -43,12 +43,12 @@ function handleCategoryClick(category: CategoryCard) {
 }
 
 function goBack() {
-  router.push('/job-listings');
+  router.push('/social/job-listings');
 }
 </script>
 
 <template>
-  <AppLayout>
+  <SocialBusinessLayout>
     <div class="category-page">
       <header class="page-header">
         <button class="btn-back" @click="goBack">
@@ -79,7 +79,7 @@ function goBack() {
         </button>
       </div>
     </div>
-  </AppLayout>
+  </SocialBusinessLayout>
 </template>
 
 <style scoped>

@@ -77,7 +77,7 @@ async function confirmDeletion() {
             <div class="status-icon">❌</div>
             <h1 class="auth-title">Link Süresi Dolmuş</h1>
             <p class="auth-subtitle">Hesap silme linkinizin süresi dolmuş.</p>
-            <RouterLink to="/settings" class="btn btn-primary btn-lg btn-block">
+            <RouterLink to="/tea/settings" class="btn btn-primary btn-lg btn-block">
               Hesap Ayarlarına Dön
             </RouterLink>
           </div>
@@ -116,7 +116,7 @@ async function confirmDeletion() {
             </div>
             
             <div class="action-buttons">
-              <RouterLink to="/dashboard" class="btn btn-secondary btn-lg">
+              <RouterLink to="/hub" class="btn btn-secondary btn-lg">
                 Hayır, Vazgeç
               </RouterLink>
               <button 

@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { api } from '@/services/api';
 import type { Session } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
-import AppLayout from '@/layouts/AppLayout.vue';
+import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
+import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
+
+const route = useRoute();
+const HubLayout = computed(() => {
+  return route.meta?.hub === 'social' ? SocialBusinessLayout : TeaBusinessLayout;
+});
 
 const authStore = useAuthStore();
 const themeStore = useThemeStore();
@@ -345,7 +352,7 @@ function switchTab(tab: typeof activeTab.value) {
 </script>
 
 <template>
-  <AppLayout>
+  <component :is="HubLayout">
     <div class="settings-page">
       <main class="settings-content">
         <!-- Header -->
@@ -846,7 +853,7 @@ function switchTab(tab: typeof activeTab.value) {
         </div>
       </div>
     </Teleport>
-  </AppLayout>
+  </component>
 </template>
 
 <style scoped>

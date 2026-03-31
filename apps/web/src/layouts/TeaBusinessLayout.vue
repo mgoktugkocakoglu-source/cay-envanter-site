@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { RouterLink, useRouter, useRoute } from 'vue-router';
+import { RouterLink, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
 
 const authStore = useAuthStore();
 const themeStore = useThemeStore();
 const router = useRouter();
-const route = useRoute();
 const isMobileMenuOpen = ref(false);
 
 const handleLogout = async () => {
