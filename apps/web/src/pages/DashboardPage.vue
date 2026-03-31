@@ -7,7 +7,7 @@ import { useHarvestsStore } from '@/stores/harvestsStore';
 import { usePaymentsStore } from '@/stores/paymentsStore';
 import { useWeather } from '@/composables/useWeather';
 import { api, type YearlySummary, type MonthlyData, type FieldProfitability } from '@/services/api';
-import AppLayout from '@/layouts/AppLayout.vue';
+import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import WeatherWidget from '@/components/ui/WeatherWidget.vue';
 
 const authStore = useAuthStore();
@@ -176,7 +176,7 @@ onMounted(loadDashboardData);
 </script>
 
 <template>
-  <AppLayout>
+  <TeaBusinessLayout>
     <div class="dashboard-page">
       <!-- Loading Skeleton -->
       <div v-if="isLoading" class="dashboard-content">
@@ -477,7 +477,7 @@ onMounted(loadDashboardData);
         </section>
       </div>
     </div>
-  </AppLayout>
+  </TeaBusinessLayout>
 </template>
 
 <style scoped>

@@ -5,7 +5,7 @@ import { useFieldsStore } from '@/stores/fieldsStore';
 import { useFirmsStore } from '@/stores/firmsStore';
 import { usePaymentsStore } from '@/stores/paymentsStore';
 import { useToast } from '@/composables/useToast';
-import AppLayout from '@/layouts/AppLayout.vue';
+import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 import AppCheckbox from '@/components/ui/AppCheckbox.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
@@ -289,7 +289,7 @@ async function confirmDeleteHarvest() {
 </script>
 
 <template>
-    <AppLayout>
+    <TeaBusinessLayout>
         <div class="harvests-page">
             <!-- Page Header -->
             <header class="page-header">
@@ -811,7 +811,7 @@ async function confirmDeleteHarvest() {
                 @confirm="confirmDeleteHarvest"
             />
         </div>
-    </AppLayout>
+    </TeaBusinessLayout>
 </template>
 
 <style scoped>

@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue';
 import { usePaymentsStore } from '@/stores/paymentsStore';
 import { useHarvestsStore } from '@/stores/harvestsStore';
 import { useToast } from '@/composables/useToast';
-import AppLayout from '@/layouts/AppLayout.vue';
+import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 
@@ -186,7 +186,7 @@ async function confirmDeletePayment() {
 </script>
 
 <template>
-    <AppLayout>
+    <TeaBusinessLayout>
         <div class="payments-page">
             <header class="page-header">
                 <div class="header-content">
@@ -449,7 +449,7 @@ async function confirmDeletePayment() {
             @confirm="confirmDeletePayment"
         />
         </div>
-    </AppLayout>
+    </TeaBusinessLayout>
 </template>
 
 <style scoped>

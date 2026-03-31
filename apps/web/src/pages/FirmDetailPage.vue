@@ -4,7 +4,7 @@ import { useRoute, RouterLink } from 'vue-router';
 import { useFirmsStore } from '@/stores/firmsStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/composables/useToast';
-import AppLayout from '@/layouts/AppLayout.vue';
+import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 
@@ -361,7 +361,7 @@ onMounted(loadFirmData);
 </script>
 
 <template>
-    <AppLayout>
+    <TeaBusinessLayout>
         <div class="firm-detail-page">
             <!-- Loading -->
             <div v-if="firmsStore.isLoading && !firmsStore.currentFirm" class="loading">
@@ -809,7 +809,7 @@ onMounted(loadFirmData);
                 @confirm="handleDeleteCP"
             />
         </div>
-    </AppLayout>
+    </TeaBusinessLayout>
 </template>
 
 <style scoped>

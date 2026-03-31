@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router';
 import { useFieldsStore } from '@/stores/fieldsStore';
 import { useToast } from '@/composables/useToast';
 import type { Field } from '@/services/api';
-import AppLayout from '@/layouts/AppLayout.vue';
+import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 
 const router = useRouter();
@@ -116,7 +116,7 @@ function getFieldInitial(name: string) {
 </script>
 
 <template>
-    <AppLayout>
+    <TeaBusinessLayout>
         <div class="fields-page">
             <!-- Header -->
             <header class="page-header">
@@ -349,7 +349,7 @@ function getFieldInitial(name: string) {
                 </Transition>
             </Teleport>
         </div>
-    </AppLayout>
+    </TeaBusinessLayout>
 </template>
 
 <style scoped>

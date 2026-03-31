@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useFirmsStore } from '@/stores/firmsStore';
 import { useAuthStore } from '@/stores/authStore';
-import AppLayout from '@/layouts/AppLayout.vue';
+import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 
 const firmsStore = useFirmsStore();
 const authStore = useAuthStore();
@@ -295,7 +295,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <AppLayout>
+    <TeaBusinessLayout>
         <div class="firms-page">
             <!-- Toast -->
             <Transition name="toast">
@@ -713,7 +713,7 @@ onMounted(() => {
                 </div>
             </Transition>
         </div>
-    </AppLayout>
+    </TeaBusinessLayout>
 </template>
 
 <style scoped>

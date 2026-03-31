@@ -30,17 +30,35 @@ const fetchListings = async () => {
         
         if (response.data) {
             // Map backend data to frontend model with fallbacks for UI elements
-            listings.value = response.data.map(item => ({
-                id: item.id,
-                type: item.type,
-                category: item.category,
-                authorName: item.author.fullName,
-                authorAvatar: item.author.avatarUrl || `https://ui-avatars.com/api/?name=${item.author.fullName}`,
-                location: `${item.author.province} / ${item.author.district}`,
-                rating: 0, // Fallback, could be calculated in backend
-                commentCount: 0,
-                ...item.metadata
-            }));
+            listings.value = response.data.map(item => {
+                const metadata = item.metadata || {};
+                
+                // Ensure properties expected as arrays by ListingCard are actual arrays
+                // (wizards currently save single strings for some of these fields)
+                const equipmentRaw = metadata.equipment;
+                const equipment = equipmentRaw ? (Array.isArray(equipmentRaw) ? equipmentRaw : [equipmentRaw]) : undefined;
+                
+                const vehicleTypesRaw = metadata.vehicleType || metadata.vehicleTypes;
+                const vehicleTypes = vehicleTypesRaw ? (Array.isArray(vehicleTypesRaw) ? vehicleTypesRaw : [vehicleTypesRaw]) : undefined;
+                
+                const terrainTypesRaw = metadata.terrainType || metadata.terrainTypes;
+                const terrainTypes = terrainTypesRaw ? (Array.isArray(terrainTypesRaw) ? terrainTypesRaw : [terrainTypesRaw]) : undefined;
+
+                return {
+                    id: item.id,
+                    type: item.type,
+                    category: item.category,
+                    authorName: item.author.fullName,
+                    authorAvatar: item.author.avatarUrl || `https://ui-avatars.com/api/?name=${item.author.fullName}`,
+                    location: `${item.author.province} / ${item.author.district}`,
+                    rating: 0, // Fallback, could be calculated in backend
+                    commentCount: 0,
+                    ...metadata,
+                    equipment,
+                    vehicleTypes,
+                    terrainTypes
+                };
+            });
         }
     } catch (error) {
         console.error('Failed to fetch job listings:', error);

@@ -6,7 +6,7 @@ import { useFieldsStore } from '@/stores/fieldsStore';
 import { api } from '@/services/api';
 import type { GeoParcelDetail, Field } from '@/services/api';
 import AppSelect from '@/components/ui/AppSelect.vue';
-import AppLayout from '@/layouts/AppLayout.vue';
+import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -415,7 +415,7 @@ function goBack() {
 </script>
 
 <template>
-    <AppLayout>
+    <TeaBusinessLayout>
         <div class="create-field-page">
             <!-- Page Header -->
             <header class="page-header">
@@ -711,7 +711,7 @@ function goBack() {
                 </Transition>
             </form>
         </div>
-    </AppLayout>
+    </TeaBusinessLayout>
 </template>
 
 <style scoped>

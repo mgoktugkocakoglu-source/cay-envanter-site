@@ -31,7 +31,7 @@ export async function authGuard(
 
     // Check if route is for guests only (login, register)
     if (to.meta.guest && authStore.isAuthenticated) {
-        next({ path: '/dashboard' });
+        next({ path: '/hub' });
         return;
     }
 

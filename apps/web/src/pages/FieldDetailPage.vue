@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useFieldsStore } from '@/stores/fieldsStore';
-import AppLayout from '@/layouts/AppLayout.vue';
+import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -114,7 +114,7 @@ function goBack() {
 </script>
 
 <template>
-    <AppLayout>
+    <TeaBusinessLayout>
         <div class="field-detail-page">
         <!-- Loading State -->
         <div v-if="fieldsStore.isLoading" class="loading-state">
@@ -307,7 +307,7 @@ function goBack() {
             </div>
         </div>
     </div>
-    </AppLayout>
+    </TeaBusinessLayout>
 </template>
 
 <style scoped>
