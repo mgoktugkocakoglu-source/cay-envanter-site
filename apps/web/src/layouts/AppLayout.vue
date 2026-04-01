@@ -27,7 +27,8 @@ function closeMobileMenu() {
   <div class="app-layout">
     <header class="app-header">
       <RouterLink to="/dashboard" class="app-logo">
-        <img src="@/assets/images/logo.png" alt="Çay Hesabım Logo" class="app-logo-img" />
+        <img v-if="themeStore.theme === 'dark'" src="@/assets/images/logo-dark.svg" alt="Çay Hesabım Logo" class="app-logo-img" />
+        <img v-else src="@/assets/images/logo-light.svg" alt="Çay Hesabım Logo" class="app-logo-img" />
       </RouterLink>
       <nav class="app-nav" :class="{ 'is-open': isMobileMenuOpen }">
         <RouterLink to="/dashboard" class="nav-link" @click="closeMobileMenu" exact-active-class="router-link-active">Ana Sayfa</RouterLink>

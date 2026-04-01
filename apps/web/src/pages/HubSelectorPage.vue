@@ -40,7 +40,8 @@ onMounted(() => {
     <!-- Header -->
     <header class="hs-header">
       <div class="hs-logo">
-        <img src="@/assets/images/logo.png" alt="Çay Hesabım Logo" class="hs-logo-img" />
+        <img v-if="themeStore.theme === 'dark'" src="@/assets/images/logo-dark.svg" alt="Çay Hesabım Logo" class="hs-logo-img" />
+        <img v-else src="@/assets/images/logo-light.svg" alt="Çay Hesabım Logo" class="hs-logo-img" />
       </div>
       <div class="hs-header-right">
         <button

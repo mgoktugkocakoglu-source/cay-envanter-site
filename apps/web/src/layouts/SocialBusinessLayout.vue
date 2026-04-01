@@ -33,7 +33,8 @@ function switchToTea() {
     <header class="hub-header">
       <div class="hub-header-left">
         <RouterLink to="/social/dashboard" class="hub-logo">
-          <img src="@/assets/images/logo.png" alt="Çay Hesabım Logo" class="hub-logo-img" />
+          <img v-if="themeStore.theme === 'dark'" src="@/assets/images/logo-dark.svg" alt="Çay Hesabım Logo" class="hub-logo-img" />
+          <img v-else src="@/assets/images/logo-light.svg" alt="Çay Hesabım Logo" class="hub-logo-img" />
         </RouterLink>
         <div class="hub-badge social-badge">
           <span class="hub-badge-icon">🤝</span>

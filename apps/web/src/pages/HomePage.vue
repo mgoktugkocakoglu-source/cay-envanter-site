@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
+import { useThemeStore } from '@/stores/themeStore';
 
 const authStore = useAuthStore();
+const themeStore = useThemeStore();
 </script>
 
 <template>
@@ -15,7 +17,8 @@ const authStore = useAuthStore();
 
     <header class="home-header">
       <RouterLink to="/" class="auth-logo">
-        <img src="@/assets/images/logo.png" alt="Çay Hesabım Logo" class="home-logo-img" />
+        <img v-if="themeStore.theme === 'dark'" src="@/assets/images/logo-dark.svg" alt="Çay Hesabım Logo" class="home-logo-img" />
+        <img v-else src="@/assets/images/logo-light.svg" alt="Çay Hesabım Logo" class="home-logo-img" />
       </RouterLink>
       <nav class="home-nav">
         <template v-if="authStore.isAuthenticated">

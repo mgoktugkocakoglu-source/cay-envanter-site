@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { useRouter, RouterLink } from 'vue-router';
 import { api } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
+import { useThemeStore } from '@/stores/themeStore';
 import AppInput from '@/components/ui/AppInput.vue';
 import AppPasswordInput from '@/components/ui/AppPasswordInput.vue';
 import AppCheckbox from '@/components/ui/AppCheckbox.vue';
@@ -10,6 +11,7 @@ import AppButton from '@/components/ui/AppButton.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const themeStore = useThemeStore();
 
 // Form data
 const form = ref({
@@ -110,7 +112,8 @@ async function resendVerification() {
   <div class="auth-page">
     <header class="auth-header">
       <RouterLink to="/" class="auth-logo">
-        <img src="@/assets/images/logo.png" alt="Çay Hesabım Logo" class="auth-logo-img" />
+        <img v-if="themeStore.theme === 'dark'" src="@/assets/images/logo-dark.svg" alt="Çay Hesabım Logo" class="auth-logo-img" />
+        <img v-else src="@/assets/images/logo-light.svg" alt="Çay Hesabım Logo" class="auth-logo-img" />
       </RouterLink>
       <RouterLink to="/register" class="btn btn-secondary">
         Hesabınız yok mu? Kayıt Olun
