@@ -1,0 +1,375 @@
+{
+  "name": "Linear → AI PRD Generator",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-1",
+      "name": "Linear Issue Updated",
+      "type": "n8n-nodes-base.linearTrigger",
+      "typeVersion": 1,
+      "position": [0, 300],
+      "credentials": {
+        "linearApi": {
+          "id": "",
+          "name": "Linear API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "id": "cond-status",
+              "leftValue": "={{ $json.data.state.name }}",
+              "rightValue": "Ready for PRD",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-1",
+      "name": "Status is Ready for PRD?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [280, 300]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Prepare GraphQL query to fetch full issue details\nconst issueId = $input.first().json.data.id;\nconst teamId = $input.first().json.data.teamId;\n\nconst query = `query($issueId: String!) {\n  issue(id: $issueId) {\n    id\n    identifier\n    title\n    description\n    priority\n    url\n    estimate\n    labels { nodes { name } }\n    assignee { name email }\n    team { name id }\n    parent { title identifier description }\n    children { nodes { identifier title description state { name } priority } }\n    comments(first: 50) { nodes { body user { name } createdAt } }\n    relations { nodes { type relatedIssue { title identifier description } } }\n  }\n}`;\n\nreturn [{\n  json: {\n    query,\n    variables: { issueId },\n    _teamId: teamId\n  }\n}];"
+      },
+      "id": "code-1",
+      "name": "Prepare GraphQL Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ query: $json.query, variables: $json.variables }) }}",
+        "options": { "batching": { "batch": { "batchSize": 1 } } },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 2000
+      },
+      "id": "http-1",
+      "name": "Fetch Full Issue Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [760, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Linear API Header"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const issue = $input.first().json.data.issue;\n\n// --- Build Context ---\nlet context = `## Task Information\\n`;\ncontext += `- **Identifier:** ${issue.identifier}\\n`;\ncontext += `- **Title:** ${issue.title}\\n`;\ncontext += `- **Priority:** ${['None','Urgent','High','Medium','Low'][issue.priority] || 'None'}\\n`;\ncontext += `- **Labels:** ${issue.labels?.nodes?.map(l => l.name).join(', ') || 'None'}\\n`;\ncontext += `- **Assignee:** ${issue.assignee?.name || 'Unassigned'}\\n`;\n\nif (issue.parent) {\n  context += `- **Epic/Parent:** ${issue.parent.identifier} - ${issue.parent.title}\\n`;\n  if (issue.parent.description) context += `  - ${issue.parent.description.substring(0, 300)}\\n`;\n}\nif (issue.estimate) context += `- **Estimate:** ${issue.estimate} points\\n`;\n\ncontext += `\\n### Original Description\\n${issue.description || 'No description provided.'}\\n`;\n\nif (issue.children?.nodes?.length > 0) {\n  context += `\\n### Sub-Tasks (${issue.children.nodes.length})\\n`;\n  for (const c of issue.children.nodes) {\n    context += `- [${c.state?.name === 'Done' ? 'x' : ' '}] **${c.identifier}** (${c.state?.name || '?'}): ${c.title}`;\n    if (c.description) context += ` — ${c.description.substring(0, 150)}`;\n    context += `\\n`;\n  }\n}\n\nif (issue.comments?.nodes?.length > 0) {\n  context += `\\n### Team Discussion (${issue.comments.nodes.length} comments)\\n`;\n  const sorted = [...issue.comments.nodes].sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt));\n  for (const c of sorted) {\n    const d = new Date(c.createdAt).toISOString().split('T')[0];\n    context += `- **@${c.user?.name || '?'}** (${d}): ${c.body?.substring(0, 500) || ''}\\n`;\n  }\n}\n\nif (issue.relations?.nodes?.length > 0) {\n  context += `\\n### Related Issues\\n`;\n  for (const r of issue.relations.nodes) {\n    const ri = r.relatedIssue;\n    context += `- ${r.type}: **${ri.identifier}** — ${ri.title}\\n`;\n  }\n}\n\n// --- System Prompt ---\nconst systemPrompt = `You are a Senior Product Manager at Çay Hesabım, a digital platform for tea producers (NestJS backend + Vue.js frontend).\n\nTransform the Linear ticket into a comprehensive PRD.\n\nRules:\n1. Include EVERYTHING a developer needs before coding\n2. User Stories: \"As a [user], I want [action], so that [benefit]\"\n3. Acceptance Criteria: testable bullet points\n4. Think about Edge Cases and error scenarios\n5. Separate Backend (NestJS endpoints, DTOs, Services) and Frontend (Vue components, Pinia stores)\n6. Include UI/UX notes for designers\n7. Write in clear English\n\nFormat:\n# [Feature Name] — PRD\\n\\n## 📋 Overview\\n[What and why]\\n\\n## 🎯 Goals & Objectives\\n- Goal 1\\n\\n## 👤 User Stories\\n1. **[Title]**\\n   - As a [user], I want [action], so that [benefit]\\n   - **Acceptance Criteria:**\\n     - [ ] Criterion\\n\\n## 🏗️ Technical Requirements\\n### Backend (NestJS)\\n- [ ] Endpoints, DTOs, Services, Entity changes\\n### Frontend (Vue.js)\\n- [ ] Components, Stores, Routes, Composables\\n\\n## 🎨 UI/UX Notes\\n- Design guidelines, responsive, accessibility\\n\\n## ⚠️ Edge Cases & Error Scenarios\\n1. Scenario: Expected behavior\\n\\n## 📊 Success Metrics\\n- KPIs\\n\\n## 🔗 Dependencies\\n- Blockers\\n\\n## 📝 Out of Scope\\n- Not included\\n\\n---\\n*Auto-generated PRD. PM approval required.*`;\n\nreturn [{\n  json: {\n    openaiBody: {\n      model: 'gpt-4o',\n      messages: [\n        { role: 'system', content: systemPrompt },\n        { role: 'user', content: `Generate a PRD for this Linear ticket:\\n\\n${context}` }\n      ],\n      max_tokens: 4096,\n      temperature: 0.7\n    },\n    issueId: issue.id,\n    issueIdentifier: issue.identifier,\n    issueTitle: issue.title,\n    issueUrl: issue.url,\n    teamId: issue.team?.id || ''\n  }\n}];"
+      },
+      "id": "code-2",
+      "name": "Build AI Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.openaiBody) }}",
+        "options": {
+          "timeout": 120000
+        },
+        "retryOnFail": true,
+        "maxTries": 2,
+        "waitBetweenTries": 5000
+      },
+      "id": "http-2",
+      "name": "Generate PRD with GPT-4o",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "OpenAI API Header"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const response = $input.first().json;\nconst prdContent = response.choices?.[0]?.message?.content || 'PRD generation failed.';\n\n// Get issue metadata from earlier node\nconst meta = $node['Build AI Prompt'].json;\n\n// --- Prepare Create Document mutation ---\nconst createDocBody = {\n  query: `mutation($title: String!, $content: String!) {\n    documentCreate(input: { title: $title, content: $content }) {\n      success\n      document { id url slugId }\n    }\n  }`,\n  variables: {\n    title: `PRD: ${meta.issueIdentifier} — ${meta.issueTitle}`,\n    content: prdContent\n  }\n};\n\nreturn [{\n  json: {\n    createDocBody,\n    prdContent,\n    issueId: meta.issueId,\n    issueIdentifier: meta.issueIdentifier,\n    issueTitle: meta.issueTitle,\n    issueUrl: meta.issueUrl,\n    teamId: meta.teamId\n  }\n}];"
+      },
+      "id": "code-3",
+      "name": "Prepare Document Creation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1600, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.createDocBody) }}",
+        "options": {}
+      },
+      "id": "http-3",
+      "name": "Create Linear Document",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1900, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Linear API Header"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const docResponse = $input.first().json;\nconst docUrl = docResponse.data?.documentCreate?.document?.url || '';\nconst docId = docResponse.data?.documentCreate?.document?.id || '';\n\nconst meta = $node['Prepare Document Creation'].json;\n\n// --- Attach document to issue ---\nconst attachBody = {\n  query: `mutation($issueId: String!, $url: String!, $title: String!) {\n    attachmentCreate(input: { issueId: $issueId, url: $url, title: $title, subtitle: \"Auto-generated PRD\" }) {\n      success\n      attachment { id }\n    }\n  }`,\n  variables: {\n    issueId: meta.issueId,\n    url: docUrl,\n    title: `📄 PRD: ${meta.issueTitle}`\n  }\n};\n\n// --- Lookup PRD Review state ---\nconst stateQuery = {\n  query: `query($teamId: ID!) {\n    team(id: $teamId) {\n      states { nodes { id name } }\n    }\n  }`,\n  variables: { teamId: meta.teamId }\n};\n\nreturn [{\n  json: {\n    attachBody,\n    stateQuery,\n    issueId: meta.issueId,\n    issueIdentifier: meta.issueIdentifier,\n    issueTitle: meta.issueTitle,\n    issueUrl: meta.issueUrl,\n    docUrl,\n    teamId: meta.teamId\n  }\n}];"
+      },
+      "id": "code-4",
+      "name": "Prepare Attachment & State Lookup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2100, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.attachBody) }}",
+        "options": {}
+      },
+      "id": "http-4",
+      "name": "Attach Document to Issue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2300, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Linear API Header"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($node['Prepare Attachment & State Lookup'].json.stateQuery) }}",
+        "options": {}
+      },
+      "id": "http-5",
+      "name": "Lookup Team States",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2500, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Linear API Header"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const statesResponse = $input.first().json;\nconst states = statesResponse.data?.team?.states?.nodes || [];\nconst prdReviewState = states.find(s => s.name === 'PRD Review');\n\nif (!prdReviewState) {\n  throw new Error('Status \"PRD Review\" not found in Linear. Please create it in Team Settings → Workflow.');\n}\n\nconst meta = $node['Prepare Attachment & State Lookup'].json;\n\n// --- Update issue status ---\nconst updateStatusBody = {\n  query: `mutation($issueId: String!, $stateId: String!) {\n    issueUpdate(id: $issueId, input: { stateId: $stateId }) {\n      success\n    }\n  }`,\n  variables: {\n    issueId: meta.issueId,\n    stateId: prdReviewState.id\n  }\n};\n\n// --- Add comment ---\nconst commentBody = {\n  query: `mutation($issueId: String!, $body: String!) {\n    commentCreate(input: { issueId: $issueId, body: $body }) {\n      success\n    }\n  }`,\n  variables: {\n    issueId: meta.issueId,\n    body: `## 🤖 AI PRD Generated\\n\\nA comprehensive PRD has been automatically generated for this issue.\\n\\n📄 **[View PRD Document](${meta.docUrl})**\\n\\n### Next Steps:\\n1. Review the PRD for accuracy and completeness\\n2. If approved → move this issue to **Todo**\\n3. If changes needed → move back to **Backlog** and add revision comments\\n\\n---\\n*Generated by AI PRD Workflow on ${new Date().toISOString().split('T')[0]}*`\n  }\n};\n\nreturn [{\n  json: {\n    updateStatusBody,\n    commentBody\n  }\n}];"
+      },
+      "id": "code-5",
+      "name": "Prepare Status Update & Comment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2700, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.updateStatusBody) }}",
+        "options": {}
+      },
+      "id": "http-6",
+      "name": "Update Status to PRD Review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2900, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Linear API Header"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($node['Prepare Status Update & Comment'].json.commentBody) }}",
+        "options": {}
+      },
+      "id": "http-7",
+      "name": "Add Review Comment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3100, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Linear API Header"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "noop-1",
+      "name": "Skip - Not Ready for PRD",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [520, 500]
+    },
+    {
+      "parameters": {
+        "content": "## 🧠 Linear → AI PRD Generator\n\n### How it works:\n1. **Trigger:** When a Linear issue status changes to \"Ready for PRD\"\n2. **Fetch:** Gets full issue data (sub-issues, comments, relations) via GraphQL\n3. **Generate:** Sends context to GPT-4o with professional PRD prompt\n4. **Output:** Creates a Linear Document with the PRD\n5. **Link:** Attaches the document to the original issue\n6. **Notify:** Updates status to \"PRD Review\" and adds a comment\n\n### Required Credentials:\n- **Linear API Header:** httpHeaderAuth with `Authorization: <linear_api_key>`\n- **OpenAI API Header:** httpHeaderAuth with `Authorization: Bearer <openai_key>`\n- **Linear API:** OAuth or API key credential for the trigger node\n\n### Required Linear Statuses:\n- `Ready for PRD` (Unstarted type)\n- `PRD Review` (Started type)"
+      },
+      "id": "note-1",
+      "name": "📋 Workflow Documentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-100, -100]
+    },
+    {
+      "parameters": {
+        "content": "### ⚠️ Human-in-the-Loop\n\nAfter PRD is generated:\n- PM reviews the document\n- **Approved:** Move issue to `Todo`\n- **Rejected:** Move to `Backlog` + add revision notes"
+      },
+      "id": "note-2",
+      "name": "🔄 Approval Flow",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [2700, 450]
+    }
+  ],
+  "connections": {
+    "Linear Issue Updated": {
+      "main": [
+        [{ "node": "Status is Ready for PRD?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Status is Ready for PRD?": {
+      "main": [
+        [{ "node": "Prepare GraphQL Query", "type": "main", "index": 0 }],
+        [{ "node": "Skip - Not Ready for PRD", "type": "main", "index": 0 }]
+      ]
+    },
+    "Prepare GraphQL Query": {
+      "main": [
+        [{ "node": "Fetch Full Issue Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Full Issue Data": {
+      "main": [
+        [{ "node": "Build AI Prompt", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build AI Prompt": {
+      "main": [
+        [{ "node": "Generate PRD with GPT-4o", "type": "main", "index": 0 }]
+      ]
+    },
+    "Generate PRD with GPT-4o": {
+      "main": [
+        [{ "node": "Prepare Document Creation", "type": "main", "index": 0 }]
+      ]
+    },
+    "Prepare Document Creation": {
+      "main": [
+        [{ "node": "Create Linear Document", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Linear Document": {
+      "main": [
+        [{ "node": "Prepare Attachment & State Lookup", "type": "main", "index": 0 }]
+      ]
+    },
+    "Prepare Attachment & State Lookup": {
+      "main": [
+        [{ "node": "Attach Document to Issue", "type": "main", "index": 0 }]
+      ]
+    },
+    "Attach Document to Issue": {
+      "main": [
+        [{ "node": "Lookup Team States", "type": "main", "index": 0 }]
+      ]
+    },
+    "Lookup Team States": {
+      "main": [
+        [{ "node": "Prepare Status Update & Comment", "type": "main", "index": 0 }]
+      ]
+    },
+    "Prepare Status Update & Comment": {
+      "main": [
+        [{ "node": "Update Status to PRD Review", "type": "main", "index": 0 }]
+      ]
+    },
+    "Update Status to PRD Review": {
+      "main": [
+        [{ "node": "Add Review Comment", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [],
+  "meta": {
+    "instanceId": ""
+  }
+}

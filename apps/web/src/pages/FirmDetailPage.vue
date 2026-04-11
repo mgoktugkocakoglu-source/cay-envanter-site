@@ -13,7 +13,7 @@ const firmsStore = useFirmsStore();
 const authStore = useAuthStore();
 const toast = useToast();
 
-const activeTab = ref<'tariffs' | 'locations'>('tariffs');
+const activeTab = ref<'tariffs' | 'locations'>('locations');
 const provinceFilter = ref('');
 const districtFilter = ref('');
 
@@ -414,6 +414,7 @@ onMounted(loadFirmData);
                 <!-- Tabs -->
                 <div class="tabs">
                     <button
+                        v-if="authStore.isAdmin"
                         class="tab-btn"
                         :class="{ 'tab-btn--active': activeTab === 'tariffs' }"
                         @click="activeTab = 'tariffs'"
@@ -433,8 +434,8 @@ onMounted(loadFirmData);
                     </button>
                 </div>
 
-                <!-- ─── Tariffs Tab ─── -->
-                <div v-if="activeTab === 'tariffs'" class="tab-content">
+                <!-- ─── Tariffs Tab (Admin Only) ─── -->
+                <div v-if="activeTab === 'tariffs' && authStore.isAdmin" class="tab-content">
                     <!-- Add Tariff Button (Admin Only) -->
                     <div v-if="authStore.isAdmin" class="tab-actions">
                         <button class="btn-add" @click="openTariffModal">

@@ -9,7 +9,13 @@ export const usePaymentsStore = defineStore('payments', () => {
     const error = ref<string | null>(null);
 
     const totalIncome = computed(() =>
-        payments.value.reduce((sum, p) => sum + p.totalPrice, 0)
+        payments.value
+            .filter(p => p.paymentStatus === 'received')
+            .reduce((sum, p) => sum + p.totalPrice, 0)
+    );
+
+    const pendingPayments = computed(() =>
+        payments.value.filter(p => p.paymentStatus === 'pending')
     );
 
     async function fetchPayments(params?: { year?: number; paymentStatus?: string }) {
@@ -111,6 +117,7 @@ export const usePaymentsStore = defineStore('payments', () => {
         isLoading,
         error,
         totalIncome,
+        pendingPayments,
         fetchPayments,
         fetchBrokerFirms,
         createPayment,

@@ -192,13 +192,9 @@ async function confirmDeletePayment() {
                 <div class="header-content">
                     <h1>Ödemeler</h1>
                     <p class="subtitle">
-                        Toplam Gelir: {{ formatCurrency(paymentsStore.totalIncome) }}
+                        Bu Yılın Geliri: {{ formatCurrency(paymentsStore.totalIncome) }}
                     </p>
                 </div>
-                <button class="btn-primary" @click="openCreateModal">
-                    <span class="icon">+</span>
-                    Ödeme Ekle
-                </button>
             </header>
 
             <div class="filters">
@@ -238,7 +234,6 @@ async function confirmDeletePayment() {
                         <th>Tutar</th>
                         <th>Kg Fiyati</th>
                         <th>Durum</th>
-                        <th>Hasat</th>
                         <th class="th-action"></th>
                     </tr>
                 </thead>
@@ -256,9 +251,6 @@ async function confirmDeletePayment() {
                             >
                                 {{ payment.paymentStatus === 'received' ? 'Alindi' : 'Bekliyor' }}
                             </span>
-                        </td>
-                        <td>
-                            <span class="harvest-count">{{ payment.harvestCount }} hasat</span>
                         </td>
                         <td class="td-action">
                             <button class="btn-icon-delete" @click="deletePayment(payment.id)">
@@ -298,10 +290,6 @@ async function confirmDeletePayment() {
                         <span class="card-label">Kg Fiyati</span>
                         <span class="card-value">{{ formatCurrency(payment.pricePerKg) }}/kg</span>
                     </div>
-                    <div class="card-row">
-                        <span class="card-label">Hasat</span>
-                        <span class="card-value">{{ payment.harvestCount }} hasat</span>
-                    </div>
                 </div>
                 <div class="card-footer">
                     <button class="btn-icon-delete" @click="deletePayment(payment.id)">
@@ -313,131 +301,37 @@ async function confirmDeletePayment() {
         </div>
         </template>
 
-        <!-- Create Modal - Wizard -->
-        <div v-if="showCreateModal" class="modal-overlay" @click.self="showCreateModal = false">
-            <div class="modal-content wizard">
-                <div class="wizard-header">
-                    <div class="step" :class="{ active: currentStep === 1, completed: currentStep > 1 }">
-                        1. Hasat Seçimi
-                    </div>
-                    <div class="step" :class="{ active: currentStep === 2 }">
-                        2. Ödeme Detayları
-                    </div>
-                </div>
-
-                <!-- Step 1: Select Harvests -->
-                <div v-if="currentStep === 1" class="wizard-step">
-                    <h3>Satılacak Hasatları Seçin</h3>
-
-                    <div v-if="harvestsStore.availableHarvests.length === 0" class="empty-state small">
-                        <p>Satışa uygun hasat bulunamadı</p>
-                    </div>
-
-                    <div v-else class="harvest-list">
-                        <div
-                            v-for="harvest in harvestsStore.availableHarvests"
-                            :key="harvest.id"
-                            class="harvest-item"
-                            :class="{ selected: isHarvestSelected(harvest.id) }"
-                            @click="toggleHarvest(harvest)"
-                        >
-                            <div class="harvest-info">
-                                <strong>{{ harvest.fieldName }}</strong>
-                                <span class="date">{{ formatDate(harvest.harvestDate) }}</span>
-                            </div>
-                            <div class="harvest-amount">
-                                {{ formatKg(Number(harvest.remainingKg) || 0) }} mevcut
-                            </div>
-                            <input
-                                v-if="isHarvestSelected(harvest.id)"
-                                type="number"
-                                :max="Number(harvest.remainingKg) || 0"
-                                min="0.1"
-                                step="0.1"
-                                v-model.number="selectedHarvests.find(h => h.harvestId === harvest.id)!.usedAmountKg"
-                                @click.stop
-                                class="amount-input"
-                            />
+        <!-- Yaklaşan Ödemelerim -->
+        <section v-if="paymentsStore.pendingPayments.length > 0" class="upcoming-payments">
+            <h2 class="upcoming-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Yaklaşan Ödemelerim
+                <span class="upcoming-count">{{ paymentsStore.pendingPayments.length }}</span>
+            </h2>
+            <div class="upcoming-grid">
+                <div
+                    v-for="payment in paymentsStore.pendingPayments"
+                    :key="'up-' + payment.id"
+                    class="upcoming-card"
+                >
+                    <div class="upcoming-card-left">
+                        <div class="upcoming-icon">⏳</div>
+                        <div>
+                            <div class="upcoming-amount">{{ formatCurrency(payment.totalPrice) }}</div>
+                            <div class="upcoming-firm">{{ payment.brokerFirm?.firmName || '—' }}</div>
                         </div>
                     </div>
-
-                    <div class="wizard-summary">
-                        <strong>Toplam: {{ formatKg(totalSelectedKg) }}</strong>
-                    </div>
-
-                    <div class="wizard-actions">
-                        <button class="btn-secondary" @click="showCreateModal = false">İptal</button>
-                        <button class="btn-primary" @click="nextStep" :disabled="selectedHarvests.length === 0">
-                            Devam
+                    <div class="upcoming-card-right">
+                        <div class="upcoming-kg">{{ formatKg(payment.totalAmountKg) }}</div>
+                        <div class="upcoming-date">{{ formatDate(payment.paymentDate) }}</div>
+                        <button class="btn-icon-delete" @click="deletePayment(payment.id)" title="Sil">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                         </button>
                     </div>
                 </div>
-
-                <!-- Step 2: Payment Details -->
-                <div v-if="currentStep === 2" class="wizard-step">
-                    <h3>Ödeme Bilgileri</h3>
-
-                    <form @submit.prevent="createPayment" class="create-form">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Toplam Miktar</label>
-                                <input type="text" :value="formatKg(totalSelectedKg)" disabled />
-                            </div>
-                            <div class="form-group">
-                                <label>Toplam Tutar (TL) *</label>
-                                <input type="number" v-model.number="createForm.totalPrice" min="1" step="0.01" required />
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Kg Başına Fiyat</label>
-                            <input type="text" :value="formatCurrency(pricePerKg) + '/kg'" disabled />
-                        </div>
-
-                        <AppSelect
-                            v-model="createForm.brokerFirmId"
-                            :options="brokerFirmOptions"
-                            label="Aracı Firma"
-                            placeholder="Seçiniz veya yeni ekleyin"
-                            variant="light"
-                        />
-
-                        <div class="form-group" v-if="!createForm.brokerFirmId">
-                            <label>Yeni Aracı Firma</label>
-                            <input type="text" v-model="createForm.newBrokerFirm" placeholder="Firma adı girin" />
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Ödeme Tarihi *</label>
-                                <input type="date" v-model="createForm.paymentDate" required />
-                            </div>
-                            <AppSelect
-                                v-model="createForm.paymentStatus"
-                                :options="paymentStatusOptions"
-                                label="Durum *"
-                                :required="true"
-                                variant="light"
-                            />
-                        </div>
-
-                        <div class="form-group">
-                            <label>Notlar</label>
-                            <textarea v-model="createForm.notes" rows="2"></textarea>
-                        </div>
-
-                        <div class="wizard-actions">
-                            <button type="button" class="btn-secondary" @click="prevStep">Geri</button>
-                            <button type="submit" class="btn-primary" :disabled="paymentsStore.isLoading">
-                                {{ paymentsStore.isLoading ? 'Kaydediliyor...' : 'Kaydet' }}
-                            </button>
-                        </div>
-                    </form>
-
-                    <p v-if="paymentsStore.error" class="error-message">{{ paymentsStore.error }}</p>
-                </div>
             </div>
-        </div>
+        </section>
+
         <!-- Delete Payment Confirm Modal -->
         <ConfirmModal
             v-model="showDeleteConfirm"
@@ -458,6 +352,106 @@ async function confirmDeletePayment() {
     max-width: 1200px;
     margin: 0 auto;
 }
+
+/* ── Yaklaşan Ödemelerim Section ── */
+.upcoming-payments {
+    margin-top: 32px;
+    padding: 24px;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(234, 88, 12, 0.06));
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    border-radius: var(--radius-xl);
+}
+
+.upcoming-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin: 0 0 16px 0;
+    color: #b45309;
+}
+
+.upcoming-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 8px;
+    background: rgba(245, 158, 11, 0.2);
+    color: #b45309;
+    border-radius: var(--radius-full);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.upcoming-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.upcoming-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    background: var(--color-bg-secondary);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    border-radius: var(--radius-lg);
+    transition: all var(--transition-fast);
+}
+
+.upcoming-card:hover {
+    border-color: rgba(245, 158, 11, 0.5);
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.1);
+}
+
+.upcoming-card-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.upcoming-icon {
+    font-size: 20px;
+}
+
+.upcoming-amount {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+}
+
+.upcoming-firm {
+    font-size: 13px;
+    color: var(--color-text-muted);
+    margin-top: 2px;
+}
+
+.upcoming-card-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.upcoming-kg {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    font-weight: 500;
+}
+
+.upcoming-date {
+    font-size: 13px;
+    color: #b45309;
+    font-weight: 600;
+    background: rgba(245, 158, 11, 0.1);
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+}
+
 
 .page-header {
     display: flex;

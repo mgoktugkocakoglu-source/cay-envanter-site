@@ -360,46 +360,19 @@ onMounted(() => {
                 <div
                     v-for="firm in filteredFirms"
                     :key="firm.id"
-                    class="firm-card"
+                    class="firm-card firm-card--simple"
                     @click="navigateToFirm(firm.id)"
                 >
-                    <div class="firm-card-header">
-                        <div class="firm-avatar" :class="{ 'firm-avatar--inactive': !firm.isActive }">
+                    <div class="firm-avatar-wrap">
+                        <div class="firm-avatar-lg" :class="{ 'firm-avatar--inactive': !firm.isActive }">
                             {{ getInitials(firm.name) }}
                         </div>
-                        <div class="firm-info">
-                            <h3 class="firm-name">{{ firm.name }}</h3>
-                            <p v-if="firm.description" class="firm-desc">{{ firm.description }}</p>
-                        </div>
-                        <span class="status-badge" :class="firm.isActive ? 'status-active' : 'status-inactive'">
-                            {{ firm.isActive ? 'Aktif' : 'Pasif' }}
-                        </span>
                     </div>
-
-                    <div class="firm-card-body">
-                        <div v-if="firm.phone" class="firm-detail">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-                            </svg>
-                            <span>{{ firm.phone }}</span>
-                        </div>
-                        <div v-if="firm.address" class="firm-detail">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                                <circle cx="12" cy="10" r="3"/>
-                            </svg>
-                            <span>{{ firm.address }}</span>
-                        </div>
-                    </div>
-
-                    <div class="firm-card-footer">
-                        <span class="view-link">
-                            Detaylari Gor
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="9 18 15 12 9 6"/>
-                            </svg>
-                        </span>
-                    </div>
+                    <h3 class="firm-name">{{ firm.name }}</h3>
+                    <span class="firm-location-hint">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        Konumları Gör
+                    </span>
                 </div>
             </div>
 
@@ -793,26 +766,69 @@ onMounted(() => {
 .search-input::placeholder { color: var(--color-text-muted); }
 
 /* ── Grid ── */
-.firms-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+.firms-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
 
-/* ── Card ── */
+/* ── Card (simple) ── */
+.firm-card--simple {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    padding: 24px 16px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 12px;
+}
+.firm-card--simple:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--color-primary);
+}
+.firm-avatar-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.firm-avatar-lg {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 22px;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(var(--color-primary-rgb, 0,0,0), 0.3);
+}
+.firm-card--simple .firm-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin: 0;
+}
+.firm-location-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+.firm-card--simple:hover .firm-location-hint {
+    color: var(--color-primary);
+}
+
+/* ── Old card styles (still needed for other references) ── */
 .firm-card { background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: var(--radius-xl); overflow: hidden; cursor: pointer; transition: all var(--transition-fast); }
 .firm-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); border-color: var(--color-primary); }
-.firm-card-header { display: flex; align-items: flex-start; gap: 12px; padding: 20px 20px 12px; }
 .firm-avatar { width: 44px; height: 44px; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover)); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; }
-.firm-avatar--inactive { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
-.firm-info { flex: 1; min-width: 0; }
-.firm-name { font-size: 16px; font-weight: 700; color: var(--color-text-primary); margin: 0 0 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.firm-desc { font-size: 13px; color: var(--color-text-muted); margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.status-badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: var(--radius-full); font-size: 11px; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
-.status-active { background: rgba(34, 197, 94, 0.15); color: var(--color-success); }
-.status-inactive { background: rgba(245, 158, 11, 0.15); color: var(--color-warning); }
-.firm-card-body { padding: 0 20px 12px; display: flex; flex-direction: column; gap: 6px; }
-.firm-detail { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--color-text-secondary); }
-.firm-detail svg { flex-shrink: 0; color: var(--color-text-muted); }
-.firm-card-footer { padding: 12px 20px; border-top: 1px solid var(--color-border); background: var(--color-bg-tertiary); }
-.view-link { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--color-primary); transition: gap var(--transition-fast); }
-.firm-card:hover .view-link { gap: 8px; }
+.firm-avatar--inactive { background: var(--color-bg-tertiary) !important; color: var(--color-text-muted) !important; }
+.firm-name { font-size: 16px; font-weight: 700; color: var(--color-text-primary); margin: 0 0 4px 0; }
 
 /* ── Toast ── */
 .toast-success { position: fixed; top: 24px; right: 24px; z-index: 1001; display: flex; align-items: center; gap: 8px; padding: 14px 20px; background: var(--color-success); color: white; border-radius: var(--radius-lg); font-weight: 600; font-size: 14px; box-shadow: 0 8px 24px rgba(34, 197, 94, 0.4); }
