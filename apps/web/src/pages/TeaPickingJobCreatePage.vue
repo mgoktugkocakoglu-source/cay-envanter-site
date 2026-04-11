@@ -331,7 +331,7 @@ function goToListings() {
             <!-- Step 2: Çalıştırmak İstediğin Tarife -->
             <div v-else-if="activeStep === 2" key="step2" class="step-card">
               <div class="step-header">
-                <button type="button" class="btn-step-back" @click="prevStep">
+                <button type="button" class="btn-step-back" aria-label="Önceki adım" @click="prevStep">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
                 </button>
                 <div class="step-badge">2</div>
@@ -352,7 +352,7 @@ function goToListings() {
             <!-- Step 3: Ödeyeceğin Çalışma Ücret Teklifin -->
             <div v-else-if="activeStep === 3" key="step3" class="step-card">
               <div class="step-header">
-                <button type="button" class="btn-step-back" @click="prevStep">
+                <button type="button" class="btn-step-back" aria-label="Önceki adım" @click="prevStep">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
                 </button>
                 <div class="step-badge">3</div>
@@ -386,7 +386,7 @@ function goToListings() {
             <!-- Step 4: Yemek/Ulaşım Hizmeti -->
             <div v-else-if="activeStep === 4" key="step4" class="step-card">
               <div class="step-header">
-                <button type="button" class="btn-step-back" @click="prevStep">
+                <button type="button" class="btn-step-back" aria-label="Önceki adım" @click="prevStep">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
                 </button>
                 <div class="step-badge">4</div>
@@ -443,7 +443,7 @@ function goToListings() {
             <!-- Step 5: Harici İş Talebi — Final Step -->
             <div v-else-if="activeStep === 5" key="step5" class="step-card step-card-final">
               <div class="step-header">
-                <button type="button" class="btn-step-back" @click="prevStep">
+                <button type="button" class="btn-step-back" aria-label="Önceki adım" @click="prevStep">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
                 </button>
                 <div class="step-badge">5</div>
