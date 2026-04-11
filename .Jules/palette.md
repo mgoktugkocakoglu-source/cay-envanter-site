@@ -1,0 +1,3 @@
+## 2026-04-11 - Added missing ARIA labels to icon-only buttons
+**Learning:** Found that multiple wizard pages (e.g. TeaTransportWorkerCreatePage) and detail pages (e.g. FirmDetailPage) use icon-only buttons (`.btn-step-back`, `.modal-close`, `.btn-icon-delete`) that were missing `aria-label` attributes. This is an accessibility issue pattern specific to this app's components as they didn't wrap their SVGs with descriptive text for screen readers.
+**Action:** When adding new icon-only interactive elements in this codebase, make sure to consistently add Turkish `aria-label`s (e.g., 'Önceki adım', 'Kapat', 'Sil', 'Kaldır').

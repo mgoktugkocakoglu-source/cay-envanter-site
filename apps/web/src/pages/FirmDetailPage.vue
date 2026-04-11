@@ -457,7 +457,7 @@ onMounted(loadFirmData);
                             class="tariff-card"
                         >
                             <!-- Admin Delete Button -->
-                            <button v-if="authStore.isAdmin" class="tariff-delete-btn" @click.stop="confirmDeleteTariff(tariff.id)" title="Tarifeyi sil">
+                            <button v-if="authStore.isAdmin" class="tariff-delete-btn" aria-label="Tarifeyi sil" @click.stop="confirmDeleteTariff(tariff.id)" title="Tarifeyi sil">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                             </button>
 
@@ -548,7 +548,7 @@ onMounted(loadFirmData);
                                     <h4 class="cp-name">{{ point.name }}</h4>
                                     <span class="cp-location">{{ point.province }} / {{ point.district }}</span>
                                 </div>
-                                <button v-if="authStore.isAdmin" class="btn-icon-delete" @click="confirmDeleteCP(point.id)" title="Sil">
+                                <button v-if="authStore.isAdmin" class="btn-icon-delete" aria-label="Sil" @click="confirmDeleteCP(point.id)" title="Sil">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                 </button>
                             </div>
@@ -598,7 +598,7 @@ onMounted(loadFirmData);
                 <div class="modal-content">
                     <div class="modal-header-row">
                         <h2>Yeni Tarife Ekle</h2>
-                        <button class="modal-close" @click="showTariffModal = false">
+                        <button class="modal-close" aria-label="Kapat" @click="showTariffModal = false">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
                     </div>
@@ -655,7 +655,7 @@ onMounted(loadFirmData);
                             <div v-for="(split, sIndex) in tariffForm.splits" :key="sIndex" class="split-entry">
                                 <div class="split-entry-header">
                                     <span class="split-badge">Kisim {{ sIndex + 1 }}</span>
-                                    <button v-if="tariffForm.splits.length > 2" type="button" class="btn-icon-sm" @click="removeSplit(sIndex)">
+                                    <button v-if="tariffForm.splits.length > 2" type="button" class="btn-icon-sm" aria-label="Kaldır" @click="removeSplit(sIndex)">
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                     </button>
                                 </div>
@@ -716,7 +716,7 @@ onMounted(loadFirmData);
                 <div class="modal-content">
                     <div class="modal-header-row">
                         <h2>Konum Ekle</h2>
-                        <button class="modal-close" @click="showCPModal = false">
+                        <button class="modal-close" aria-label="Kapat" @click="showCPModal = false">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
                     </div>

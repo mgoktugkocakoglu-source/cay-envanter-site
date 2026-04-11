@@ -514,7 +514,7 @@ onMounted(() => {
                             <div v-for="(tariff, tIndex) in tariffs" :key="tIndex" class="tariff-entry">
                                 <div class="tariff-entry-header">
                                     <h4>Tarife {{ tIndex + 1 }}</h4>
-                                    <button type="button" class="btn-icon-sm" @click="removeTariff(tIndex)" title="Kaldir">
+                                    <button type="button" class="btn-icon-sm" aria-label="Kaldır" @click="removeTariff(tIndex)" title="Kaldir">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                     </button>
                                 </div>
@@ -568,7 +568,7 @@ onMounted(() => {
                                     <div v-for="(split, sIndex) in tariff.splits" :key="sIndex" class="split-entry">
                                         <div class="split-entry-header">
                                             <span class="split-badge">Kisim {{ sIndex + 1 }}</span>
-                                            <button v-if="tariff.splits.length > 2" type="button" class="btn-icon-sm" @click="removeSplit(tIndex, sIndex)" title="Kaldir">
+                                            <button v-if="tariff.splits.length > 2" type="button" class="btn-icon-sm" aria-label="Kaldır" @click="removeSplit(tIndex, sIndex)" title="Kaldir">
                                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                             </button>
                                         </div>
@@ -629,7 +629,7 @@ onMounted(() => {
                             <div v-for="(loc, lIndex) in locations" :key="lIndex" class="location-entry">
                                 <div class="location-entry-header">
                                     <h4>Konum {{ lIndex + 1 }}</h4>
-                                    <button v-if="locations.length > 1" type="button" class="btn-icon-sm" @click="removeLocation(lIndex)" title="Kaldir">
+                                    <button v-if="locations.length > 1" type="button" class="btn-icon-sm" aria-label="Kaldır" @click="removeLocation(lIndex)" title="Kaldir">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                     </button>
                                 </div>
