@@ -8,7 +8,6 @@ import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 
-
 const route = useRoute();
 const firmsStore = useFirmsStore();
 const authStore = useAuthStore();
@@ -332,7 +331,7 @@ async function initMap(containerId: string, lat: number, lng: number) {
 }
 
 // Watch for location tab activation to init maps
-watch(activeTab, async (newTab) => {
+watch(activeTab, async (newTab: 'tariffs' | 'locations') => {
     if (newTab === 'locations') {
         await nextTick();
         filteredCollectionPoints.value.forEach(point => {
