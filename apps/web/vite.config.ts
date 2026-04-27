@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import path from 'path';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
     plugins: [vue()],
     resolve: {
         alias: {
@@ -10,7 +10,9 @@ export default defineConfig({
         },
     },
     // Capacitor için relative path gereklidir
-    base: './',
+    // Web deploys need absolute asset URLs so nested route refreshes work.
+    // Capacitor builds still need relative paths inside the native WebView.
+    base: mode === 'mobile' ? './' : '/',
     build: {
         // Capacitor WebView uyumluluğu için
         target: 'es2020',
@@ -24,6 +26,6 @@ export default defineConfig({
                 changeOrigin: true,
             },
         },
-        allowedHosts: ['sandie-hypnoidal-satedly.ngrok-free.dev']
+        allowedHosts: ['cayhesabim.com']
     },
-});
+}));

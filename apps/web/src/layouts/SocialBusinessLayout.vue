@@ -305,32 +305,63 @@ function switchToTea() {
 
 @media (max-width: 768px) {
   .hub-header {
-    height: auto;
-    min-height: 60px;
-    padding: 8px 16px;
+    height: 60px;
+    padding: 8px 12px;
   }
   .mobile-menu-toggle { display: flex; }
   .hub-nav {
     display: none;
-    width: 100%;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 12px;
+    left: auto;
+    width: auto;
+    min-width: 240px;
+    max-width: calc(100vw - 24px);
     flex-direction: column;
-    gap: 4px;
-    padding: 12px 0;
-    border-top: 1px solid var(--color-border);
-    order: 3;
+    align-items: stretch;
+    gap: 2px;
+    padding: 8px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
     background: var(--color-bg-secondary);
+    box-shadow: var(--shadow-lg);
+    z-index: 60;
   }
   .hub-nav.is-open { display: flex; }
   .nav-link {
     width: 100%;
     padding: 10px 12px;
+    font-size: 14px;
+    gap: 10px;
+    justify-content: flex-start;
   }
   .nav-link span { display: inline; }
   .nav-divider {
-    width: 100%;
+    width: auto;
     height: 1px;
-    margin: 4px 0;
+    margin: 6px 4px;
+    align-self: stretch;
   }
-  .btn-logout { width: 100%; justify-content: center; }
+  .nav-link--secondary {
+    color: var(--color-text-muted);
+  }
+  .btn-logout {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 10px 12px;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .hub-switch-btn .hub-switch-label,
+  .hub-switch-btn svg:last-child { display: none; }
+  .hub-switch-btn {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    justify-content: center;
+    border-radius: var(--radius-md);
+  }
+  .hub-badge { display: none; }
 }
 </style>

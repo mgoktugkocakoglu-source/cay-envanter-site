@@ -1090,6 +1090,344 @@ async function confirmDeleteHarvest() {
     font-weight: 500;
 }
 
+/* ═══════════════ Sale Form Card ═══════════════ */
+.sale-form-card {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    padding: 24px;
+    box-shadow: var(--shadow-sm);
+}
+
+.sale-form-header {
+    margin-bottom: 20px;
+}
+
+.sale-form-header h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin: 0 0 6px;
+}
+
+.sale-form-header p {
+    color: var(--color-text-muted);
+    font-size: 14px;
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* ═══════════════ Firm Chips ═══════════════ */
+.firm-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.firm-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px 8px 8px;
+    background: var(--color-bg-tertiary);
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-full);
+    color: var(--color-text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-family: inherit;
+    white-space: nowrap;
+}
+
+.firm-chip:hover {
+    border-color: var(--color-primary);
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+}
+
+.firm-chip--active {
+    background: var(--color-primary-light);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
+.firm-chip--active .firm-chip-avatar {
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+    color: white;
+}
+
+.firm-chip-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-secondary);
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.firm-chip--add {
+    border-style: dashed;
+    background: transparent;
+    color: var(--color-text-muted);
+    padding: 8px 14px;
+}
+
+.firm-chip--add:hover {
+    border-style: solid;
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    background: var(--color-primary-light);
+}
+
+.loading-inline {
+    display: flex;
+    align-items: center;
+    padding: 8px 0;
+}
+
+.spinner-sm {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--color-border);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* ═══════════════ Tariff Toggle Button ═══════════════ */
+.tariff-panel-toggle {
+    display: flex;
+}
+
+.btn-tariff-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: transparent;
+    border: 1.5px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-family: inherit;
+}
+
+.btn-tariff-toggle:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    background: var(--color-primary-light);
+}
+
+.btn-tariff-toggle--open {
+    border-style: solid;
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    background: var(--color-primary-light);
+}
+
+.tariff-toggle-hint {
+    color: var(--color-text-muted);
+    font-weight: 400;
+    font-size: 13px;
+}
+
+/* ═══════════════ Tariff Panel ═══════════════ */
+.tariff-panel {
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    overflow: hidden;
+}
+
+.tariff-panel-header h4 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin: 0 0 4px;
+}
+
+.tariff-panel-header p {
+    color: var(--color-text-muted);
+    font-size: 13px;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.tariff-panel-enter-active,
+.tariff-panel-leave-active {
+    transition: opacity 0.2s ease, transform 0.2s ease, max-height 0.25s ease;
+    max-height: 1000px;
+}
+
+.tariff-panel-enter-from,
+.tariff-panel-leave-to {
+    opacity: 0;
+    transform: translateY(-6px);
+    max-height: 0;
+}
+
+.split-toggle-row {
+    display: flex;
+}
+
+.split-toggle-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.split-toggle-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+}
+
+/* ═══════════════ Payment Term Buttons ═══════════════ */
+.payment-term-options {
+    display: flex;
+    gap: 6px;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 4px;
+}
+
+.term-btn {
+    flex: 1;
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm, 6px);
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-family: inherit;
+    white-space: nowrap;
+}
+
+.term-btn:hover {
+    color: var(--color-text-primary);
+    background: var(--color-bg-tertiary);
+}
+
+.term-btn--active {
+    background: var(--color-primary);
+    color: white;
+}
+
+.term-btn--active:hover {
+    background: var(--color-primary-hover);
+    color: white;
+}
+
+/* ═══════════════ Split Payment Entries ═══════════════ */
+.split-entry {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.split-entry-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.split-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    border-radius: var(--radius-full);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.btn-icon-sm {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm, 6px);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.btn-icon-sm:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--color-danger);
+}
+
+.btn-add-split {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 16px;
+    background: transparent;
+    border: 1.5px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-family: inherit;
+    align-self: flex-start;
+}
+
+.btn-add-split:hover {
+    border-style: solid;
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    background: var(--color-primary-light);
+}
+
+/* ═══════════════ Form Rows ═══════════════ */
+.form-row {
+    display: grid;
+    gap: 12px;
+}
+
+.form-row--3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 540px) {
+    .form-row--3 {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* ═══════════════ Sale Form (Step 3) ═══════════════ */
 .sale-form {
     max-width: 560px;
