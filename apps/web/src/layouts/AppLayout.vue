@@ -102,6 +102,9 @@ function closeMobileMenu() {
   justify-content: space-between;
   align-items: center;
   padding: 8px var(--space-8);
+  padding-top: calc(8px + env(safe-area-inset-top));
+  padding-left: max(var(--space-8), env(safe-area-inset-left));
+  padding-right: max(var(--space-8), env(safe-area-inset-right));
   background: var(--color-bg-secondary);
   border-bottom: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
@@ -226,6 +229,9 @@ function closeMobileMenu() {
     flex-direction: row;
     flex-wrap: wrap;
     padding: 12px 16px;
+    padding-top: calc(12px + env(safe-area-inset-top));
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
   }
 
   .mobile-menu-toggle {

@@ -120,7 +120,10 @@ function switchToSocial() {
   justify-content: space-between;
   align-items: center;
   padding: 0 var(--space-6);
-  height: 64px;
+  padding-top: env(safe-area-inset-top);
+  padding-left: max(var(--space-6), env(safe-area-inset-left));
+  padding-right: max(var(--space-6), env(safe-area-inset-right));
+  height: calc(64px + env(safe-area-inset-top));
   background: var(--color-bg-secondary);
   border-bottom: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
@@ -306,8 +309,11 @@ function switchToSocial() {
 
 @media (max-width: 768px) {
   .hub-header {
-    height: 60px;
+    height: calc(60px + env(safe-area-inset-top));
     padding: 8px 12px;
+    padding-top: calc(8px + env(safe-area-inset-top));
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
   }
   .mobile-menu-toggle { display: flex; }
   .hub-nav {
