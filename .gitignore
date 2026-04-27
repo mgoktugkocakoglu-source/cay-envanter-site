@@ -10,6 +10,11 @@ build/
 .env
 .env.local
 .env.*.local
+apps/web/.env.mobile.local
+
+# TLS certificates
+cloudflare/*.pem
+cloudflare/*.key
 
 # IDE
 .idea/

@@ -74,6 +74,10 @@ services:
         condition: service_healthy
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - ./cloudflare/origin.pem:/etc/nginx/ssl/cert.pem:ro
+      - ./cloudflare/origin-key.pem:/etc/nginx/ssl/key.pem:ro
     networks:
       - cayhesabim-network
 

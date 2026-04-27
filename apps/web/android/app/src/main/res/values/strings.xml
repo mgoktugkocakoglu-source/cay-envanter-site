@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Çay Hesabım</string>
+    <string name="title_activity_main">Çay Hesabım</string>
+    <string name="package_name">com.cayhesabim.app</string>
+    <string name="custom_url_scheme">com.cayhesabim.app</string>
+</resources>

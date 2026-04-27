@@ -1,6 +1,7 @@
 import { useAuthStore, UserType } from '@/stores/authStore';
 
-const API_BASE = '/api';
+// Capacitor (native) build'de mutlak URL gereklidir; web'de Vite proxy '/api' yeterlidir
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 interface ApiError {
     message: string;

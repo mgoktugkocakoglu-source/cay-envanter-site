@@ -39,17 +39,18 @@ COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 # Copy built static files
 COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
 
-# Security: Run as non-root
+# Ensure nginx-owned runtime directories are writable.
+# The master process stays root so it can bind 80/443 and read mounted TLS keys;
+# nginx workers run as the nginx user from the base image config.
 RUN chown -R nginx:nginx /usr/share/nginx/html && \
     chown -R nginx:nginx /var/cache/nginx && \
     chown -R nginx:nginx /var/log/nginx && \
     touch /var/run/nginx.pid && \
     chown -R nginx:nginx /var/run/nginx.pid
 
-USER nginx
-
 # Expose port
 EXPOSE 80
+EXPOSE 443
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

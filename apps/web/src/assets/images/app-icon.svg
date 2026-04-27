@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Arka plan: App Store uyumlu köşe yarıçapı yok (Apple otomatik ekler) -->
+  <rect width="1024" height="1024" fill="#16a34a"/>
+
+  <!-- Çay fincanı gövdesi -->
+  <rect x="312" y="460" width="400" height="260" rx="30" ry="30" fill="white" opacity="0.95"/>
+
+  <!-- Fincan kulpu -->
+  <path d="M712 510 Q800 510 800 590 Q800 670 712 670" fill="none" stroke="white" stroke-width="40" stroke-linecap="round" opacity="0.95"/>
+
+  <!-- Fincan altlığı -->
+  <rect x="262" y="720" width="500" height="30" rx="15" ry="15" fill="white" opacity="0.85"/>
+  <rect x="312" y="750" width="400" height="20" rx="10" ry="10" fill="white" opacity="0.70"/>
+
+  <!-- Buhar dalgaları -->
+  <path d="M420 400 Q440 360 420 320 Q400 280 420 240" fill="none" stroke="white" stroke-width="22" stroke-linecap="round" opacity="0.75"/>
+  <path d="M512 400 Q532 360 512 320 Q492 280 512 240" fill="none" stroke="white" stroke-width="22" stroke-linecap="round" opacity="0.75"/>
+  <path d="M604 400 Q624 360 604 320 Q584 280 604 240" fill="none" stroke="white" stroke-width="22" stroke-linecap="round" opacity="0.75"/>
+
+  <!-- ₺ para birimi sembolü (gelir takibi) -->
+  <text x="512" y="640" font-family="Arial, sans-serif" font-size="140" font-weight="bold" fill="#16a34a" text-anchor="middle" dominant-baseline="middle">₺</text>
+</svg>

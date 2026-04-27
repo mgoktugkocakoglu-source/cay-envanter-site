@@ -17,7 +17,9 @@
       "Bash(where:*)",
       "Bash(node -e \"\nconst fs = require\\(''fs''\\);\nconst data = fs.readFileSync\\(''C:\\\\\\\\Users\\\\\\\\Huseyin\\\\\\\\.claude\\\\\\\\projects\\\\\\\\C--Users-Huseyin-OneDrive-Masa-st--cayhesabim\\\\\\\\ffa0605b-69a9-456c-95b7-682952fc45cc.jsonl'', ''utf-8''\\);\nconst lines = data.split\\(''\\\\n''\\).filter\\(l => l.trim\\(\\)\\);\nconst last100 = lines.slice\\(-100\\);\n\nfor \\(const line of last100\\) {\n  try {\n    const obj = JSON.parse\\(line\\);\n    if \\(obj.type === ''assistant'' && obj.message && obj.message.content\\) {\n      for \\(const item of obj.message.content\\) {\n        if \\(item.type === ''text'' && item.text.length > 200\\) {\n          console.log\\(item.text.substring\\(0, 5000\\)\\);\n          console.log\\(''...[TRUNCATED]...\\\\n''\\);\n        }\n      }\n    }\n  } catch\\(e\\) {}\n}\n\")",
       "Bash(node:*)",
-      "Bash(cat /c/Users/Huseyin/OneDrive/Masaüstü/cayhesabim/apps/api/src/auth/enums/*.ts)"
+      "Bash(cat /c/Users/Huseyin/OneDrive/Masaüstü/cayhesabim/apps/api/src/auth/enums/*.ts)",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm build:*)"
     ]
   }
 }
