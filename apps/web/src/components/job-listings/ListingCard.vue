@@ -3,613 +3,629 @@ import { computed } from 'vue';
 
 export interface JobListing {
   id: string;
-  type: 'worker' | 'job'; // 'worker' = I'm a worker looking for a job. 'job' = I'm an employer looking for a worker.
+  type: 'worker' | 'job';
   category: 'tea-picking' | 'tea-transport' | 'daily-jobs';
-  
-  // Header / User Profile
   authorName: string;
   authorAvatar?: string;
   location: string;
   age?: number;
   rating?: number;
-  reviewCount?: number;
   commentCount?: number;
-
-  // Global / General Extensibility
-  customBadge?: string; 
-
-  // --- Category Specifics ---
-  // Tea Picking
+  createdAt?: string;
+  phone?: string;
+  customBadge?: string;
   equipment?: string[];
-  pricingPreference?: string[];
-  dailyRate?: number;
-  perKiloRate?: number;
-  pickingPerformance?: number; // kg/gün
-
-  // Transport
-  vehicleTypes?: string[];
+  rateType?: string;
+  requestedFee?: number;
+  offerFee?: number;
+  feeUnit?: string;
+  dailyTeaAmount?: number;
+  foodTransportRequest?: string;
+  foodTransportService?: string;
+  transportCost?: number;
+  mealCost?: number;
+  externalService?: string;
+  externalWorkRequest?: string;
+  teaTransportFee?: number;
+  teaSaleFee?: number;
+  terrainType?: string;
   terrainTypes?: string[];
-  distanceCapacity?: number; // km veya İl dışı (e.g. 999 = iller arası)
-  transportFee?: number; // TL / Ton
-  salesFee?: number;     // TL / Ton
-  hasTransportService?: boolean; // Ek hizmet olarak Taşıma var mı
-  hasSalesService?: boolean;     // Ek hizmet olarak Satma var mı
-
-  // Daily Jobs
+  distanceRange?: string;
+  distanceCapacity?: number;
+  transportFee?: number;
+  sellingFee?: number;
+  salesFee?: number;
+  jobType?: string;
+  jobTypeLabel?: string;
   dailyJobType?: string;
   dailyJobTypeLabel?: string;
+  rateChoice?: string;
+  jobFee?: number;
   dailyFee?: number;
-  dailyFeeUnit?: string; // e.g., 'TL/Gün' or 'TL/m²'
+  dailyFeeUnit?: string;
   hasAdditionalWork?: boolean;
-  additionalWorkFee?: number; // always TL/gün for "El ile Çay Üzeri Temizlik"
-
-  // Food & Transport Add-ons
-  transportCost?: number; // TL/yol
-  mealCost?: number;      // TL/gün
+  additionalWorkFee?: number;
 }
 
 const props = defineProps<{
   listing: JobListing;
 }>();
 
+const categoryMeta = {
+  'tea-picking': { label: 'Çay Toplama', icon: 'leaf', tone: 'green' },
+  'tea-transport': { label: 'Taşıma / Satma', icon: 'truck', tone: 'amber' },
+  'daily-jobs': { label: 'Günlük İşler', icon: 'tool', tone: 'blue' },
+} as const;
+
+const equipmentLabelMap: Record<string, string> = {
+  elektrikli_motor: 'Elektrikli Motor',
+  elektrikli_motorlu: 'Elektrikli Motorlu',
+  benzinli_motor: 'Benzinli Motor',
+  benzinli_motorlu: 'Benzinli Motorlu',
+  sarjli_makas: 'Şarjlı Makas',
+  manuel_makas: 'Çay Makası',
+  cay_makasi: 'Çay Makası',
+};
+
+const rateTypeLabelMap: Record<string, string> = {
+  gunluk_ucret: 'Günlük Ücret',
+  kilo_isi: 'Kilo İşi',
+};
+
+const foodRequestLabelMap: Record<string, string> = {
+  evet_isterim: 'Yemek / ulaşım ister',
+  kendim_karsilayabilirim: 'Yol / yemek katkısı ister',
+};
+
+const foodServiceLabelMap: Record<string, string> = {
+  evet_saglarim: 'Yemek / ulaşım sağlar',
+  karsi_taraf_saglasin: 'Yol / yemek katkısı verir',
+};
+
+const yesNoLabelMap: Record<string, string> = {
+  evet: 'Evet',
+  hayir: 'Hayır',
+};
+
+const terrainLabelMap: Record<string, string> = {
+  duz: 'Düz Arazi',
+  egimli: 'Eğimli Arazi',
+  uzak: 'Uzak Arazi',
+  yakin: 'Yakın Mesafe',
+  orta: 'Orta Mesafe',
+};
+
+const distanceLabelMap: Record<string, string> = {
+  '0-5': '0-5 km',
+  '5-10': '5-10 km',
+  '10-20': '10-20 km',
+  '20+': '20+ km',
+  il_disi: 'İl dışı',
+};
+
 const initials = computed(() => {
-  if (props.listing.authorAvatar) return null;
-  const names = props.listing.authorName.split(' ');
-  if (names.length >= 2) return `${names[0][0]}${names[1][0]}`.toUpperCase();
-  return names[0][0].toUpperCase();
+  const name = props.listing.authorName?.trim() || 'İlan';
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map(part => part[0])
+    .join('')
+    .toUpperCase();
 });
 
-// Helper formatted values
-const formattedDailyRate = computed(() => props.listing.dailyRate?.toLocaleString('tr-TR'));
-const formattedPerKiloRate = computed(() => props.listing.perKiloRate?.toLocaleString('tr-TR'));
-const formattedTransportFee = computed(() => props.listing.transportFee?.toLocaleString('tr-TR'));
-const formattedSalesFee = computed(() => props.listing.salesFee?.toLocaleString('tr-TR'));
-const formattedDailyFee = computed(() => props.listing.dailyFee?.toLocaleString('tr-TR'));
-const formattedAdditionalWorkFee = computed(() => props.listing.additionalWorkFee?.toLocaleString('tr-TR'));
-const formatUnit = (cost?: number) => cost ? cost.toLocaleString('tr-TR') : '0';
+const category = computed(() => categoryMeta[props.listing.category]);
+const listingRole = computed(() => props.listing.type === 'worker' ? 'İş arayan' : 'İşçi arayan');
+const actionLabel = computed(() => props.listing.type === 'worker' ? 'Teklif Ver' : 'Başvur');
 
-// Conditions based on design
-const hasEquipment = computed(() => props.listing.equipment && props.listing.equipment.length > 0);
-const hasPickingPricing = computed(() => props.listing.category === 'tea-picking' && (props.listing.dailyRate || props.listing.perKiloRate));
-const hasTransportPricing = computed(() => props.listing.category === 'tea-transport' && (props.listing.transportFee || props.listing.salesFee));
-const hasDailyPricing = computed(() => props.listing.category === 'daily-jobs' && props.listing.dailyFee);
-const hasExtras = computed(() => props.listing.transportCost || props.listing.mealCost);
+const primaryFee = computed(() => {
+  const value = props.listing.requestedFee ?? props.listing.offerFee ?? props.listing.jobFee ?? props.listing.dailyFee;
+  if (!value) return null;
+  return {
+    label: props.listing.type === 'worker' ? 'Talep edilen ücret' : 'Teklif edilen ücret',
+    value: formatMoney(value),
+    unit: props.listing.feeUnit ?? props.listing.dailyFeeUnit ?? '',
+  };
+});
 
-const equipmentIconMap: Record<string, string> = {
-  'elektrikli_motorlu': '🔌',
-  'benzinli_motorlu': '⛽',
-  'sarjli_makas': '✂️',
-  'manuel_makas': '✂️',
-};
-const equipmentLabelMap: Record<string, string> = {
-  'elektrikli_motorlu': 'Elektrikli Motorlu',
-  'benzinli_motorlu': 'Benzinli Motorlu',
-  'sarjli_makas': 'Şarjlı Makas',
-  'manuel_makas': 'Çay Makası', 
-};
+const detailItems = computed(() => {
+  const listing = props.listing;
+  const items: { label: string; value: string; tone?: 'strong' | 'muted' }[] = [];
 
-function getEquipmentIcon(eq: string) { return equipmentIconMap[eq] || '⚙️'; }
-function getEquipmentLabel(eq: string) { return equipmentLabelMap[eq] || eq; }
+  if (listing.category === 'tea-picking') {
+    if (listing.rateType) items.push({ label: 'Tarife', value: labelFromMap(rateTypeLabelMap, listing.rateType) });
+    if (listing.dailyTeaAmount) items.push({ label: 'Günlük miktar', value: `${formatNumber(listing.dailyTeaAmount)} kg/gün` });
+    if (listing.equipment?.length) items.push({ label: 'Ekipman', value: listing.equipment.map(getEquipmentLabel).join(', ') });
+  }
 
+  if (listing.category === 'tea-transport') {
+    const terrains = listing.terrainTypes?.length ? listing.terrainTypes : (listing.terrainType ? [listing.terrainType] : []);
+    if (terrains.length) items.push({ label: 'Arazi', value: terrains.map(value => labelFromMap(terrainLabelMap, value)).join(', ') });
+    if (listing.distanceRange) items.push({ label: 'Mesafe', value: labelFromMap(distanceLabelMap, listing.distanceRange) });
+    if (listing.distanceCapacity) {
+      items.push({ label: 'Kapasite', value: listing.distanceCapacity === 999 ? 'İl dışı' : `Max ${listing.distanceCapacity} km` });
+    }
+  }
+
+  if (listing.category === 'daily-jobs') {
+    if (listing.jobTypeLabel || listing.dailyJobTypeLabel) items.push({ label: 'İş türü', value: listing.jobTypeLabel ?? listing.dailyJobTypeLabel ?? '' });
+    if (listing.rateChoice) items.push({ label: 'Tarife', value: labelFromMap(rateTypeLabelMap, listing.rateChoice) });
+    if (listing.hasAdditionalWork) items.push({ label: 'Ek iş', value: `Çay üzeri temizlik${listing.additionalWorkFee ? ` +${formatMoney(listing.additionalWorkFee)} TL/gün` : ''}` });
+  }
+
+  const foodValue = listing.foodTransportRequest
+    ? labelFromMap(foodRequestLabelMap, listing.foodTransportRequest)
+    : listing.foodTransportService
+      ? labelFromMap(foodServiceLabelMap, listing.foodTransportService)
+      : '';
+  if (foodValue) items.push({ label: 'Yemek / yol', value: foodValue });
+
+  return items;
+});
+
+const serviceItems = computed(() => {
+  const listing = props.listing;
+  const items: { label: string; value: string; tone: 'green' | 'amber' | 'blue' }[] = [];
+  const transportFee = listing.transportFee ?? listing.teaTransportFee;
+  const saleFee = listing.salesFee ?? listing.sellingFee ?? listing.teaSaleFee;
+
+  if (transportFee) items.push({ label: 'Çay taşıma', value: `+${formatMoney(transportFee)} TL/Ton`, tone: 'amber' });
+  if (saleFee) items.push({ label: 'Çay satma', value: `+${formatMoney(saleFee)} TL/Ton`, tone: 'blue' });
+  if (listing.transportCost) items.push({ label: 'Yol katkısı', value: `+${formatMoney(listing.transportCost)} TL/Yol`, tone: 'green' });
+  if (listing.mealCost) items.push({ label: 'Yemek katkısı', value: `+${formatMoney(listing.mealCost)} TL/Gün`, tone: 'green' });
+
+  return items;
+});
+
+const externalLabel = computed(() => {
+  const value = props.listing.externalService ?? props.listing.externalWorkRequest;
+  if (!value) return '';
+  const label = props.listing.type === 'worker' ? 'Ek hizmet verir' : 'Ek hizmet ister';
+  return `${label}: ${labelFromMap(yesNoLabelMap, value)}`;
+});
+
+function formatNumber(value: number): string {
+  return value.toLocaleString('tr-TR');
+}
+
+function formatMoney(value: number): string {
+  return value.toLocaleString('tr-TR');
+}
+
+function labelFromMap(map: Record<string, string>, value: string): string {
+  return map[value] ?? value.replace(/_/g, ' ');
+}
+
+function getEquipmentLabel(value: string): string {
+  return labelFromMap(equipmentLabelMap, value);
+}
 </script>
 
 <template>
-  <article class="listing-card">
-    <div class="card-inner">
-      
-      <!-- HEADER -->
-      <header class="card-header">
-        <div class="avatar-wrapper">
-          <img v-if="listing.authorAvatar" :src="listing.authorAvatar" :alt="listing.authorName" class="avatar-image" />
-          <div v-else class="avatar-placeholder">{{ initials }}</div>
-        </div>
-        <div class="header-info">
-          <h2 class="author-name">
-            {{ listing.authorName }}
-            <span v-if="listing.customBadge" class="badge-role">{{ listing.customBadge }}</span>
-          </h2>
-          <div class="meta-row">
-            <span class="meta-item text-green">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-              {{ listing.location }}
-            </span>
-            <span v-if="listing.age" class="meta-divider">·</span>
-            <span v-if="listing.age" class="meta-item text-gray">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-              {{ listing.age }} Yaş
-            </span>
-          </div>
-        </div>
-      </header>
+  <article class="listing-card" :class="`listing-card--${category.tone}`">
+    <header class="card-header">
+      <div class="avatar-shell">
+        <img v-if="listing.authorAvatar" :src="listing.authorAvatar" :alt="listing.authorName" class="avatar-image" />
+        <div v-else class="avatar-placeholder">{{ initials }}</div>
+      </div>
 
-      <div class="card-body">
-        
-        <!-- SECTION: Ekipman (Çay Toplama / Worker) -->
-        <div v-if="hasEquipment" class="card-section">
-          <h3 class="section-title">
-            <span class="icon-gear">⚙️</span>
-            Ekipman
-          </h3>
-          <ul class="equipment-list">
-            <li v-for="eq in listing.equipment" :key="eq" class="equipment-item">
-              <span class="eq-icon">{{ getEquipmentIcon(eq) }}</span>
-              {{ getEquipmentLabel(eq) }}
-            </li>
-          </ul>
+      <div class="header-copy">
+        <div class="eyebrow-row">
+          <span class="category-pill">
+            <svg v-if="category.icon === 'leaf'" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19c8 0 13-5 14-14C10 6 5 11 5 19Z"/><path d="M5 19c3-4 6-7 11-10"/></svg>
+            <svg v-else-if="category.icon === 'truck'" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+            <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="m14 7 3 3"/><path d="M5 19 16 8l-3-3L2 16v3z"/><path d="m15 5 2-2 4 4-2 2"/></svg>
+            {{ category.label }}
+          </span>
+          <span class="role-pill">{{ listingRole }}</span>
         </div>
+        <h2>{{ listing.authorName }}</h2>
+        <div class="meta-line">
+          <span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-5.1 7-11a7 7 0 1 0-14 0c0 5.9 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+            {{ listing.location }}
+          </span>
+          <span v-if="listing.age">{{ listing.age }} yas</span>
+        </div>
+      </div>
+    </header>
 
-        <!-- SECTION: Araç & Alan (Çay Taşıma) -->
-        <div v-if="listing.category === 'tea-transport' && listing.vehicleTypes" class="card-section">
-          <h3 class="section-title">
-            <span>🚛</span>
-            Araç & Bölge
-          </h3>
-          <div class="tags-group">
-            <span v-for="veh in listing.vehicleTypes" :key="veh" class="tag-badge">
-              {{ veh === 'kamyonet' ? 'Kamyonet' : veh === 'transit' ? 'Transit' : veh === 'panelvan' ? 'Panelvan' : 'Teleferik/İlkel' }}
-            </span>
-          </div>
-          <p v-if="listing.distanceCapacity" class="detail-row">
-            Mesafe: <strong>{{ listing.distanceCapacity === 999 ? 'İller Arası' : `Max ${listing.distanceCapacity} km` }}</strong>
-          </p>
-          <div v-if="listing.terrainTypes" class="tags-group" style="margin-top: 8px;">
-            <span v-for="ters in listing.terrainTypes" :key="ters" class="tag-badge outline">
-              {{ ters === 'duz' ? 'Düz Arazi' : ters === 'egimli' ? 'Eğimli Arazi' : 'Uzak Arazi' }}
-            </span>
-          </div>
-        </div>
+    <section v-if="primaryFee" class="price-panel">
+      <span>{{ primaryFee.label }}</span>
+      <strong>{{ primaryFee.value }} {{ primaryFee.unit }}</strong>
+    </section>
 
-        <!-- SECTION: Çalışma Tercihi (Çay Toplama / Daily Jobs Pricing) -->
-        <div v-if="hasPickingPricing || hasDailyPricing" class="card-section">
-          <h3 class="section-title">
-            <span class="icon-money">💰</span>
-            Çalışma Tercihi <span class="title-sub" v-if="listing.category === 'daily-jobs'">({{ listing.dailyJobTypeLabel }})</span>
-          </h3>
-          
-          <div class="pricing-group">
-            <!-- Picking -->
-            <template v-if="hasPickingPricing">
-              <div v-if="listing.dailyRate" class="price-badge bg-green-light text-green-dark">
-                Günlük: <strong>{{ formattedDailyRate }} TL</strong>
-              </div>
-              <span v-if="listing.dailyRate && listing.perKiloRate" class="price-or">veya</span>
-              <div v-if="listing.perKiloRate" class="price-badge bg-orange-light text-orange-dark">
-                Kilo Başı: <span class="icon-bag">⛑️</span> <strong>{{ formattedPerKiloRate }} TL</strong> / Ton
-              </div>
-            </template>
-            <!-- Daily Jobs -->
-            <template v-if="hasDailyPricing">
-              <div class="price-badge bg-teal-light text-teal-dark">
-                {{ listing.dailyJobTypeLabel }}: <strong>{{ formattedDailyFee }} {{ listing.dailyFeeUnit }}</strong>
-              </div>
-              <div v-if="listing.additionalWorkFee" class="price-badge bg-orange-light text-orange-dark" style="margin-top:8px;">
-                + Çay Üzeri Temizlik: <strong>{{ formattedAdditionalWorkFee }} TL/Gün</strong>
-              </div>
-            </template>
-          </div>
-        </div>
+    <section v-if="detailItems.length" class="detail-grid">
+      <div v-for="item in detailItems" :key="`${item.label}-${item.value}`" class="detail-item">
+        <span>{{ item.label }}</span>
+        <strong>{{ item.value }}</strong>
+      </div>
+    </section>
 
-        <!-- SECTION: Fiyat Tarifesi (Çay Taşıma Pricing) -->
-        <div v-if="hasTransportPricing" class="card-section">
-          <h3 class="section-title">
-            <span>💸</span> Fiyat Tarifesi
-          </h3>
-          <div class="services-list">
-            <div v-if="listing.transportFee" class="service-row">
-              <div class="service-name">
-                <span class="icon-bag2">📦</span> Çay Taşıma
-              </div>
-              <div class="service-price">
-                <span class="price-tag orange">+{{ formattedTransportFee }} TL/Ton</span>
-              </div>
-            </div>
-            <div v-if="listing.salesFee" class="service-row">
-              <div class="service-name">
-                <span class="icon-bag2">🤝</span> Alım Yeri (Satma)
-              </div>
-              <div class="service-price">
-                <span class="price-tag blue">+{{ formattedSalesFee }} TL/Ton</span>
-              </div>
-            </div>
-          </div>
+    <section v-if="serviceItems.length || externalLabel" class="services-panel">
+      <div v-if="externalLabel" class="service-note">{{ externalLabel }}</div>
+      <div v-if="serviceItems.length" class="service-list">
+        <div v-for="item in serviceItems" :key="`${item.label}-${item.value}`" class="service-chip" :class="`service-chip--${item.tone}`">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
         </div>
+      </div>
+    </section>
 
-        <!-- SECTION: Performans (Çay Toplama / Worker) -->
-        <div v-if="listing.pickingPerformance" class="card-section">
-          <h3 class="section-title">
-            <span class="icon-chart">📊</span>
-            Performans
-          </h3>
-          <div class="perf-badge">
-            Ortalama: <strong>{{ listing.pickingPerformance }} kg/gün</strong>
-          </div>
-        </div>
-
-        <!-- SECTION: Ek Talepler / Katkı (Food/Travel) -->
-        <div v-if="hasExtras" class="card-section">
-          <h3 class="section-title">
-            <span class="icon-fork">🍽️</span>
-            {{ listing.type === 'job' ? 'Sağlanan Ek Hizmetler' : 'Ek Talepler' }}
-          </h3>
-          <div class="extras-group">
-            <div v-if="listing.transportCost" class="extra-item">
-              <span class="icon-check">✓</span> 
-              <span class="extra-label">Yol:</span>
-              <span class="price-tag outline-orange">+{{ formatUnit(listing.transportCost) }} TL/yol</span>
-            </div>
-            <div v-if="listing.mealCost" class="extra-item">
-              <span class="icon-bowl">🍲</span> 
-              <span class="extra-label">Yemek:</span>
-              <span class="price-tag outline-red">+{{ formatUnit(listing.mealCost) }} TL/gün</span>
-            </div>
-          </div>
-        </div>
-        
-        <!-- SECTION: Ek Hizmetler (Çay Toplama / Worker adding Tasıma/Satma) -->
-        <!-- Only shown if this is a picking listing that also offers transport -->
-        <div v-if="listing.category === 'tea-picking' && (listing.hasTransportService || listing.hasSalesService)" class="card-section">
-          <h3 class="section-title">
-            <span class="icon-plus">➕</span>
-            Ek Hizmetler
-          </h3>
-          <div class="services-list">
-            <div v-if="listing.hasTransportService && listing.transportFee" class="service-row">
-              <div class="service-name">
-                <span class="icon-bag2">💰</span> Çay Taşıma
-              </div>
-              <div class="service-price">
-                <span class="price-tag orange">+{{ formattedTransportFee }} TL/Ton</span>
-                <!-- Reference image had a double badge "+500TL/ +400TL/Ton" implying multiple variants, we simplify here based on our wizard -->
-              </div>
-            </div>
-            <div v-if="listing.hasSalesService && listing.salesFee" class="service-row">
-              <div class="service-name">
-                <span class="icon-bag2">💰</span> Çay Satma
-              </div>
-              <div class="service-price">
-                <span class="price-tag orange">+{{ formattedSalesFee }} TL/Ton</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div> <!-- /card-body -->
-
-      <!-- FOOTER -->
-      <footer class="card-footer">
-        <div class="footer-stats">
-          <div class="rating">
-            <span class="star">⭐</span>
-            <span class="rating-val">Puan: <strong class="text-black">{{ listing.rating || 'Yeni' }}</strong> <span class="rating-max" v-if="listing.rating">/ 5</span></span>
-          </div>
-          <div class="comments">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-            <strong>{{ listing.commentCount || 0 }}</strong> Yorum
-          </div>
-        </div>
-        
-        <div class="footer-actions">
-          <button class="btn-primary">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            Teklif Ver
-          </button>
-          <button class="btn-secondary">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-            Mesaj
-          </button>
-        </div>
-      </footer>
-
-    </div>
+    <footer class="card-footer">
+      <div class="trust-row">
+        <span>Puan: <strong>{{ listing.rating || 'Yeni' }}</strong></span>
+        <span>{{ listing.commentCount || 0 }} Yorum</span>
+      </div>
+      <div class="action-row">
+        <button type="button" class="btn-primary">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>
+          {{ actionLabel }}
+        </button>
+        <button type="button" class="btn-secondary">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="m4 7 8 6 8-6"/></svg>
+          Mesaj
+        </button>
+      </div>
+    </footer>
   </article>
 </template>
 
 <style scoped>
 .listing-card {
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(0,0,0,0.04);
-  overflow: hidden;
-  max-width: 440px;
+  --accent: #16a34a;
+  --accent-soft: rgba(22, 163, 74, 0.1);
+  --accent-border: rgba(22, 163, 74, 0.22);
   width: 100%;
-  font-family: var(--font-family, system-ui, sans-serif);
-  color: #333;
+  max-width: 430px;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #d9e2ef;
+  border-radius: 8px;
+  color: #0f172a;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.12);
 }
 
-.card-inner {
-  display: flex;
-  flex-direction: column;
+.listing-card--amber {
+  --accent: #d97706;
+  --accent-soft: rgba(217, 119, 6, 0.1);
+  --accent-border: rgba(217, 119, 6, 0.24);
 }
 
-/* ── HEADER ── */
+.listing-card--blue {
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --accent-border: rgba(37, 99, 235, 0.22);
+}
+
 .card-header {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 20px 20px 16px;
+  gap: 14px;
+  padding: 18px 18px 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
 }
 
-.avatar-wrapper {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  overflow: hidden;
+.avatar-shell {
+  width: 62px;
+  height: 62px;
   flex-shrink: 0;
-  background: #f0fdf4;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+}
+
+.avatar-image,
+.avatar-placeholder {
+  width: 100%;
+  height: 100%;
 }
 
 .avatar-image {
-  width: 100%;
-  height: 100%;
   object-fit: cover;
 }
 
 .avatar-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  font-weight: 700;
-  color: #166534;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  font-size: 22px;
+  font-weight: 800;
 }
 
-.header-info {
+.header-copy {
+  min-width: 0;
   flex: 1;
 }
 
-.author-name {
-  font-size: 20px;
-  font-weight: 700;
-  margin: 0 0 4px 0;
-  color: #111827;
+.eyebrow-row,
+.meta-line,
+.category-pill,
+.role-pill {
   display: flex;
   align-items: center;
-  gap: 8px;
 }
 
-.badge-role {
-  font-size: 11px;
-  background: #f1f5f9;
+.eyebrow-row {
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.category-pill,
+.role-pill {
+  min-height: 24px;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.category-pill {
+  gap: 5px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+}
+
+.category-pill svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.role-pill {
   color: #475569;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-weight: 600;
+  background: #f1f5f9;
   border: 1px solid #e2e8f0;
 }
 
-.meta-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 500;
+h2 {
+  margin: 0 0 6px;
+  color: #0f172a;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.2;
 }
 
-.meta-item {
+.meta-line {
+  gap: 10px;
+  flex-wrap: wrap;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.meta-line span {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-.text-green { color: #15803d; }
-.text-gray { color: #6b7280; }
-.meta-divider { color: #cbd5e1; }
-
-/* ── BODY ── */
-.card-body {
-  display: flex;
-  flex-direction: column;
+.meta-line svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
 }
 
-.card-section {
-  padding: 16px 20px;
-  border-top: 1px solid #f1f5f9;
-}
-
-.section-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: #334155;
-  margin: 0 0 12px 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.title-sub { font-weight: 500; color: #64748b; font-size: 12px; }
-
-/* Equipment */
-.equipment-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.equipment-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: #334155;
-}
-
-.eq-icon {
-  filter: grayscale(0.5) contrast(1.2);
-}
-
-/* Tags/Badges Generic */
-.tags-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.tag-badge {
-  font-size: 13px;
-  padding: 4px 10px;
-  border-radius: 6px;
-  background: #f0fdf4;
-  color: #166534;
-  font-weight: 500;
-}
-.tag-badge.outline {
-  background: transparent;
-  border: 1px solid #d1fae5;
-}
-.detail-row {
-  font-size: 13px; color: #475569; margin: 8px 0 0;
-}
-
-
-/* Pricing */
-.pricing-group {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.price-badge {
-  padding: 6px 12px;
+.price-panel {
+  margin: 0 18px 14px;
+  padding: 14px;
+  border: 1px solid var(--accent-border);
   border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
+  background: var(--accent-soft);
 }
 
-.price-badge strong { font-weight: 700; font-size: 15px; }
-.price-or { font-size: 13px; color: #94a3b8; }
-
-.bg-green-light { background: #f0fdf4; border: 1px solid #d1fae5; }
-.text-green-dark { color: #166534; }
-
-.bg-orange-light { background: #fff7ed; border: 1px solid #ffedd5; }
-.text-orange-dark { color: #9a3412; }
-
-.bg-teal-light { background: #f0fdfa; border: 1px solid #ccfbf1; }
-.text-teal-dark { color: #0f766e; }
-
-/* Performance */
-.perf-badge {
-  display: inline-flex;
-  padding: 6px 12px;
-  background: #f8fafc;
+.price-panel span {
+  display: block;
+  margin-bottom: 3px;
   color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.price-panel strong {
+  color: var(--accent);
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 18px 16px;
+}
+
+.detail-item {
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
+  background: #f8fafc;
+}
+
+.detail-item span {
+  display: block;
+  margin-bottom: 4px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.detail-item strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: #1e293b;
   font-size: 14px;
-  border: 1px solid #f1f5f9;
-}
-.perf-badge strong { color: #0f766e; font-weight: 700; margin-left: 4px; }
-
-
-/* Extras */
-.extras-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+  line-height: 1.25;
 }
 
-.extra-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
+.services-panel {
+  padding: 14px 18px 16px;
+  border-top: 1px solid #eef2f7;
 }
 
-.extra-label { color: #64748b; font-weight: 500; }
-.icon-check { color: #16a34a; font-weight: bold; }
-
-.price-tag {
+.service-note {
+  margin-bottom: 10px;
+  color: #334155;
   font-size: 13px;
   font-weight: 700;
-  padding: 4px 8px;
-  border-radius: 6px;
 }
-.price-tag.orange { background: #fff7ed; color: #c2410c; }
-.price-tag.blue { background: #eff6ff; color: #1d4ed8; }
-.price-tag.outline-orange { background: #fff7ed; color: #b45309; }
-.price-tag.outline-red { background: #fef2f2; color: #b91c1c; }
 
-/* Services */
-.services-list {
+.service-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.service-chip {
   display: flex;
   flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+}
+
+.service-chip span {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.service-chip strong {
+  color: #1d4ed8;
+  font-size: 13px;
+}
+
+.service-chip--green {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.service-chip--green strong {
+  color: #15803d;
+}
+
+.service-chip--amber {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.service-chip--amber strong {
+  color: #c2410c;
+}
+
+.card-footer {
+  padding: 14px 18px 18px;
+  border-top: 1px solid #eef2f7;
+}
+
+.trust-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.trust-row strong {
+  color: #0f172a;
+}
+
+.action-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
 
-.service-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.service-name {
-  font-size: 14px;
-  color: #334155;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-
-/* ── FOOTER ── */
-.card-footer {
-  padding: 16px 20px;
-  border-top: 1px solid #f1f5f9;
-}
-
-.footer-stats {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  font-size: 14px;
-  color: #64748b;
-  font-weight: 500;
-}
-
-.rating { display: flex; align-items: center; gap: 4px; }
-.star { font-size: 16px; color: #fbbf24; }
-.text-black { color: #0f172a; font-size: 15px; }
-.rating-max { color: #94a3b8; font-size: 13px; }
-
-.comments { display: flex; align-items: center; gap: 6px; }
-.comments svg { color: #10b981; }
-
-.footer-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.btn-primary, .btn-secondary {
-  flex: 1;
-  display: flex;
+.btn-primary,
+.btn-secondary {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px;
-  border-radius: 10px;
-  font-weight: 700;
-  font-size: 15px;
+  min-height: 44px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 800;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.btn-primary svg,
+.btn-secondary svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .btn-primary {
-  background: #65a30d; /* Matching visual reference green */
-  color: white;
-  border: none;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #ffffff;
 }
-.btn-primary:hover { background: #4d7c0f; }
 
 .btn-secondary {
-  background: white;
-  color: #475569;
   border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
 }
-.btn-secondary:hover { background: #f8fafc; border-color: #94a3b8; }
 
+.btn-primary:hover,
+.btn-secondary:hover {
+  transform: translateY(-1px);
+}
+
+.btn-secondary:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+@media (max-width: 520px) {
+  .listing-card {
+    max-width: none;
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.1);
+  }
+
+  .card-header {
+    padding: 16px;
+  }
+
+  .avatar-shell {
+    width: 54px;
+    height: 54px;
+  }
+
+  h2 {
+    font-size: 18px;
+  }
+
+  .price-panel {
+    margin-inline: 16px;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
+    padding-inline: 16px;
+  }
+
+  .services-panel,
+  .card-footer {
+    padding-inline: 16px;
+  }
+}
 </style>

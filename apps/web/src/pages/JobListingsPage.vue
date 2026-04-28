@@ -32,6 +32,7 @@ const fetchListings = async () => {
             // Map backend data to frontend model with fallbacks for UI elements
             listings.value = response.data.map(item => {
                 const metadata = item.metadata || {};
+                const authorName = metadata.fullName || item.author?.fullName || 'İsimsiz İlan';
                 
                 // Ensure properties expected as arrays by ListingCard are actual arrays
                 // (wizards currently save single strings for some of these fields)
@@ -48,15 +49,23 @@ const fetchListings = async () => {
                     id: item.id,
                     type: item.type,
                     category: item.category,
-                    authorName: item.author.fullName,
-                    authorAvatar: item.author.avatarUrl || `https://ui-avatars.com/api/?name=${item.author.fullName}`,
-                    location: `${item.author.province} / ${item.author.district}`,
+                    authorName,
+                    authorAvatar: item.author?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}`,
+                    location: item.location || [item.author?.province, item.author?.district].filter(Boolean).join(' / '),
+                    createdAt: item.createdAt,
                     rating: 0, // Fallback, could be calculated in backend
                     commentCount: 0,
                     ...metadata,
+                    phone: metadata.phone || item.author?.phone,
                     equipment,
                     vehicleTypes,
-                    terrainTypes
+                    terrainTypes,
+                    transportFee: metadata.transportFee ?? metadata.teaTransportFee,
+                    salesFee: metadata.salesFee ?? metadata.sellingFee ?? metadata.teaSaleFee,
+                    dailyFee: metadata.dailyFee ?? metadata.jobFee,
+                    dailyFeeUnit: metadata.dailyFeeUnit ?? metadata.feeUnit,
+                    dailyJobType: metadata.dailyJobType ?? metadata.jobType,
+                    dailyJobTypeLabel: metadata.dailyJobTypeLabel ?? metadata.jobTypeLabel,
                 };
             });
         }
