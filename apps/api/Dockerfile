@@ -64,6 +64,10 @@ WORKDIR /app
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nestjs
 
+# Writable upload directory for Multer. The app runs as the non-root
+# nestjs user, so this must exist with the correct ownership.
+RUN mkdir -p /app/uploads && chown -R nestjs:nodejs /app/uploads
+
 # Copy built application
 COPY --from=builder --chown=nestjs:nodejs /app/apps/api/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/apps/api/package.json ./

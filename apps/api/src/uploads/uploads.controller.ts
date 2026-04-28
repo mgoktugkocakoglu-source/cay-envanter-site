@@ -14,7 +14,7 @@ import { JwtAuthGuard } from '@/auth/guards';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { v4 as uuid } from 'uuid';
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
 import { Response, Request } from 'express';
 
 const UPLOAD_DIR = join(process.cwd(), 'uploads');
@@ -55,9 +55,12 @@ const storage = diskStorage({
         _file: Express.Multer.File,
         cb: (error: Error | null, destination: string) => void,
     ): void => {
-        const { mkdirSync } = require('fs');
-        mkdirSync(UPLOAD_DIR, { recursive: true });
-        cb(null, UPLOAD_DIR);
+        try {
+            mkdirSync(UPLOAD_DIR, { recursive: true });
+            cb(null, UPLOAD_DIR);
+        } catch (error) {
+            cb(error as Error, UPLOAD_DIR);
+        }
     },
     filename: (
         _req: Request,

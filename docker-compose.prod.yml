@@ -53,6 +53,8 @@ services:
       - cayhesabim-network
     expose:
       - "3000"
+    volumes:
+      - api_uploads_prod:/app/uploads
     healthcheck:
       test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1" ]
       interval: 15s
@@ -89,6 +91,7 @@ services:
 
 volumes:
   postgres_data_prod:
+  api_uploads_prod:
 
 
 networks:

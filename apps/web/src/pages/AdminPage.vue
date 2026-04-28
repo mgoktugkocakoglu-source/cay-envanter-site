@@ -38,9 +38,6 @@ const navItems = [
     { name: 'Gösterge Paneli', icon: '📊', route: '/admin', active: true },
     { name: 'Kullanıcılar', icon: '👥', route: '/admin/users', active: false },
     { name: 'Firmalar', icon: '🏢', route: '/admin/firms', active: false },
-    { name: 'Topluluk Yönetimi', icon: '📂', route: '/admin/categories', active: false },
-    { name: 'Konular', icon: '💬', route: '/admin/topics', active: false },
-    { name: 'Raporlar', icon: '🚨', route: '/admin/reports', active: false },
 ];
 
 function navigateTo(route: string) {
