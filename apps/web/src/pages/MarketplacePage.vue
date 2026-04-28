@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
+import SocialWorkspaceLayout from '@/layouts/SocialWorkspaceLayout.vue';
 
 const activeTab = ref<'all' | 'sell' | 'buy' | 'trade'>('all');
 
@@ -22,7 +23,8 @@ const categories = [
 
 <template>
   <SocialBusinessLayout>
-    <div class="marketplace-page">
+    <SocialWorkspaceLayout>
+      <div class="marketplace-page">
       <header class="mp-header">
         <h1 class="mp-title">
           <span>🛒</span>
@@ -94,15 +96,14 @@ const categories = [
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </SocialWorkspaceLayout>
   </SocialBusinessLayout>
 </template>
 
 <style scoped>
 .marketplace-page {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: var(--space-8) var(--space-4);
+  width: 100%;
 }
 
 .mp-header {

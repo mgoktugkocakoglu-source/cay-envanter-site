@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
+import SocialWorkspaceLayout from '@/layouts/SocialWorkspaceLayout.vue';
 
 // Equipment categories for the tea industry
 const categories = ref([
@@ -17,7 +18,8 @@ const selectedCategory = ref<string | null>(null);
 
 <template>
   <SocialBusinessLayout>
-    <div class="equipment-page">
+    <SocialWorkspaceLayout>
+      <div class="equipment-page">
       <header class="eq-header">
         <h1 class="eq-title">
           <span>🔧</span>
@@ -82,15 +84,14 @@ const selectedCategory = ref<string | null>(null);
           </div>
         </div>
       </section>
-    </div>
+      </div>
+    </SocialWorkspaceLayout>
   </SocialBusinessLayout>
 </template>
 
 <style scoped>
 .equipment-page {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: var(--space-8) var(--space-4);
+  width: 100%;
 }
 
 .eq-header {

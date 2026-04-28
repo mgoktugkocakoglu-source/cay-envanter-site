@@ -127,7 +127,7 @@ function closeMobileMenu() {
 }
 
 .app-logo-img {
-  height: 80px;
+  height: 40px;
   width: auto;
   object-fit: contain;
 }

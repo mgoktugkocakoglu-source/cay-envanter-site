@@ -238,10 +238,15 @@ function positionDropdown() {
   const spaceBelow = window.innerHeight - rect.bottom
   const openAbove = spaceBelow < 260 && rect.top > spaceBelow
 
+  // Cap the dropdown so it can grow past the trigger to fit option labels,
+  // but never extend past the viewport edge.
+  const maxWidth = Math.max(rect.width, Math.min(window.innerWidth - rect.left - 8, 320))
+
   dropdownStyle.value = {
     position: 'fixed',
     left: `${rect.left}px`,
-    width: `${rect.width}px`,
+    minWidth: `${rect.width}px`,
+    maxWidth: `${maxWidth}px`,
     zIndex: '1000',
     ...(openAbove
       ? { bottom: `${window.innerHeight - rect.top + 2}px` }
@@ -536,11 +541,20 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   cursor: pointer;
   transition: background var(--transition-fast);
   font-size: var(--font-size-base);
   color: var(--color-text-primary);
+}
+
+.app-select-option-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
 }
 
 .app-select-option:hover,

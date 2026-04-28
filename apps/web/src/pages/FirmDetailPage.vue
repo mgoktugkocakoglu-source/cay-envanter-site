@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { useRoute, RouterLink } from 'vue-router';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { useFirmsStore } from '@/stores/firmsStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/composables/useToast';
@@ -305,7 +307,6 @@ async function handleDeleteCP() {
 
 // ─── Satellite Map ───
 async function initMap(containerId: string, lat: number, lng: number) {
-    const L = await import('leaflet');
     await nextTick();
 
     const container = document.getElementById(containerId);
@@ -328,6 +329,9 @@ async function initMap(containerId: string, lat: number, lng: number) {
     L.marker([lat, lng]).addTo(map);
 
     mapInstances.value[containerId] = map;
+
+    // Force tile recomputation once container size is finalized
+    requestAnimationFrame(() => map.invalidateSize());
 }
 
 // Watch for location tab activation to init maps
@@ -748,7 +752,8 @@ onMounted(loadFirmData);
 
                         <div class="form-row">
                             <div class="form-group">
-                                <AppSelect v-model="cpForm.province" :options="provinceFormOptions" label="Il *" placeholder="Il seciniz..." variant="light" :required="true" />
+                                <label class="form-label">Il <span class="required">*</span></label>
+                                <AppSelect v-model="cpForm.province" :options="provinceFormOptions" placeholder="Il seciniz..." variant="light" />
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Ilce <span class="required">*</span></label>
@@ -914,6 +919,7 @@ onMounted(loadFirmData);
 /* ── Location Header ── */
 .location-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
 .location-filters { display: flex; gap: 16px; align-items: center; flex: 1; }
+.location-filters :deep(.app-select-wrapper) { min-width: 160px; }
 .filter-count { font-size: 13px; color: var(--color-text-muted); font-weight: 500; white-space: nowrap; }
 
 /* ── Collection Points ── */

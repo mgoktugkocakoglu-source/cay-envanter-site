@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
 import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
+import SocialWorkspaceLayout from '@/layouts/SocialWorkspaceLayout.vue';
 
 const router = useRouter();
 
@@ -17,21 +18,21 @@ const categories: CategoryCard[] = [
     icon: '🍃',
     title: 'Çay Toplama İşçisi İlanı Oluştur',
     description: 'Çay toplama işi için deneyim ve ücret bilgilerinizi paylaşın',
-    route: '/job-listings/worker/create/tea-picking',
+    route: '/social/job-listings/worker/create/tea-picking',
     enabled: true,
   },
   {
     icon: '🚛',
     title: 'Çay Taşıma/Satma İşçisi İlanı Oluştur',
     description: 'Çay taşıma ve satma işleri için ilanınızı oluşturun',
-    route: '/job-listings/worker/create/tea-transport',
+    route: '/social/job-listings/worker/create/tea-transport',
     enabled: true,
   },
   {
     icon: '🔨',
     title: 'Günlük İşler İşçisi İlanı Oluştur',
     description: 'Günlük işler için ilanınızı oluşturun',
-    route: '/job-listings/worker/create/daily-jobs',
+    route: '/social/job-listings/worker/create/daily-jobs',
     enabled: true,
   },
 ];
@@ -49,7 +50,8 @@ function goBack() {
 
 <template>
   <SocialBusinessLayout>
-    <div class="category-page">
+    <SocialWorkspaceLayout>
+      <div class="category-page">
       <header class="page-header">
         <button class="btn-back" @click="goBack">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -78,15 +80,14 @@ function goBack() {
           <svg v-else class="category-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
       </div>
-    </div>
+      </div>
+    </SocialWorkspaceLayout>
   </SocialBusinessLayout>
 </template>
 
 <style scoped>
 .category-page {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: var(--space-4) var(--space-4) var(--space-8);
+  width: 100%;
 }
 
 .page-header {

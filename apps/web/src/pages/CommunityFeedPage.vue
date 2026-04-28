@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { useCommunityStore } from '@/stores/communityStore';
 import { useAuthStore } from '@/stores/authStore';
 import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
+import SocialWorkspaceLayout from '@/layouts/SocialWorkspaceLayout.vue';
 import type { CommunityPostType, CommunityReactionType } from '@/services/api';
 
 const store = useCommunityStore();
@@ -81,7 +82,7 @@ async function react(postId: string, t: CommunityReactionType) {
   await store.toggleReaction('post', postId, t);
 }
 
-function goTo(id: string) { router.push(`/community/post/${id}`); }
+function goTo(id: string) { router.push(`/social/community/post/${id}`); }
 
 function filterMyPosts() {
   if (!authStore.user) { router.push('/login'); return; }
@@ -105,22 +106,8 @@ const hasActiveFilter = () => activeType.value || activeTag.value || searchQuery
 
 <template>
   <SocialBusinessLayout>
-    <div class="cp">
-      <div class="cp-grid">
-        <!-- Left Sidebar - Facebook-like -->
-        <aside class="cp-side">
-          <!-- User Profile Card -->
-          <div v-if="authStore.isAuthenticated" class="side-profile" @click="router.push('/settings')">
-            <div class="sp-avatar">
-              <img v-if="authStore.user?.avatarUrl" :src="authStore.user.avatarUrl" :alt="authStore.user?.fullName" />
-              <span v-else>{{ authStore.user?.fullName?.charAt(0)?.toUpperCase() }}</span>
-            </div>
-            <div class="sp-info">
-              <span class="sp-name">{{ authStore.user?.fullName }}</span>
-              <span v-if="authStore.user?.userType" class="sp-type">{{ userLabel(authStore.user.userType) }}</span>
-            </div>
-          </div>
-
+    <SocialWorkspaceLayout>
+      <template #sidebar>
           <!-- Navigation Menu -->
           <nav class="side-nav">
             <button class="nav-item" :class="{ active: !activeType && !activeTag && !store.activeFilters.userId }" @click="clearAllFilters">
@@ -159,7 +146,7 @@ const hasActiveFilter = () => activeType.value || activeTag.value || searchQuery
               <p v-if="store.trendingTags.length === 0" class="st-empty">Henüz popüler konu yok</p>
             </div>
           </div>
-        </aside>
+      </template>
 
         <!-- Main Feed -->
         <main class="feed">
@@ -321,8 +308,7 @@ const hasActiveFilter = () => activeType.value || activeTag.value || searchQuery
             </div>
           </div>
         </main>
-      </div>
-    </div>
+    </SocialWorkspaceLayout>
   </SocialBusinessLayout>
 </template>
 
@@ -353,19 +339,24 @@ const hasActiveFilter = () => activeType.value || activeTag.value || searchQuery
 .sp-type { font-size: 12px; color: var(--color-primary); font-weight: 500; }
 
 /* Navigation */
+.side-module-nav,
 .side-nav {
   display: flex; flex-direction: column; gap: 2px;
   padding: 8px 0; background: var(--color-bg-secondary); border: 1px solid var(--color-border);
   border-radius: 12px; overflow: hidden;
 }
+.module-nav-item,
 .nav-item {
   display: flex; align-items: center; gap: 12px;
   padding: 10px 16px; background: transparent; border: none;
   font-size: 14px; font-weight: 500; color: var(--color-text-secondary);
-  cursor: pointer; transition: all .15s; text-align: left;
+  cursor: pointer; transition: all .15s; text-align: left; text-decoration: none;
 }
+.module-nav-item:hover,
 .nav-item:hover { background: var(--color-bg-tertiary); color: var(--color-text-primary); }
+.module-nav-item.active,
 .nav-item.active { background: var(--color-primary-light); color: var(--color-primary); font-weight: 600; }
+.module-nav-item svg,
 .nav-item svg { flex-shrink: 0; }
 
 /* Trending Tags */
@@ -627,7 +618,9 @@ const hasActiveFilter = () => activeType.value || activeTag.value || searchQuery
   .cp-grid { grid-template-columns: 1fr; }
   .cp-side { position: static; flex-direction: row; overflow-x: auto; gap: 8px; padding-bottom: 4px; }
   .side-profile { min-width: 200px; flex-shrink: 0; }
+  .side-module-nav,
   .side-nav { flex-direction: row; min-width: max-content; flex-shrink: 0; padding: 8px; border-radius: 12px; }
+  .module-nav-item,
   .nav-item { white-space: nowrap; padding: 8px 14px; border-radius: 8px; }
   .side-tags { min-width: 220px; flex-shrink: 0; }
   .st-list { flex-direction: row; flex-wrap: nowrap; overflow-x: auto; gap: 4px; }

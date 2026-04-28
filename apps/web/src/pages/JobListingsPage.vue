@@ -2,6 +2,7 @@
 import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
+import SocialWorkspaceLayout from '@/layouts/SocialWorkspaceLayout.vue';
 import ListingCard, { type JobListing } from '@/components/job-listings/ListingCard.vue';
 import { api } from '@/services/api';
 
@@ -91,7 +92,8 @@ watch(searchQuery, () => {
 
 <template>
   <SocialBusinessLayout>
-    <div class="job-listings-page">
+    <SocialWorkspaceLayout>
+      <div class="job-listings-page">
       <header class="page-header">
         <div class="header-content">
           <h1 class="page-title">
@@ -207,15 +209,14 @@ watch(searchQuery, () => {
         </div>
       </section>
 
-    </div>
+      </div>
+    </SocialWorkspaceLayout>
   </SocialBusinessLayout>
 </template>
 
 <style scoped>
 .job-listings-page {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: var(--space-6) var(--space-4) var(--space-8);
+  width: 100%;
 }
 
 .page-header {
