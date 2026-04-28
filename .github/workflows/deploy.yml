@@ -113,8 +113,8 @@ jobs:
             echo "=== API Container Logs ==="
             docker logs cayhesabim-api-prod --tail 80 2>&1 || true
             echo "=== Health Check ==="
-            curl -fsS http://localhost/health
-            curl -fsSk https://localhost/api/health
+            curl -fsS http://127.0.0.1/health
+            curl -fsSk https://127.0.0.1/api/health
             
             # Cleanup unused Docker resources
             docker system prune -f
