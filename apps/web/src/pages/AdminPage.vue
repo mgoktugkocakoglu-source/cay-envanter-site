@@ -37,6 +37,7 @@ const recentActivity = ref([
 const navItems = [
     { name: 'Gösterge Paneli', icon: '📊', route: '/admin', active: true },
     { name: 'Kullanıcılar', icon: '👥', route: '/admin/users', active: false },
+    { name: 'Firmalar', icon: '🏢', route: '/admin/firms', active: false },
     { name: 'Topluluk Yönetimi', icon: '📂', route: '/admin/categories', active: false },
     { name: 'Konular', icon: '💬', route: '/admin/topics', active: false },
     { name: 'Raporlar', icon: '🚨', route: '/admin/reports', active: false },
@@ -130,6 +131,10 @@ function getActivityIcon(type: string) {
                             <button class="action-btn" @click="navigateTo('/admin/users')">
                                 <span class="action-icon">👤</span>
                                 <span>Kullanıcı Yönet</span>
+                            </button>
+                            <button class="action-btn" @click="navigateTo('/admin/firms')">
+                                <span class="action-icon">🏢</span>
+                                <span>Firma Yönet</span>
                             </button>
                             <button class="action-btn" @click="navigateTo('/admin/reports')">
                                 <span class="action-icon">📋</span>

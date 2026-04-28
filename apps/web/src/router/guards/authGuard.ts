@@ -29,6 +29,18 @@ export async function authGuard(
         }
     }
 
+    // Check admin-only routes after authentication has been established
+    if (to.meta.requiresAdmin) {
+        if (!authStore.user) {
+            await authStore.fetchCurrentUser();
+        }
+
+        if (!authStore.isAdmin) {
+            next({ path: '/hub' });
+            return;
+        }
+    }
+
     // Check if route is for guests only (login, register)
     if (to.meta.guest && authStore.isAuthenticated) {
         next({ path: '/hub' });

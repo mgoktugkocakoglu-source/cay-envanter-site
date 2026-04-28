@@ -380,8 +380,16 @@ onMounted(loadFirmData);
                 <!-- Firm Header -->
                 <header class="firm-header">
                     <div class="firm-header-left">
-                        <div class="firm-avatar-lg" :class="{ 'firm-avatar-lg--inactive': !firmsStore.currentFirm.isActive }">
-                            {{ firmsStore.currentFirm.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) }}
+                        <div class="firm-logo-panel" :class="{ 'firm-logo-panel--inactive': !firmsStore.currentFirm.isActive }">
+                            <img
+                                v-if="firmsStore.currentFirm.logoUrl"
+                                :src="firmsStore.currentFirm.logoUrl"
+                                :alt="`${firmsStore.currentFirm.name} logosu`"
+                                class="firm-logo-img"
+                            />
+                            <div v-else class="firm-avatar-lg">
+                                {{ firmsStore.currentFirm.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) }}
+                            </div>
                         </div>
                         <div class="firm-header-info">
                             <div class="firm-title-row">
@@ -407,6 +415,16 @@ onMounted(loadFirmData);
                                     {{ firmsStore.currentFirm.address }}
                                 </span>
                             </div>
+                        </div>
+                    </div>
+                    <div class="firm-metrics">
+                        <div class="metric-card">
+                            <span class="metric-value">{{ firmsStore.currentTariffs.length }}</span>
+                            <span class="metric-label">Aktif tarife</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-value">{{ firmsStore.collectionPoints.length }}</span>
+                            <span class="metric-label">Toplama noktasi</span>
                         </div>
                     </div>
                 </header>
@@ -827,17 +845,23 @@ onMounted(loadFirmData);
 .breadcrumb-current { color: var(--color-text-secondary); }
 
 /* ── Firm Header ── */
-.firm-header { background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: var(--radius-xl); padding: 24px; margin-bottom: 24px; }
-.firm-header-left { display: flex; gap: 20px; align-items: flex-start; }
-.firm-avatar-lg { width: 64px; height: 64px; border-radius: var(--radius-xl); background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover)); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px; flex-shrink: 0; }
-.firm-avatar-lg--inactive { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
+.firm-header { display: flex; justify-content: space-between; gap: 24px; background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: var(--radius-xl); padding: 24px; margin-bottom: 24px; }
+.firm-header-left { display: flex; gap: 20px; align-items: flex-start; min-width: 0; }
+.firm-logo-panel { width: 88px; height: 88px; border-radius: 20px; background: #fff; border: 1px solid var(--color-border); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
+.firm-logo-panel--inactive { opacity: 0.65; }
+.firm-logo-img { width: 100%; height: 100%; object-fit: contain; padding: 10px; box-sizing: border-box; }
+.firm-avatar-lg { width: 100%; height: 100%; background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover)); color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 26px; }
 .firm-header-info { flex: 1; min-width: 0; }
 .firm-title-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-.firm-title-row h1 { font-size: 24px; font-weight: 700; color: var(--color-text-primary); margin: 0; }
+.firm-title-row h1 { font-size: 30px; font-weight: 800; color: var(--color-text-primary); margin: 0; }
 .firm-description { font-size: 14px; color: var(--color-text-secondary); margin: 0 0 12px; line-height: 1.5; }
 .firm-contact-row { display: flex; flex-wrap: wrap; gap: 16px; }
 .contact-item { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--color-text-muted); }
 .contact-item svg { flex-shrink: 0; }
+.firm-metrics { display: grid; grid-template-columns: repeat(2, minmax(120px, 1fr)); gap: 12px; align-self: stretch; min-width: 260px; }
+.metric-card { display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 16px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg-primary); }
+.metric-value { color: var(--color-primary); font-size: 28px; font-weight: 800; line-height: 1; }
+.metric-label { color: var(--color-text-muted); font-size: 12px; font-weight: 600; }
 
 /* ── Status Badge ── */
 .status-badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: var(--radius-full); font-size: 11px; font-weight: 600; white-space: nowrap; }
@@ -983,7 +1007,9 @@ onMounted(loadFirmData);
 /* ── Responsive ── */
 @media (max-width: 768px) {
     .firm-detail-page { padding: 16px; }
+    .firm-header { flex-direction: column; }
     .firm-header-left { flex-direction: column; align-items: center; text-align: center; }
+    .firm-metrics { grid-template-columns: 1fr 1fr; min-width: 0; }
     .firm-title-row { flex-direction: column; gap: 8px; }
     .firm-title-row h1 { font-size: 20px; }
     .firm-contact-row { justify-content: center; }

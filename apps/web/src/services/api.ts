@@ -386,6 +386,18 @@ export interface CreateCommunityPostData {
     tagNames?: string[];
 }
 
+export interface AdminUser {
+    id: string;
+    fullName: string;
+    email: string;
+    role: 'user' | 'moderator' | 'admin';
+    isActive: boolean;
+    isBanned: boolean;
+    createdAt: string;
+    topicCount: number;
+    replyCount: number;
+}
+
 export const api = {
     // Auth endpoints
     register: (data: {
@@ -636,6 +648,26 @@ export const api = {
         request<{ id: string; fullName: string; userType: string }>(
             `/users/search?query=${encodeURIComponent(query)}&type=${type}`
         ),
+
+    // Admin: users
+    listAdminUsers: (params?: { search?: string; role?: string; status?: string }) => {
+        const query = new URLSearchParams();
+        if (params?.search) query.append('search', params.search);
+        if (params?.role && params.role !== 'all') query.append('role', params.role);
+        if (params?.status && params.status !== 'all') query.append('status', params.status);
+        const qs = query.toString();
+        return request<AdminUser[]>(`/users/admin/list${qs ? `?${qs}` : ''}`);
+    },
+    setAdminUserBan: (id: string, banned: boolean) =>
+        request<AdminUser>(`/users/admin/${id}/ban`, {
+            method: 'PATCH',
+            body: JSON.stringify({ banned }),
+        }),
+    setAdminUserRole: (id: string, role: 'user' | 'moderator' | 'admin') =>
+        request<AdminUser>(`/users/admin/${id}/role`, {
+            method: 'PATCH',
+            body: JSON.stringify({ role }),
+        }),
 
     // Uploads
     uploadImage: async (file: File): Promise<ApiResponse<{ url: string; filename: string }>> => {

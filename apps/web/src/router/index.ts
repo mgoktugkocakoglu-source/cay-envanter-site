@@ -205,19 +205,19 @@ const router = createRouter({
             path: '/admin',
             name: 'admin',
             component: () => import('@/pages/AdminPage.vue'),
-            meta: { requiresAuth: true },
+            meta: { requiresAuth: true, requiresAdmin: true },
         },
         {
             path: '/admin/users',
             name: 'admin-users',
             component: () => import('@/pages/AdminUsersPage.vue'),
-            meta: { requiresAuth: true },
+            meta: { requiresAuth: true, requiresAdmin: true },
         },
         {
             path: '/admin/firms',
             name: 'admin-firms',
-            component: () => import('@/pages/FirmsPage.vue'),
-            meta: { requiresAuth: true },
+            component: () => import('@/pages/AdminFirmsPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true },
         },
 
         // ═══════ BACKWARD COMPATIBILITY REDIRECTS ═══════

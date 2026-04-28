@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue';
+import { onMounted, ref, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
+import { api, type AdminUser } from '@/services/api';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
@@ -10,29 +11,21 @@ const router = useRouter();
 const authStore = useAuthStore();
 
 // State
-const users = ref<Array<{
-    id: string;
-    fullName: string;
-    email: string;
-    role: string;
-    isActive: boolean;
-    isBanned: boolean;
-    createdAt: string;
-    topicCount: number;
-    replyCount: number;
-}>>([]);
+const users = ref<AdminUser[]>([]);
 
 const loading = ref(false);
+const errorMessage = ref<string | null>(null);
 const searchQuery = ref('');
-const filterRole = ref('all');
-const filterStatus = ref('all');
-const selectedUser = ref<typeof users.value[0] | null>(null);
+const filterRole = ref<'all' | 'user' | 'moderator' | 'admin'>('all');
+const filterStatus = ref<'all' | 'active' | 'banned'>('all');
+const selectedUser = ref<AdminUser | null>(null);
 const showUserModal = ref(false);
 const showBanConfirm = ref(false);
 const showRoleConfirm = ref(false);
-const banTargetUser = ref<typeof users.value[0] | null>(null);
-const roleTargetUser = ref<typeof users.value[0] | null>(null);
-const roleTargetRole = ref('');
+const banTargetUser = ref<AdminUser | null>(null);
+const roleTargetUser = ref<AdminUser | null>(null);
+const roleTargetRole = ref<'user' | 'moderator' | 'admin' | ''>('');
+const actionLoading = ref(false);
 
 // Options for AppSelect
 const roleFilterOptions = [
@@ -48,7 +41,6 @@ const statusFilterOptions = [
     { value: 'banned', label: 'Yasaklı' }
 ];
 
-// Mock data - would come from API
 onMounted(() => {
     if (!authStore.isAuthenticated) {
         router.push('/login');
@@ -57,33 +49,33 @@ onMounted(() => {
     fetchUsers();
 });
 
+let searchDebounce: ReturnType<typeof setTimeout> | null = null;
+watch(searchQuery, () => {
+    if (searchDebounce) clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => fetchUsers(), 300);
+});
+watch([filterRole, filterStatus], () => fetchUsers());
+
 async function fetchUsers() {
     loading.value = true;
-    // Mock users - in real app, call API
-    setTimeout(() => {
-        users.value = [
-            { id: '1', fullName: 'Ahmet Yılmaz', email: 'ahmet@example.com', role: 'user', isActive: true, isBanned: false, createdAt: '2024-01-15', topicCount: 5, replyCount: 23 },
-            { id: '2', fullName: 'Mehmet Kaya', email: 'mehmet@example.com', role: 'moderator', isActive: true, isBanned: false, createdAt: '2024-01-10', topicCount: 12, replyCount: 45 },
-            { id: '3', fullName: 'Ali Demir', email: 'ali@example.com', role: 'user', isActive: false, isBanned: true, createdAt: '2024-02-01', topicCount: 0, replyCount: 3 },
-            { id: '4', fullName: 'Veli Şahin', email: 'veli@example.com', role: 'admin', isActive: true, isBanned: false, createdAt: '2023-12-01', topicCount: 8, replyCount: 67 },
-        ];
-        loading.value = false;
-    }, 500);
+    errorMessage.value = null;
+    const { data, error } = await api.listAdminUsers({
+        search: searchQuery.value || undefined,
+        role: filterRole.value,
+        status: filterStatus.value,
+    });
+    if (error) {
+        errorMessage.value = error.message;
+        users.value = [];
+    } else {
+        users.value = data ?? [];
+    }
+    loading.value = false;
 }
 
-const filteredUsers = computed(() => {
-    return users.value.filter(user => {
-        const matchesSearch = user.fullName.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-                            user.email.toLowerCase().includes(searchQuery.value.toLowerCase());
-        const matchesRole = filterRole.value === 'all' || user.role === filterRole.value;
-        const matchesStatus = filterStatus.value === 'all' ||
-                            (filterStatus.value === 'active' && user.isActive && !user.isBanned) ||
-                            (filterStatus.value === 'banned' && user.isBanned);
-        return matchesSearch && matchesRole && matchesStatus;
-    });
-});
+const filteredUsers = computed(() => users.value);
 
-function openUserModal(user: typeof users.value[0]) {
+function openUserModal(user: AdminUser) {
     selectedUser.value = user;
     showUserModal.value = true;
 }
@@ -93,31 +85,49 @@ function closeUserModal() {
     showUserModal.value = false;
 }
 
-function toggleBan(user: typeof users.value[0]) {
+function toggleBan(user: AdminUser) {
     banTargetUser.value = user;
     showBanConfirm.value = true;
 }
 
-function confirmBan() {
-    if (banTargetUser.value) {
-        banTargetUser.value.isBanned = !banTargetUser.value.isBanned;
-        banTargetUser.value.isActive = !banTargetUser.value.isBanned;
-        banTargetUser.value = null;
+async function confirmBan() {
+    if (!banTargetUser.value) return;
+    const target = banTargetUser.value;
+    actionLoading.value = true;
+    const { data, error } = await api.setAdminUserBan(target.id, !target.isBanned);
+    actionLoading.value = false;
+    if (error) {
+        errorMessage.value = error.message;
+    } else if (data) {
+        const idx = users.value.findIndex(u => u.id === data.id);
+        if (idx !== -1) users.value[idx] = data;
+        if (selectedUser.value?.id === data.id) selectedUser.value = data;
     }
+    banTargetUser.value = null;
 }
 
-function changeRole(user: typeof users.value[0], newRole: string) {
+function changeRole(user: AdminUser, newRole: 'user' | 'moderator' | 'admin') {
     roleTargetUser.value = user;
     roleTargetRole.value = newRole;
     showRoleConfirm.value = true;
 }
 
-function confirmChangeRole() {
-    if (roleTargetUser.value) {
-        roleTargetUser.value.role = roleTargetRole.value;
-        roleTargetUser.value = null;
-        roleTargetRole.value = '';
+async function confirmChangeRole() {
+    if (!roleTargetUser.value || !roleTargetRole.value) return;
+    const targetId = roleTargetUser.value.id;
+    const newRole = roleTargetRole.value;
+    actionLoading.value = true;
+    const { data, error } = await api.setAdminUserRole(targetId, newRole);
+    actionLoading.value = false;
+    if (error) {
+        errorMessage.value = error.message;
+    } else if (data) {
+        const idx = users.value.findIndex(u => u.id === data.id);
+        if (idx !== -1) users.value[idx] = data;
+        if (selectedUser.value?.id === data.id) selectedUser.value = data;
     }
+    roleTargetUser.value = null;
+    roleTargetRole.value = '';
 }
 
 function getRoleLabel(role: string) {
@@ -183,6 +193,11 @@ function formatDate(dateString: string) {
                     :options="statusFilterOptions"
                     placeholder="Durum filtresi"
                 />
+            </div>
+
+            <!-- Error -->
+            <div v-if="errorMessage" class="error-banner">
+                {{ errorMessage }}
             </div>
 
             <!-- Loading -->
@@ -434,6 +449,17 @@ function formatDate(dateString: string) {
 
 .filter-select option {
     background: var(--color-bg-secondary);
+}
+
+/* Error */
+.error-banner {
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    color: var(--color-danger);
+    font-size: 14px;
 }
 
 /* Loading */

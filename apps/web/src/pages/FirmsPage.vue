@@ -363,15 +363,34 @@ onMounted(() => {
                     class="firm-card firm-card--simple"
                     @click="navigateToFirm(firm.id)"
                 >
-                    <div class="firm-avatar-wrap">
-                        <div class="firm-avatar-lg" :class="{ 'firm-avatar--inactive': !firm.isActive }">
-                            {{ getInitials(firm.name) }}
+                    <div class="firm-card-top">
+                        <div class="firm-logo-wrap" :class="{ 'firm-logo-wrap--inactive': !firm.isActive }">
+                            <img v-if="firm.logoUrl" :src="firm.logoUrl" :alt="`${firm.name} logosu`" class="firm-logo" />
+                            <div v-else class="firm-avatar-lg">
+                                {{ getInitials(firm.name) }}
+                            </div>
                         </div>
+                        <span class="firm-status" :class="firm.isActive ? 'firm-status--active' : 'firm-status--inactive'">
+                            {{ firm.isActive ? 'Aktif' : 'Pasif' }}
+                        </span>
                     </div>
-                    <h3 class="firm-name">{{ firm.name }}</h3>
+                    <div class="firm-card-body">
+                        <h3 class="firm-name">{{ firm.name }}</h3>
+                        <p class="firm-description">{{ firm.description || 'Firma detaylarini ve toplama noktalarini goruntuleyin.' }}</p>
+                    </div>
+                    <div class="firm-card-meta">
+                        <span v-if="firm.phone" class="firm-meta-item">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                            {{ firm.phone }}
+                        </span>
+                        <span v-if="firm.email" class="firm-meta-item">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                            {{ firm.email }}
+                        </span>
+                    </div>
                     <span class="firm-location-hint">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                        Konumları Gör
+                        Firma detaylarini gor
                     </span>
                 </div>
             </div>
@@ -766,36 +785,60 @@ onMounted(() => {
 .search-input::placeholder { color: var(--color-text-muted); }
 
 /* ── Grid ── */
-.firms-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
+.firms-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }
 
 /* ── Card (simple) ── */
 .firm-card--simple {
     background: var(--color-bg-secondary);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-xl);
-    padding: 24px 16px;
+    padding: 18px;
     cursor: pointer;
     transition: all var(--transition-fast);
     display: flex;
     flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: 12px;
+    align-items: stretch;
+    text-align: left;
+    gap: 16px;
+    min-height: 220px;
 }
 .firm-card--simple:hover {
-    transform: translateY(-4px);
+    transform: translateY(-3px);
     box-shadow: var(--shadow-lg);
     border-color: var(--color-primary);
 }
-.firm-avatar-wrap {
+.firm-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.firm-logo-wrap {
+    width: 76px;
+    height: 76px;
+    border-radius: 18px;
+    background: #fff;
+    border: 1px solid var(--color-border);
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.firm-logo-wrap--inactive {
+    opacity: 0.65;
+}
+.firm-logo {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    padding: 8px;
+    box-sizing: border-box;
 }
 .firm-avatar-lg {
-    width: 72px;
-    height: 72px;
-    border-radius: 50%;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
     background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
     color: white;
     display: flex;
@@ -803,24 +846,66 @@ onMounted(() => {
     justify-content: center;
     font-weight: 800;
     font-size: 22px;
-    flex-shrink: 0;
-    box-shadow: 0 4px 12px rgba(var(--color-primary-rgb, 0,0,0), 0.3);
 }
+.firm-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 10px;
+    border-radius: var(--radius-full);
+    font-size: 12px;
+    font-weight: 700;
+}
+.firm-status--active { background: rgba(34, 197, 94, 0.14); color: var(--color-success); }
+.firm-status--inactive { background: rgba(245, 158, 11, 0.14); color: var(--color-warning); }
+.firm-card-body { min-width: 0; }
 .firm-card--simple .firm-name {
-    font-size: 15px;
+    font-size: 18px;
     font-weight: 700;
     color: var(--color-text-primary);
+    margin: 0 0 8px;
+}
+.firm-description {
+    min-height: 40px;
     margin: 0;
+    color: var(--color-text-muted);
+    font-size: 13px;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.firm-card-meta {
+    display: flex;
+    min-height: 22px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.firm-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 100%;
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+.firm-meta-item svg {
+    flex-shrink: 0;
 }
 .firm-location-hint {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    color: var(--color-text-muted);
+    justify-content: space-between;
+    gap: 6px;
+    margin-top: auto;
+    padding-top: 14px;
+    border-top: 1px solid var(--color-border);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-primary);
 }
 .firm-card--simple:hover .firm-location-hint {
-    color: var(--color-primary);
+    color: var(--color-primary-hover);
 }
 
 /* ── Old card styles (still needed for other references) ── */
