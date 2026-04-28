@@ -269,8 +269,9 @@ async function resendVerification() {
         <span class="auth-logo-icon">🍃</span>
         <span>Çay Platformu</span>
       </RouterLink>
-      <RouterLink to="/login" class="btn btn-secondary">
-        Zaten hesabınız var mı? Giriş Yapın
+      <RouterLink to="/login" class="btn btn-secondary auth-header-cta">
+        <span class="auth-cta-prefix">Zaten hesabınız var mı?</span>
+        <span>Giriş Yapın</span>
       </RouterLink>
     </header>
 

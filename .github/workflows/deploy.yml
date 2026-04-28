@@ -10,6 +10,10 @@ on:
       - main
   workflow_dispatch: # Manual trigger option
 
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
 env:
   DOCKER_BUILDKIT: 1
   COMPOSE_DOCKER_CLI_BUILD: 1
@@ -61,8 +65,11 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
+            set -euo pipefail
+
             # Navigate to project directory
             cd ~/cayhesabim
+            PREVIOUS_COMMIT="$(git rev-parse HEAD)"
             
             # Pull latest changes
             git fetch origin main
@@ -83,23 +90,36 @@ jobs:
             APP_URL=${{ secrets.APP_URL }}
             EOF
             
-            # Build and deploy with Docker Compose
-            docker compose -f docker-compose.prod.yml down
-            docker compose -f docker-compose.prod.yml build --no-cache
-            docker compose -f docker-compose.prod.yml up -d || true
+            rollback() {
+              trap - ERR
+              echo "Deployment failed. Rolling back to ${PREVIOUS_COMMIT}..."
+              git reset --hard "${PREVIOUS_COMMIT}"
+              docker compose -f docker-compose.prod.yml build
+              docker compose -f docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 180
+            }
+            trap rollback ERR
+
+            # Build first while the currently running containers keep serving traffic.
+            docker compose -f docker-compose.prod.yml build
+
+            # Do not run `down`: it removes the live containers before replacements are ready.
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 180
             
-            # Wait and show diagnostics
-            sleep 20
+            # Show diagnostics after Compose confirms the services are healthy.
             echo "=== API Container Status ==="
             docker inspect --format='{{.State.Status}} (health: {{.State.Health.Status}})' cayhesabim-api-prod 2>&1 || true
+            echo "=== Web Container Status ==="
+            docker inspect --format='{{.State.Status}} (health: {{.State.Health.Status}})' cayhesabim-web-prod 2>&1 || true
             echo "=== API Container Logs ==="
             docker logs cayhesabim-api-prod --tail 80 2>&1 || true
             echo "=== Health Check ==="
-            curl -f http://localhost/api/health || echo "❌ Health check failed"
+            curl -fsS http://localhost/health
+            curl -fsSk https://localhost/api/health
             
             # Cleanup unused Docker resources
             docker system prune -f
             
+            trap - ERR
             echo "✅ Deployment completed!"
 
       - name: Deployment Status

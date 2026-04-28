@@ -115,8 +115,9 @@ async function resendVerification() {
         <img v-if="themeStore.theme === 'dark'" src="@/assets/images/logo-dark.svg" alt="Çay Hesabım Logo" class="auth-logo-img" />
         <img v-else src="@/assets/images/logo-light.svg" alt="Çay Hesabım Logo" class="auth-logo-img" />
       </RouterLink>
-      <RouterLink to="/register" class="btn btn-secondary">
-        Hesabınız yok mu? Kayıt Olun
+      <RouterLink to="/register" class="btn btn-secondary auth-header-cta">
+        <span class="auth-cta-prefix">Hesabınız yok mu?</span>
+        <span>Kayıt Olun</span>
       </RouterLink>
     </header>
 

@@ -126,6 +126,9 @@ const themeStore = useThemeStore();
   justify-content: space-between;
   align-items: center;
   padding: var(--space-4) var(--space-8);
+  padding-top: calc(var(--space-4) + env(safe-area-inset-top));
+  padding-left: max(var(--space-8), env(safe-area-inset-left));
+  padding-right: max(var(--space-8), env(safe-area-inset-right));
   max-width: 1200px;
   margin: 0 auto;
   position: relative;
@@ -269,6 +272,25 @@ const themeStore = useThemeStore();
 
   .home-header {
     padding: var(--space-3) var(--space-4);
+    padding-top: calc(var(--space-3) + env(safe-area-inset-top));
+    padding-left: max(var(--space-4), env(safe-area-inset-left));
+    padding-right: max(var(--space-4), env(safe-area-inset-right));
+    gap: var(--space-2);
+  }
+
+  .home-logo-img {
+    height: 40px;
+  }
+
+  .home-nav {
+    gap: var(--space-2);
+    flex-shrink: 0;
+  }
+
+  .home-nav .btn {
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--font-size-sm);
+    min-height: 38px;
   }
 
   .home-hero {
