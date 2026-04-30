@@ -116,7 +116,7 @@ async function saveFirm() {
 
     if (success) {
         closeCreateForm();
-        showSuccess(wasEditing ? 'Firma guncellendi' : 'Firma eklendi');
+        showSuccess(wasEditing ? 'Firma güncellendi' : 'Firma eklendi');
         return;
     }
 
@@ -146,7 +146,7 @@ async function uploadLogo(event: Event) {
         return;
     }
 
-    formError.value = response.error?.message || 'Logo yuklenemedi';
+    formError.value = response.error?.message || 'Logo yüklenemedi';
 }
 
 function clearLogo() {
@@ -220,7 +220,7 @@ onMounted(() => {
 
             <div v-if="firmsStore.isLoading && !showCreateForm" class="loading-state">
                 <div class="spinner"></div>
-                <p>Firmalar yukleniyor...</p>
+                <p>Firmalar yükleniyor...</p>
             </div>
 
             <div v-else class="firms-table">
@@ -239,7 +239,7 @@ onMounted(() => {
                             <div v-else class="firm-logo-placeholder">{{ firm.name.charAt(0).toUpperCase() }}</div>
                             <div class="firm-copy">
                                 <strong>{{ firm.name }}</strong>
-                                <span>{{ firm.description || 'Aciklama yok' }}</span>
+                                <span>{{ firm.description || 'Açıklama yok' }}</span>
                             </div>
                         </div>
                     </div>
@@ -258,8 +258,8 @@ onMounted(() => {
                         <button class="btn-secondary" type="button" @click="openEditForm(firm)">
                             Duzenle
                         </button>
-                        <button class="btn-danger" type="button" title="Firmayi kaldir" @click="confirmDeleteFirm(firm)">
-                            Kaldir
+                        <button class="btn-danger" type="button" title="Firmayı kaldır" @click="confirmDeleteFirm(firm)">
+                            Kaldır
                         </button>
                     </div>
                 </div>
@@ -276,7 +276,7 @@ onMounted(() => {
             <div v-if="showCreateForm" class="modal-overlay" @click.self="closeCreateForm">
                 <form class="modal" @submit.prevent="saveFirm">
                     <div class="modal-header">
-                        <h2>{{ editTarget ? 'Firmayi Duzenle' : 'Yeni Firma' }}</h2>
+                        <h2>{{ editTarget ? 'Firmayı Düzenle' : 'Yeni Firma' }}</h2>
                         <button type="button" class="close-btn" @click="closeCreateForm">Kapat</button>
                     </div>
 
@@ -288,7 +288,7 @@ onMounted(() => {
                     </label>
 
                     <label class="form-field">
-                        <span>Aciklama</span>
+                        <span>Açıklama</span>
                         <textarea v-model="firmForm.description" maxlength="2000" rows="3"></textarea>
                     </label>
 
@@ -303,7 +303,7 @@ onMounted(() => {
                             {{ isUploadingLogo ? 'Yukleniyor...' : 'Logo Yukle' }}
                         </label>
                         <button v-if="firmForm.logoUrl" type="button" class="btn-secondary" @click="clearLogo">
-                            Logoyu Kaldir
+                            Logoyu Kaldır
                         </button>
                     </div>
 
@@ -346,9 +346,9 @@ onMounted(() => {
 
             <ConfirmModal
                 v-model="showDeleteConfirm"
-                title="Firmayi Kaldir"
+                title="Firmayı Kaldır"
                 :message="`${deleteTarget?.name || ''} firmasini kalici olarak kaldirmak istediginize emin misiniz?`"
-                confirm-text="Kaldir"
+                confirm-text="Kaldır"
                 cancel-text="Vazgec"
                 variant="danger"
                 @confirm="deleteFirm"

@@ -111,9 +111,7 @@ const router = createRouter({
         // ═══════ SOSYAL İŞ HESABI (SOCIAL BUSINESS HUB) ═══════
         {
             path: '/social/dashboard',
-            name: 'social-dashboard',
-            component: () => import('@/pages/SocialDashboardPage.vue'),
-            meta: { requiresAuth: true, hub: 'social' },
+            redirect: '/social/community',
         },
         {
             path: '/social/job-listings',

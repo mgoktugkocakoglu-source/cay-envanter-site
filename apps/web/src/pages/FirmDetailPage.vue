@@ -23,10 +23,10 @@ const firmId = computed(() => route.params.id as string);
 
 // ─── Payment Term Labels ───
 const paymentTermLabels: Record<string, string> = {
-    'cash': 'Pesin',
-    'weekly': 'Haftalik',
-    'monthly': 'Aylik',
-    'custom': 'Ozel Tarih',
+    'cash': 'Peşin',
+    'weekly': 'Haftalık',
+    'monthly': 'Aylık',
+    'custom': 'Özel Tarih',
 };
 
 const paymentTermIcons: Record<string, string> = {
@@ -78,7 +78,7 @@ const deleteCPTargetId = ref('');
 const mapInstances = ref<Record<string, unknown>>({});
 
 const provinceFilterOptions = computed(() => [
-    { value: '', label: 'Tum Iller' },
+    { value: '', label: 'Tüm İller' },
     { value: 'Rize', label: 'Rize' },
     { value: 'Trabzon', label: 'Trabzon' },
     { value: 'Artvin', label: 'Artvin' },
@@ -87,7 +87,7 @@ const provinceFilterOptions = computed(() => [
 ]);
 
 const provinceFormOptions = [
-    { value: '', label: 'Il Seciniz' },
+    { value: '', label: 'İl Seçiniz' },
     { value: 'Rize', label: 'Rize' },
     { value: 'Trabzon', label: 'Trabzon' },
     { value: 'Artvin', label: 'Artvin' },
@@ -103,7 +103,7 @@ const districtOptions = computed(() => {
         }
     });
     return [
-        { value: '', label: 'Tum Ilceler' },
+        { value: '', label: 'Tüm İlçeler' },
         ...Array.from(districts).sort().map(d => ({ value: d, label: d })),
     ];
 });
@@ -202,10 +202,10 @@ async function saveTariff() {
         if (tariffForm.value.endDate) data.endDate = tariffForm.value.endDate;
         const success = await firmsStore.createTariff(firmId.value, data);
         if (success) {
-            toast.success('Tarife basariyla eklendi');
+            toast.success('Tarife başarıyla eklendi');
             showTariffModal.value = false;
         } else {
-            toast.error(firmsStore.error || 'Tarife eklenirken hata olustu');
+            toast.error(firmsStore.error || 'Tarife eklenirken hata oluştu');
         }
     } else {
         if (!tariffForm.value.pricePerKg) {
@@ -225,10 +225,10 @@ async function saveTariff() {
         }
         const success = await firmsStore.createTariff(firmId.value, data);
         if (success) {
-            toast.success('Tarife basariyla eklendi');
+            toast.success('Tarife başarıyla eklendi');
             showTariffModal.value = false;
         } else {
-            toast.error(firmsStore.error || 'Tarife eklenirken hata olustu');
+            toast.error(firmsStore.error || 'Tarife eklenirken hata oluştu');
         }
     }
 
@@ -245,7 +245,7 @@ async function handleDeleteTariff() {
     if (success) {
         toast.success('Tarife silindi');
     } else {
-        toast.error('Tarife silinirken hata olustu');
+        toast.error('Tarife silinirken hata oluştu');
     }
 }
 
@@ -283,10 +283,10 @@ async function saveCollectionPoint() {
 
     const success = await firmsStore.createCollectionPoint(firmId.value, data);
     if (success) {
-        toast.success('Toplama noktasi basariyla eklendi');
+        toast.success('Toplama noktası başarıyla eklendi');
         showCPModal.value = false;
     } else {
-        toast.error(firmsStore.error || 'Toplama noktasi eklenirken hata olustu');
+        toast.error(firmsStore.error || 'Toplama noktası eklenirken hata oluştu');
     }
     isSavingCP.value = false;
 }
@@ -299,9 +299,9 @@ function confirmDeleteCP(pointId: string) {
 async function handleDeleteCP() {
     const success = await firmsStore.deleteCollectionPoint(firmId.value, deleteCPTargetId.value);
     if (success) {
-        toast.success('Toplama noktasi silindi');
+        toast.success('Toplama noktası silindi');
     } else {
-        toast.error('Toplama noktasi silinirken hata olustu');
+        toast.error('Toplama noktası silinirken hata oluştu');
     }
 }
 
@@ -428,7 +428,7 @@ onMounted(loadFirmData);
                         </div>
                         <div class="metric-card">
                             <span class="metric-value">{{ firmsStore.collectionPoints.length }}</span>
-                            <span class="metric-label">Toplama noktasi</span>
+                            <span class="metric-label">Toplama noktası</span>
                         </div>
                     </div>
                 </header>
@@ -442,7 +442,7 @@ onMounted(loadFirmData);
                         @click="activeTab = 'tariffs'"
                     >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                        Yas Cay Alim Tarifeleri
+                        Yaş Çay Alım Tarifeleri
                         <span class="tab-count">{{ firmsStore.currentTariffs.length }}</span>
                     </button>
                     <button
@@ -451,7 +451,7 @@ onMounted(loadFirmData);
                         @click="activeTab = 'locations'"
                     >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                        Cay Toplayici Konumlari
+                        Çay Toplayıcı Konumları
                         <span class="tab-count">{{ firmsStore.collectionPoints.length }}</span>
                     </button>
                 </div>
@@ -504,7 +504,7 @@ onMounted(loadFirmData);
                             <template v-else>
                                 <div class="tariff-header">
                                     <span class="tariff-term-icon">🔀</span>
-                                    <span class="tariff-term">Paylasimli Odeme</span>
+                                    <span class="tariff-term">Paylaşımlı Ödeme</span>
                                 </div>
                                 <div v-if="tariff.splitDetails" class="split-details">
                                     <div v-for="(split, si) in tariff.splitDetails" :key="si" class="split-row">
@@ -532,13 +532,13 @@ onMounted(loadFirmData);
                             <AppSelect
                                 v-model="provinceFilter"
                                 :options="provinceFilterOptions"
-                                placeholder="Il Secin"
+                                placeholder="İl Seçin"
                                 @update:model-value="onProvinceChange"
                             />
                             <AppSelect
                                 v-model="districtFilter"
                                 :options="districtOptions"
-                                placeholder="Ilce Secin"
+                                placeholder="İlçe Seçin"
                             />
                             <span class="filter-count">{{ filteredCollectionPoints.length }} nokta</span>
                         </div>
@@ -550,9 +550,9 @@ onMounted(loadFirmData);
 
                     <div v-if="filteredCollectionPoints.length === 0" class="empty-state">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-text-muted)"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                        <h3>Toplama noktasi bulunamadi</h3>
-                        <p v-if="provinceFilter || districtFilter">Filtre kriterlerinize uygun sonuc yok. Filtreleri temizleyin.</p>
-                        <p v-else>Bu firmanin henuz kayitli toplama noktasi yok.</p>
+                        <h3>Toplama noktası bulunamadı</h3>
+                        <p v-if="provinceFilter || districtFilter">Filtre kriterlerinize uygun sonuç yok. Filtreleri temizleyin.</p>
+                        <p v-else>Bu firmanın henüz kayıtlı toplama noktası yok.</p>
                     </div>
 
                     <!-- Collection Points List -->
@@ -592,7 +592,7 @@ onMounted(loadFirmData);
                                     <span class="cp-value">{{ point.address }}</span>
                                 </div>
                                 <div v-if="point.collectorName" class="cp-detail">
-                                    <span class="cp-label">Toplayici</span>
+                                    <span class="cp-label">Toplayıcı</span>
                                     <span class="cp-value">{{ point.collectorName }}</span>
                                 </div>
                                 <div v-if="point.collectorPhone" class="cp-detail">
@@ -612,7 +612,7 @@ onMounted(loadFirmData);
             <!-- Error -->
             <div v-else-if="firmsStore.error" class="error-state">
                 <p class="error-message">{{ firmsStore.error }}</p>
-                <RouterLink to="/tea/firms" class="back-link">Firmalara Don</RouterLink>
+                <RouterLink to="/tea/firms" class="back-link">Firmalara Dön</RouterLink>
             </div>
 
             <!-- ═══ Add Tariff Modal ═══ -->
@@ -631,14 +631,14 @@ onMounted(loadFirmData);
                         <div class="split-toggle-row">
                             <label class="split-toggle-label">
                                 <input type="checkbox" :checked="tariffForm.isSplitPayment" @change="toggleSplitPayment" />
-                                <span>Paylasimli odeme (Ornegin: %50 pesin, %50 vadeli)</span>
+                                <span>Paylaşımlı ödeme (Örneğin: %50 peşin, %50 vadeli)</span>
                             </label>
                         </div>
 
                         <!-- Simple Tariff -->
                         <template v-if="!tariffForm.isSplitPayment">
                             <div class="form-group">
-                                <label class="form-label">Odeme Tarihi <span class="required">*</span></label>
+                                <label class="form-label">Ödeme Tarihi <span class="required">*</span></label>
                                 <div class="payment-term-options">
                                     <button
                                         v-for="term in (['cash', 'weekly', 'monthly', 'custom'] as PaymentTermType[])"
@@ -654,7 +654,7 @@ onMounted(loadFirmData);
                             </div>
 
                             <div v-if="tariffForm.paymentTerm === 'custom'" class="form-group">
-                                <label class="form-label">Ozel Odeme Tarihi</label>
+                                <label class="form-label">Özel Ödeme Tarihi</label>
                                 <input type="date" v-model="tariffForm.customPaymentDate" class="form-input" />
                             </div>
 
@@ -665,7 +665,7 @@ onMounted(loadFirmData);
                                     v-model.number="tariffForm.pricePerKg"
                                     min="0.01"
                                     step="0.01"
-                                    placeholder="Ornegin: 21"
+                                    placeholder="Örneğin: 21"
                                     class="form-input"
                                     required
                                 />
@@ -687,12 +687,12 @@ onMounted(loadFirmData);
                                         <input type="number" v-model.number="split.percentage" min="1" max="100" placeholder="50" class="form-input" />
                                     </div>
                                     <div class="form-group">
-                                        <label class="form-label">Odeme Turu</label>
+                                        <label class="form-label">Ödeme Türü</label>
                                         <select v-model="split.paymentTerm" class="form-input">
-                                            <option value="cash">Pesin</option>
-                                            <option value="weekly">Haftalik</option>
-                                            <option value="monthly">Aylik</option>
-                                            <option value="custom">Ozel</option>
+                                            <option value="cash">Peşin</option>
+                                            <option value="weekly">Haftalık</option>
+                                            <option value="monthly">Aylık</option>
+                                            <option value="custom">Özel</option>
                                         </select>
                                     </div>
                                     <div class="form-group">
@@ -724,7 +724,7 @@ onMounted(loadFirmData);
                         </div>
 
                         <div class="modal-actions">
-                            <button type="button" class="btn-secondary" @click="showTariffModal = false">Iptal</button>
+                            <button type="button" class="btn-secondary" @click="showTariffModal = false">İptal</button>
                             <button type="submit" class="btn-primary" :disabled="isSavingTariff">
                                 {{ isSavingTariff ? 'Kaydediliyor...' : 'Tarife Ekle' }}
                             </button>
@@ -742,40 +742,40 @@ onMounted(loadFirmData);
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
                     </div>
-                    <p class="modal-subtitle">{{ firmsStore.currentFirm?.name }} icin yeni cay toplayici konumu ekleyin.</p>
+                    <p class="modal-subtitle">{{ firmsStore.currentFirm?.name }} için yeni çay toplayıcı konumu ekleyin.</p>
 
                     <form @submit.prevent="saveCollectionPoint" class="modal-form">
                         <div class="form-group">
-                            <label class="form-label">Konum Adi <span class="required">*</span></label>
-                            <input type="text" v-model="cpForm.name" placeholder="Ornegin: Cayeli Merkez" class="form-input" required />
+                            <label class="form-label">Konum Adı <span class="required">*</span></label>
+                            <input type="text" v-model="cpForm.name" placeholder="Örneğin: Çayeli Merkez" class="form-input" required />
                         </div>
 
                         <div class="form-row">
                             <div class="form-group">
-                                <label class="form-label">Il <span class="required">*</span></label>
-                                <AppSelect v-model="cpForm.province" :options="provinceFormOptions" placeholder="Il seciniz..." variant="light" />
+                                <label class="form-label">İl <span class="required">*</span></label>
+                                <AppSelect v-model="cpForm.province" :options="provinceFormOptions" placeholder="İl seçiniz..." variant="light" />
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Ilce <span class="required">*</span></label>
-                                <input type="text" v-model="cpForm.district" placeholder="Ilce adi" class="form-input" required />
+                                <label class="form-label">İlçe <span class="required">*</span></label>
+                                <input type="text" v-model="cpForm.district" placeholder="İlçe adı" class="form-input" required />
                             </div>
                         </div>
 
                         <div class="form-group">
-                            <label class="form-label">Aciklama</label>
+                            <label class="form-label">Açıklama</label>
                             <textarea
                                 v-model="cpForm.description"
                                 maxlength="1000"
-                                placeholder="Ornegin: Cataldere Koyu Kuran Kursu Altinda bulunuyoruz"
+                                placeholder="Örneğin: Çataldere Köyü Kuran Kursu altında bulunuyoruz"
                                 rows="2"
                                 class="form-input form-textarea"
                             ></textarea>
-                            <span class="form-hint">Kullanicilara konum hakkinda detayli bilgi verin</span>
+                            <span class="form-hint">Kullanıcılara konum hakkında detaylı bilgi verin</span>
                         </div>
 
                         <div class="form-group">
                             <label class="form-label">Adres</label>
-                            <input type="text" v-model="cpForm.address" placeholder="Acik adres" class="form-input" />
+                            <input type="text" v-model="cpForm.address" placeholder="Açık adres" class="form-input" />
                         </div>
 
                         <div class="form-row">
@@ -791,17 +791,17 @@ onMounted(loadFirmData);
 
                         <div class="form-row">
                             <div class="form-group">
-                                <label class="form-label">Toplayici Adi</label>
+                                <label class="form-label">Toplayıcı Adı</label>
                                 <input type="text" v-model="cpForm.collectorName" placeholder="Ad Soyad" class="form-input" />
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Toplayici Telefonu</label>
+                                <label class="form-label">Toplayıcı Telefonu</label>
                                 <input type="tel" v-model="cpForm.collectorPhone" placeholder="0532 000 00 00" class="form-input" />
                             </div>
                         </div>
 
                         <div class="modal-actions">
-                            <button type="button" class="btn-secondary" @click="showCPModal = false">Iptal</button>
+                            <button type="button" class="btn-secondary" @click="showCPModal = false">İptal</button>
                             <button type="submit" class="btn-primary" :disabled="isSavingCP || !cpForm.name.trim() || !cpForm.province || !cpForm.district.trim()">
                                 {{ isSavingCP ? 'Kaydediliyor...' : 'Konum Ekle' }}
                             </button>
@@ -825,7 +825,7 @@ onMounted(loadFirmData);
             <ConfirmModal
                 v-model="showDeleteCPConfirm"
                 title="Konumu Sil"
-                message="Bu toplama noktasini silmek istediginize emin misiniz?"
+                message="Bu toplama noktasını silmek istediğinize emin misiniz?"
                 confirm-text="Sil"
                 cancel-text="Vazgec"
                 variant="danger"

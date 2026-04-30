@@ -496,7 +496,7 @@ export const api = {
             const data = await response.json();
 
             if (!response.ok) {
-                return { error: { message: data.message || 'Avatar yuklenemedi', statusCode: response.status } };
+                return { error: { message: data.message || 'Avatar yüklenemedi', statusCode: response.status } };
             }
 
             return { data };
@@ -702,11 +702,11 @@ export const api = {
 
             const data = await response.json();
             if (!response.ok) {
-                return { error: { message: data.message || 'Dosya yuklenemedi', statusCode: response.status } };
+                return { error: { message: data.message || 'Dosya yüklenemedi', statusCode: response.status } };
             }
             return { data };
         } catch {
-            return { error: { message: 'Dosya yuklenirken hata olustu', statusCode: 0 } };
+            return { error: { message: 'Dosya yüklenirken hata oluştu', statusCode: 0 } };
         }
     },
 

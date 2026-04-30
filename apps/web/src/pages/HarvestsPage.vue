@@ -10,6 +10,8 @@ import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 import AppCheckbox from '@/components/ui/AppCheckbox.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
+import caykurLogo from '@/assets/images/caykur.jpg';
+import ofcayLogo from '@/assets/images/ofcay.png';
 
 const harvestsStore = useHarvestsStore();
 const fieldsStore = useFieldsStore();
@@ -222,6 +224,13 @@ const canSubmitSale = computed(() =>
     selectedFirmId.value && saleKg.value && saleKg.value > 0 && saleFieldId.value
 );
 
+const firmLogoMap: Record<string, string> = {
+    'caykur': caykurLogo,
+    'çaykur': caykurLogo,
+    'ofcay': ofcayLogo,
+    'ofçay': ofcayLogo,
+};
+
 // ─── Lifecycle ───
 onMounted(() => {
     firmsStore.fetchFirms({ isActive: true });
@@ -362,7 +371,7 @@ function harvestAmount(harvest: Harvest) {
 }
 
 function formatPercent(value: number | null) {
-    if (value === null) return 'Karsilastirma yok';
+    if (value === null) return 'Karşılaştırma yok';
     const sign = value > 0 ? '+' : '';
     return `${sign}${value.toLocaleString('tr-TR', { maximumFractionDigits: 1 })}%`;
 }
@@ -381,6 +390,16 @@ function formatPrice(price: number) {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     }).format(price);
+}
+
+function getFirmInitials(name: string) {
+    return name.split(' ').map((word) => word[0]).join('').toUpperCase().slice(0, 2);
+}
+
+function getFirmLogo(firm: { name: string; logoUrl: string | null }) {
+    if (firm.logoUrl) return firm.logoUrl;
+    const normalized = firm.name.toLocaleLowerCase('tr-TR').replace(/\s+/g, '');
+    return firmLogoMap[normalized] || null;
 }
 
 function deleteHarvest(id: string) {
@@ -509,8 +528,16 @@ async function confirmDeleteHarvest() {
                                         :class="{ 'firm-chip--active': selectedFirmId === firm.id }"
                                         @click="selectedFirmId = firm.id"
                                     >
-                                        <span class="firm-chip-avatar">{{ firm.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) }}</span>
-                                        {{ firm.name }}
+                                        <span class="firm-chip-avatar" :class="{ 'firm-chip-avatar--logo': getFirmLogo(firm) }">
+                                            <img
+                                                v-if="getFirmLogo(firm)"
+                                                :src="getFirmLogo(firm) || ''"
+                                                :alt="`${firm.name} logosu`"
+                                                class="firm-chip-logo"
+                                            />
+                                            <span v-else>{{ getFirmInitials(firm.name) }}</span>
+                                        </span>
+                                        <span class="firm-chip-name">{{ firm.name }}</span>
                                     </button>
                                 </div>
                             </div>
@@ -786,13 +813,13 @@ async function confirmDeleteHarvest() {
                 <div class="analysis-header">
                     <div>
                         <h2>Arazi Verim Analizi</h2>
-                        <p>Arazilerinizin aylik ve yillik yas cay verimini karsilastirin.</p>
+                        <p>Arazilerinizin aylık ve yıllık yaş çay verimini karşılaştırın.</p>
                     </div>
                     <div class="filters analysis-filters">
                         <AppSelect
                             v-model="yearFilter"
                             :options="yearOptions"
-                            placeholder="Yil"
+                            placeholder="Yıl"
                             @update:model-value="applyFilters"
                         />
                         <AppSelect
@@ -811,7 +838,7 @@ async function confirmDeleteHarvest() {
                 <div v-else-if="analysisMonthRows.length === 0 && analysisYearRows.length === 0" class="empty-state">
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-text-muted)"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
                     <h3>Analiz icin hasat verisi yok</h3>
-                    <p>Yas Cay Sat sekmesinden hasat eklediginizde verim degisimleri burada gorunur.</p>
+                    <p>Yaş Çay Sat sekmesinden hasat eklediğinizde verim değişimleri burada görünür.</p>
                 </div>
 
                 <template v-else>
@@ -832,7 +859,7 @@ async function confirmDeleteHarvest() {
 
                     <section class="analysis-section">
                         <div class="analysis-section-header">
-                            <h3>Aylik Karsilastirma</h3>
+                            <h3>Aylık Karşılaştırma</h3>
                             <p>Ayni arazide bir onceki hasat ayina gore degisim.</p>
                         </div>
                         <div class="analysis-grid">
@@ -871,7 +898,7 @@ async function confirmDeleteHarvest() {
 
                     <section class="analysis-section">
                         <div class="analysis-section-header">
-                            <h3>Yillik Karsilastirma</h3>
+                            <h3>Yıllık Karşılaştırma</h3>
                             <p>{{ Number(yearFilter) - 1 }} yilina gore {{ yearFilter }} toplam verim degisimi.</p>
                         </div>
                         <div class="year-table">
@@ -1366,18 +1393,31 @@ async function confirmDeleteHarvest() {
     flex-shrink: 0;
 }
 
+.firm-chip-avatar--logo {
+    background: white;
+    color: transparent;
+    overflow: hidden;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.firm-chip-logo {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.firm-chip-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .firm-chip--add {
-    border-style: dashed;
-    background: transparent;
-    color: var(--color-text-muted);
-    padding: 8px 14px;
+    display: none;
 }
 
 .firm-chip--add:hover {
-    border-style: solid;
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    background: var(--color-primary-light);
+    display: none;
 }
 
 .loading-inline {
@@ -2421,6 +2461,22 @@ async function confirmDeleteHarvest() {
 
     .sale-form {
         max-width: 100%;
+    }
+
+    .firm-chips {
+        gap: 10px;
+    }
+
+    .firm-chip {
+        min-height: 52px;
+        padding: 8px 14px 8px 8px;
+        max-width: 100%;
+    }
+
+    .firm-chip-avatar {
+        width: 36px;
+        height: 36px;
+        font-size: 12px;
     }
 
     .filters {

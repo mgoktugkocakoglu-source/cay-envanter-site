@@ -324,9 +324,9 @@ function formatDate(dateString: string) {
         <!-- Ban/Unban Confirm Modal -->
         <ConfirmModal
             v-model="showBanConfirm"
-            :title="banTargetUser?.isBanned ? 'Yasagi Kaldir' : 'Kullaniciyi Yasakla'"
+            :title="banTargetUser?.isBanned ? 'Yasağı Kaldır' : 'Kullanıcıyı Yasakla'"
             :message="`${banTargetUser?.fullName || ''} kullanicisini ${banTargetUser?.isBanned ? 'yasagini kaldirmak' : 'yasaklamak'} istediginize emin misiniz?`"
-            :confirm-text="banTargetUser?.isBanned ? 'Yasagi Kaldir' : 'Yasakla'"
+            :confirm-text="banTargetUser?.isBanned ? 'Yasağı Kaldır' : 'Yasakla'"
             cancel-text="Vazgec"
             :variant="banTargetUser?.isBanned ? 'info' : 'danger'"
             @confirm="confirmBan"
@@ -335,9 +335,9 @@ function formatDate(dateString: string) {
         <!-- Change Role Confirm Modal -->
         <ConfirmModal
             v-model="showRoleConfirm"
-            title="Rol Degistir"
+            title="Rol Değiştir"
             :message="`${roleTargetUser?.fullName || ''} kullanicisinin rolunu ${getRoleLabel(roleTargetRole)} olarak degistirmek istediginize emin misiniz?`"
-            confirm-text="Degistir"
+            confirm-text="Değiştir"
             cancel-text="Vazgec"
             variant="warning"
             @confirm="confirmChangeRole"

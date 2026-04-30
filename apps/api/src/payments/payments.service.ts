@@ -4,9 +4,10 @@ import {
     NotFoundException,
     BadRequestException,
     ConflictException,
+    ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Brackets, Repository, DataSource } from 'typeorm';
 import { Payment, PaymentHarvest, BrokerFirm } from '@/payments/entities';
 import { Harvest } from '@/harvests/entities';
 import { Field } from '@/fields/entities';
@@ -17,6 +18,7 @@ import {
     CreateBrokerFirmDto,
     PaymentWithDetails,
 } from '@/payments/dto';
+import { UsersService } from '@/users/users.service';
 
 @Injectable()
 export class PaymentsService {
@@ -34,6 +36,7 @@ export class PaymentsService {
         @InjectRepository(Field)
         private readonly fieldRepository: Repository<Field>,
         private readonly dataSource: DataSource,
+        private readonly usersService: UsersService,
     ) { }
 
     async create(userId: string, dto: CreatePaymentDto): Promise<Payment> {
@@ -125,14 +128,31 @@ export class PaymentsService {
     }
 
     async findAll(userId: string, query: PaymentQueryDto): Promise<PaymentWithDetails[]> {
+        const user = await this.usersService.findById(userId);
+
         const qb = this.paymentRepository
             .createQueryBuilder('payment')
             .leftJoinAndSelect('payment.brokerFirm', 'brokerFirm')
             .leftJoin('payment.harvestAllocations', 'allocations')
-            .where('payment.userId = :userId', { userId })
+            .leftJoin('allocations.harvest', 'harvest')
+            .leftJoin('harvest.field', 'field')
+            .leftJoin('field.partners', 'partners')
+            .where(new Brackets((where) => {
+                where.where('payment.userId = :userId', { userId });
+
+                if (user?.farmerIdNumber) {
+                    where.orWhere('partners.partnerIdentityNumber = :identityNumber', {
+                        identityNumber: user.farmerIdNumber,
+                    });
+                }
+
+                if (user?.phone) {
+                    where.orWhere('partners.partnerPhone = :phone', { phone: user.phone });
+                }
+            }))
             .groupBy('payment.id')
             .addGroupBy('brokerFirm.id')
-            .addSelect('COUNT(allocations.id)', 'harvestCount');
+            .addSelect('COUNT(DISTINCT allocations.id)', 'harvestCount');
 
         if (query.brokerFirmId) {
             qb.andWhere('payment.brokerFirmId = :brokerFirmId', { brokerFirmId: query.brokerFirmId });
@@ -170,7 +190,7 @@ export class PaymentsService {
 
     async findOne(id: string, userId: string): Promise<Payment> {
         const payment = await this.paymentRepository.findOne({
-            where: { id, userId },
+            where: { id },
             relations: ['brokerFirm', 'harvestAllocations', 'harvestAllocations.harvest', 'harvestAllocations.harvest.field'],
         });
 
@@ -178,11 +198,24 @@ export class PaymentsService {
             throw new NotFoundException('Payment not found');
         }
 
+        if (payment.userId === userId) {
+            return payment;
+        }
+
+        const hasPartnerAccess = await this.hasPartnerAccessToPayment(payment, userId);
+        if (!hasPartnerAccess) {
+            throw new ForbiddenException('Access denied');
+        }
+
         return payment;
     }
 
     async update(id: string, userId: string, dto: UpdatePaymentDto): Promise<Payment> {
         const payment = await this.findOne(id, userId);
+
+        if (payment.userId !== userId) {
+            throw new ForbiddenException('Access denied');
+        }
 
         if (dto.totalPrice !== undefined) payment.totalPrice = dto.totalPrice;
         if (dto.paymentDate !== undefined) payment.paymentDate = new Date(dto.paymentDate);
@@ -197,6 +230,10 @@ export class PaymentsService {
 
     async remove(id: string, userId: string): Promise<void> {
         const payment = await this.findOne(id, userId);
+
+        if (payment.userId !== userId) {
+            throw new ForbiddenException('Access denied');
+        }
 
         // Delete payment (cascades to payment_harvests)
         await this.paymentRepository.remove(payment);
@@ -224,5 +261,36 @@ export class PaymentsService {
         const saved = await this.brokerFirmRepository.save(firm);
         this.logger.log(`Broker firm created: ${saved.id}`);
         return saved;
+    }
+
+    private async hasPartnerAccessToPayment(payment: Payment, userId: string): Promise<boolean> {
+        const user = await this.usersService.findById(userId);
+        if (!user?.farmerIdNumber && !user?.phone) return false;
+
+        const fieldIds = payment.harvestAllocations
+            ?.map((allocation) => allocation.harvest?.field?.id)
+            .filter((fieldId): fieldId is string => !!fieldId) || [];
+
+        if (fieldIds.length === 0) return false;
+
+        const count = await this.fieldRepository
+            .createQueryBuilder('field')
+            .leftJoin('field.partners', 'partners')
+            .where('field.id IN (:...fieldIds)', { fieldIds })
+            .andWhere(new Brackets((where) => {
+                if (user.farmerIdNumber) {
+                    where.where('partners.partnerIdentityNumber = :identityNumber', {
+                        identityNumber: user.farmerIdNumber,
+                    });
+                }
+
+                if (user.phone) {
+                    const method = user.farmerIdNumber ? 'orWhere' : 'where';
+                    where[method]('partners.partnerPhone = :phone', { phone: user.phone });
+                }
+            }))
+            .getCount();
+
+        return count > 0;
     }
 }

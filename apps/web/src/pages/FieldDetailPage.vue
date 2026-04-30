@@ -265,8 +265,14 @@ function goBack() {
                                     <span class="partner-name">{{ partner.partnerName }}</span>
                                     <span v-if="partner.partnerPhone" class="partner-contact">{{ partner.partnerPhone }}</span>
                                     <span v-if="partner.partnerIdentityNumber" class="partner-contact">TC: {{ partner.partnerIdentityNumber }}</span>
-                                    <span class="primary-badge">{{ partner.invitationStatus === 'accepted' ? 'Onaylandi' : partner.invitationStatus === 'rejected' ? 'Reddedildi' : 'Onay Bekliyor' }}</span>
+                                    <span class="primary-badge">{{ partner.invitationStatus === 'accepted' ? 'Onaylandı' : partner.invitationStatus === 'rejected' ? 'Reddedildi' : 'Onay Bekliyor' }}</span>
                                 </div>
+                            </div>
+                            <div class="partner-share-wrap">
+                                <div class="partner-share-bar">
+                                    <div class="partner-share-fill" :style="{ width: `${partner.sharePercentage}%` }"></div>
+                                </div>
+                                <span class="partner-share-text">%{{ partner.sharePercentage }}</span>
                             </div>
                         </div>
                     </div>

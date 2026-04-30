@@ -229,10 +229,10 @@ async function confirmDeletePayment() {
                 <thead>
                     <tr>
                         <th>Tarih</th>
-                        <th>Araci Firma</th>
+                        <th>Aracı Firma</th>
                         <th>Miktar</th>
                         <th>Tutar</th>
-                        <th>Kg Fiyati</th>
+                        <th>Kg Fiyatı</th>
                         <th>Durum</th>
                         <th class="th-action"></th>
                     </tr>
@@ -249,7 +249,7 @@ async function confirmDeletePayment() {
                                 class="status-badge"
                                 :class="payment.paymentStatus === 'received' ? 'status-received' : 'status-pending'"
                             >
-                                {{ payment.paymentStatus === 'received' ? 'Alindi' : 'Bekliyor' }}
+                                {{ payment.paymentStatus === 'received' ? 'Alındı' : 'Bekliyor' }}
                             </span>
                         </td>
                         <td class="td-action">
@@ -274,12 +274,12 @@ async function confirmDeletePayment() {
                         class="status-badge"
                         :class="payment.paymentStatus === 'received' ? 'status-received' : 'status-pending'"
                     >
-                        {{ payment.paymentStatus === 'received' ? 'Alindi' : 'Bekliyor' }}
+                        {{ payment.paymentStatus === 'received' ? 'Alındı' : 'Bekliyor' }}
                     </span>
                 </div>
                 <div class="card-body">
                     <div class="card-row">
-                        <span class="card-label">Araci Firma</span>
+                        <span class="card-label">Aracı Firma</span>
                         <span class="card-value">{{ payment.brokerFirm?.firmName || '-' }}</span>
                     </div>
                     <div class="card-row">
@@ -287,7 +287,7 @@ async function confirmDeletePayment() {
                         <span class="card-value">{{ formatKg(payment.totalAmountKg) }}</span>
                     </div>
                     <div class="card-row">
-                        <span class="card-label">Kg Fiyati</span>
+                        <span class="card-label">Kg Fiyatı</span>
                         <span class="card-value">{{ formatCurrency(payment.pricePerKg) }}/kg</span>
                     </div>
                 </div>
@@ -335,8 +335,8 @@ async function confirmDeletePayment() {
         <!-- Delete Payment Confirm Modal -->
         <ConfirmModal
             v-model="showDeleteConfirm"
-            title="Odemeyi Sil"
-            message="Bu odemeyi silmek istediginize emin misiniz? Bu islem geri alinamaz."
+            title="Ödemeyi Sil"
+            message="Bu ödemeyi silmek istediğinize emin misiniz? Bu işlem geri alınamaz."
             confirm-text="Sil"
             cancel-text="Vazgec"
             variant="danger"
@@ -413,28 +413,35 @@ async function confirmDeletePayment() {
     display: flex;
     align-items: center;
     gap: 12px;
+    min-width: 0;
 }
 
 .upcoming-icon {
     font-size: 20px;
+    flex: 0 0 auto;
 }
 
 .upcoming-amount {
     font-size: 16px;
     font-weight: 700;
     color: var(--color-text-primary);
+    white-space: nowrap;
 }
 
 .upcoming-firm {
     font-size: 13px;
     color: var(--color-text-muted);
     margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .upcoming-card-right {
     display: flex;
     align-items: center;
     gap: 16px;
+    flex-shrink: 0;
 }
 
 .upcoming-kg {
@@ -946,6 +953,74 @@ async function confirmDeletePayment() {
 @media (max-width: 768px) {
     .payments-page {
         padding: 16px;
+    }
+
+    .upcoming-payments {
+        padding: 16px;
+    }
+
+    .upcoming-title {
+        font-size: 18px;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .upcoming-card {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+        padding: 12px;
+    }
+
+    .upcoming-icon {
+        display: none;
+    }
+
+    .upcoming-card-left {
+        gap: 0;
+    }
+
+    .upcoming-card-left > div {
+        min-width: 0;
+    }
+
+    .upcoming-amount {
+        font-size: clamp(15px, 4vw, 18px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .upcoming-firm,
+    .upcoming-kg {
+        font-size: 12px;
+    }
+
+    .upcoming-card-right {
+        display: grid;
+        grid-template-columns: auto 30px;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .upcoming-card-right .upcoming-kg {
+        grid-column: 1 / -1;
+        justify-self: end;
+    }
+
+    .upcoming-date {
+        max-width: 92px;
+        white-space: normal;
+        text-align: center;
+        line-height: 1.25;
+        padding: 6px 10px;
+    }
+
+    .upcoming-card .btn-icon-delete {
+        width: 30px;
+        height: 30px;
+        justify-content: center;
+        padding: 0;
     }
 
     .page-header {

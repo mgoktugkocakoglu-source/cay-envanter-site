@@ -113,7 +113,7 @@ async function handleAvatarUpload(event: Event) {
   // Validate client-side
   const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
   if (!allowedTypes.includes(file.type)) {
-    avatarError.value = 'Sadece JPEG, PNG, GIF ve WebP dosyalari yuklenebilir.';
+    avatarError.value = 'Sadece JPEG, PNG, GIF ve WebP dosyaları yüklenebilir.';
     return;
   }
   if (file.size > 2 * 1024 * 1024) {
@@ -192,22 +192,22 @@ function validatePasswordField(field: string): boolean {
       if (!pwd) {
         passwordErrors.value[field] = 'Yeni sifre gereklidir';
       } else if (pwd.length < 8) {
-        passwordErrors.value[field] = 'Sifre en az 8 karakter olmalidir';
+        passwordErrors.value[field] = 'Şifre en az 8 karakter olmalıdır';
       } else if (!/[a-z]/.test(pwd)) {
-        passwordErrors.value[field] = 'Sifre en az bir kucuk harf icermelidir';
+        passwordErrors.value[field] = 'Şifre en az bir küçük harf içermelidir';
       } else if (!/[A-Z]/.test(pwd)) {
-        passwordErrors.value[field] = 'Sifre en az bir buyuk harf icermelidir';
+        passwordErrors.value[field] = 'Şifre en az bir büyük harf içermelidir';
       } else if (!/[0-9]/.test(pwd)) {
-        passwordErrors.value[field] = 'Sifre en az bir rakam icermelidir';
+        passwordErrors.value[field] = 'Şifre en az bir rakam içermelidir';
       }
       break;
     }
 
     case 'confirmPassword':
       if (!passwordForm.value.confirmPassword) {
-        passwordErrors.value[field] = 'Sifre tekrari gereklidir';
+        passwordErrors.value[field] = 'Şifre tekrarı gereklidir';
       } else if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
-        passwordErrors.value[field] = 'Sifreler eslemiyor';
+        passwordErrors.value[field] = 'Şifreler eşleşmiyor';
       }
       break;
   }
@@ -235,7 +235,7 @@ async function handlePasswordChange() {
     return;
   }
 
-  passwordSuccess.value = 'Sifre basariyla degistirildi';
+  passwordSuccess.value = 'Şifre başarıyla değiştirildi';
   passwordForm.value = { currentPassword: '', newPassword: '', confirmPassword: '' };
 }
 
@@ -389,12 +389,12 @@ function switchTab(tab: typeof activeTab.value) {
               @click="handleAvatarRemove"
               :disabled="avatarLoading"
             >
-              Kaldir
+              Kaldır
             </button>
             <p v-if="avatarError" class="avatar-error">{{ avatarError }}</p>
           </div>
           <div class="settings-header-info">
-            <h1 class="settings-title">Hesap Ayarlari</h1>
+            <h1 class="settings-title">Hesap Ayarları</h1>
             <p class="settings-email">{{ authStore.user?.email }}</p>
           </div>
         </div>
@@ -497,37 +497,37 @@ function switchTab(tab: typeof activeTab.value) {
                   />
                 </div>
                 <div class="form-group">
-                  <label class="form-label" for="profileProvince">Il</label>
+                  <label class="form-label" for="profileProvince">İl</label>
                   <input
                     id="profileProvince"
                     v-model="profileForm.province"
                     type="text"
                     class="form-input"
-                    placeholder="Il"
+                    placeholder="İl"
                   />
                 </div>
               </div>
 
               <div class="form-row">
                 <div class="form-group">
-                  <label class="form-label" for="profileDistrict">Ilce</label>
+                  <label class="form-label" for="profileDistrict">İlçe</label>
                   <input
                     id="profileDistrict"
                     v-model="profileForm.district"
                     type="text"
                     class="form-input"
-                    placeholder="Ilce"
+                    placeholder="İlçe"
                   />
                 </div>
                 <div class="form-group">
-                  <label class="form-label">Kullanici Tipi</label>
+                  <label class="form-label">Kullanıcı Tipi</label>
                   <input
                     type="text"
                     class="form-input"
                     :value="userTypeLabel"
                     disabled
                   />
-                  <span class="form-help">Kullanici tipi degistirilemez</span>
+                  <span class="form-help">Kullanıcı tipi değiştirilemez</span>
                 </div>
               </div>
 
@@ -546,7 +546,7 @@ function switchTab(tab: typeof activeTab.value) {
         <div v-if="activeTab === 'security'" class="tab-content">
           <div class="card">
             <div class="card-header">
-              <h2>Sifre Degistir</h2>
+              <h2>Şifre Değiştir</h2>
             </div>
 
             <div v-if="passwordSuccess" class="message-box message-success">
@@ -556,7 +556,7 @@ function switchTab(tab: typeof activeTab.value) {
 
             <form @submit.prevent="handlePasswordChange" class="password-form">
               <div class="form-group">
-                <label class="form-label" for="currentPassword">Mevcut Sifre</label>
+                <label class="form-label" for="currentPassword">Mevcut Şifre</label>
                 <div class="input-with-action">
                   <input
                     id="currentPassword"
@@ -575,7 +575,7 @@ function switchTab(tab: typeof activeTab.value) {
               </div>
 
               <div class="form-group">
-                <label class="form-label" for="newPassword">Yeni Sifre</label>
+                <label class="form-label" for="newPassword">Yeni Şifre</label>
                 <div class="input-with-action">
                   <input
                     id="newPassword"
@@ -604,7 +604,7 @@ function switchTab(tab: typeof activeTab.value) {
               </div>
 
               <div class="form-group">
-                <label class="form-label" for="confirmPassword">Yeni Sifre Tekrari</label>
+                <label class="form-label" for="confirmPassword">Yeni Şifre Tekrarı</label>
                 <input
                   id="confirmPassword"
                   v-model="passwordForm.confirmPassword"
@@ -620,7 +620,7 @@ function switchTab(tab: typeof activeTab.value) {
                 <button type="submit" class="btn btn-primary" :disabled="passwordLoading">
                   <svg v-if="!passwordLoading" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                   <span v-else class="spinner-sm"></span>
-                  {{ passwordLoading ? 'Degistiriliyor...' : 'Sifreyi Degistir' }}
+                  {{ passwordLoading ? 'Değiştiriliyor...' : 'Şifreyi Değiştir' }}
                 </button>
               </div>
             </form>
@@ -640,12 +640,12 @@ function switchTab(tab: typeof activeTab.value) {
               >
                 <span v-if="revokeAllLoading" class="spinner-sm"></span>
                 <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                Tum Oturumlari Kapat
+                Tüm Oturumları Kapat
               </button>
             </div>
 
             <p class="card-description">
-              Hesabiniza giris yapilan cihazlari ve oturumlari buradan yonetebilirsiniz.
+              Hesabınıza giriş yapılan cihazları ve oturumları buradan yönetebilirsiniz.
             </p>
 
             <div v-if="sessionsError" class="message-box message-error">
@@ -656,7 +656,7 @@ function switchTab(tab: typeof activeTab.value) {
             <!-- Loading -->
             <div v-if="sessionsLoading" class="sessions-loading">
               <span class="spinner-md"></span>
-              <span>Oturumlar yukleniyor...</span>
+              <span>Oturumlar yükleniyor...</span>
             </div>
 
             <!-- Sessions List -->
@@ -756,7 +756,7 @@ function switchTab(tab: typeof activeTab.value) {
                 </div>
                 <div class="theme-option-info">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-                  <span>Acik Tema</span>
+                  <span>Açık Tema</span>
                 </div>
               </button>
             </div>
@@ -780,7 +780,7 @@ function switchTab(tab: typeof activeTab.value) {
                 <span class="account-info-value">{{ authStore.user?.email }}</span>
               </div>
               <div class="account-info-item">
-                <span class="account-info-label">Kullanici Tipi</span>
+                <span class="account-info-label">Kullanıcı Tipi</span>
                 <span class="account-info-value">{{ userTypeLabel }}</span>
               </div>
             </div>
@@ -791,21 +791,21 @@ function switchTab(tab: typeof activeTab.value) {
             <div class="card-header">
               <h2 class="danger-title">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                Tehlikeli Bolge
+                Tehlikeli Bölge
               </h2>
             </div>
             <p class="danger-text">
-              Hesabinizi silmek geri alinamaz bir islemdir. Tum verileriniz kalici olarak silinecektir.
+              Hesabınızı silmek geri alınamaz bir işlemdir. Tüm verileriniz kalıcı olarak silinecektir.
             </p>
 
             <div v-if="deleteSuccess" class="message-box message-info">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-              Silme onay emaili gonderildi. Lutfen email kutunuzu kontrol edin.
+              Silme onay e-postası gönderildi. Lütfen e-posta kutunuzu kontrol edin.
             </div>
 
             <button v-else class="btn btn-danger" @click="showDeleteModal = true">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-              Hesabimi Sil
+              Hesabımı Sil
             </button>
           </div>
         </div>
@@ -819,18 +819,18 @@ function switchTab(tab: typeof activeTab.value) {
           <div class="modal-header">
             <h2 class="modal-title danger-title">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-              Hesabi Sil
+              Hesabı Sil
             </h2>
             <button class="modal-close" aria-label="Kapat" @click="showDeleteModal = false">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
 
-          <p>Hesabinizi silmek istediginizden emin misiniz?</p>
-          <p class="modal-warning">Bu islem geri alinamaz ve tum verileriniz kalici olarak silinecektir.</p>
+          <p>Hesabınızı silmek istediğinizden emin misiniz?</p>
+          <p class="modal-warning">Bu işlem geri alınamaz ve tüm verileriniz kalıcı olarak silinecektir.</p>
 
           <div class="form-group">
-            <label class="form-label">Devam etmek icin email adresinizi girin:</label>
+            <label class="form-label">Devam etmek için e-posta adresinizi girin:</label>
             <input
               v-model="deleteEmail"
               type="email"
@@ -843,7 +843,7 @@ function switchTab(tab: typeof activeTab.value) {
 
           <div class="modal-actions">
             <button class="btn btn-secondary" @click="showDeleteModal = false">
-              Iptal
+              İptal
             </button>
             <button class="btn btn-danger" @click="handleDeleteRequest" :disabled="deleteLoading">
               <span v-if="deleteLoading" class="spinner-sm"></span>

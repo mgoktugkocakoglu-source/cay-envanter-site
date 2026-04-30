@@ -62,7 +62,7 @@ interface Props {
 withDefaults(defineProps<Props>(), {
     title: 'Onay',
     confirmText: 'Evet',
-    cancelText: 'Iptal',
+    cancelText: 'İptal',
     variant: 'danger',
     icon: true,
 });

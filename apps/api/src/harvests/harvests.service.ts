@@ -6,9 +6,10 @@ import {
     ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { Harvest } from '@/harvests/entities';
 import { Field } from '@/fields/entities';
+import { UsersService } from '@/users/users.service';
 import {
     CreateHarvestDto,
     UpdateHarvestDto,
@@ -25,6 +26,7 @@ export class HarvestsService {
         private readonly harvestRepository: Repository<Harvest>,
         @InjectRepository(Field)
         private readonly fieldRepository: Repository<Field>,
+        private readonly usersService: UsersService,
     ) { }
 
     async create(userId: string, dto: CreateHarvestDto): Promise<Harvest> {
@@ -68,15 +70,30 @@ export class HarvestsService {
     }
 
     async findAll(userId: string, query: HarvestQueryDto): Promise<HarvestWithStatus[]> {
+        const user = await this.usersService.findById(userId);
+
         const qb = this.harvestRepository
             .createQueryBuilder('harvest')
             .leftJoinAndSelect('harvest.field', 'field')
+            .leftJoin('field.partners', 'partners')
             .leftJoin(
                 'payment_harvests',
                 'ph',
                 'ph.harvest_id = harvest.id',
             )
-            .where('field.userId = :userId', { userId })
+            .where(new Brackets((where) => {
+                where.where('field.userId = :userId', { userId });
+
+                if (user?.farmerIdNumber) {
+                    where.orWhere('partners.partnerIdentityNumber = :identityNumber', {
+                        identityNumber: user.farmerIdNumber,
+                    });
+                }
+
+                if (user?.phone) {
+                    where.orWhere('partners.partnerPhone = :phone', { phone: user.phone });
+                }
+            }))
             .andWhere('harvest.deleted = :deleted', { deleted: false })
             .andWhere('field.deleted = :fieldDeleted', { fieldDeleted: false })
             .groupBy('harvest.id')
@@ -154,7 +171,7 @@ export class HarvestsService {
             throw new NotFoundException('Harvest not found');
         }
 
-        if (harvest.field.userId !== userId) {
+        if (!(await this.canAccessField(harvest.field, userId))) {
             throw new ForbiddenException('Access denied');
         }
 
@@ -163,6 +180,10 @@ export class HarvestsService {
 
     async update(id: string, userId: string, dto: UpdateHarvestDto): Promise<Harvest> {
         const harvest = await this.findOne(id, userId);
+
+        if (harvest.field.userId !== userId) {
+            throw new ForbiddenException('Access denied');
+        }
 
         // Check if harvest has payments - if so, only notes can be updated
         const hasPayments = await this.checkHasPayments(id);
@@ -194,6 +215,10 @@ export class HarvestsService {
 
     async softDelete(id: string, userId: string): Promise<void> {
         const harvest = await this.findOne(id, userId);
+
+        if (harvest.field.userId !== userId) {
+            throw new ForbiddenException('Access denied');
+        }
 
         // Check if harvest has payments
         const hasPayments = await this.checkHasPayments(id);
@@ -243,5 +268,32 @@ export class HarvestsService {
         ).catch(() => [{ count: 0 }]);
 
         return parseInt(result[0]?.count || '0', 10) > 0;
+    }
+
+    private async canAccessField(field: Field, userId: string): Promise<boolean> {
+        if (field.userId === userId) return true;
+
+        const user = await this.usersService.findById(userId);
+        if (!user?.farmerIdNumber && !user?.phone) return false;
+
+        const count = await this.fieldRepository
+            .createQueryBuilder('field')
+            .leftJoin('field.partners', 'partners')
+            .where('field.id = :fieldId', { fieldId: field.id })
+            .andWhere(new Brackets((where) => {
+                if (user.farmerIdNumber) {
+                    where.where('partners.partnerIdentityNumber = :identityNumber', {
+                        identityNumber: user.farmerIdNumber,
+                    });
+                }
+
+                if (user.phone) {
+                    const method = user.farmerIdNumber ? 'orWhere' : 'where';
+                    where[method]('partners.partnerPhone = :phone', { phone: user.phone });
+                }
+            }))
+            .getCount();
+
+        return count > 0;
     }
 }

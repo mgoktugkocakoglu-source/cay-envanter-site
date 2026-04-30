@@ -55,10 +55,10 @@ const { currentWeather, hourlyForecast, alerts: weatherAlerts, isLoading: weathe
 
 const greetingText = computed(() => {
   const hour = new Date().getHours();
-  if (hour < 6) return 'Iyi geceler';
-  if (hour < 12) return 'Gunaydin';
-  if (hour < 18) return 'Iyi gunler';
-  return 'Iyi aksamlar';
+  if (hour < 6) return 'İyi geceler';
+  if (hour < 12) return 'Günaydın';
+  if (hour < 18) return 'İyi günler';
+  return 'İyi akşamlar';
 });
 
 const firstName = computed(() => {
@@ -69,7 +69,7 @@ const firstName = computed(() => {
 const userTypeLabel = computed(() => {
   const typeMap: Record<string, string> = {
     land_owner: 'Arazi Sahibi',
-    worker: 'Cay Iscisi',
+    worker: 'Çay İşçisi',
     self_farmer: 'Kendi Isleyen',
   };
   return typeMap[authStore.user?.userType || ''] || '';
@@ -253,7 +253,7 @@ onUnmounted(stopClock);
             <h1>{{ greetingText }}<span v-if="firstName">, {{ firstName }}</span></h1>
             <div class="greeting-meta">
               <span v-if="userTypeLabel" class="user-type-badge">{{ userTypeLabel }}</span>
-              <p>{{ currentYear }} sezon ozetiniz</p>
+              <p>{{ currentYear }} sezon özetiniz</p>
             </div>
           </div>
           <div class="greeting-actions">
@@ -268,7 +268,7 @@ onUnmounted(stopClock);
                 İş İlanı Oluştur
               </RouterLink>
             </template>
-            <!-- Cay Iscisi icin -->
+            <!-- Çay işçisi için -->
             <template v-else-if="authStore.user?.userType === 'worker'">
               <RouterLink to="/social/job-listings/worker/create" class="action-btn action-btn--primary">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
@@ -368,7 +368,7 @@ onUnmounted(stopClock);
             </div>
             <div class="stat-info">
               <span class="stat-value">{{ pendingPayments.length }}</span>
-              <span class="stat-label">Bekleyen Odeme</span>
+              <span class="stat-label">Bekleyen Ödeme</span>
             </div>
             <div class="stat-sub">
               {{ formatCurrency(pendingPayments.reduce((s, p) => s + p.totalPrice, 0)) }} bekliyor
@@ -381,7 +381,7 @@ onUnmounted(stopClock);
           <!-- Monthly Income Chart -->
           <div class="chart-card">
             <div class="chart-header">
-              <h3>Aylik Gelir</h3>
+              <h3>Aylık Gelir</h3>
               <span class="chart-year">{{ currentYear }}</span>
             </div>
             <div class="bar-chart">
@@ -405,7 +405,7 @@ onUnmounted(stopClock);
           <!-- Monthly Harvest Chart -->
           <div class="chart-card">
             <div class="chart-header">
-              <h3>Aylik Hasat (kg)</h3>
+              <h3>Aylık Hasat (kg)</h3>
               <span class="chart-year">{{ currentYear }}</span>
             </div>
             <div class="bar-chart">
@@ -439,7 +439,7 @@ onUnmounted(stopClock);
           </RouterLink>
           <RouterLink to="/tea/fields" class="quick-link-card">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-            <span>Tarlalarim</span>
+            <span>Tarlalarım</span>
           </RouterLink>
         </section>
       </div>

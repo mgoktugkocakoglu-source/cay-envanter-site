@@ -17,8 +17,8 @@ const fieldsStore = useFieldsStore();
 // Form state
 const fieldName = ref('');
 const notes = ref('');
-const partners = ref<Array<{ name: string; phone: string; identityNumber: string; isPrimary: boolean }>>([
-    { name: '', phone: '', identityNumber: '', isPrimary: true }
+const partners = ref<Array<{ firstName: string; lastName: string; identityNumber: string; sharePercentage: number | null }>>([
+    { firstName: '', lastName: '', identityNumber: '', sharePercentage: null }
 ]);
 const isSubmitting = ref(false);
 const formError = ref<string | null>(null);
@@ -36,9 +36,12 @@ const isLoadingParcel = ref(false);
 
 const TURKEY_CENTER: L.LatLngExpression = [39.0, 35.0];
 const TURKEY_ZOOM = 6;
+const MAP_MIN_ZOOM = 6;
+const MAP_MAX_ZOOM = 18;
+const TILE_MAX_NATIVE_ZOOM = 17;
 const SELECTED_PARCEL_FIT_OPTIONS: L.FitBoundsOptions = {
     padding: [16, 16],
-    maxZoom: 18,
+    maxZoom: MAP_MAX_ZOOM,
     animate: true,
 };
 
@@ -70,9 +73,9 @@ function isStepComplete(s: number): boolean {
 // Label for each step
 function stepLabel(s: number): string {
     switch (s) {
-        case 1: return 'Tarla Adi';
-        case 2: return 'Il';
-        case 3: return 'Ilce';
+        case 1: return 'Tarla Adı';
+        case 2: return 'İl';
+        case 3: return 'İlçe';
         case 4: return 'Mahalle';
         case 5: return 'Parsel';
         case 6: return 'Detaylar';
@@ -165,9 +168,13 @@ const completedSteps = computed(() => {
     return steps;
 });
 
+function isAllowedProvince(provinceName: string) {
+    return provinceName.trim().toLocaleLowerCase('tr-TR') !== 'ordu';
+}
+
 const provinceOptions = computed(() =>
     geoStore.provinces
-        .filter((province) => province.name !== 'Ordu')
+        .filter((province) => isAllowedProvince(province.name))
         .map((province) => ({ value: province.id.toString(), label: province.name }))
 );
 
@@ -176,13 +183,17 @@ onMounted(async () => {
     if (mapContainer.value) {
         map = L.map(mapContainer.value, {
             zoomControl: false,
+            minZoom: MAP_MIN_ZOOM,
+            maxZoom: MAP_MAX_ZOOM,
         }).setView(TURKEY_CENTER, TURKEY_ZOOM);
 
         L.control.zoom({ position: 'topright' }).addTo(map);
 
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             attribution: '&copy; <a href="https://www.esri.com/">Esri</a> &mdash; Source: Esri, Maxar, Earthstar Geographics',
-            maxZoom: 19,
+            minZoom: MAP_MIN_ZOOM,
+            maxZoom: MAP_MAX_ZOOM,
+            maxNativeZoom: TILE_MAX_NATIVE_ZOOM,
         }).addTo(map);
 
         map.on('click', handleMapClick);
@@ -351,6 +362,13 @@ async function handleMapClick(e: L.LeafletMouseEvent) {
     }
 }
 
+watch(() => geoStore.provinces, () => {
+    const selectedProvince = geoStore.selectedProvince;
+    if (selectedProvince && !isAllowedProvince(selectedProvince.name)) {
+        geoStore.selectProvince(null);
+    }
+}, { deep: true });
+
 function displayClickedParcel(parcel: GeoParcelDetail) {
     if (!map) return;
     clearClickedParcelLayer();
@@ -409,31 +427,45 @@ function handleRoadChange(value: SelectValue) {
 }
 
 function addPartner() {
-    partners.value.push({ name: '', phone: '', identityNumber: '', isPrimary: false });
+    partners.value.push({ firstName: '', lastName: '', identityNumber: '', sharePercentage: null });
 }
 
 function removePartner(index: number) {
     if (partners.value.length > 1) {
         partners.value.splice(index, 1);
-        if (!partners.value.some(p => p.isPrimary)) partners.value[0].isPrimary = true;
     }
 }
 
-function setPrimaryOwner(index: number) {
-    partners.value.forEach((p, i) => { p.isPrimary = i === index; });
+function hasPartnerValue(partner: { firstName: string; lastName: string; identityNumber: string; sharePercentage: number | null }) {
+    return !!(
+        partner.firstName.trim() ||
+        partner.lastName.trim() ||
+        partner.identityNumber.trim() ||
+        partner.sharePercentage
+    );
 }
 
 async function handleSubmit() {
     if (!isFormValid.value) return;
 
-    const invalidPartner = partners.value.some((partner) => {
-        const hasAnyValue = partner.name.trim() || partner.phone.trim() || partner.identityNumber.trim();
-        if (!hasAnyValue) return false;
-        return !partner.name.trim() || (!partner.phone.trim() && !partner.identityNumber.trim());
-    });
+    const filledPartners = partners.value.filter(hasPartnerValue);
+    const invalidPartner = filledPartners.some((partner) =>
+        !partner.firstName.trim() ||
+        !partner.lastName.trim() ||
+        !/^[0-9]{11}$/.test(partner.identityNumber.trim()) ||
+        !partner.sharePercentage ||
+        partner.sharePercentage <= 0 ||
+        partner.sharePercentage > 100,
+    );
 
     if (invalidPartner) {
-        formError.value = 'Ortak icin ad ve telefon veya TC No bilgilerinden en az biri gereklidir';
+        formError.value = 'Ortak için ad, soyad, 11 haneli TC No ve 1-100 arası ortaklık yüzdesi gereklidir';
+        return;
+    }
+
+    const totalShare = filledPartners.reduce((sum, partner) => sum + (partner.sharePercentage || 0), 0);
+    if (totalShare > 100) {
+        formError.value = 'Ortaklık yüzdelerinin toplamı 100 değerini aşamaz';
         return;
     }
 
@@ -444,7 +476,7 @@ async function handleSubmit() {
         const parcelCoordinates = clickedParcel.value?.polygon || geoStore.selectedNeighborhood?.bounds || [];
         const parcelNo = clickedParcel.value?.properties.parselNo || null;
 
-        const fieldData: Omit<Partial<Field>, 'partners'> & { partners?: Array<{ partnerName: string; partnerPhone: string | null; partnerIdentityNumber: string | null; isPrimaryOwner: boolean }> } = {
+        const fieldData: Omit<Partial<Field>, 'partners'> & { partners?: Array<{ partnerName: string; partnerPhone: string | null; partnerIdentityNumber: string | null; sharePercentage: number; isPrimaryOwner: boolean }> } = {
             name: fieldName.value.trim(),
             province: clickedParcel.value?.properties.ilAd || geoStore.selectedProvince?.name || '',
             district: clickedParcel.value?.properties.ilceAd || geoStore.selectedDistrict?.name || '',
@@ -452,11 +484,12 @@ async function handleSubmit() {
             road: geoStore.selectedRoad?.name || null,
             parcelNo, coordinates: parcelCoordinates, area: selectedArea.value, areaUnit: 'm2' as const,
             notes: notes.value.trim() || null,
-            partners: partners.value.filter(p => p.name.trim()).map(p => ({
-                partnerName: p.name.trim(),
-                partnerPhone: p.phone.trim() || null,
+            partners: filledPartners.map(p => ({
+                partnerName: `${p.firstName.trim()} ${p.lastName.trim()}`,
+                partnerPhone: null,
                 partnerIdentityNumber: p.identityNumber.trim() || null,
-                isPrimaryOwner: p.isPrimary,
+                sharePercentage: p.sharePercentage || 0,
+                isPrimaryOwner: false,
             }))
         };
 
@@ -464,10 +497,10 @@ async function handleSubmit() {
         if (result) {
             router.push('/fields');
         } else {
-            formError.value = fieldsStore.error || 'Tarla olusturulamadi';
+            formError.value = fieldsStore.error || 'Tarla oluşturulamadı';
         }
     } catch {
-        formError.value = 'Bir hata olustu';
+        formError.value = 'Bir hata oluştu';
     } finally {
         isSubmitting.value = false;
     }
@@ -485,11 +518,11 @@ function goBack() {
             <header class="page-header">
                 <button class="btn-back" @click="goBack">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                    Geri Don
+                    Geri Dön
                 </button>
                 <div class="header-center">
                     <h1>Yeni Tarla Ekle</h1>
-                    <p class="header-sub">Adim {{ activeStep }} / {{ TOTAL_STEPS }}</p>
+                    <p class="header-sub">Adım {{ activeStep }} / {{ TOTAL_STEPS }}</p>
                 </div>
             </header>
 
@@ -505,7 +538,7 @@ function goBack() {
                     <div class="map-status">
                         <div v-if="isLoadingParcel" class="map-status-item map-status-loading">
                             <span class="spinner"></span>
-                            Parsel bilgisi yukleniyor...
+                            Parsel bilgisi yükleniyor...
                         </div>
                         <div v-else-if="clickedParcel" class="map-status-item map-status-selected">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -523,7 +556,7 @@ function goBack() {
                         </div>
                         <div v-else-if="geoStore.selectedNeighborhoodId" class="map-status-item map-status-hint">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                            Yol secip haritaya tiklayarak parsel secebilirsiniz
+                            Yol seçip haritaya tıklayarak parsel seçebilirsiniz
                         </div>
                         <div v-else class="map-status-item map-status-default">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
@@ -556,8 +589,8 @@ function goBack() {
                         <div class="step-header">
                             <div class="step-badge">1</div>
                             <div>
-                                <h2 class="step-title">Tarla Adi <span class="required">*</span></h2>
-                                <p class="step-hint">Tarlaniza kolay hatirlanacak bir isim verin</p>
+                                <h2 class="step-title">Tarla Adı <span class="required">*</span></h2>
+                                <p class="step-hint">Tarlanıza kolay hatırlanacak bir isim verin</p>
                             </div>
                         </div>
                         <input
@@ -565,7 +598,7 @@ function goBack() {
                             v-model="fieldName"
                             type="text"
                             class="form-input"
-                            placeholder="Orn: Ust Bahce"
+                            placeholder="Örn: Üst Bahçe"
                             autofocus
                             @keyup.enter="nextStep"
                         />
@@ -586,14 +619,14 @@ function goBack() {
                             </button>
                             <div class="step-badge">2</div>
                             <div>
-                                <h2 class="step-title">Il Secin <span class="required">*</span></h2>
-                                <p class="step-hint">Tarlanizin bulundugu ili secin</p>
+                                <h2 class="step-title">İl Seçin <span class="required">*</span></h2>
+                                <p class="step-hint">Tarlanızın bulunduğu ili seçin</p>
                             </div>
                         </div>
                         <AppSelect
                             :model-value="geoStore.selectedProvinceId?.toString() || ''"
                             :options="provinceOptions"
-                            placeholder="Il Secin"
+                            placeholder="İl Seçin"
                             :disabled="geoStore.isLoadingProvinces"
                             required
                             searchable
@@ -609,14 +642,14 @@ function goBack() {
                             </button>
                             <div class="step-badge">3</div>
                             <div>
-                                <h2 class="step-title">Ilce Secin <span class="required">*</span></h2>
-                                <p class="step-hint">Tarlanizin bulundugu ilceyi secin</p>
+                                <h2 class="step-title">İlçe Seçin <span class="required">*</span></h2>
+                                <p class="step-hint">Tarlanızın bulunduğu ilçeyi seçin</p>
                             </div>
                         </div>
                         <AppSelect
                             :model-value="geoStore.selectedDistrictId?.toString() || ''"
                             :options="geoStore.districts.map(d => ({ value: d.id.toString(), label: d.name }))"
-                            placeholder="Ilce Secin"
+                            placeholder="İlçe Seçin"
                             :disabled="!geoStore.selectedProvinceId || geoStore.isLoadingDistricts"
                             required
                             searchable
@@ -635,14 +668,14 @@ function goBack() {
                             </button>
                             <div class="step-badge">4</div>
                             <div>
-                                <h2 class="step-title">Mahalle Secin <span class="required">*</span></h2>
-                                <p class="step-hint">Tarlanizin bulundugu mahalleyi secin</p>
+                                <h2 class="step-title">Mahalle Seçin <span class="required">*</span></h2>
+                                <p class="step-hint">Tarlanızın bulunduğu mahalleyi seçin</p>
                             </div>
                         </div>
                         <AppSelect
                             :model-value="geoStore.selectedNeighborhoodId?.toString() || ''"
                             :options="geoStore.neighborhoods.map(n => ({ value: n.id.toString(), label: n.name }))"
-                            placeholder="Mahalle Secin"
+                            placeholder="Mahalle Seçin"
                             :disabled="!geoStore.selectedDistrictId || geoStore.isLoadingNeighborhoods"
                             required
                             searchable
@@ -661,25 +694,25 @@ function goBack() {
                             </button>
                             <div class="step-badge">5</div>
                             <div>
-                                <h2 class="step-title">Parsel Secin</h2>
-                                <p class="step-hint">Once yolu secin, sonra haritada parselin uzerine tiklayin</p>
+                                <h2 class="step-title">Parsel Seçin</h2>
+                                <p class="step-hint">Önce yolu seçin, sonra haritada parselin üzerine tıklayın</p>
                             </div>
                         </div>
                         <AppSelect
                             :model-value="geoStore.selectedRoadId?.toString() || ''"
                             :options="geoStore.roads.map(r => ({ value: r.id.toString(), label: r.name }))"
-                            placeholder="Yol Seciniz"
+                            placeholder="Yol Seçiniz"
                             :disabled="!geoStore.selectedNeighborhoodId || geoStore.isLoadingRoads"
                             searchable
                             @update:model-value="handleRoadChange"
                         />
                         <span v-if="geoStore.isLoadingRoads" class="loading-text">
-                            <span class="spinner-tiny"></span> Yollar yukleniyor...
+                            <span class="spinner-tiny"></span> Yollar yükleniyor...
                         </span>
 
                         <div v-if="selectedArea > 0" class="area-inline">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
-                            <span>Tarla Alani: <strong>{{ selectedArea.toLocaleString('tr-TR') }} m&sup2;</strong></span>
+                            <span>Tarla Alanı: <strong>{{ selectedArea.toLocaleString('tr-TR') }} m&sup2;</strong></span>
                         </div>
 
                         <!-- Skip parcel button -->
@@ -702,7 +735,7 @@ function goBack() {
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                             </div>
                             <div>
-                                <h2 class="step-title">Son Adim: Detaylar</h2>
+                                <h2 class="step-title">Son Adım: Detaylar</h2>
                                 <p class="step-hint">Notlarinizi ve ortak bilgilerinizi ekleyin</p>
                             </div>
                         </div>
@@ -722,7 +755,7 @@ function goBack() {
                                 <div class="partners-toggle-left">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                                     <span class="detail-label-text">Ortaklar</span>
-                                    <span v-if="partners.filter(p => p.name.trim()).length > 0" class="partner-badge">{{ partners.filter(p => p.name.trim()).length }}</span>
+                                    <span v-if="partners.filter(hasPartnerValue).length > 0" class="partner-badge">{{ partners.filter(hasPartnerValue).length }}</span>
                                 </div>
                                 <svg class="chevron" :class="{ open: isPartnersOpen }" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                             </button>
@@ -733,20 +766,20 @@ function goBack() {
                                         Ortak Ekle
                                     </button>
                                     <div v-for="(partner, index) in partners" :key="index" class="partner-row">
-                                        <input v-model="partner.name" type="text" placeholder="Ortak Adi" class="form-input partner-name-input" />
-                                        <input v-model="partner.phone" type="tel" maxlength="10" placeholder="Telefon" class="form-input partner-phone-input" />
-                                        <input v-model="partner.identityNumber" type="text" maxlength="11" placeholder="TC No" class="form-input partner-tc-input" />
-                                        <label class="radio-label">
-                                            <input type="radio" name="primaryOwner" :checked="partner.isPrimary" @change="setPrimaryOwner(index)" />
-                                            <span class="radio-text">Ana</span>
-                                        </label>
+                                        <input v-model="partner.firstName" type="text" placeholder="Ad" class="form-input partner-name-input" />
+                                        <input v-model="partner.lastName" type="text" placeholder="Soyad" class="form-input partner-name-input" />
+                                        <input v-model="partner.identityNumber" type="text" maxlength="11" inputmode="numeric" placeholder="TC No" class="form-input partner-tc-input" />
+                                        <div class="partner-share-input-wrap">
+                                            <input v-model.number="partner.sharePercentage" type="number" min="1" max="100" step="0.01" placeholder="Pay" class="form-input partner-share-input" />
+                                            <span>%</span>
+                                        </div>
                                         <button v-if="partners.length > 1" type="button" class="btn-remove" @click="removePartner(index)">
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                         </button>
                                     </div>
-                                    <div v-if="partners.some(p => p.name.trim())" class="pct-warning-bar">
+                                    <div v-if="partners.some(hasPartnerValue)" class="pct-warning-bar">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                                        Eklenen ortaklara onay daveti bekliyor durumunda kaydedilir.
+                                        TC No eşleşen kullanıcı bu araziye bağlı hasat ve ödeme kayıtlarını görebilir.
                                     </div>
                                 </div>
                             </div>
@@ -760,7 +793,7 @@ function goBack() {
 
                         <!-- Submit -->
                         <div class="step-actions">
-                            <button type="button" class="btn-cancel" @click="goBack">Iptal</button>
+                            <button type="button" class="btn-cancel" @click="goBack">İptal</button>
                             <button type="submit" class="btn-submit" :disabled="!isFormValid || isSubmitting">
                                 <span v-if="isSubmitting" class="spinner"></span>
                                 <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
@@ -777,7 +810,7 @@ function goBack() {
 
 <style scoped>
 .create-field-page {
-    max-width: 720px;
+    max-width: 1120px;
     margin: 0 auto;
     padding: var(--space-4) var(--space-4) var(--space-8);
 }
@@ -856,8 +889,8 @@ function goBack() {
 }
 
 .map-container {
-    height: min(52vh, 440px);
-    min-height: 360px;
+    height: min(64vh, 640px);
+    min-height: 460px;
     width: 100%;
     background: var(--color-bg-primary);
 }
@@ -1126,12 +1159,10 @@ function goBack() {
 .btn-add-partner:hover { background: var(--color-primary-light); border-style: solid; }
 
 .partner-row { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
-.partner-name-input { flex: 1; min-width: 0; }
-.partner-phone-input,
+.partner-name-input { flex: 1 1 140px; min-width: 120px; }
 .partner-tc-input { flex: 0 1 132px; min-width: 118px; }
-.radio-label { display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
-.radio-label input[type="radio"] { accent-color: var(--color-primary); width: 14px; height: 14px; }
-.radio-text { font-size: var(--font-size-xs); color: var(--color-text-muted); }
+.partner-share-input-wrap { display: flex; align-items: center; gap: 6px; flex: 0 0 96px; color: var(--color-text-muted); font-size: var(--font-size-sm); }
+.partner-share-input { width: 72px; text-align: right; }
 .btn-remove { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: rgba(239, 68, 68, 0.1); border: none; border-radius: var(--radius-md); color: var(--color-danger); cursor: pointer; flex-shrink: 0; transition: all var(--transition-fast); }
 .btn-remove:hover { background: rgba(239, 68, 68, 0.2); }
 .pct-warning-bar { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); background: rgba(245, 158, 11, 0.1); border-radius: var(--radius-md); color: var(--color-warning); font-size: var(--font-size-xs); font-weight: var(--font-weight-medium); }
@@ -1156,15 +1187,16 @@ function goBack() {
     .create-field-page { padding: var(--space-3); }
     .page-header { flex-direction: column; align-items: flex-start; }
     .map-container {
-        height: 42vh;
-        min-height: 300px;
+        height: 52vh;
+        min-height: 360px;
     }
     .map-section { position: static; }
     .step-card { padding: var(--space-4); }
     .partner-row { flex-wrap: wrap; }
     .partner-name-input,
-    .partner-phone-input,
-    .partner-tc-input { flex: 1 1 100%; }
+    .partner-tc-input,
+    .partner-share-input-wrap { flex: 1 1 100%; }
+    .partner-share-input { width: 100%; text-align: left; }
     .breadcrumb { gap: var(--space-1); }
     .breadcrumb-item { padding: 4px 8px; font-size: 11px; }
     .breadcrumb-value { max-width: 80px; }

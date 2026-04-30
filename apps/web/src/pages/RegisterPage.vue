@@ -20,13 +20,13 @@ const userTypes: Array<{ value: UserType; label: string; description: string; ic
   {
     value: 'land_owner',
     label: 'Arazi Sahibi',
-    description: 'Arazim var fakat kendim isleyemiyorum. Isci veya yarilici ariyorum.',
+    description: 'Arazim var fakat kendim işleyemiyorum. İşçi veya yarılıkçı arıyorum.',
     icon: '🏡',
   },
   {
     value: 'worker',
-    label: 'Cay Iscisi',
-    description: 'Arazim yok, baskalarinin arazilerinde cay topluyorum veya yarilici olarak calisiyorum.',
+    label: 'Çay İşçisi',
+    description: 'Arazim yok, başkalarının arazilerinde çay topluyorum veya yarılıkçı olarak çalışıyorum.',
     icon: '👷',
   },
 ];

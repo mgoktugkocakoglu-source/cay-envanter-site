@@ -6,7 +6,7 @@ import {
     ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { Field, FieldPartner } from '@/fields/entities';
 import {
     CreateFieldDto,
@@ -30,7 +30,7 @@ export class FieldsService {
     ) { }
 
     async create(userId: string, dto: CreateFieldDto): Promise<Field> {
-        this.validatePartnerContacts(dto.partners);
+        this.validatePartners(dto.partners);
 
         const field = this.fieldRepository.create({
             userId,
@@ -43,7 +43,7 @@ export class FieldsService {
             coordinates: dto.coordinates,
             area: dto.area,
             areaUnit: dto.areaUnit,
-            partnerCount: dto.partners?.length || 1,
+            partnerCount: (dto.partners?.length || 0) + 1,
             notes: dto.notes || null,
         });
 
@@ -70,10 +70,24 @@ export class FieldsService {
     }
 
     async findAll(userId: string, query: FieldQueryDto): Promise<Field[]> {
+        const user = await this.usersService.findById(userId);
+
         const qb = this.fieldRepository
             .createQueryBuilder('field')
             .leftJoinAndSelect('field.partners', 'partners')
-            .where('field.userId = :userId', { userId })
+            .where(new Brackets((where) => {
+                where.where('field.userId = :userId', { userId });
+
+                if (user?.farmerIdNumber) {
+                    where.orWhere('partners.partnerIdentityNumber = :identityNumber', {
+                        identityNumber: user.farmerIdNumber,
+                    });
+                }
+
+                if (user?.phone) {
+                    where.orWhere('partners.partnerPhone = :phone', { phone: user.phone });
+                }
+            }))
             .andWhere('field.deleted = :deleted', { deleted: false });
 
         const normalizedProvince = query.province?.trim();
@@ -113,7 +127,13 @@ export class FieldsService {
             throw new NotFoundException('Field not found');
         }
 
-        if (field.userId !== userId) {
+        const user = await this.usersService.findById(userId);
+        const hasPartnerAccess = field.partners?.some((partner) =>
+            (!!partner.partnerIdentityNumber && partner.partnerIdentityNumber === user?.farmerIdNumber) ||
+            (!!partner.partnerPhone && partner.partnerPhone === user?.phone),
+        );
+
+        if (field.userId !== userId && !hasPartnerAccess) {
             throw new ForbiddenException('Access denied');
         }
 
@@ -121,7 +141,7 @@ export class FieldsService {
     }
 
     async update(id: string, userId: string, dto: UpdateFieldDto): Promise<Field> {
-        const field = await this.findOne(id, userId);
+        const field = await this.findOwnedField(id, userId);
 
         if (dto.name !== undefined) field.name = dto.name;
         if (dto.area !== undefined) field.area = dto.area;
@@ -135,7 +155,7 @@ export class FieldsService {
     }
 
     async softDelete(id: string, userId: string): Promise<void> {
-        const field = await this.findOne(id, userId);
+        const field = await this.findOwnedField(id, userId);
 
         field.deleted = true;
         field.deletedAt = new Date();
@@ -167,8 +187,8 @@ export class FieldsService {
 
     // Partner management
     async addPartner(fieldId: string, userId: string, dto: CreateFieldPartnerDto): Promise<FieldPartner> {
-        const field = await this.findOne(fieldId, userId);
-        this.validatePartnerContacts([dto]);
+        const field = await this.findOwnedField(fieldId, userId);
+        this.validatePartners([dto]);
 
         const partner = this.partnerRepository.create({
             fieldId,
@@ -183,7 +203,7 @@ export class FieldsService {
         const saved = await this.partnerRepository.save(partner);
 
         // Update partner count
-        field.partnerCount = await this.partnerRepository.count({ where: { fieldId } });
+        field.partnerCount = (await this.partnerRepository.count({ where: { fieldId } })) + 1;
         await this.fieldRepository.save(field);
 
         this.logger.log(`Partner added to field ${fieldId}: ${saved.id}`);
@@ -196,7 +216,7 @@ export class FieldsService {
         userId: string,
         dto: UpdateFieldPartnerDto,
     ): Promise<FieldPartner> {
-        await this.findOne(fieldId, userId);
+        await this.findOwnedField(fieldId, userId);
 
         const partner = await this.partnerRepository.findOne({
             where: { id: partnerId, fieldId },
@@ -212,7 +232,7 @@ export class FieldsService {
         if (dto.sharePercentage !== undefined) partner.sharePercentage = dto.sharePercentage;
         if (dto.isPrimaryOwner !== undefined) partner.isPrimaryOwner = dto.isPrimaryOwner;
         if (dto.invitationStatus !== undefined) partner.invitationStatus = dto.invitationStatus;
-        this.validatePartnerContacts([partner]);
+        this.validatePartners([partner]);
 
         await this.partnerRepository.save(partner);
         this.logger.log(`Partner updated: ${partnerId}`);
@@ -221,7 +241,7 @@ export class FieldsService {
     }
 
     async removePartner(fieldId: string, partnerId: string, userId: string): Promise<void> {
-        const field = await this.findOne(fieldId, userId);
+        const field = await this.findOwnedField(fieldId, userId);
 
         const partner = await this.partnerRepository.findOne({
             where: { id: partnerId, fieldId },
@@ -234,7 +254,7 @@ export class FieldsService {
         await this.partnerRepository.remove(partner);
 
         // Update partner count
-        field.partnerCount = await this.partnerRepository.count({ where: { fieldId } });
+        field.partnerCount = (await this.partnerRepository.count({ where: { fieldId } })) + 1;
         await this.fieldRepository.save(field);
 
         this.logger.log(`Partner removed from field ${fieldId}: ${partnerId}`);
@@ -274,15 +294,32 @@ export class FieldsService {
         return partner;
     }
 
-    private validatePartnerContacts(partners?: Array<Pick<CreateFieldPartnerDto, 'partnerName' | 'partnerPhone' | 'partnerIdentityNumber'>>): void {
+    private async findOwnedField(id: string, userId: string): Promise<Field> {
+        const field = await this.fieldRepository.findOne({
+            where: { id, deleted: false },
+            relations: ['partners'],
+        });
+
+        if (!field) {
+            throw new NotFoundException('Field not found');
+        }
+
+        if (field.userId !== userId) {
+            throw new ForbiddenException('Access denied');
+        }
+
+        return field;
+    }
+
+    private validatePartners(partners?: Array<Pick<CreateFieldPartnerDto, 'partnerName' | 'partnerPhone' | 'partnerIdentityNumber' | 'sharePercentage'>>): void {
         if (!partners) return;
 
         const invalid = partners.some((partner) =>
-            partner.partnerName?.trim() && !partner.partnerPhone && !partner.partnerIdentityNumber,
+            partner.partnerName?.trim() && (!partner.partnerIdentityNumber || !partner.sharePercentage || partner.sharePercentage <= 0),
         );
 
         if (invalid) {
-            throw new BadRequestException('Partner phone or identity number is required');
+            throw new BadRequestException('Ortak için ad soyad, TC kimlik numarası ve ortaklık yüzdesi gereklidir');
         }
     }
 }

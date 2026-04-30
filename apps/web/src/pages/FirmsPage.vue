@@ -12,7 +12,7 @@ const searchQuery = ref('');
 
 // ─── Wizard State ───
 const showWizard = ref(false);
-const wizardStep = ref(1); // 1: Firma Adi, 2: Tarifeler, 3: Konumlar
+const wizardStep = ref(1); // 1: Firma Adı, 2: Tarifeler, 3: Konumlar
 const isSaving = ref(false);
 const formError = ref<string | null>(null);
 const successMessage = ref<string | null>(null);
@@ -126,10 +126,10 @@ const filteredFirms = computed(() => {
 });
 
 const paymentTermLabels: Record<string, string> = {
-    'cash': 'Pesin',
-    'weekly': 'Haftalik',
-    'monthly': 'Aylik',
-    'custom': 'Ozel Tarih',
+    'cash': 'Peşin',
+    'weekly': 'Haftalık',
+    'monthly': 'Aylık',
+    'custom': 'Özel Tarih',
 };
 
 const canProceedStep1 = computed(() => firmForm.value.name.trim().length > 0);
@@ -196,7 +196,7 @@ async function handleStep1Next() {
         wizardStep.value = 2;
         addTariff(); // Start with one empty tariff
     } else {
-        formError.value = firmsStore.error || 'Firma olusturulamadi';
+        formError.value = firmsStore.error || 'Firma oluşturulamadı';
     }
     isSaving.value = false;
 }
@@ -269,7 +269,7 @@ async function handleStep3Finish() {
     }
 
     closeWizard();
-    successMessage.value = 'Firma basariyla eklendi';
+    successMessage.value = 'Firma başarıyla eklendi';
     setTimeout(() => { successMessage.value = null; }, 3000);
     await firmsStore.fetchFirms();
     isSaving.value = false;
@@ -277,7 +277,7 @@ async function handleStep3Finish() {
 
 function skipAndFinish() {
     closeWizard();
-    successMessage.value = 'Firma basariyla eklendi';
+    successMessage.value = 'Firma başarıyla eklendi';
     setTimeout(() => { successMessage.value = null; }, 3000);
 }
 
@@ -346,7 +346,7 @@ onMounted(() => {
                         <polyline points="9 22 9 12 15 12 15 22"/>
                     </svg>
                 </div>
-                <h3>Henuz firma kaydedilmemis</h3>
+                <h3>Henüz firma kaydedilmemiş</h3>
                 <p>Anlasmali firmalar burada listelenecektir</p>
                 <button v-if="authStore.isAdmin" class="btn-add-empty" @click="router.push('/admin/firms')">
                     Firma Yonetimine Git
@@ -418,7 +418,7 @@ onMounted(() => {
                                     <svg v-if="wizardStep > 1" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                                     <span v-else>1</span>
                                 </div>
-                                <span class="step-label">Firma Adi</span>
+                                <span class="step-label">Firma Adı</span>
                             </div>
                             <div class="step-line" :class="{ 'step-line--done': wizardStep > 1 }"></div>
                             <div class="step" :class="{ 'step--active': wizardStep === 2, 'step--done': wizardStep > 2 }">
@@ -448,22 +448,22 @@ onMounted(() => {
                             <p class="wizard-desc">Firma bilgilerini girin.</p>
 
                             <div class="form-group">
-                                <label>Firma Adi <span class="required">*</span></label>
+                                <label>Firma Adı <span class="required">*</span></label>
                                 <input
                                     v-model="firmForm.name"
                                     type="text"
                                     maxlength="150"
-                                    placeholder="Ornegin: CAYKUR"
+                                    placeholder="Örneğin: ÇAYKUR"
                                     class="form-input"
                                 />
                             </div>
 
                             <div class="form-group">
-                                <label>Aciklama</label>
+                                <label>Açıklama</label>
                                 <textarea
                                     v-model="firmForm.description"
                                     maxlength="2000"
-                                    placeholder="Firma hakkinda kisa bilgi..."
+                                    placeholder="Firma hakkında kısa bilgi..."
                                     rows="2"
                                     class="form-input form-textarea"
                                 ></textarea>
@@ -486,7 +486,7 @@ onMounted(() => {
                             </div>
 
                             <div class="wizard-footer">
-                                <button type="button" class="btn-cancel" @click="closeWizard">Iptal</button>
+                                <button type="button" class="btn-cancel" @click="closeWizard">İptal</button>
                                 <button type="button" class="btn-next" :disabled="isSaving || !canProceedStep1" @click="handleStep1Next">
                                     <div v-if="isSaving" class="btn-spinner"></div>
                                     <template v-else>
@@ -497,14 +497,14 @@ onMounted(() => {
                             </div>
                         </div>
 
-                        <!-- ─── Step 2: Yas Cay Alim Tarifeleri ─── -->
+                        <!-- ─── Step 2: Yaş Çay Alım Tarifeleri ─── -->
                         <div v-if="wizardStep === 2" class="wizard-body">
-                            <p class="wizard-desc">Yas cay alim tarifelerini ekleyin. Tarifeler daha sonra da guncellenebilir.</p>
+                            <p class="wizard-desc">Yaş çay alım tarifelerini ekleyin. Tarifeler daha sonra da güncellenebilir.</p>
 
                             <div v-for="(tariff, tIndex) in tariffs" :key="tIndex" class="tariff-entry">
                                 <div class="tariff-entry-header">
                                     <h4>Tarife {{ tIndex + 1 }}</h4>
-                                    <button type="button" class="btn-icon-sm" aria-label="Kaldır" @click="removeTariff(tIndex)" title="Kaldir">
+                                    <button type="button" class="btn-icon-sm" aria-label="Kaldır" @click="removeTariff(tIndex)" title="Kaldır">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                     </button>
                                 </div>
@@ -513,14 +513,14 @@ onMounted(() => {
                                 <div class="split-toggle-row">
                                     <label class="split-toggle-label">
                                         <input type="checkbox" :checked="tariff.isSplitPayment" @change="toggleSplitPayment(tIndex)" />
-                                        <span>Paylasimli odeme</span>
+                                        <span>Paylaşımlı ödeme</span>
                                     </label>
                                 </div>
 
                                 <!-- Simple tariff -->
                                 <template v-if="!tariff.isSplitPayment">
                                     <div class="form-group">
-                                        <label>Odeme Tarihi <span class="required">*</span></label>
+                                        <label>Ödeme Tarihi <span class="required">*</span></label>
                                         <div class="payment-term-options">
                                             <button
                                                 v-for="term in (['cash', 'weekly', 'monthly', 'custom'] as PaymentTermType[])"
@@ -536,7 +536,7 @@ onMounted(() => {
                                     </div>
 
                                     <div v-if="tariff.paymentTerm === 'custom'" class="form-group">
-                                        <label>Ozel Odeme Tarihi</label>
+                                        <label>Özel Ödeme Tarihi</label>
                                         <input type="date" v-model="tariff.customPaymentDate" class="form-input" />
                                     </div>
 
@@ -547,7 +547,7 @@ onMounted(() => {
                                             v-model.number="tariff.pricePerKg"
                                             min="0.01"
                                             step="0.01"
-                                            placeholder="Ornegin: 21"
+                                            placeholder="Örneğin: 21"
                                             class="form-input"
                                         />
                                     </div>
@@ -557,24 +557,24 @@ onMounted(() => {
                                 <template v-else>
                                     <div v-for="(split, sIndex) in tariff.splits" :key="sIndex" class="split-entry">
                                         <div class="split-entry-header">
-                                            <span class="split-badge">Kisim {{ sIndex + 1 }}</span>
-                                            <button v-if="tariff.splits.length > 2" type="button" class="btn-icon-sm" aria-label="Kaldır" @click="removeSplit(tIndex, sIndex)" title="Kaldir">
+                                            <span class="split-badge">Kısım {{ sIndex + 1 }}</span>
+                                            <button v-if="tariff.splits.length > 2" type="button" class="btn-icon-sm" aria-label="Kaldır" @click="removeSplit(tIndex, sIndex)" title="Kaldır">
                                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                             </button>
                                         </div>
 
                                         <div class="form-row form-row--3">
                                             <div class="form-group">
-                                                <label>Yuzde (%)</label>
+                                                <label>Yüzde (%)</label>
                                                 <input type="number" v-model.number="split.percentage" min="1" max="100" placeholder="50" class="form-input" />
                                             </div>
                                             <div class="form-group">
-                                                <label>Odeme Turu</label>
+                                                <label>Ödeme Türü</label>
                                                 <select v-model="split.paymentTerm" class="form-input">
-                                                    <option value="cash">Pesin</option>
-                                                    <option value="weekly">Haftalik</option>
-                                                    <option value="monthly">Aylik</option>
-                                                    <option value="custom">Ozel</option>
+                                                    <option value="cash">Peşin</option>
+                                                    <option value="weekly">Haftalık</option>
+                                                    <option value="monthly">Aylık</option>
+                                                    <option value="custom">Özel</option>
                                                 </select>
                                             </div>
                                             <div class="form-group">
@@ -612,52 +612,52 @@ onMounted(() => {
                             </div>
                         </div>
 
-                        <!-- ─── Step 3: Firma Cay Toplayici Konumlari ─── -->
+                        <!-- ─── Step 3: Firma Çay Toplayıcı Konumları ─── -->
                         <div v-if="wizardStep === 3" class="wizard-body">
-                            <p class="wizard-desc">Cay toplayici konumlarini ekleyin. Birden fazla konum ekleyebilirsiniz.</p>
+                            <p class="wizard-desc">Çay toplayıcı konumlarını ekleyin. Birden fazla konum ekleyebilirsiniz.</p>
 
                             <div v-for="(loc, lIndex) in locations" :key="lIndex" class="location-entry">
                                 <div class="location-entry-header">
                                     <h4>Konum {{ lIndex + 1 }}</h4>
-                                    <button v-if="locations.length > 1" type="button" class="btn-icon-sm" aria-label="Kaldır" @click="removeLocation(lIndex)" title="Kaldir">
+                                    <button v-if="locations.length > 1" type="button" class="btn-icon-sm" aria-label="Kaldır" @click="removeLocation(lIndex)" title="Kaldır">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                     </button>
                                 </div>
 
                                 <div class="form-group">
-                                    <label>Konum Adi <span class="required">*</span></label>
-                                    <input v-model="loc.name" type="text" maxlength="100" placeholder="Ornegin: Cayeli Merkez" class="form-input" />
+                                    <label>Konum Adı <span class="required">*</span></label>
+                                    <input v-model="loc.name" type="text" maxlength="100" placeholder="Örneğin: Çayeli Merkez" class="form-input" />
                                 </div>
 
                                 <div class="form-row">
                                     <div class="form-group">
-                                        <label>Il <span class="required">*</span></label>
+                                        <label>İl <span class="required">*</span></label>
                                         <select v-model="loc.province" class="form-input">
-                                            <option value="">Il Seciniz</option>
+                                            <option value="">İl Seçiniz</option>
                                             <option v-for="p in provinceOptions" :key="p.value" :value="p.value">{{ p.label }}</option>
                                         </select>
                                     </div>
                                     <div class="form-group">
-                                        <label>Ilce <span class="required">*</span></label>
-                                        <input v-model="loc.district" type="text" maxlength="50" placeholder="Ilce adi" class="form-input" />
+                                        <label>İlçe <span class="required">*</span></label>
+                                        <input v-model="loc.district" type="text" maxlength="50" placeholder="İlçe adı" class="form-input" />
                                     </div>
                                 </div>
 
                                 <div class="form-group">
-                                    <label>Aciklama</label>
+                                    <label>Açıklama</label>
                                     <textarea
                                         v-model="loc.description"
                                         maxlength="1000"
-                                        placeholder="Ornegin: Cataldere Koyu Kuran Kursu Altinda bulunuyoruz"
+                                        placeholder="Örneğin: Çataldere Köyü Kuran Kursu altında bulunuyoruz"
                                         rows="2"
                                         class="form-input form-textarea"
                                     ></textarea>
-                                    <span class="form-hint">Kullanicilara konum hakkinda detayli bilgi verin</span>
+                                    <span class="form-hint">Kullanıcılara konum hakkında detaylı bilgi verin</span>
                                 </div>
 
                                 <div class="form-group">
                                     <label>Adres</label>
-                                    <input v-model="loc.address" type="text" maxlength="500" placeholder="Acik adres" class="form-input" />
+                                    <input v-model="loc.address" type="text" maxlength="500" placeholder="Açık adres" class="form-input" />
                                 </div>
 
                                 <div class="form-row">
@@ -673,11 +673,11 @@ onMounted(() => {
 
                                 <div class="form-row">
                                     <div class="form-group">
-                                        <label>Toplayici Adi</label>
+                                        <label>Toplayıcı Adı</label>
                                         <input v-model="loc.collectorName" type="text" maxlength="100" placeholder="Ad Soyad" class="form-input" />
                                     </div>
                                     <div class="form-group">
-                                        <label>Toplayici Telefonu</label>
+                                        <label>Toplayıcı Telefonu</label>
                                         <input v-model="loc.collectorPhone" type="tel" maxlength="20" placeholder="0532 000 00 00" class="form-input" />
                                     </div>
                                 </div>

@@ -31,7 +31,7 @@ export const useFirmsStore = defineStore('firms', () => {
                 error.value = response.error.message;
             }
         } catch (e) {
-            error.value = 'Firmalar yuklenirken hata olustu';
+            error.value = 'Firmalar yüklenirken hata oluştu';
         } finally {
             isLoading.value = false;
         }
@@ -48,7 +48,7 @@ export const useFirmsStore = defineStore('firms', () => {
                 error.value = response.error.message;
             }
         } catch (e) {
-            error.value = 'Firma detayi yuklenirken hata olustu';
+            error.value = 'Firma detayı yüklenirken hata oluştu';
         } finally {
             isLoading.value = false;
         }
@@ -63,7 +63,7 @@ export const useFirmsStore = defineStore('firms', () => {
                 error.value = response.error.message;
             }
         } catch (e) {
-            error.value = 'Tarifeler yuklenirken hata olustu';
+            error.value = 'Tarifeler yüklenirken hata oluştu';
         }
     }
 
@@ -76,7 +76,7 @@ export const useFirmsStore = defineStore('firms', () => {
                 error.value = response.error.message;
             }
         } catch (e) {
-            error.value = 'Toplama noktalari yuklenirken hata olustu';
+            error.value = 'Toplama noktaları yüklenirken hata oluştu';
         }
     }
 
@@ -91,7 +91,7 @@ export const useFirmsStore = defineStore('firms', () => {
                 error.value = response.error.message;
             }
         } catch (e) {
-            error.value = 'Firma tarifeleri yuklenirken hata olustu';
+            error.value = 'Firma tarifeleri yüklenirken hata oluştu';
         } finally {
             isLoading.value = false;
         }
@@ -110,7 +110,7 @@ export const useFirmsStore = defineStore('firms', () => {
             }
             return false;
         } catch (e) {
-            error.value = 'Firma olusturulurken hata olustu';
+            error.value = 'Firma oluşturulurken hata oluştu';
             return false;
         } finally {
             isLoading.value = false;
@@ -130,7 +130,7 @@ export const useFirmsStore = defineStore('firms', () => {
             }
             return false;
         } catch (e) {
-            error.value = 'Firma guncellenirken hata olustu';
+            error.value = 'Firma güncellenirken hata oluştu';
             return false;
         } finally {
             isLoading.value = false;
@@ -150,7 +150,7 @@ export const useFirmsStore = defineStore('firms', () => {
             }
             return false;
         } catch (e) {
-            error.value = 'Firma silinirken hata olustu';
+            error.value = 'Firma silinirken hata oluştu';
             return false;
         } finally {
             isLoading.value = false;
@@ -170,7 +170,7 @@ export const useFirmsStore = defineStore('firms', () => {
             }
             return false;
         } catch (e) {
-            error.value = 'Tarife olusturulurken hata olustu';
+            error.value = 'Tarife oluşturulurken hata oluştu';
             return false;
         }
     }
@@ -187,7 +187,7 @@ export const useFirmsStore = defineStore('firms', () => {
             }
             return false;
         } catch (e) {
-            error.value = 'Tarife guncellenirken hata olustu';
+            error.value = 'Tarife güncellenirken hata oluştu';
             return false;
         }
     }
@@ -204,7 +204,7 @@ export const useFirmsStore = defineStore('firms', () => {
             }
             return false;
         } catch (e) {
-            error.value = 'Tarife silinirken hata olustu';
+            error.value = 'Tarife silinirken hata oluştu';
             return false;
         }
     }
@@ -222,7 +222,7 @@ export const useFirmsStore = defineStore('firms', () => {
             }
             return false;
         } catch (e) {
-            error.value = 'Toplama noktasi olusturulurken hata olustu';
+            error.value = 'Toplama noktası oluşturulurken hata oluştu';
             return false;
         }
     }
@@ -239,7 +239,7 @@ export const useFirmsStore = defineStore('firms', () => {
             }
             return false;
         } catch (e) {
-            error.value = 'Toplama noktasi guncellenirken hata olustu';
+            error.value = 'Toplama noktası güncellenirken hata oluştu';
             return false;
         }
     }
@@ -256,7 +256,7 @@ export const useFirmsStore = defineStore('firms', () => {
             }
             return false;
         } catch (e) {
-            error.value = 'Toplama noktasi silinirken hata olustu';
+            error.value = 'Toplama noktası silinirken hata oluştu';
             return false;
         }
     }

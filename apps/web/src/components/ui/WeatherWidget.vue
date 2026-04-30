@@ -159,7 +159,7 @@ function getSeverityClass(severity: string): string {
             class="hour-card"
             :class="{ 'hour-card--now': idx === 0 }"
           >
-            <span class="hour-time">{{ idx === 0 ? 'Simdi' : formatHour(hour.time) }}</span>
+            <span class="hour-time">{{ idx === 0 ? 'Şimdi' : formatHour(hour.time) }}</span>
             <span class="hour-icon">{{ hour.icon }}</span>
             <span class="hour-temp">{{ Math.round(hour.temperature) }}°</span>
             <span v-if="hour.rain > 0" class="hour-rain">

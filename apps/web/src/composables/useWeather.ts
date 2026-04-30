@@ -7,32 +7,32 @@ interface WeatherCodeInfo {
 }
 
 const WMO_CODES: Record<number, WeatherCodeInfo> = {
-    0: { icon: '☀️', label: 'Acik' },
+    0: { icon: '☀️', label: 'Açık' },
     1: { icon: '🌤️', label: 'Az Bulutlu' },
-    2: { icon: '⛅', label: 'Parcali Bulutlu' },
+    2: { icon: '⛅', label: 'Parçalı Bulutlu' },
     3: { icon: '☁️', label: 'Bulutlu' },
     45: { icon: '🌫️', label: 'Sisli' },
-    48: { icon: '🌫️', label: 'Kiragili Sis' },
-    51: { icon: '🌦️', label: 'Hafif Ciseleme' },
-    53: { icon: '🌦️', label: 'Ciseleme' },
-    55: { icon: '🌧️', label: 'Yogun Ciseleme' },
-    61: { icon: '🌧️', label: 'Hafif Yagmur' },
-    63: { icon: '🌧️', label: 'Yagmurlu' },
-    65: { icon: '🌧️', label: 'Siddetli Yagmur' },
-    66: { icon: '🌨️', label: 'Dondurucu Yagmur' },
-    67: { icon: '🌨️', label: 'Yogun Dondurucu Yagmur' },
+    48: { icon: '🌫️', label: 'Kırağılı Sis' },
+    51: { icon: '🌦️', label: 'Hafif Çiseleme' },
+    53: { icon: '🌦️', label: 'Çiseleme' },
+    55: { icon: '🌧️', label: 'Yoğun Çiseleme' },
+    61: { icon: '🌧️', label: 'Hafif Yağmur' },
+    63: { icon: '🌧️', label: 'Yağmurlu' },
+    65: { icon: '🌧️', label: 'Şiddetli Yağmur' },
+    66: { icon: '🌨️', label: 'Dondurucu Yağmur' },
+    67: { icon: '🌨️', label: 'Yoğun Dondurucu Yağmur' },
     71: { icon: '❄️', label: 'Hafif Kar' },
-    73: { icon: '❄️', label: 'Kar Yagisi' },
-    75: { icon: '❄️', label: 'Yogun Kar' },
+    73: { icon: '❄️', label: 'Kar Yağışı' },
+    75: { icon: '❄️', label: 'Yoğun Kar' },
     77: { icon: '🌨️', label: 'Kar Taneleri' },
-    80: { icon: '🌦️', label: 'Hafif Saganak' },
-    81: { icon: '🌧️', label: 'Saganak Yagis' },
-    82: { icon: '⛈️', label: 'Siddetli Saganak' },
-    85: { icon: '🌨️', label: 'Hafif Kar Saganagi' },
-    86: { icon: '🌨️', label: 'Yogun Kar Saganagi' },
-    95: { icon: '⛈️', label: 'Gok Gurultusu' },
-    96: { icon: '⛈️', label: 'Dolu ile Firtina' },
-    99: { icon: '⛈️', label: 'Siddetli Dolu Firtinasi' },
+    80: { icon: '🌦️', label: 'Hafif Sağanak' },
+    81: { icon: '🌧️', label: 'Sağanak Yağış' },
+    82: { icon: '⛈️', label: 'Şiddetli Sağanak' },
+    85: { icon: '🌨️', label: 'Hafif Kar Sağanağı' },
+    86: { icon: '🌨️', label: 'Yoğun Kar Sağanağı' },
+    95: { icon: '⛈️', label: 'Gök Gürültüsü' },
+    96: { icon: '⛈️', label: 'Dolu ile Fırtına' },
+    99: { icon: '⛈️', label: 'Şiddetli Dolu Fırtınası' },
 };
 
 export interface HourlyForecast {
@@ -62,6 +62,19 @@ export interface CurrentWeather {
     label: string;
 }
 
+export interface DailyForecast {
+    date: Date;
+    weatherCode: number;
+    icon: string;
+    label: string;
+    tempMax: number;
+    tempMin: number;
+    precipitation: number;
+    sunshineHours: number;
+    avgHumidity: number;
+    suitabilityScore: number;
+}
+
 export type AlertSeverity = 'critical' | 'warning' | 'info';
 
 export interface AgriculturalAlert {
@@ -86,6 +99,7 @@ export function useWeather(latitude: Ref<number>, longitude: Ref<number>) {
     const error = ref<string | null>(null);
     const currentWeather = ref<CurrentWeather | null>(null);
     const hourlyForecast = ref<HourlyForecast[]>([]);
+    const dailyForecast = ref<DailyForecast[]>([]);
     const alerts = ref<AgriculturalAlert[]>([]);
     const lastUpdated = ref<Date | null>(null);
 
@@ -107,7 +121,14 @@ export function useWeather(latitude: Ref<number>, longitude: Ref<number>) {
                 'wind_speed_10m',
                 'cloud_cover',
             ].join(','),
-            forecast_days: '1',
+            daily: [
+                'weather_code',
+                'temperature_2m_max',
+                'temperature_2m_min',
+                'precipitation_sum',
+                'sunshine_duration',
+            ].join(','),
+            forecast_days: '5',
             timezone: 'auto',
         });
         return `https://api.open-meteo.com/v1/forecast?${params.toString()}`;
@@ -116,6 +137,7 @@ export function useWeather(latitude: Ref<number>, longitude: Ref<number>) {
     /** Parse the API response into structured data */
     function parseResponse(data: Record<string, unknown>): void {
         const hourly = data.hourly as Record<string, unknown>;
+        const daily = data.daily as Record<string, unknown> | undefined;
         if (!hourly) return;
 
         const times = hourly.time as string[];
@@ -150,9 +172,7 @@ export function useWeather(latitude: Ref<number>, longitude: Ref<number>) {
 
         // Find the current hour
         const now = new Date();
-        const currentHourIndex = allHours.findIndex(
-            (h) => h.time.getHours() === now.getHours()
-        );
+        const currentHourIndex = allHours.findIndex((h) => h.time >= now);
         const currentIdx = currentHourIndex >= 0 ? currentHourIndex : 0;
 
         // Set current weather from the matching hour
@@ -169,12 +189,81 @@ export function useWeather(latitude: Ref<number>, longitude: Ref<number>) {
             label: current.label,
         };
 
-        // Hourly forecast: next 12 hours from now
-        hourlyForecast.value = allHours.slice(currentIdx, currentIdx + 12);
+        // Hourly forecast: next 24 hours from now
+        hourlyForecast.value = allHours.slice(currentIdx, currentIdx + 24);
+
+        if (daily) {
+            dailyForecast.value = parseDailyForecast(daily, allHours);
+        }
 
         // Generate agricultural alerts
         alerts.value = generateAlerts(allHours);
         lastUpdated.value = new Date();
+    }
+
+    function parseDailyForecast(daily: Record<string, unknown>, allHours: HourlyForecast[]): DailyForecast[] {
+        const dates = daily.time as string[];
+        const weatherCodes = daily.weather_code as number[];
+        const tempMax = daily.temperature_2m_max as number[];
+        const tempMin = daily.temperature_2m_min as number[];
+        const precipitation = daily.precipitation_sum as number[];
+        const sunshineDuration = daily.sunshine_duration as number[];
+
+        if (!dates?.length) return [];
+
+        return dates.map((dateString, index) => {
+            const date = new Date(`${dateString}T00:00:00`);
+            const dayHours = allHours.filter((hour) =>
+                hour.time.getFullYear() === date.getFullYear() &&
+                hour.time.getMonth() === date.getMonth() &&
+                hour.time.getDate() === date.getDate()
+            );
+            const avgHumidity = dayHours.length
+                ? dayHours.reduce((sum, hour) => sum + hour.humidity, 0) / dayHours.length
+                : 0;
+            const sunshineHours = (sunshineDuration?.[index] || 0) / 3600;
+            const rainMm = precipitation?.[index] || 0;
+            const score = calculateTeaPickingScore({
+                sunshineHours,
+                precipitation: rainMm,
+                avgHumidity,
+                tempMax: tempMax?.[index] || 0,
+                tempMin: tempMin?.[index] || 0,
+            });
+            const info = getWeatherInfo(weatherCodes?.[index] || 0);
+
+            return {
+                date,
+                weatherCode: weatherCodes?.[index] || 0,
+                icon: info.icon,
+                label: info.label,
+                tempMax: tempMax?.[index] || 0,
+                tempMin: tempMin?.[index] || 0,
+                precipitation: rainMm,
+                sunshineHours,
+                avgHumidity,
+                suitabilityScore: score,
+            };
+        });
+    }
+
+    function calculateTeaPickingScore(input: {
+        sunshineHours: number;
+        precipitation: number;
+        avgHumidity: number;
+        tempMax: number;
+        tempMin: number;
+    }): number {
+        let score = 55;
+        score += Math.min(input.sunshineHours, 8) * 4;
+        score -= input.precipitation * 8;
+
+        if (input.avgHumidity > 85) score -= (input.avgHumidity - 85) * 1.5;
+        if (input.avgHumidity < 45 && input.avgHumidity > 0) score -= (45 - input.avgHumidity) * 0.8;
+        if (input.tempMax > 30) score -= (input.tempMax - 30) * 2;
+        if (input.tempMin < 8) score -= (8 - input.tempMin) * 2;
+
+        return Math.round(Math.max(0, Math.min(100, score)));
     }
 
     /** Analyze hourly data and generate agricultural alerts for tea farming */
@@ -190,7 +279,7 @@ export function useWeather(latitude: Ref<number>, longitude: Ref<number>) {
                 severity: minTemp <= 0 ? 'critical' : 'warning',
                 icon: '🥶',
                 title: 'Don Riski',
-                description: `Sicaklik ${minTemp.toFixed(1)}°C'ye kadar dusebilir. Cay fidanlarini koruma altina alin.`,
+                description: `Sıcaklık ${minTemp.toFixed(1)}°C'ye kadar düşebilir. Çay fidanlarını koruma altına alın.`,
                 timeRange: formatTimeRange(frostHours),
             });
         }
@@ -205,7 +294,7 @@ export function useWeather(latitude: Ref<number>, longitude: Ref<number>) {
                 id: 'heavy-rain',
                 severity: maxRain > 20 ? 'critical' : 'warning',
                 icon: '🌧️',
-                title: 'Siddetli Yagis',
+                title: 'Şiddetli Yağış',
                 description: `Saatte ${maxRain.toFixed(1)} mm'ye varan yagis bekleniyor. Hasat planlarinizi erteleyin.`,
                 timeRange: formatTimeRange(heavyRainHours),
             });
@@ -247,8 +336,8 @@ export function useWeather(latitude: Ref<number>, longitude: Ref<number>) {
                 id: 'snowfall',
                 severity: totalSnow > 5 ? 'critical' : 'info',
                 icon: '❄️',
-                title: 'Kar Yagisi',
-                description: `Toplam ${totalSnow.toFixed(1)} cm kar bekleniyor. Cay bahcelerini kontrol edin.`,
+                title: 'Kar Yağışı',
+                description: `Toplam ${totalSnow.toFixed(1)} cm kar bekleniyor. Çay bahçelerini kontrol edin.`,
                 timeRange: formatTimeRange(snowHours),
             });
         }
@@ -259,8 +348,8 @@ export function useWeather(latitude: Ref<number>, longitude: Ref<number>) {
                 id: 'all-clear',
                 severity: 'info',
                 icon: '✅',
-                title: 'Uygun Kosullar',
-                description: 'Bugün hava kosullari tarimsal faaliyetler icin uygundur.',
+                title: 'Uygun Koşullar',
+                description: 'Bugün hava koşulları tarımsal faaliyetler için uygundur.',
                 timeRange: '',
             });
         }
@@ -296,7 +385,7 @@ export function useWeather(latitude: Ref<number>, longitude: Ref<number>) {
             parseResponse(data);
         } catch (e) {
             error.value =
-                e instanceof Error ? e.message : 'Hava durumu yuklenemedi';
+                e instanceof Error ? e.message : 'Hava durumu yüklenemedi';
         } finally {
             isLoading.value = false;
         }
@@ -343,6 +432,7 @@ export function useWeather(latitude: Ref<number>, longitude: Ref<number>) {
     return {
         currentWeather,
         hourlyForecast,
+        dailyForecast,
         alerts,
         hasActiveAlerts,
         isLoading,

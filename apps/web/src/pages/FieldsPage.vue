@@ -25,7 +25,7 @@ const viewMode = ref<'grid' | 'list'>('grid');
 const provinces = ['Rize', 'Trabzon', 'Artvin', 'Giresun', 'Ordu'];
 
 const provinceOptions = computed(() => [
-    { value: '', label: 'Tum Iller' },
+    { value: '', label: 'Tüm İller' },
     ...provinces.map(p => ({ value: p, label: p }))
 ]);
 
@@ -83,10 +83,10 @@ async function confirmDelete() {
     try {
         const success = await fieldsStore.deleteField(fieldToDelete.value.id);
         if (success) {
-            toast.success('Tarla basariyla silindi');
+            toast.success('Tarla başarıyla silindi');
             closeDeleteModal();
         } else {
-            toast.error('Tarla silinirken bir hata olustu');
+            toast.error('Tarla silinirken bir hata oluştu');
         }
     } finally {
         isDeleting.value = false;
@@ -121,7 +121,7 @@ function getFieldInitial(name: string) {
             <!-- Header -->
             <header class="page-header">
                 <div class="header-left">
-                    <h1>Tarlalarim</h1>
+                    <h1>Tarlalarım</h1>
                     <div class="header-stats">
                         <span class="stat-chip">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -157,7 +157,7 @@ function getFieldInitial(name: string) {
                     <AppSelect
                         v-model="provinceFilter"
                         :options="provinceOptions"
-                        placeholder="Il Secin"
+                        placeholder="İl Seçin"
                     />
                     <div class="view-toggle">
                         <button
@@ -183,7 +183,7 @@ function getFieldInitial(name: string) {
             <!-- Loading -->
             <div v-if="fieldsStore.isLoading" class="loading-state">
                 <div class="spinner"></div>
-                <p>Tarlalar yukleniyor...</p>
+                <p>Tarlalar yükleniyor...</p>
             </div>
 
             <!-- Error -->
@@ -197,7 +197,7 @@ function getFieldInitial(name: string) {
                 <div class="empty-illustration">
                     <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                 </div>
-                <h3>Henuz tarla eklenmedi</h3>
+                <h3>Henüz tarla eklenmedi</h3>
                 <p>Ilk tarlanizi ekleyerek baslayin</p>
                 <button class="btn-create btn-create--sm" @click="navigateToCreateParams">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -269,7 +269,7 @@ function getFieldInitial(name: string) {
             <!-- List View -->
             <div v-else class="fields-list">
                 <div class="list-header">
-                    <span class="lh-name">Tarla Adi</span>
+                    <span class="lh-name">Tarla Adı</span>
                     <span class="lh-location">Konum</span>
                     <span class="lh-area">Alan</span>
                     <span class="lh-partners">Ortaklar</span>
@@ -322,13 +322,13 @@ function getFieldInitial(name: string) {
                             <div class="modal-icon-wrap">
                                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                             </div>
-                            <h2>Tarlayi Sil</h2>
+                            <h2>Tarlayı Sil</h2>
                             <p>
                                 <strong>{{ fieldToDelete?.name }}</strong> tarlanizi silmek istediginize emin misiniz?
                             </p>
                             <div class="modal-warning">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                                Bu islem geri alinamaz. Tarlaya ait tum hasat kayitlari da etkilenebilir.
+                                Bu işlem geri alınamaz. Tarlaya ait tüm hasat kayıtları da etkilenebilir.
                             </div>
 
                             <div v-if="fieldsStore.error" class="modal-error">
@@ -337,7 +337,7 @@ function getFieldInitial(name: string) {
 
                             <div class="modal-actions">
                                 <button class="btn-modal-cancel" @click="closeDeleteModal" :disabled="isDeleting">
-                                    Iptal
+                                    İptal
                                 </button>
                                 <button class="btn-modal-danger" @click="confirmDelete" :disabled="isDeleting">
                                     <span v-if="isDeleting" class="spinner-sm"></span>

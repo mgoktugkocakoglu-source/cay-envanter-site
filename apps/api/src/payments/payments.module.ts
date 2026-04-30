@@ -4,10 +4,11 @@ import { PaymentsController, BrokerFirmsController } from '@/payments/payments.c
 import { PaymentsService } from '@/payments/payments.service';
 import { Payment, PaymentHarvest, BrokerFirm } from '@/payments/entities';
 import { Harvest } from '@/harvests/entities';
-import { Field } from '@/fields/entities';
+import { Field, FieldPartner } from '@/fields/entities';
+import { UsersModule } from '@/users/users.module';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Payment, PaymentHarvest, BrokerFirm, Harvest, Field])],
+    imports: [TypeOrmModule.forFeature([Payment, PaymentHarvest, BrokerFirm, Harvest, Field, FieldPartner]), UsersModule],
     controllers: [PaymentsController, BrokerFirmsController],
     providers: [PaymentsService],
     exports: [PaymentsService],
