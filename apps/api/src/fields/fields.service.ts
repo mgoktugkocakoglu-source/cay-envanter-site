@@ -84,8 +84,13 @@ export class FieldsService {
             qb.andWhere('field.name ILIKE :search', { search: `%${query.search}%` });
         }
 
-        const sortBy = query.sortBy || 'createdAt';
-        const sortOrder = query.sortOrder || 'DESC';
+        const allowedSortBy = new Set(['name', 'area', 'createdAt']);
+        const requestedSortBy = query.sortBy?.trim();
+        const sortBy = requestedSortBy && allowedSortBy.has(requestedSortBy) ? requestedSortBy : 'createdAt';
+
+        const requestedSortOrder = query.sortOrder?.trim().toUpperCase();
+        const sortOrder = requestedSortOrder === 'ASC' ? 'ASC' : 'DESC';
+
         qb.orderBy(`field.${sortBy}`, sortOrder);
 
         return qb.getMany();
