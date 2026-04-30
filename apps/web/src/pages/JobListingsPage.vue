@@ -43,7 +43,7 @@ const fetchListings = async () => {
                 const vehicleTypesRaw = metadata.vehicleType || metadata.vehicleTypes;
                 const vehicleTypes = vehicleTypesRaw ? (Array.isArray(vehicleTypesRaw) ? vehicleTypesRaw : [vehicleTypesRaw]) : undefined;
                 
-                const terrainTypesRaw = metadata.terrainType || metadata.terrainTypes;
+                const terrainTypesRaw = metadata.terrainTypes || metadata.terrainType;
                 const terrainTypes = terrainTypesRaw ? (Array.isArray(terrainTypesRaw) ? terrainTypesRaw : [terrainTypesRaw]) : undefined;
 
                 return {

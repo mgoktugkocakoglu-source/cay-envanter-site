@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useGeoStore } from '@/stores/geoStore';
 import { useFieldsStore } from '@/stores/fieldsStore';
@@ -17,8 +17,8 @@ const fieldsStore = useFieldsStore();
 // Form state
 const fieldName = ref('');
 const notes = ref('');
-const partners = ref<Array<{ name: string; percentage: number; isPrimary: boolean }>>([
-    { name: '', percentage: 100, isPrimary: true }
+const partners = ref<Array<{ name: string; phone: string; identityNumber: string; isPrimary: boolean }>>([
+    { name: '', phone: '', identityNumber: '', isPrimary: true }
 ]);
 const isSubmitting = ref(false);
 const formError = ref<string | null>(null);
@@ -28,7 +28,7 @@ const isPartnersOpen = ref(false);
 const mapContainer = ref<HTMLDivElement | null>(null);
 let map: L.Map | null = null;
 let currentLayer: L.GeoJSON | null = null;
-let parcelLayers: L.GeoJSON | null = null;
+let roadLayers: L.GeoJSON | null = null;
 let clickedParcelLayer: L.GeoJSON | null = null;
 
 const clickedParcel = ref<GeoParcelDetail | null>(null);
@@ -36,6 +36,11 @@ const isLoadingParcel = ref(false);
 
 const TURKEY_CENTER: L.LatLngExpression = [39.0, 35.0];
 const TURKEY_ZOOM = 6;
+const SELECTED_PARCEL_FIT_OPTIONS: L.FitBoundsOptions = {
+    padding: [16, 16],
+    maxZoom: 18,
+    animate: true,
+};
 
 // Theme-aware color helper for Leaflet
 function getCssVar(name: string, fallback: string): string {
@@ -56,7 +61,7 @@ function isStepComplete(s: number): boolean {
         case 2: return !!geoStore.selectedProvinceId;
         case 3: return !!geoStore.selectedDistrictId;
         case 4: return !!geoStore.selectedNeighborhoodId;
-        case 5: return !!(clickedParcel.value || geoStore.selectedParcelId);
+        case 5: return !!clickedParcel.value;
         case 6: return true;
         default: return false;
     }
@@ -84,7 +89,6 @@ function stepValue(s: number): string {
         case 4: return geoStore.selectedNeighborhood?.name || '';
         case 5: {
             if (clickedParcel.value) return clickedParcel.value.properties.parselNo;
-            if (geoStore.selectedParcel) return geoStore.selectedParcel.parcelNo;
             return '';
         }
         case 6: return '';
@@ -107,17 +111,20 @@ function goToStep(s: number) {
             // Going back to province — clear district, neighborhood, parcel
             geoStore.selectDistrict(null);
             geoStore.selectNeighborhood(null);
+            geoStore.selectRoad(null);
             geoStore.selectParcel(null);
             clickedParcel.value = null;
             clearClickedParcelLayer();
         } else if (s <= 3) {
             // Going back to district — clear neighborhood, parcel
             geoStore.selectNeighborhood(null);
+            geoStore.selectRoad(null);
             geoStore.selectParcel(null);
             clickedParcel.value = null;
             clearClickedParcelLayer();
         } else if (s <= 4) {
             // Going back to neighborhood — clear parcel
+            geoStore.selectRoad(null);
             geoStore.selectParcel(null);
             clickedParcel.value = null;
             clearClickedParcelLayer();
@@ -139,8 +146,6 @@ const selectedArea = computed(() => {
         const alanStr = clickedParcel.value.properties.alan;
         return parseFloat(alanStr.replace('.', '').replace(',', '.')) || 0;
     }
-    const parcel = geoStore.selectedParcel;
-    if (parcel) return parcel.area;
     return 0;
 });
 
@@ -149,10 +154,6 @@ const isFormValid = computed(() => {
         geoStore.selectedProvinceId &&
         geoStore.selectedDistrictId &&
         geoStore.selectedNeighborhoodId;
-});
-
-const totalPartnerPercentage = computed(() => {
-    return partners.value.reduce((sum, p) => sum + (p.percentage || 0), 0);
 });
 
 // Steps completed before active step (for breadcrumb)
@@ -210,11 +211,42 @@ watch(() => geoStore.selectedNeighborhood, (neighborhood) => {
     }
 });
 
-watch(() => geoStore.parcels, (parcels) => {
-    if (map && parcels.length > 0) {
-        displayParcels(parcels);
+watch(() => geoStore.roads, (roads) => {
+    if (map && roads.length > 0) {
+        displayRoads(roads);
     }
 });
+
+watch(() => geoStore.selectedRoadId, () => {
+    refreshRoadStyles();
+    fitSelectedRoad();
+});
+
+watch(activeStep, async () => {
+    await nextTick();
+    requestAnimationFrame(() => {
+        map?.invalidateSize();
+        if (activeStep.value === 5) {
+            fitSelectedRoad();
+            if (clickedParcelLayer) {
+                fitLayerBounds(clickedParcelLayer);
+            }
+        }
+    });
+});
+
+function fitLayerBounds(layer: L.FeatureGroup | L.GeoJSON, options: L.FitBoundsOptions = SELECTED_PARCEL_FIT_OPTIONS) {
+    if (!map) return;
+
+    requestAnimationFrame(() => {
+        if (!map) return;
+        map.invalidateSize();
+        const bounds = layer.getBounds();
+        if (bounds.isValid()) {
+            map.fitBounds(bounds, options);
+        }
+    });
+}
 
 function zoomToBounds(coordinates: number[][][]) {
     if (!map) return;
@@ -230,45 +262,61 @@ function zoomToBounds(coordinates: number[][][]) {
         style: { color: primary, weight: 2, fillOpacity: 0.08, fillColor: primary }
     }).addTo(map);
 
-    map.fitBounds(currentLayer.getBounds(), { padding: [20, 20] });
+    fitLayerBounds(currentLayer, { padding: [24, 24], maxZoom: 15, animate: true });
 }
 
-function displayParcels(parcels: typeof geoStore.parcels) {
+function displayRoads(roads: typeof geoStore.roads) {
     if (!map) return;
-    if (parcelLayers) map.removeLayer(parcelLayers);
+    if (roadLayers) map.removeLayer(roadLayers);
 
-    const features: GeoJSON.Feature[] = parcels.map(parcel => ({
+    const features: GeoJSON.Feature[] = roads.map(road => ({
         type: 'Feature',
-        properties: { id: parcel.id, parcelNo: parcel.parcelNo, area: parcel.area },
-        geometry: { type: 'Polygon', coordinates: parcel.polygon }
+        properties: { id: road.id, name: road.name },
+        geometry: { type: 'MultiLineString', coordinates: road.geometry }
     }));
 
     const primaryColor = getCssVar('--color-primary', '#10b981');
     const mutedColor = getCssVar('--color-text-muted', '#64748b');
-    parcelLayers = L.geoJSON({ type: 'FeatureCollection', features } as any, {
+    roadLayers = L.geoJSON({ type: 'FeatureCollection', features } as any, {
         style: (feature) => ({
-            color: feature?.properties?.id === geoStore.selectedParcelId ? primaryColor : mutedColor,
-            weight: feature?.properties?.id === geoStore.selectedParcelId ? 3 : 1,
-            fillOpacity: feature?.properties?.id === geoStore.selectedParcelId ? 0.25 : 0.08,
-            fillColor: feature?.properties?.id === geoStore.selectedParcelId ? primaryColor : mutedColor,
+            color: feature?.properties?.id === geoStore.selectedRoadId ? primaryColor : mutedColor,
+            weight: feature?.properties?.id === geoStore.selectedRoadId ? 5 : 2,
+            opacity: feature?.properties?.id === geoStore.selectedRoadId ? 0.95 : 0.55,
+            dashArray: feature?.properties?.id === geoStore.selectedRoadId ? '8 6' : undefined,
         }),
         onEachFeature: (feature, layer) => {
             layer.on('click', () => {
-                geoStore.selectParcel(feature.properties?.id || null);
-                if (parcelLayers) {
-                    const pc = getCssVar('--color-primary', '#10b981');
-                    const mc = getCssVar('--color-text-muted', '#64748b');
-                    parcelLayers.setStyle((f) => ({
-                        color: f?.properties?.id === geoStore.selectedParcelId ? pc : mc,
-                        weight: f?.properties?.id === geoStore.selectedParcelId ? 3 : 1,
-                        fillOpacity: f?.properties?.id === geoStore.selectedParcelId ? 0.25 : 0.08,
-                        fillColor: f?.properties?.id === geoStore.selectedParcelId ? pc : mc,
-                    }));
-                }
+                geoStore.selectRoad(feature.properties?.id || null);
             });
-            layer.bindTooltip(`Parsel: ${feature.properties?.parcelNo || 'N/A'}`, { className: 'dark-tooltip' });
+            layer.bindTooltip(`Yol: ${feature.properties?.name || 'N/A'}`, { className: 'dark-tooltip' });
         }
     }).addTo(map);
+
+    fitSelectedRoad();
+}
+
+function refreshRoadStyles() {
+    if (!roadLayers) return;
+
+    const primaryColor = getCssVar('--color-primary', '#10b981');
+    const mutedColor = getCssVar('--color-text-muted', '#64748b');
+    roadLayers.setStyle((feature) => ({
+        color: feature?.properties?.id === geoStore.selectedRoadId ? primaryColor : mutedColor,
+        weight: feature?.properties?.id === geoStore.selectedRoadId ? 5 : 2,
+        opacity: feature?.properties?.id === geoStore.selectedRoadId ? 0.95 : 0.55,
+        dashArray: feature?.properties?.id === geoStore.selectedRoadId ? '8 6' : undefined,
+    }));
+}
+
+function fitSelectedRoad() {
+    if (!roadLayers || !geoStore.selectedRoadId) return;
+
+    roadLayers.eachLayer((layer) => {
+        const feature = (layer as L.GeoJSON).feature as GeoJSON.Feature | undefined;
+        if (feature?.properties?.id === geoStore.selectedRoadId) {
+            fitLayerBounds(layer as L.FeatureGroup);
+        }
+    });
 }
 
 async function handleMapClick(e: L.LeafletMouseEvent) {
@@ -317,7 +365,7 @@ function displayClickedParcel(parcel: GeoParcelDetail) {
         </div>
     `).openPopup();
 
-    map.fitBounds(clickedParcelLayer.getBounds(), { padding: [50, 50] });
+    fitLayerBounds(clickedParcelLayer);
 }
 
 function clearClickedParcelLayer() {
@@ -348,14 +396,14 @@ function handleNeighborhoodChange(value: SelectValue) {
     if (v) nextStep();
 }
 
-function handleParcelChange(value: SelectValue) {
+function handleRoadChange(value: SelectValue) {
     const v = Array.isArray(value) ? value[0] : value;
-    geoStore.selectParcel(v ? String(v) : null);
-    if (v) nextStep();
+    geoStore.selectRoad(v ? String(v) : null);
+    fitSelectedRoad();
 }
 
 function addPartner() {
-    partners.value.push({ name: '', percentage: 0, isPrimary: false });
+    partners.value.push({ name: '', phone: '', identityNumber: '', isPrimary: false });
 }
 
 function removePartner(index: number) {
@@ -372,8 +420,14 @@ function setPrimaryOwner(index: number) {
 async function handleSubmit() {
     if (!isFormValid.value) return;
 
-    if (totalPartnerPercentage.value !== 100) {
-        formError.value = 'Ortaklarin toplam payi %100 olmalidir';
+    const invalidPartner = partners.value.some((partner) => {
+        const hasAnyValue = partner.name.trim() || partner.phone.trim() || partner.identityNumber.trim();
+        if (!hasAnyValue) return false;
+        return !partner.name.trim() || (!partner.phone.trim() && !partner.identityNumber.trim());
+    });
+
+    if (invalidPartner) {
+        formError.value = 'Ortak icin ad ve telefon veya TC No bilgilerinden en az biri gereklidir';
         return;
     }
 
@@ -381,18 +435,22 @@ async function handleSubmit() {
     formError.value = null;
 
     try {
-        const parcelCoordinates = clickedParcel.value?.polygon || geoStore.selectedParcel?.polygon || geoStore.selectedNeighborhood?.bounds || [];
-        const parcelNo = clickedParcel.value?.properties.parselNo || geoStore.selectedParcel?.parcelNo || null;
+        const parcelCoordinates = clickedParcel.value?.polygon || geoStore.selectedNeighborhood?.bounds || [];
+        const parcelNo = clickedParcel.value?.properties.parselNo || null;
 
-        const fieldData: Omit<Partial<Field>, 'partners'> & { partners?: Array<{ partnerName: string; sharePercentage: number; isPrimaryOwner: boolean }> } = {
+        const fieldData: Omit<Partial<Field>, 'partners'> & { partners?: Array<{ partnerName: string; partnerPhone: string | null; partnerIdentityNumber: string | null; isPrimaryOwner: boolean }> } = {
             name: fieldName.value.trim(),
             province: clickedParcel.value?.properties.ilAd || geoStore.selectedProvince?.name || '',
             district: clickedParcel.value?.properties.ilceAd || geoStore.selectedDistrict?.name || '',
             neighborhood: clickedParcel.value?.properties.mahalleAd || geoStore.selectedNeighborhood?.name || '',
+            road: geoStore.selectedRoad?.name || null,
             parcelNo, coordinates: parcelCoordinates, area: selectedArea.value, areaUnit: 'm2' as const,
             notes: notes.value.trim() || null,
             partners: partners.value.filter(p => p.name.trim()).map(p => ({
-                partnerName: p.name.trim(), sharePercentage: p.percentage, isPrimaryOwner: p.isPrimary
+                partnerName: p.name.trim(),
+                partnerPhone: p.phone.trim() || null,
+                partnerIdentityNumber: p.identityNumber.trim() || null,
+                isPrimaryOwner: p.isPrimary,
             }))
         };
 
@@ -451,16 +509,15 @@ function goBack() {
                             </div>
                             <span class="area-chip">{{ clickedParcel.properties.alan }} m&sup2;</span>
                         </div>
-                        <div v-else-if="geoStore.selectedParcel" class="map-status-item map-status-selected">
+                        <div v-else-if="geoStore.selectedRoad" class="map-status-item map-status-selected">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                             <div class="map-status-text">
-                                <span class="map-status-title">Parsel: {{ geoStore.selectedParcel.parcelNo }}</span>
+                                <span class="map-status-title">Yol: {{ geoStore.selectedRoad.name }}</span>
                             </div>
-                            <span class="area-chip">{{ geoStore.selectedParcel.area.toLocaleString('tr-TR') }} m&sup2;</span>
                         </div>
                         <div v-else-if="geoStore.selectedNeighborhoodId" class="map-status-item map-status-hint">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                            Haritaya tiklayarak parsel secebilirsiniz
+                            Yol secip haritaya tiklayarak parsel secebilirsiniz
                         </div>
                         <div v-else class="map-status-item map-status-default">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
@@ -599,19 +656,19 @@ function goBack() {
                             <div class="step-badge">5</div>
                             <div>
                                 <h2 class="step-title">Parsel Secin</h2>
-                                <p class="step-hint">Haritaya tiklayarak veya listeden parsel secin</p>
+                                <p class="step-hint">Once yolu secin, sonra haritada parselin uzerine tiklayin</p>
                             </div>
                         </div>
                         <AppSelect
-                            :model-value="geoStore.selectedParcelId?.toString() || ''"
-                            :options="geoStore.parcels.map(p => ({ value: p.id.toString(), label: `${p.parcelNo} (${p.area.toLocaleString('tr-TR')} m²)` }))"
-                            placeholder="Haritadan veya listeden"
-                            :disabled="!geoStore.selectedNeighborhoodId || geoStore.isLoadingParcels"
+                            :model-value="geoStore.selectedRoadId?.toString() || ''"
+                            :options="geoStore.roads.map(r => ({ value: r.id.toString(), label: r.name }))"
+                            placeholder="Yol Seciniz"
+                            :disabled="!geoStore.selectedNeighborhoodId || geoStore.isLoadingRoads"
                             searchable
-                            @update:model-value="handleParcelChange"
+                            @update:model-value="handleRoadChange"
                         />
-                        <span v-if="geoStore.isLoadingParcels" class="loading-text">
-                            <span class="spinner-tiny"></span> Parseller yukleniyor...
+                        <span v-if="geoStore.isLoadingRoads" class="loading-text">
+                            <span class="spinner-tiny"></span> Yollar yukleniyor...
                         </span>
 
                         <div v-if="selectedArea > 0" class="area-inline">
@@ -650,7 +707,7 @@ function goBack() {
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
                                 Notlar
                             </label>
-                            <textarea id="notes" v-model="notes" rows="3" class="form-textarea" placeholder="Tarla hakkinda notlar..."></textarea>
+                            <textarea id="notes" v-model="notes" rows="3" class="form-textarea" placeholder="Istege bagli"></textarea>
                         </div>
 
                         <!-- Partners -->
@@ -671,10 +728,8 @@ function goBack() {
                                     </button>
                                     <div v-for="(partner, index) in partners" :key="index" class="partner-row">
                                         <input v-model="partner.name" type="text" placeholder="Ortak Adi" class="form-input partner-name-input" />
-                                        <div class="pct-input-wrap">
-                                            <input v-model.number="partner.percentage" type="number" min="0" max="100" step="1" class="form-input pct-input" />
-                                            <span class="pct-symbol">%</span>
-                                        </div>
+                                        <input v-model="partner.phone" type="tel" maxlength="10" placeholder="Telefon" class="form-input partner-phone-input" />
+                                        <input v-model="partner.identityNumber" type="text" maxlength="11" placeholder="TC No" class="form-input partner-tc-input" />
                                         <label class="radio-label">
                                             <input type="radio" name="primaryOwner" :checked="partner.isPrimary" @change="setPrimaryOwner(index)" />
                                             <span class="radio-text">Ana</span>
@@ -683,9 +738,9 @@ function goBack() {
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                         </button>
                                     </div>
-                                    <div v-if="totalPartnerPercentage !== 100 && partners.some(p => p.name.trim())" class="pct-warning-bar">
+                                    <div v-if="partners.some(p => p.name.trim())" class="pct-warning-bar">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                                        Toplam pay: %{{ totalPartnerPercentage }} (100% olmali)
+                                        Eklenen ortaklara onay daveti bekliyor durumunda kaydedilir.
                                     </div>
                                 </div>
                             </div>
@@ -795,7 +850,8 @@ function goBack() {
 }
 
 .map-container {
-    height: 280px;
+    height: min(52vh, 440px);
+    min-height: 360px;
     width: 100%;
     background: var(--color-bg-primary);
 }
@@ -1065,9 +1121,8 @@ function goBack() {
 
 .partner-row { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
 .partner-name-input { flex: 1; min-width: 0; }
-.pct-input-wrap { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.pct-input { width: 64px; text-align: center; padding: var(--space-2) var(--space-2) !important; min-height: 40px !important; }
-.pct-symbol { color: var(--color-text-muted); font-size: var(--font-size-sm); }
+.partner-phone-input,
+.partner-tc-input { flex: 0 1 132px; min-width: 118px; }
 .radio-label { display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
 .radio-label input[type="radio"] { accent-color: var(--color-primary); width: 14px; height: 14px; }
 .radio-text { font-size: var(--font-size-xs); color: var(--color-text-muted); }
@@ -1094,11 +1149,16 @@ function goBack() {
 @media (max-width: 768px) {
     .create-field-page { padding: var(--space-3); }
     .page-header { flex-direction: column; align-items: flex-start; }
-    .map-container { height: 200px; }
+    .map-container {
+        height: 42vh;
+        min-height: 300px;
+    }
     .map-section { position: static; }
     .step-card { padding: var(--space-4); }
     .partner-row { flex-wrap: wrap; }
-    .partner-name-input { flex: 1 1 100%; }
+    .partner-name-input,
+    .partner-phone-input,
+    .partner-tc-input { flex: 1 1 100%; }
     .breadcrumb { gap: var(--space-1); }
     .breadcrumb-item { padding: 4px 8px; font-size: 11px; }
     .breadcrumb-value { max-width: 80px; }

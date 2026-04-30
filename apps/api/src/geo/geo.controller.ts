@@ -2,7 +2,7 @@ import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { GeoService } from '@/geo/geo.service';
-import { ProvinceDto, DistrictDto, NeighborhoodDto, ParcelDto, ParcelDetailDto } from '@/geo/dto';
+import { ProvinceDto, DistrictDto, NeighborhoodDto, RoadDto, ParcelDto, ParcelDetailDto } from '@/geo/dto';
 
 @ApiTags('Geo')
 @ApiBearerAuth()
@@ -32,6 +32,14 @@ export class GeoController {
     @ApiResponse({ status: 200, description: 'List of neighborhoods with polygon bounds' })
     async getNeighborhoods(@Param('districtId') districtId: string): Promise<NeighborhoodDto[]> {
         return this.geoService.getNeighborhoods(districtId);
+    }
+
+    @Get('roads/:neighborhoodId')
+    @ApiOperation({ summary: 'Get roads for a neighborhood' })
+    @ApiParam({ name: 'neighborhoodId', description: 'Neighborhood ID from TKGM' })
+    @ApiResponse({ status: 200, description: 'List of roads with line coordinates' })
+    async getRoads(@Param('neighborhoodId') neighborhoodId: string): Promise<RoadDto[]> {
+        return this.geoService.getRoads(neighborhoodId);
     }
 
     @Get('parcels/:neighborhoodId')

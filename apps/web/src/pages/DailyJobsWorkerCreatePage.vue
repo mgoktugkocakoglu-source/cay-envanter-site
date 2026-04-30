@@ -30,22 +30,32 @@ const jobTypes: JobTypeConfig[] = [
   },
   { value: 'arazi_temizligi', label: 'Arazi Temizliği', unit: 'TL/Gün', suggested: 3000 },
   { value: 'cay_budama', label: 'Çay Budama', unit: 'TL/m²', suggested: 150 },
-  { value: 'gubre_tasima', label: 'Çay Gübresi Taşıma/Atma', unit: 'TL/kg', suggested: 5 },
+  { value: 'gubre_atma', label: 'Çay Gübresi Atma', unit: 'TL/Ton', suggested: 0 },
+  { value: 'gubre_tasima', label: 'Çay Gübresi Taşıma', unit: 'TL/Ton', suggested: 0 },
   {
     value: 'arazi_duzenleme',
     label: 'Arazi Düzenleme İşçiliği',
     unit: 'TL/Gün',
-    suggested: 6000,
-    hasRateChoice: true,
-    rateOptions: [
-      { value: 'gunluk', label: 'Günlük Ücret', unit: 'TL/Gün', suggested: 6000 },
-      { value: 'metrekare', label: 'Metrekare Ücreti', unit: 'TL/m²', suggested: 75 },
-    ],
+    suggested: 0,
   },
   { value: 'tohum_ekimi', label: 'Çay Tohum Ekimi', unit: 'TL/Gün', suggested: 4000 },
 ];
 
 const jobTypeOptions = jobTypes.map(jt => ({ value: jt.value, label: jt.label }));
+type PruningAmount = '1-2' | '3-4';
+type PruningOffer = {
+  pruningAmount: PruningAmount;
+  jobFee: number | null;
+};
+const terrainOptions = [
+  { value: 'duz', label: 'Düz' },
+  { value: 'egimli', label: 'Eğimli' },
+];
+const landArrangementOptions = [
+  { value: 'cay_seti_duzenleme', label: 'Çay seti düzenleme', unit: 'TL/Gün' },
+  { value: 'arazi_yol_duzenleme', label: 'Arazi yol düzenleme', unit: 'TL/Gün' },
+  { value: 'cay_fidesi_dikimi', label: 'Çay fidesi dikimi', unit: 'TL/Adet' },
+];
 
 // ═══════ FORM STATE ═══════
 const age = ref<number | null>(null);
@@ -53,6 +63,12 @@ const location = ref('');
 const selectedJobType = ref('');
 const rateChoice = ref('');
 const jobFee = ref<number | null>(null);
+const pruningOffers = ref<PruningOffer[]>([
+  { pruningAmount: '1-2', jobFee: null },
+]);
+const fertilizerTerrainType = ref('');
+const fertilizerExtraWork = ref('');
+const landArrangementDetail = ref('');
 const wantsAdditionalWork = ref('');
 const additionalWorkFee = ref<number | null>(null);
 const foodTransportRequest = ref('');
@@ -65,10 +81,27 @@ const formError = ref<string | null>(null);
 
 // ═══════ COMPUTED ═══════
 const currentJobType = computed(() => jobTypes.find(jt => jt.value === selectedJobType.value));
+const isTeaPruning = computed(() => selectedJobType.value === 'cay_budama');
+const isFertilizerWork = computed(() => selectedJobType.value === 'gubre_atma' || selectedJobType.value === 'gubre_tasima');
+const isLandArrangement = computed(() => selectedJobType.value === 'arazi_duzenleme');
+const completePruningOffers = computed(() =>
+  pruningOffers.value.filter(offer => offer.jobFee !== null && offer.jobFee > 0)
+);
+const selectedLandArrangement = computed(() =>
+  landArrangementOptions.find(option => option.value === landArrangementDetail.value)
+);
+const fertilizerExtraWorkOptions = computed(() => [
+  {
+    value: selectedJobType.value === 'gubre_atma' ? 'gubre_tasima' : 'gubre_atma',
+    label: selectedJobType.value === 'gubre_atma' ? 'Çay Gübresi Taşıma' : 'Çay Gübresi Atma',
+  },
+  { value: 'istemiyorum', label: 'İstemiyorum' },
+]);
 
 const currentUnit = computed(() => {
   const jt = currentJobType.value;
   if (!jt) return '';
+  if (isLandArrangement.value && selectedLandArrangement.value) return selectedLandArrangement.value.unit;
   if (jt.hasRateChoice && rateChoice.value) {
     return jt.rateOptions?.find(r => r.value === rateChoice.value)?.unit || jt.unit;
   }
@@ -108,7 +141,16 @@ function isStepComplete(s: number): boolean {
       if (!selectedJobType.value) return false;
       const jt = currentJobType.value;
       if (jt?.hasRateChoice && !rateChoice.value) return false;
-      if (!jobFee.value || jobFee.value <= 0) return false;
+      if (isTeaPruning.value) {
+        if (completePruningOffers.value.length < 1) return false;
+        if (!pruningOffers.value.every(isPruningOfferComplete)) return false;
+      } else if (isFertilizerWork.value) {
+        if (!fertilizerTerrainType.value || !fertilizerExtraWork.value) return false;
+        if (!jobFee.value || jobFee.value <= 0) return false;
+      } else if (isLandArrangement.value) {
+        if (!landArrangementDetail.value) return false;
+        if (!jobFee.value || jobFee.value <= 0) return false;
+      } else if (!jobFee.value || jobFee.value <= 0) return false;
       if (jt?.hasAdditionalWork && !wantsAdditionalWork.value) return false;
       if (wantsAdditionalWork.value === 'evet' && (!additionalWorkFee.value || additionalWorkFee.value <= 0)) return false;
       return true;
@@ -134,7 +176,18 @@ function stepValue(s: number): string {
     case 2: return location.value.trim();
     case 3: {
       const jt = currentJobType.value;
-      if (!jt || !jobFee.value) return '';
+      if (!jt) return '';
+      if (isTeaPruning.value) {
+        return completePruningOffers.value.map(formatPruningOffer).join(' / ');
+      }
+      if (!jobFee.value) return '';
+      if (isFertilizerWork.value) {
+        const terrain = terrainOptions.find(o => o.value === fertilizerTerrainType.value)?.label || '';
+        return `${jt.label} · ${terrain} · ${jobFee.value.toLocaleString('tr-TR')} ${currentUnit.value}`;
+      }
+      if (isLandArrangement.value) {
+        return `${selectedLandArrangement.value?.label || jt.label} · ${jobFee.value.toLocaleString('tr-TR')} ${currentUnit.value}`;
+      }
       return `${jt.label} · ${jobFee.value.toLocaleString('tr-TR')} ${currentUnit.value}`;
     }
     case 4: return foodTransportOptions.find(o => o.value === foodTransportRequest.value)?.label || '';
@@ -168,12 +221,35 @@ function handleJobTypeChange(value: SelectValue) {
   selectedJobType.value = v ? String(v) : '';
   rateChoice.value = '';
   jobFee.value = null;
+  pruningOffers.value = [{ pruningAmount: '1-2', jobFee: null }];
+  fertilizerTerrainType.value = '';
+  fertilizerExtraWork.value = '';
+  landArrangementDetail.value = '';
   wantsAdditionalWork.value = '';
   additionalWorkFee.value = null;
   const jt = jobTypes.find(j => j.value === v);
-  if (jt && !jt.hasRateChoice) {
+  if (jt && !jt.hasRateChoice && jt.value !== 'cay_budama' && jt.value !== 'gubre_atma' && jt.value !== 'gubre_tasima' && jt.value !== 'arazi_duzenleme') {
     jobFee.value = jt.suggested;
   }
+}
+
+function isPruningOfferComplete(offer: PruningOffer): boolean {
+  return offer.jobFee !== null && offer.jobFee > 0;
+}
+
+function formatPruningOffer(offer: PruningOffer): string {
+  return `${offer.pruningAmount} budama · ${offer.jobFee?.toLocaleString('tr-TR')} TL/m²`;
+}
+
+function addPruningOffer() {
+  if (pruningOffers.value.length >= 2) return;
+  if (!pruningOffers.value.every(isPruningOfferComplete)) return;
+  pruningOffers.value.push({ pruningAmount: '3-4', jobFee: null });
+}
+
+function removePruningOffer(index: number) {
+  if (pruningOffers.value.length === 1) return;
+  pruningOffers.value.splice(index, 1);
 }
 
 function handleRateChoiceChange(value: SelectValue) {
@@ -184,6 +260,22 @@ function handleRateChoiceChange(value: SelectValue) {
     const opt = jt.rateOptions?.find(r => r.value === v);
     if (opt) jobFee.value = opt.suggested;
   }
+}
+
+function handleFertilizerTerrainChange(value: SelectValue) {
+  const v = Array.isArray(value) ? value[0] : value;
+  fertilizerTerrainType.value = v ? String(v) : '';
+}
+
+function handleFertilizerExtraWorkChange(value: SelectValue) {
+  const v = Array.isArray(value) ? value[0] : value;
+  fertilizerExtraWork.value = v ? String(v) : '';
+}
+
+function handleLandArrangementDetailChange(value: SelectValue) {
+  const v = Array.isArray(value) ? value[0] : value;
+  landArrangementDetail.value = v ? String(v) : '';
+  jobFee.value = null;
 }
 
 function handleAdditionalWorkChange(value: SelectValue) {
@@ -221,8 +313,13 @@ async function handleSubmit() {
       jobType: selectedJobType.value,
       jobTypeLabel: currentJobType.value?.label,
       rateChoice: rateChoice.value || null,
-      jobFee: jobFee.value,
+      jobFee: isTeaPruning.value ? completePruningOffers.value[0]?.jobFee : jobFee.value,
       feeUnit: currentUnit.value,
+      pruningOffers: isTeaPruning.value ? completePruningOffers.value : undefined,
+      fertilizerTerrainType: isFertilizerWork.value ? fertilizerTerrainType.value : undefined,
+      fertilizerExtraWork: isFertilizerWork.value ? fertilizerExtraWork.value : undefined,
+      landArrangementDetail: isLandArrangement.value ? landArrangementDetail.value : undefined,
+      landArrangementDetailLabel: isLandArrangement.value ? selectedLandArrangement.value?.label : undefined,
       hasAdditionalWork: wantsAdditionalWork.value === 'evet',
       additionalWorkFee: wantsAdditionalWork.value === 'evet' ? additionalWorkFee.value : null,
       foodTransportRequest: foodTransportRequest.value,
@@ -275,7 +372,23 @@ function goToListings() { router.push('/social/job-listings'); }
               <div class="preview-detail"><span class="preview-detail-label">Yaş</span><span class="preview-detail-value">{{ age }}</span></div>
               <div class="preview-detail"><span class="preview-detail-label">Konum</span><span class="preview-detail-value">{{ location }}</span></div>
               <div class="preview-detail"><span class="preview-detail-label">İş Türü</span><span class="preview-detail-value">{{ currentJobType?.label }}</span></div>
-              <div class="preview-detail"><span class="preview-detail-label">Ücret</span><span class="preview-detail-value highlight">{{ jobFee?.toLocaleString('tr-TR') }} {{ currentUnit }}</span></div>
+              <div v-if="isTeaPruning" class="preview-detail">
+                <span class="preview-detail-label">Budama Ücretleri</span>
+                <span class="preview-detail-value highlight">{{ completePruningOffers.map(formatPruningOffer).join(' / ') }}</span>
+              </div>
+              <div v-else-if="isFertilizerWork" class="preview-detail">
+                <span class="preview-detail-label">Gübre İşi</span>
+                <span class="preview-detail-value highlight">
+                  {{ terrainOptions.find(o => o.value === fertilizerTerrainType)?.label }} ·
+                  {{ fertilizerExtraWorkOptions.find(o => o.value === fertilizerExtraWork)?.label }} ·
+                  {{ jobFee?.toLocaleString('tr-TR') }} {{ currentUnit }}
+                </span>
+              </div>
+              <div v-else-if="isLandArrangement" class="preview-detail">
+                <span class="preview-detail-label">İş Detayı</span>
+                <span class="preview-detail-value highlight">{{ selectedLandArrangement?.label }} · {{ jobFee?.toLocaleString('tr-TR') }} {{ currentUnit }}</span>
+              </div>
+              <div v-else class="preview-detail"><span class="preview-detail-label">Ücret</span><span class="preview-detail-value highlight">{{ jobFee?.toLocaleString('tr-TR') }} {{ currentUnit }}</span></div>
               <div v-if="wantsAdditionalWork === 'evet'" class="preview-detail">
                 <span class="preview-detail-label">İlave İş</span>
                 <span class="preview-detail-value">El ile Çay Üzeri Temizlik · {{ additionalWorkFee?.toLocaleString('tr-TR') }} TL/Gün</span>
@@ -369,11 +482,17 @@ function goToListings() { router.push('/social/job-listings'); }
               <div class="sub-step">
                 <label class="sub-step-label">İş Türü</label>
                 <AppSelect :model-value="selectedJobType" :options="jobTypeOptions" placeholder="İş türü seçin" required @update:model-value="handleJobTypeChange" />
+                <p v-if="selectedJobType === 'arazi_temizligi'" class="job-type-helper">Diken, odun, taş vb. arazi temizliği işleri.</p>
+                <p v-if="isLandArrangement" class="job-type-helper">Çay veya herhangi bir arazi üzerinde çapalama, dikim gibi hizmetleri ifade eder.</p>
               </div>
 
               <!-- Rate choice for Arazi Düzenleme -->
               <Transition name="fade">
-                <div v-if="currentJobType?.hasRateChoice" class="sub-step">
+                <div v-if="isLandArrangement" class="sub-step">
+                  <label class="sub-step-label">İş Detayı</label>
+                  <AppSelect :model-value="landArrangementDetail" :options="landArrangementOptions" placeholder="İş detayı seçin" required @update:model-value="handleLandArrangementDetailChange" />
+                </div>
+                <div v-else-if="currentJobType?.hasRateChoice" class="sub-step">
                   <label class="sub-step-label">Ücret Türü</label>
                   <AppSelect :model-value="rateChoice" :options="currentJobType.rateOptions!.map(r => ({ value: r.value, label: r.label }))" placeholder="Ücret türü seçin" required @update:model-value="handleRateChoiceChange" />
                 </div>
@@ -381,7 +500,69 @@ function goToListings() { router.push('/social/job-listings'); }
 
               <!-- Fee input -->
               <Transition name="fade">
-                <div v-if="selectedJobType && (!currentJobType?.hasRateChoice || rateChoice)" class="sub-step">
+                <div v-if="isTeaPruning" class="sub-step">
+                  <p class="job-type-helper">En az 1 budama miktarı için ücret girin. İkinci budama miktarı isteğe bağlıdır.</p>
+                  <div
+                    v-for="(offer, index) in pruningOffers"
+                    :key="offer.pruningAmount"
+                    class="pruning-offer-card"
+                  >
+                    <div class="pruning-offer-header">
+                      <strong>Budama Miktarı: {{ offer.pruningAmount }}</strong>
+                      <button
+                        v-if="pruningOffers.length > 1"
+                        type="button"
+                        class="btn-remove-offer"
+                        @click="removePruningOffer(index)"
+                      >
+                        Kaldır
+                      </button>
+                    </div>
+                    <label class="sub-step-label">Ücretiniz</label>
+                    <div class="input-with-unit">
+                      <input v-model.number="offer.jobFee" type="number" class="form-input" placeholder="Ücret girin" min="0" />
+                      <span class="input-unit">TL/m²</span>
+                    </div>
+                  </div>
+                  <button
+                    v-if="pruningOffers.length < 2"
+                    type="button"
+                    class="btn-add-offer"
+                    :disabled="!pruningOffers.every(isPruningOfferComplete)"
+                    @click="addPruningOffer"
+                  >
+                    + 3-4 budama miktarı için ücret ekle
+                  </button>
+                </div>
+                <div v-else-if="isFertilizerWork" class="sub-step">
+                  <div class="sub-step">
+                    <label class="sub-step-label">Arazi Tipi</label>
+                    <AppSelect :model-value="fertilizerTerrainType" :options="terrainOptions" placeholder="Arazi tipi seçin" required @update:model-value="handleFertilizerTerrainChange" />
+                  </div>
+                  <Transition name="fade">
+                    <div v-if="fertilizerTerrainType" class="sub-step">
+                      <label class="sub-step-label">Ek İş</label>
+                      <AppSelect :model-value="fertilizerExtraWork" :options="fertilizerExtraWorkOptions" placeholder="Ek iş seçin" required @update:model-value="handleFertilizerExtraWorkChange" />
+                    </div>
+                  </Transition>
+                  <Transition name="fade">
+                    <div v-if="fertilizerTerrainType && fertilizerExtraWork" class="sub-step">
+                      <label class="sub-step-label">Ücretiniz</label>
+                      <div class="input-with-unit">
+                        <input v-model.number="jobFee" type="number" class="form-input" placeholder="Ücret girin" min="0" />
+                        <span class="input-unit">TL/Ton</span>
+                      </div>
+                    </div>
+                  </Transition>
+                </div>
+                <div v-else-if="isLandArrangement && landArrangementDetail" class="sub-step">
+                  <label class="sub-step-label">Talep Ettiğiniz Ücret</label>
+                  <div class="input-with-unit">
+                    <input v-model.number="jobFee" type="number" class="form-input" placeholder="Ücret girin" min="0" />
+                    <span class="input-unit">{{ currentUnit }}</span>
+                  </div>
+                </div>
+                <div v-else-if="selectedJobType && (!currentJobType?.hasRateChoice || rateChoice)" class="sub-step">
                   <label class="sub-step-label">Talep Ettiğiniz Ücret</label>
                   <div class="input-with-unit">
                     <input v-model.number="jobFee" type="number" class="form-input" :placeholder="`Örn: ${currentSuggested}`" min="0" />
@@ -499,6 +680,14 @@ function goToListings() { router.push('/social/job-listings'); }
 
 .sub-step { margin-bottom: var(--space-4); }
 .sub-step-label { display: block; font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); color: var(--color-text-secondary); margin-bottom: var(--space-2); }
+.job-type-helper { margin: var(--space-2) 0 0; color: var(--color-text-muted); font-size: var(--font-size-xs); line-height: 1.5; }
+.pruning-offer-card { padding: var(--space-4); margin-bottom: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg-secondary); }
+.pruning-offer-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); color: var(--color-text-primary); }
+.btn-remove-offer, .btn-add-offer { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-tertiary); color: var(--color-text-secondary); cursor: pointer; font-weight: var(--font-weight-semibold); transition: all var(--transition-fast); }
+.btn-remove-offer { padding: 6px 10px; font-size: var(--font-size-xs); }
+.btn-add-offer { width: 100%; min-height: 44px; margin-bottom: var(--space-4); }
+.btn-remove-offer:hover, .btn-add-offer:hover:not(:disabled) { border-color: #0d9488; color: #0d9488; }
+.btn-add-offer:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .form-input { width: 100%; padding: var(--space-3) var(--space-4); background: var(--color-bg-tertiary); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-text-primary); font-size: var(--font-size-base); font-family: var(--font-family); transition: all var(--transition-fast); min-height: 48px; }
 .form-input:focus { outline: none; border-color: #0d9488; box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15); }

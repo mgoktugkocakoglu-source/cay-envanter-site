@@ -30,6 +30,11 @@ export interface JobListing {
   teaSaleFee?: number;
   terrainType?: string;
   terrainTypes?: string[];
+  transportOffers?: Array<{
+    terrainType: string;
+    distanceRange: string;
+    transportFee: number;
+  }>;
   distanceRange?: string;
   distanceCapacity?: number;
   transportFee?: number;
@@ -41,6 +46,14 @@ export interface JobListing {
   dailyJobTypeLabel?: string;
   rateChoice?: string;
   jobFee?: number;
+  fertilizerTerrainType?: string;
+  fertilizerExtraWork?: string;
+  landArrangementDetail?: string;
+  landArrangementDetailLabel?: string;
+  pruningOffers?: Array<{
+    pruningAmount: string;
+    jobFee: number;
+  }>;
   dailyFee?: number;
   dailyFeeUnit?: string;
   hasAdditionalWork?: boolean;
@@ -87,15 +100,32 @@ const yesNoLabelMap: Record<string, string> = {
   hayir: 'Hayır',
 };
 
+const fertilizerWorkLabelMap: Record<string, string> = {
+  gubre_atma: 'Çay Gübresi Atma',
+  gubre_tasima: 'Çay Gübresi Taşıma',
+  istemiyorum: 'İstemiyorum',
+};
+
+const landArrangementLabelMap: Record<string, string> = {
+  cay_seti_duzenleme: 'Çay seti düzenleme',
+  arazi_yol_duzenleme: 'Arazi yol düzenleme',
+  cay_fidesi_dikimi: 'Çay fidesi dikimi',
+};
+
 const terrainLabelMap: Record<string, string> = {
   duz: 'Düz Arazi',
+  duz_arazi: 'Düz Arazi',
   egimli: 'Eğimli Arazi',
+  egimli_arazi: 'Eğimli Arazi',
   uzak: 'Uzak Arazi',
   yakin: 'Yakın Mesafe',
   orta: 'Orta Mesafe',
 };
 
 const distanceLabelMap: Record<string, string> = {
+  '100m-300m': '100m - 300m',
+  '300m-600m': '300m - 600m',
+  '600m-1000m': '600m - 1000m',
   '0-5': '0-5 km',
   '5-10': '5-10 km',
   '10-20': '10-20 km',
@@ -118,6 +148,7 @@ const listingRole = computed(() => props.listing.type === 'worker' ? 'İş araya
 const actionLabel = computed(() => props.listing.type === 'worker' ? 'Teklif Ver' : 'Başvur');
 
 const primaryFee = computed(() => {
+  if (props.listing.pruningOffers?.length) return null;
   const value = props.listing.requestedFee ?? props.listing.offerFee ?? props.listing.jobFee ?? props.listing.dailyFee;
   if (!value) return null;
   return {
@@ -138,9 +169,18 @@ const detailItems = computed(() => {
   }
 
   if (listing.category === 'tea-transport') {
-    const terrains = listing.terrainTypes?.length ? listing.terrainTypes : (listing.terrainType ? [listing.terrainType] : []);
-    if (terrains.length) items.push({ label: 'Arazi', value: terrains.map(value => labelFromMap(terrainLabelMap, value)).join(', ') });
-    if (listing.distanceRange) items.push({ label: 'Mesafe', value: labelFromMap(distanceLabelMap, listing.distanceRange) });
+    if (listing.transportOffers?.length) {
+      items.push({
+        label: 'Arazi',
+        value: listing.transportOffers
+          .map(offer => `${labelFromMap(terrainLabelMap, offer.terrainType)} · ${labelFromMap(distanceLabelMap, offer.distanceRange)} · ${formatMoney(offer.transportFee)} TL/Ton`)
+          .join(' / '),
+      });
+    } else {
+      const terrains = listing.terrainTypes?.length ? listing.terrainTypes : (listing.terrainType ? [listing.terrainType] : []);
+      if (terrains.length) items.push({ label: 'Arazi', value: terrains.map(value => labelFromMap(terrainLabelMap, value)).join(', ') });
+      if (listing.distanceRange) items.push({ label: 'Mesafe', value: labelFromMap(distanceLabelMap, listing.distanceRange) });
+    }
     if (listing.distanceCapacity) {
       items.push({ label: 'Kapasite', value: listing.distanceCapacity === 999 ? 'İl dışı' : `Max ${listing.distanceCapacity} km` });
     }
@@ -148,6 +188,26 @@ const detailItems = computed(() => {
 
   if (listing.category === 'daily-jobs') {
     if (listing.jobTypeLabel || listing.dailyJobTypeLabel) items.push({ label: 'İş türü', value: listing.jobTypeLabel ?? listing.dailyJobTypeLabel ?? '' });
+    if (listing.fertilizerTerrainType) {
+      items.push({ label: 'Arazi', value: labelFromMap(terrainLabelMap, listing.fertilizerTerrainType) });
+    }
+    if (listing.fertilizerExtraWork) {
+      items.push({ label: 'Ek iş', value: labelFromMap(fertilizerWorkLabelMap, listing.fertilizerExtraWork) });
+    }
+    if (listing.landArrangementDetail || listing.landArrangementDetailLabel) {
+      items.push({
+        label: 'İş detayı',
+        value: listing.landArrangementDetailLabel ?? labelFromMap(landArrangementLabelMap, listing.landArrangementDetail ?? ''),
+      });
+    }
+    if (listing.pruningOffers?.length) {
+      items.push({
+        label: 'Budama',
+        value: listing.pruningOffers
+          .map(offer => `${offer.pruningAmount} budama · ${formatMoney(offer.jobFee)} TL/m²`)
+          .join(' / '),
+      });
+    }
     if (listing.rateChoice) items.push({ label: 'Tarife', value: labelFromMap(rateTypeLabelMap, listing.rateChoice) });
     if (listing.hasAdditionalWork) items.push({ label: 'Ek iş', value: `Çay üzeri temizlik${listing.additionalWorkFee ? ` +${formatMoney(listing.additionalWorkFee)} TL/gün` : ''}` });
   }
@@ -168,7 +228,7 @@ const serviceItems = computed(() => {
   const transportFee = listing.transportFee ?? listing.teaTransportFee;
   const saleFee = listing.salesFee ?? listing.sellingFee ?? listing.teaSaleFee;
 
-  if (transportFee) items.push({ label: 'Çay taşıma', value: `+${formatMoney(transportFee)} TL/Ton`, tone: 'amber' });
+  if (transportFee && !listing.transportOffers?.length) items.push({ label: 'Çay taşıma', value: `+${formatMoney(transportFee)} TL/Ton`, tone: 'amber' });
   if (saleFee) items.push({ label: 'Çay satma', value: `+${formatMoney(saleFee)} TL/Ton`, tone: 'blue' });
   if (listing.transportCost) items.push({ label: 'Yol katkısı', value: `+${formatMoney(listing.transportCost)} TL/Yol`, tone: 'green' });
   if (listing.mealCost) items.push({ label: 'Yemek katkısı', value: `+${formatMoney(listing.mealCost)} TL/Gün`, tone: 'green' });

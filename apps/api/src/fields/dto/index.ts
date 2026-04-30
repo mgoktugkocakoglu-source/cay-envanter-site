@@ -8,7 +8,7 @@ import {
     Min,
     Max,
     ValidateNested,
-    ArrayMinSize,
+    Matches,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -20,11 +20,24 @@ export class CreateFieldPartnerDto {
     @MaxLength(100)
     partnerName: string;
 
-    @ApiProperty({ description: 'Share percentage (0-100)', minimum: 0, maximum: 100 })
+    @ApiPropertyOptional({ description: 'Partner phone number' })
+    @IsOptional()
+    @IsString()
+    @Matches(/^(5)[0-9]{9}$/, { message: 'Telefon numarası 5XXXXXXXXX formatında olmalıdır' })
+    partnerPhone?: string | null;
+
+    @ApiPropertyOptional({ description: 'Partner Turkish identity number' })
+    @IsOptional()
+    @IsString()
+    @Matches(/^[0-9]{11}$/, { message: 'TC kimlik numarası 11 haneli olmalıdır' })
+    partnerIdentityNumber?: string | null;
+
+    @ApiPropertyOptional({ description: 'Share percentage kept for legacy records', minimum: 0, maximum: 100 })
+    @IsOptional()
     @IsNumber()
-    @Min(0.01)
+    @Min(0)
     @Max(100)
-    sharePercentage: number;
+    sharePercentage?: number;
 
     @ApiProperty({ description: 'Is primary owner', default: false })
     @IsOptional()
@@ -51,6 +64,12 @@ export class CreateFieldDto {
     @IsString()
     @MaxLength(100)
     neighborhood: string;
+
+    @ApiPropertyOptional({ description: 'Road/street name from cadastre address data' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(150)
+    road?: string;
 
     @ApiPropertyOptional({ description: 'Parcel number from cadastre' })
     @IsOptional()
@@ -117,12 +136,29 @@ export class UpdateFieldPartnerDto {
     @MaxLength(100)
     partnerName?: string;
 
-    @ApiPropertyOptional({ description: 'Share percentage (0-100)' })
+    @ApiPropertyOptional({ description: 'Partner phone number' })
+    @IsOptional()
+    @IsString()
+    @Matches(/^(5)[0-9]{9}$/, { message: 'Telefon numarası 5XXXXXXXXX formatında olmalıdır' })
+    partnerPhone?: string | null;
+
+    @ApiPropertyOptional({ description: 'Partner Turkish identity number' })
+    @IsOptional()
+    @IsString()
+    @Matches(/^[0-9]{11}$/, { message: 'TC kimlik numarası 11 haneli olmalıdır' })
+    partnerIdentityNumber?: string | null;
+
+    @ApiPropertyOptional({ description: 'Share percentage kept for legacy records' })
     @IsOptional()
     @IsNumber()
-    @Min(0.01)
+    @Min(0)
     @Max(100)
     sharePercentage?: number;
+
+    @ApiPropertyOptional({ description: 'Partner invitation status', enum: ['pending', 'accepted', 'rejected'] })
+    @IsOptional()
+    @IsEnum(['pending', 'accepted', 'rejected'])
+    invitationStatus?: 'pending' | 'accepted' | 'rejected';
 
     @ApiPropertyOptional({ description: 'Is primary owner' })
     @IsOptional()

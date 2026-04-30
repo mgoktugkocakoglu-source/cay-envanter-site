@@ -15,6 +15,7 @@ import {
     UpdateFieldPartnerDto,
     FieldQueryDto,
 } from '@/fields/dto';
+import { UsersService } from '@/users/users.service';
 
 @Injectable()
 export class FieldsService {
@@ -25,16 +26,11 @@ export class FieldsService {
         private readonly fieldRepository: Repository<Field>,
         @InjectRepository(FieldPartner)
         private readonly partnerRepository: Repository<FieldPartner>,
+        private readonly usersService: UsersService,
     ) { }
 
     async create(userId: string, dto: CreateFieldDto): Promise<Field> {
-        // Validate partner shares if provided
-        if (dto.partners && dto.partners.length > 0) {
-            const totalShare = dto.partners.reduce((sum, p) => sum + p.sharePercentage, 0);
-            if (Math.abs(totalShare - 100) > 0.01) {
-                throw new BadRequestException('Partner share percentages must sum to 100%');
-            }
-        }
+        this.validatePartnerContacts(dto.partners);
 
         const field = this.fieldRepository.create({
             userId,
@@ -42,6 +38,7 @@ export class FieldsService {
             province: dto.province,
             district: dto.district,
             neighborhood: dto.neighborhood,
+            road: dto.road || null,
             parcelNo: dto.parcelNo || null,
             coordinates: dto.coordinates,
             area: dto.area,
@@ -58,8 +55,11 @@ export class FieldsService {
                 this.partnerRepository.create({
                     fieldId: savedField.id,
                     partnerName: p.partnerName,
-                    sharePercentage: p.sharePercentage,
+                    partnerPhone: p.partnerPhone || null,
+                    partnerIdentityNumber: p.partnerIdentityNumber || null,
+                    sharePercentage: p.sharePercentage || 0,
                     isPrimaryOwner: p.isPrimaryOwner || false,
+                    invitationStatus: 'pending',
                 }),
             );
             await this.partnerRepository.save(partners);
@@ -156,24 +156,16 @@ export class FieldsService {
     // Partner management
     async addPartner(fieldId: string, userId: string, dto: CreateFieldPartnerDto): Promise<FieldPartner> {
         const field = await this.findOne(fieldId, userId);
-
-        // Check total share won't exceed 100%
-        const currentShares = await this.partnerRepository
-            .createQueryBuilder('partner')
-            .where('partner.fieldId = :fieldId', { fieldId })
-            .select('SUM(partner.sharePercentage)', 'total')
-            .getRawOne();
-
-        const currentTotal = parseFloat(currentShares?.total || '0');
-        if (currentTotal + dto.sharePercentage > 100.01) {
-            throw new BadRequestException('Total partner shares cannot exceed 100%');
-        }
+        this.validatePartnerContacts([dto]);
 
         const partner = this.partnerRepository.create({
             fieldId,
             partnerName: dto.partnerName,
-            sharePercentage: dto.sharePercentage,
+            partnerPhone: dto.partnerPhone || null,
+            partnerIdentityNumber: dto.partnerIdentityNumber || null,
+            sharePercentage: dto.sharePercentage || 0,
             isPrimaryOwner: dto.isPrimaryOwner || false,
+            invitationStatus: 'pending',
         });
 
         const saved = await this.partnerRepository.save(partner);
@@ -203,21 +195,12 @@ export class FieldsService {
         }
 
         if (dto.partnerName !== undefined) partner.partnerName = dto.partnerName;
+        if (dto.partnerPhone !== undefined) partner.partnerPhone = dto.partnerPhone;
+        if (dto.partnerIdentityNumber !== undefined) partner.partnerIdentityNumber = dto.partnerIdentityNumber;
         if (dto.sharePercentage !== undefined) partner.sharePercentage = dto.sharePercentage;
         if (dto.isPrimaryOwner !== undefined) partner.isPrimaryOwner = dto.isPrimaryOwner;
-
-        // Validate total shares
-        const otherShares = await this.partnerRepository
-            .createQueryBuilder('partner')
-            .where('partner.fieldId = :fieldId', { fieldId })
-            .andWhere('partner.id != :partnerId', { partnerId })
-            .select('SUM(partner.sharePercentage)', 'total')
-            .getRawOne();
-
-        const otherTotal = parseFloat(otherShares?.total || '0');
-        if (otherTotal + partner.sharePercentage > 100.01) {
-            throw new BadRequestException('Total partner shares cannot exceed 100%');
-        }
+        if (dto.invitationStatus !== undefined) partner.invitationStatus = dto.invitationStatus;
+        this.validatePartnerContacts([partner]);
 
         await this.partnerRepository.save(partner);
         this.logger.log(`Partner updated: ${partnerId}`);
@@ -248,5 +231,46 @@ export class FieldsService {
     async getPartners(fieldId: string, userId: string): Promise<FieldPartner[]> {
         await this.findOne(fieldId, userId);
         return this.partnerRepository.find({ where: { fieldId } });
+    }
+
+    async respondToPartnerInvitation(
+        fieldId: string,
+        partnerId: string,
+        userId: string,
+        status: 'accepted' | 'rejected',
+    ): Promise<FieldPartner> {
+        const partner = await this.partnerRepository.findOne({
+            where: { id: partnerId, fieldId },
+        });
+
+        if (!partner) {
+            throw new NotFoundException('Partner not found');
+        }
+
+        const user = await this.usersService.findById(userId);
+        const phoneMatches = !!partner.partnerPhone && user?.phone === partner.partnerPhone;
+        const identityMatches = !!partner.partnerIdentityNumber && user?.farmerIdNumber === partner.partnerIdentityNumber;
+
+        if (!phoneMatches && !identityMatches) {
+            throw new ForbiddenException('Partner invitation does not belong to current user');
+        }
+
+        partner.invitationStatus = status;
+        await this.partnerRepository.save(partner);
+        this.logger.log(`Partner invitation ${status}: ${partnerId}`);
+
+        return partner;
+    }
+
+    private validatePartnerContacts(partners?: Array<Pick<CreateFieldPartnerDto, 'partnerName' | 'partnerPhone' | 'partnerIdentityNumber'>>): void {
+        if (!partners) return;
+
+        const invalid = partners.some((partner) =>
+            partner.partnerName?.trim() && !partner.partnerPhone && !partner.partnerIdentityNumber,
+        );
+
+        if (invalid) {
+            throw new BadRequestException('Partner phone or identity number is required');
+        }
     }
 }

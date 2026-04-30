@@ -5,6 +5,7 @@ import { useFieldsStore } from '@/stores/fieldsStore';
 import { useFirmsStore } from '@/stores/firmsStore';
 import { usePaymentsStore } from '@/stores/paymentsStore';
 import { useToast } from '@/composables/useToast';
+import { api, type Harvest } from '@/services/api';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 import AppCheckbox from '@/components/ui/AppCheckbox.vue';
@@ -26,8 +27,6 @@ const saleFieldId = ref('');
 const useCustomDate = ref(false);
 const saleDate = ref(new Date().toISOString().split('T')[0]);
 const isSaving = ref(false);
-const showAddFirmModal = ref(false);
-const newFirmName = ref('');
 const saleSuccess = ref(false);
 const saleSummary = ref<{ firmName: string; tariffLabel: string; kg: number; fieldName: string; totalPrice: number | null; date: string } | null>(null);
 
@@ -81,6 +80,23 @@ const fieldFilter = ref('');
 const yearFilter = ref(new Date().getFullYear());
 const showDeleteConfirm = ref(false);
 const deleteTargetId = ref('');
+const analysisHarvests = ref<Harvest[]>([]);
+const isLoadingAnalysis = ref(false);
+
+const monthNames = [
+    'Ocak',
+    'Subat',
+    'Mart',
+    'Nisan',
+    'Mayis',
+    'Haziran',
+    'Temmuz',
+    'Agustos',
+    'Eylul',
+    'Ekim',
+    'Kasim',
+    'Aralik',
+];
 
 const years = computed(() => {
     const current = new Date().getFullYear();
@@ -105,6 +121,94 @@ const fieldSelectOptions = computed(() => [
     }))
 ]);
 
+const analysisMonthRows = computed(() => {
+    const selectedYear = Number(yearFilter.value);
+    const selectedField = fieldFilter.value;
+    const totals = new Map<string, { fieldId: string; fieldName: string; month: number; kg: number }>();
+
+    analysisHarvests.value.forEach((harvest) => {
+        const date = new Date(harvest.harvestDate);
+        if (date.getFullYear() !== selectedYear) return;
+        if (selectedField && harvest.fieldId !== selectedField) return;
+
+        const month = date.getMonth();
+        const key = `${harvest.fieldId}-${month}`;
+        const current = totals.get(key) || {
+            fieldId: harvest.fieldId,
+            fieldName: harvest.fieldName || fieldsStore.fields.find(f => f.id === harvest.fieldId)?.name || 'Arazi',
+            month,
+            kg: 0,
+        };
+        current.kg += harvestAmount(harvest);
+        totals.set(key, current);
+    });
+
+    const grouped = new Map<string, Array<{ fieldId: string; fieldName: string; month: number; kg: number }>>();
+    Array.from(totals.values()).forEach((row) => {
+        const fieldRows = grouped.get(row.fieldId) || [];
+        fieldRows.push(row);
+        grouped.set(row.fieldId, fieldRows);
+    });
+
+    return Array.from(grouped.values()).flatMap((rows) => {
+        const sorted = rows.sort((a, b) => a.month - b.month);
+        return sorted.map((row, index) => {
+            const previous = sorted[index - 1] || null;
+            const changePercent = previous && previous.kg > 0
+                ? ((row.kg - previous.kg) / previous.kg) * 100
+                : null;
+
+            return {
+                ...row,
+                monthName: monthNames[row.month],
+                previousMonthName: previous ? monthNames[previous.month] : null,
+                previousKg: previous?.kg ?? null,
+                changePercent,
+            };
+        });
+    });
+});
+
+const analysisYearRows = computed(() => {
+    const selectedYear = Number(yearFilter.value);
+    const selectedField = fieldFilter.value;
+    const totals = new Map<string, { fieldId: string; fieldName: string; currentKg: number; previousKg: number }>();
+
+    analysisHarvests.value.forEach((harvest) => {
+        if (selectedField && harvest.fieldId !== selectedField) return;
+
+        const date = new Date(harvest.harvestDate);
+        const year = date.getFullYear();
+        if (year !== selectedYear && year !== selectedYear - 1) return;
+
+        const current = totals.get(harvest.fieldId) || {
+            fieldId: harvest.fieldId,
+            fieldName: harvest.fieldName || fieldsStore.fields.find(f => f.id === harvest.fieldId)?.name || 'Arazi',
+            currentKg: 0,
+            previousKg: 0,
+        };
+
+        if (year === selectedYear) current.currentKg += harvestAmount(harvest);
+        if (year === selectedYear - 1) current.previousKg += harvestAmount(harvest);
+        totals.set(harvest.fieldId, current);
+    });
+
+    return Array.from(totals.values())
+        .filter(row => row.currentKg > 0 || row.previousKg > 0)
+        .map((row) => ({
+            ...row,
+            changePercent: row.previousKg > 0
+                ? ((row.currentKg - row.previousKg) / row.previousKg) * 100
+                : null,
+        }));
+});
+
+const analysisNotifications = computed(() =>
+    analysisMonthRows.value
+        .filter(row => row.changePercent !== null && Math.abs(row.changePercent) >= 10)
+        .slice(0, 4)
+);
+
 // ─── Form Computed ───
 const selectedFirm = computed(() =>
     firmsStore.firms.find(f => f.id === selectedFirmId.value)
@@ -124,27 +228,10 @@ onMounted(() => {
     fieldsStore.fetchFields();
     harvestsStore.fetchHarvests({ year: yearFilter.value });
     paymentsStore.fetchBrokerFirms();
+    loadAnalysisData();
 });
 
 // ─── Form Actions ───
-async function openAddFirmModal() {
-    showAddFirmModal.value = true;
-    newFirmName.value = '';
-}
-
-async function addNewFirm() {
-    if (!newFirmName.value.trim()) return;
-    const success = await firmsStore.createFirm({ name: newFirmName.value.trim(), isActive: true });
-    if (success) {
-        toast.success('Firma başarıyla eklendi');
-        showAddFirmModal.value = false;
-        newFirmName.value = '';
-        await firmsStore.fetchFirms({ isActive: true });
-    } else {
-        toast.error('Firma eklenirken hata oluştu');
-    }
-}
-
 async function completeSale() {
     if (!selectedFirm.value || !saleKg.value || !saleFieldId.value) return;
 
@@ -234,6 +321,26 @@ function applyFilters() {
     if (fieldFilter.value) params.fieldId = fieldFilter.value;
     if (yearFilter.value) params.year = yearFilter.value;
     harvestsStore.fetchHarvests(params as { fieldId?: string; year?: number });
+    loadAnalysisData();
+}
+
+async function loadAnalysisData() {
+    isLoadingAnalysis.value = true;
+    const selectedYear = Number(yearFilter.value);
+
+    try {
+        const [currentYear, previousYear] = await Promise.all([
+            api.getHarvests({ year: selectedYear }),
+            api.getHarvests({ year: selectedYear - 1 }),
+        ]);
+
+        analysisHarvests.value = [
+            ...(currentYear.data || []),
+            ...(previousYear.data || []),
+        ];
+    } finally {
+        isLoadingAnalysis.value = false;
+    }
 }
 
 function formatDate(dateStr: string) {
@@ -248,6 +355,23 @@ function formatKg(kg?: number | string) {
     if (kg === undefined || kg === null) return '-';
     const num = typeof kg === 'string' ? parseFloat(kg) : kg;
     return num.toLocaleString('tr-TR', { maximumFractionDigits: 1 }) + ' kg';
+}
+
+function harvestAmount(harvest: Harvest) {
+    return Number.parseFloat(String(harvest.amountKg || 0)) || 0;
+}
+
+function formatPercent(value: number | null) {
+    if (value === null) return 'Karsilastirma yok';
+    const sign = value > 0 ? '+' : '';
+    return `${sign}${value.toLocaleString('tr-TR', { maximumFractionDigits: 1 })}%`;
+}
+
+function getTrendLabel(value: number | null) {
+    if (value === null) return 'Onceki veri yok';
+    if (value > 0) return 'Verim artisi';
+    if (value < 0) return 'Verim dususu';
+    return 'Degisim yok';
 }
 
 function formatPrice(price: number) {
@@ -388,10 +512,6 @@ async function confirmDeleteHarvest() {
                                         <span class="firm-chip-avatar">{{ firm.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) }}</span>
                                         {{ firm.name }}
                                     </button>
-                                    <button type="button" class="firm-chip firm-chip--add" @click="openAddFirmModal">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                        Firma Ekle
-                                    </button>
                                 </div>
                             </div>
 
@@ -451,10 +571,7 @@ async function confirmDeleteHarvest() {
                                     :class="{ 'btn-tariff-toggle--open': showTariffPanel }"
                                     @click="toggleTariffPanel"
                                 >
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <line v-if="!showTariffPanel" x1="12" y1="5" x2="12" y2="19"/>
-                                        <line x1="5" y1="12" x2="19" y2="12"/>
-                                    </svg>
+                                    <span v-if="!showTariffPanel">+</span>
                                     {{ showTariffPanel ? 'Tarife Bilgisini Kaldır' : 'Tarife Ekle' }}
                                     <span class="tariff-toggle-hint">{{ showTariffPanel ? '' : '(İsteğe bağlı)' }}</span>
                                 </button>
@@ -666,42 +783,118 @@ async function confirmDeleteHarvest() {
 
             <!-- ═══════════════ TAB 3: Arazi Verim Analizi ═══════════════ -->
             <div v-if="activeMainTab === 'analysis'" class="tab-content">
-                <div class="empty-state">
+                <div class="analysis-header">
+                    <div>
+                        <h2>Arazi Verim Analizi</h2>
+                        <p>Arazilerinizin aylik ve yillik yas cay verimini karsilastirin.</p>
+                    </div>
+                    <div class="filters analysis-filters">
+                        <AppSelect
+                            v-model="yearFilter"
+                            :options="yearOptions"
+                            placeholder="Yil"
+                            @update:model-value="applyFilters"
+                        />
+                        <AppSelect
+                            v-model="fieldFilter"
+                            :options="fieldFilterOptions"
+                            placeholder="Arazi"
+                            @update:model-value="applyFilters"
+                        />
+                    </div>
+                </div>
+
+                <div v-if="isLoadingAnalysis" class="loading">
+                    <div class="spinner"></div>
+                </div>
+
+                <div v-else-if="analysisMonthRows.length === 0 && analysisYearRows.length === 0" class="empty-state">
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-text-muted)"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-                    <h3>Arazi Verim Analizi</h3>
-                    <p>Bu alan yakında aktif olacaktır. Arazilerinizin verim analizlerini buradan takip edebileceksiniz.</p>
+                    <h3>Analiz icin hasat verisi yok</h3>
+                    <p>Yas Cay Sat sekmesinden hasat eklediginizde verim degisimleri burada gorunur.</p>
                 </div>
-            </div>
 
-            <!-- Add Firm Modal -->
-            <div v-if="showAddFirmModal" class="modal-overlay" @click.self="showAddFirmModal = false">
-                <div class="modal-content">
-                    <h2>Yeni Firma Ekle</h2>
-                    <p class="modal-subtitle">Yaş çayınızı sattığınız firmanın ismini girin.</p>
-
-                    <form @submit.prevent="addNewFirm" class="create-form">
-                        <div class="form-group">
-                            <label class="form-label">Firma Adı <span class="required">*</span></label>
-                            <input
-                                type="text"
-                                v-model="newFirmName"
-                                placeholder="Örn: ÇAYKUR"
-                                class="form-input"
-                                required
-                                autofocus
-                            />
+                <template v-else>
+                    <div v-if="analysisNotifications.length > 0" class="analysis-notifications">
+                        <div
+                            v-for="item in analysisNotifications"
+                            :key="`${item.fieldId}-${item.month}`"
+                            class="analysis-notification"
+                            :class="{ 'analysis-notification--down': item.changePercent !== null && item.changePercent < 0 }"
+                        >
+                            <strong>{{ item.fieldName }}</strong>
+                            <span>
+                                {{ item.previousMonthName }} ayina gore {{ item.monthName }} ayinda
+                                {{ formatPercent(item.changePercent) }} {{ item.changePercent !== null && item.changePercent >= 0 ? 'verim artisi' : 'verim dususu' }} gozlemlendi.
+                            </span>
                         </div>
+                    </div>
 
-                        <div class="form-actions">
-                            <button type="button" class="btn-secondary" @click="showAddFirmModal = false">
-                                İptal
-                            </button>
-                            <button type="submit" class="btn-primary" :disabled="firmsStore.isLoading || !newFirmName.trim()">
-                                {{ firmsStore.isLoading ? 'Ekleniyor...' : 'Firma Ekle' }}
-                            </button>
+                    <section class="analysis-section">
+                        <div class="analysis-section-header">
+                            <h3>Aylik Karsilastirma</h3>
+                            <p>Ayni arazide bir onceki hasat ayina gore degisim.</p>
                         </div>
-                    </form>
-                </div>
+                        <div class="analysis-grid">
+                            <article
+                                v-for="row in analysisMonthRows"
+                                :key="`${row.fieldId}-${row.month}`"
+                                class="analysis-card"
+                            >
+                                <div class="analysis-card-top">
+                                    <div>
+                                        <span class="analysis-field">{{ row.fieldName }}</span>
+                                        <strong>{{ row.monthName }}</strong>
+                                    </div>
+                                    <span
+                                        class="analysis-trend"
+                                        :class="{ 'analysis-trend--down': row.changePercent !== null && row.changePercent < 0 }"
+                                    >
+                                        {{ formatPercent(row.changePercent) }}
+                                    </span>
+                                </div>
+                                <div class="analysis-metric">
+                                    <span>Toplanan</span>
+                                    <strong>{{ formatKg(row.kg) }}</strong>
+                                </div>
+                                <p class="analysis-note">
+                                    <template v-if="row.previousKg !== null">
+                                        {{ row.previousMonthName }}: {{ formatKg(row.previousKg) }} - {{ getTrendLabel(row.changePercent) }}
+                                    </template>
+                                    <template v-else>
+                                        Bu yil icin ilk hasat ayi.
+                                    </template>
+                                </p>
+                            </article>
+                        </div>
+                    </section>
+
+                    <section class="analysis-section">
+                        <div class="analysis-section-header">
+                            <h3>Yillik Karsilastirma</h3>
+                            <p>{{ Number(yearFilter) - 1 }} yilina gore {{ yearFilter }} toplam verim degisimi.</p>
+                        </div>
+                        <div class="year-table">
+                            <div class="year-row year-row--head">
+                                <span>Arazi</span>
+                                <span>{{ Number(yearFilter) - 1 }}</span>
+                                <span>{{ yearFilter }}</span>
+                                <span>Degisim</span>
+                            </div>
+                            <div v-for="row in analysisYearRows" :key="row.fieldId" class="year-row">
+                                <strong>{{ row.fieldName }}</strong>
+                                <span>{{ formatKg(row.previousKg) }}</span>
+                                <span>{{ formatKg(row.currentKg) }}</span>
+                                <span
+                                    class="analysis-trend"
+                                    :class="{ 'analysis-trend--down': row.changePercent !== null && row.changePercent < 0 }"
+                                >
+                                    {{ formatPercent(row.changePercent) }}
+                                </span>
+                            </div>
+                        </div>
+                    </section>
+                </template>
             </div>
 
             <!-- Delete Harvest Confirm Modal -->
@@ -1846,6 +2039,150 @@ async function confirmDeleteHarvest() {
 }
 
 /* ═══════════════ Delete Button ═══════════════ */
+.analysis-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    align-items: flex-start;
+    margin-bottom: 24px;
+}
+
+.analysis-header h2,
+.analysis-section-header h3 {
+    margin: 0;
+    color: var(--color-text-primary);
+}
+
+.analysis-header p,
+.analysis-section-header p,
+.analysis-note {
+    margin: 6px 0 0;
+    color: var(--color-text-secondary);
+    font-size: 14px;
+}
+
+.analysis-filters {
+    margin: 0;
+    flex-wrap: nowrap;
+}
+
+.analysis-notifications {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.analysis-notification {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 16px;
+    border: 1px solid rgba(16, 185, 129, 0.22);
+    border-radius: var(--radius-lg);
+    background: rgba(16, 185, 129, 0.08);
+    color: var(--color-text-primary);
+}
+
+.analysis-notification--down {
+    border-color: rgba(239, 68, 68, 0.22);
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.analysis-section {
+    margin-top: 24px;
+}
+
+.analysis-section-header {
+    margin-bottom: 14px;
+}
+
+.analysis-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+}
+
+.analysis-card,
+.year-table {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm);
+}
+
+.analysis-card {
+    padding: 18px;
+}
+
+.analysis-card-top,
+.analysis-metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.analysis-card-top strong,
+.analysis-metric strong {
+    display: block;
+    color: var(--color-text-primary);
+}
+
+.analysis-field,
+.analysis-metric span {
+    display: block;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+.analysis-trend {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 86px;
+    padding: 5px 10px;
+    border-radius: var(--radius-full);
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--color-success);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.analysis-trend--down {
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--color-danger);
+}
+
+.analysis-metric {
+    margin-top: 18px;
+}
+
+.year-table {
+    overflow: hidden;
+}
+
+.year-row {
+    display: grid;
+    grid-template-columns: 1.4fr repeat(3, minmax(100px, 1fr));
+    gap: 12px;
+    align-items: center;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.year-row:last-child {
+    border-bottom: none;
+}
+
+.year-row--head {
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
 .btn-icon-delete {
     display: inline-flex;
     align-items: center;

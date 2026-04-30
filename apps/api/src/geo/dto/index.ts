@@ -16,6 +16,12 @@ export interface NeighborhoodDto {
     bounds: number[][][];
 }
 
+export interface RoadDto {
+    id: string;
+    name: string;
+    geometry: number[][][];
+}
+
 export interface ParcelDto {
     id: string;
     parcelNo: string;

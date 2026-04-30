@@ -232,6 +232,10 @@ function goBack() {
                             <span class="detail-label">Mahalle</span>
                             <span class="detail-value">{{ fieldsStore.currentField.neighborhood }}</span>
                         </div>
+                        <div v-if="fieldsStore.currentField.road" class="detail-row">
+                            <span class="detail-label">Yol</span>
+                            <span class="detail-value">{{ fieldsStore.currentField.road }}</span>
+                        </div>
                         <div v-if="fieldsStore.currentField.parcelNo" class="detail-row">
                             <span class="detail-label">Parsel No</span>
                             <span class="detail-value highlight">{{ fieldsStore.currentField.parcelNo }}</span>
@@ -259,14 +263,10 @@ function goBack() {
                                 </div>
                                 <div class="partner-info">
                                     <span class="partner-name">{{ partner.partnerName }}</span>
-                                    <span v-if="partner.isPrimaryOwner" class="primary-badge">Ana Sahip</span>
+                                    <span v-if="partner.partnerPhone" class="partner-contact">{{ partner.partnerPhone }}</span>
+                                    <span v-if="partner.partnerIdentityNumber" class="partner-contact">TC: {{ partner.partnerIdentityNumber }}</span>
+                                    <span class="primary-badge">{{ partner.invitationStatus === 'accepted' ? 'Onaylandi' : partner.invitationStatus === 'rejected' ? 'Reddedildi' : 'Onay Bekliyor' }}</span>
                                 </div>
-                            </div>
-                            <div class="partner-share-wrap">
-                                <div class="partner-share-bar">
-                                    <div class="partner-share-fill" :style="{ width: partner.sharePercentage + '%' }"></div>
-                                </div>
-                                <span class="partner-share-text">%{{ partner.sharePercentage }}</span>
                             </div>
                         </div>
                     </div>
@@ -691,6 +691,11 @@ function goBack() {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.partner-contact {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
 }
 
 .primary-badge {

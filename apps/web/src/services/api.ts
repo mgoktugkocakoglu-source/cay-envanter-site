@@ -105,6 +105,7 @@ export interface Field {
     province: string;
     district: string;
     neighborhood: string;
+    road: string | null;
     parcelNo: string | null;
     coordinates: number[][][];
     area: number;
@@ -119,8 +120,11 @@ export interface Field {
 export interface FieldPartner {
     id: string;
     partnerName: string;
+    partnerPhone: string | null;
+    partnerIdentityNumber: string | null;
     sharePercentage: number;
     isPrimaryOwner: boolean;
+    invitationStatus: 'pending' | 'accepted' | 'rejected';
 }
 
 export interface Harvest {
@@ -169,6 +173,12 @@ export interface GeoNeighborhood {
     id: string;
     name: string;
     bounds: number[][][];
+}
+
+export interface GeoRoad {
+    id: string;
+    name: string;
+    geometry: number[][][];
 }
 
 export interface GeoParcel {
@@ -518,6 +528,7 @@ export const api = {
     getProvinces: () => request<GeoProvince[]>('/geo/provinces'),
     getDistricts: (provinceId: string) => request<GeoDistrict[]>(`/geo/districts/${provinceId}`),
     getNeighborhoods: (districtId: string) => request<GeoNeighborhood[]>(`/geo/neighborhoods/${districtId}`),
+    getRoads: (neighborhoodId: string) => request<GeoRoad[]>(`/geo/roads/${neighborhoodId}`),
     getParcels: (neighborhoodId: string) => request<GeoParcel[]>(`/geo/parcels/${neighborhoodId}`),
     getParcelByCoordinates: (lat: number, lng: number) => request<GeoParcelDetail | null>(`/geo/parcel/${lat}/${lng}`),
 
@@ -538,6 +549,10 @@ export const api = {
         request<FieldPartner>(`/fields/${fieldId}/partners`, { method: 'POST', body: JSON.stringify(data) }),
     updateFieldPartner: (fieldId: string, partnerId: string, data: Partial<FieldPartner>) =>
         request<FieldPartner>(`/fields/${fieldId}/partners/${partnerId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    acceptFieldPartner: (fieldId: string, partnerId: string) =>
+        request<FieldPartner>(`/fields/${fieldId}/partners/${partnerId}/accept`, { method: 'POST' }),
+    rejectFieldPartner: (fieldId: string, partnerId: string) =>
+        request<FieldPartner>(`/fields/${fieldId}/partners/${partnerId}/reject`, { method: 'POST' }),
     removeFieldPartner: (fieldId: string, partnerId: string) =>
         request<void>(`/fields/${fieldId}/partners/${partnerId}`, { method: 'DELETE' }),
 

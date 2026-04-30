@@ -23,11 +23,20 @@ export class FieldPartner {
     @Column({ type: 'varchar', length: 100 })
     partnerName: string;
 
-    @Column({ type: 'decimal', precision: 5, scale: 2 })
+    @Column({ type: 'varchar', length: 10, nullable: true })
+    partnerPhone: string | null;
+
+    @Column({ type: 'varchar', length: 11, nullable: true })
+    partnerIdentityNumber: string | null;
+
+    @Column({ type: 'decimal', precision: 5, scale: 2, default: 0 })
     sharePercentage: number;
 
     @Column({ type: 'boolean', default: false })
     isPrimaryOwner: boolean;
+
+    @Column({ type: 'varchar', length: 20, default: 'pending' })
+    invitationStatus: 'pending' | 'accepted' | 'rejected';
 
     @CreateDateColumn()
     createdAt: Date;

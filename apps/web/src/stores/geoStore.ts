@@ -1,21 +1,24 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { api, type GeoProvince, type GeoDistrict, type GeoNeighborhood, type GeoParcel } from '@/services/api';
+import { api, type GeoProvince, type GeoDistrict, type GeoNeighborhood, type GeoRoad, type GeoParcel } from '@/services/api';
 
 export const useGeoStore = defineStore('geo', () => {
     const provinces = ref<GeoProvince[]>([]);
     const districts = ref<GeoDistrict[]>([]);
     const neighborhoods = ref<GeoNeighborhood[]>([]);
+    const roads = ref<GeoRoad[]>([]);
     const parcels = ref<GeoParcel[]>([]);
 
     const selectedProvinceId = ref<string | null>(null);
     const selectedDistrictId = ref<string | null>(null);
     const selectedNeighborhoodId = ref<string | null>(null);
+    const selectedRoadId = ref<string | null>(null);
     const selectedParcelId = ref<string | null>(null);
 
     const isLoadingProvinces = ref(false);
     const isLoadingDistricts = ref(false);
     const isLoadingNeighborhoods = ref(false);
+    const isLoadingRoads = ref(false);
     const isLoadingParcels = ref(false);
     const error = ref<string | null>(null);
 
@@ -29,6 +32,10 @@ export const useGeoStore = defineStore('geo', () => {
 
     const selectedNeighborhood = computed(() =>
         neighborhoods.value.find(n => n.id === selectedNeighborhoodId.value) || null
+    );
+
+    const selectedRoad = computed(() =>
+        roads.value.find(r => r.id === selectedRoadId.value) || null
     );
 
     const selectedParcel = computed(() =>
@@ -59,9 +66,11 @@ export const useGeoStore = defineStore('geo', () => {
         error.value = null;
         districts.value = [];
         neighborhoods.value = [];
+        roads.value = [];
         parcels.value = [];
         selectedDistrictId.value = null;
         selectedNeighborhoodId.value = null;
+        selectedRoadId.value = null;
         selectedParcelId.value = null;
 
         try {
@@ -82,8 +91,10 @@ export const useGeoStore = defineStore('geo', () => {
         isLoadingNeighborhoods.value = true;
         error.value = null;
         neighborhoods.value = [];
+        roads.value = [];
         parcels.value = [];
         selectedNeighborhoodId.value = null;
+        selectedRoadId.value = null;
         selectedParcelId.value = null;
 
         try {
@@ -120,6 +131,27 @@ export const useGeoStore = defineStore('geo', () => {
         }
     }
 
+    async function fetchRoads(neighborhoodId: string) {
+        isLoadingRoads.value = true;
+        error.value = null;
+        roads.value = [];
+        selectedRoadId.value = null;
+        selectedParcelId.value = null;
+
+        try {
+            const response = await api.getRoads(neighborhoodId);
+            if (response.data) {
+                roads.value = response.data;
+            } else if (response.error) {
+                error.value = response.error.message;
+            }
+        } catch (e) {
+            error.value = 'Failed to fetch roads';
+        } finally {
+            isLoadingRoads.value = false;
+        }
+    }
+
     function selectProvince(provinceId: string | null) {
         selectedProvinceId.value = provinceId;
         if (provinceId) {
@@ -127,9 +159,11 @@ export const useGeoStore = defineStore('geo', () => {
         } else {
             districts.value = [];
             neighborhoods.value = [];
+            roads.value = [];
             parcels.value = [];
             selectedDistrictId.value = null;
             selectedNeighborhoodId.value = null;
+            selectedRoadId.value = null;
             selectedParcelId.value = null;
         }
     }
@@ -140,8 +174,10 @@ export const useGeoStore = defineStore('geo', () => {
             fetchNeighborhoods(districtId);
         } else {
             neighborhoods.value = [];
+            roads.value = [];
             parcels.value = [];
             selectedNeighborhoodId.value = null;
+            selectedRoadId.value = null;
             selectedParcelId.value = null;
         }
     }
@@ -149,11 +185,17 @@ export const useGeoStore = defineStore('geo', () => {
     function selectNeighborhood(neighborhoodId: string | null) {
         selectedNeighborhoodId.value = neighborhoodId;
         if (neighborhoodId) {
-            fetchParcels(neighborhoodId);
+            fetchRoads(neighborhoodId);
         } else {
+            roads.value = [];
             parcels.value = [];
+            selectedRoadId.value = null;
             selectedParcelId.value = null;
         }
+    }
+
+    function selectRoad(roadId: string | null) {
+        selectedRoadId.value = roadId;
     }
 
     function selectParcel(parcelId: string | null) {
@@ -164,9 +206,11 @@ export const useGeoStore = defineStore('geo', () => {
         selectedProvinceId.value = null;
         selectedDistrictId.value = null;
         selectedNeighborhoodId.value = null;
+        selectedRoadId.value = null;
         selectedParcelId.value = null;
         districts.value = [];
         neighborhoods.value = [];
+        roads.value = [];
         parcels.value = [];
         error.value = null;
     }
@@ -179,27 +223,33 @@ export const useGeoStore = defineStore('geo', () => {
         provinces,
         districts,
         neighborhoods,
+        roads,
         parcels,
         selectedProvinceId,
         selectedDistrictId,
         selectedNeighborhoodId,
+        selectedRoadId,
         selectedParcelId,
         selectedProvince,
         selectedDistrict,
         selectedNeighborhood,
+        selectedRoad,
         selectedParcel,
         isLoadingProvinces,
         isLoadingDistricts,
         isLoadingNeighborhoods,
+        isLoadingRoads,
         isLoadingParcels,
         error,
         fetchProvinces,
         fetchDistricts,
         fetchNeighborhoods,
+        fetchRoads,
         fetchParcels,
         selectProvince,
         selectDistrict,
         selectNeighborhood,
+        selectRoad,
         selectParcel,
         resetSelections,
         clearError,

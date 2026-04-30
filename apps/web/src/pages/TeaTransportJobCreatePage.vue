@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/services/api';
@@ -11,9 +11,6 @@ const authStore = useAuthStore();
 
 // ═══════ FORM STATE ═══════
 const location = ref('');
-const terrainType = ref('');
-const distanceRange = ref('');
-const transportFee = ref<number | null>(null);
 const sellingFee = ref<number | null>(null);
 const foodTransportService = ref('');
 const transportCost = ref<number | null>(null);
@@ -40,32 +37,24 @@ const foodTransportOptions = [
   { value: 'evet_saglarim', label: 'Evet Sağlarım' },
 ];
 
-// ═══════ SUGGESTED PRICES (employer side – lower than worker) ═══════
-const suggestedPrices: Record<string, Record<string, number>> = {
-  duz_arazi: {
-    '100m-300m': 900,
-    '300m-600m': 1200,
-    '600m-1000m': 1600,
-  },
-  egimli_arazi: {
-    '100m-300m': 1800,
-    '300m-600m': 2300,
-    '600m-1000m': 2800,
-  },
+type TransportOffer = {
+  terrainType: string;
+  distanceRange: string;
+  transportFee: number | null;
 };
 
-watch([terrainType, distanceRange], ([terrain, distance]) => {
-  if (terrain && distance && suggestedPrices[terrain]?.[distance]) {
-    transportFee.value = suggestedPrices[terrain][distance];
-  }
-});
+const transportOffers = ref<TransportOffer[]>([
+  { terrainType: '', distanceRange: '', transportFee: null },
+]);
 
-const suggestedPrice = computed(() => {
-  if (terrainType.value && distanceRange.value) {
-    return suggestedPrices[terrainType.value]?.[distanceRange.value] || null;
-  }
-  return null;
-});
+const completeTransportOffers = computed(() =>
+  transportOffers.value.filter(offer =>
+    offer.terrainType !== '' &&
+    offer.distanceRange !== '' &&
+    offer.transportFee !== null &&
+    offer.transportFee > 0
+  )
+);
 
 // ═══════ WIZARD STEP MANAGEMENT ═══════
 const activeStep = ref(1);
@@ -76,7 +65,7 @@ type SelectValue = string | number | (string | number)[] | null;
 function isStepComplete(s: number): boolean {
   switch (s) {
     case 1: return location.value.trim() !== '';
-    case 2: return terrainType.value !== '' && distanceRange.value !== '' && transportFee.value !== null && transportFee.value > 0;
+    case 2: return completeTransportOffers.value.length >= 1 && transportOffers.value.every(isTransportOfferComplete);
     case 3: return sellingFee.value !== null && sellingFee.value > 0;
     case 4: return foodTransportService.value !== '';
     default: return false;
@@ -97,9 +86,9 @@ function stepValue(s: number): string {
   switch (s) {
     case 1: return location.value.trim();
     case 2: {
-      if (!transportFee.value) return '';
-      const terrain = terrainOptions.find(o => o.value === terrainType.value)?.label || '';
-      return `${terrain} · ${distanceRange.value} · ${transportFee.value.toLocaleString('tr-TR')} TL/Ton`;
+      return completeTransportOffers.value
+        .map(formatTransportOffer)
+        .join(' / ');
     }
     case 3: return sellingFee.value ? `${sellingFee.value.toLocaleString('tr-TR')} TL/Ton` : '';
     case 4: return foodTransportOptions.find(o => o.value === foodTransportService.value)?.label || '';
@@ -134,16 +123,51 @@ const completedSteps = computed(() => {
 });
 
 // ═══════ SELECT HANDLERS ═══════
-function handleTerrainChange(value: SelectValue) {
-  const v = Array.isArray(value) ? value[0] : value;
-  terrainType.value = v ? String(v) : '';
-  distanceRange.value = '';
-  transportFee.value = null;
+function isTransportOfferComplete(offer: TransportOffer): boolean {
+  return offer.terrainType !== '' && offer.distanceRange !== '' && offer.transportFee !== null && offer.transportFee > 0;
 }
 
-function handleDistanceChange(value: SelectValue) {
+function formatTransportOffer(offer: TransportOffer): string {
+  const terrain = terrainOptions.find(o => o.value === offer.terrainType)?.label || '';
+  return `${terrain} · ${offer.distanceRange} · ${offer.transportFee?.toLocaleString('tr-TR')} TL/Ton`;
+}
+
+function getTerrainOptionsForOffer(index: number) {
+  const selectedByOthers = transportOffers.value
+    .map((offer, offerIndex) => offerIndex === index ? '' : offer.terrainType)
+    .filter(Boolean);
+
+  return terrainOptions.filter(option =>
+    !selectedByOthers.includes(option.value) ||
+    transportOffers.value[index]?.terrainType === option.value
+  );
+}
+
+function addTransportOffer() {
+  if (transportOffers.value.length >= terrainOptions.length) return;
+  if (!transportOffers.value.every(isTransportOfferComplete)) return;
+  transportOffers.value.push({ terrainType: '', distanceRange: '', transportFee: null });
+}
+
+function removeTransportOffer(index: number) {
+  if (transportOffers.value.length === 1) return;
+  transportOffers.value.splice(index, 1);
+}
+
+function handleTerrainChange(index: number, value: SelectValue) {
   const v = Array.isArray(value) ? value[0] : value;
-  distanceRange.value = v ? String(v) : '';
+  const offer = transportOffers.value[index];
+  if (!offer) return;
+  offer.terrainType = v ? String(v) : '';
+  offer.distanceRange = '';
+  offer.transportFee = null;
+}
+
+function handleDistanceChange(index: number, value: SelectValue) {
+  const v = Array.isArray(value) ? value[0] : value;
+  const offer = transportOffers.value[index];
+  if (!offer) return;
+  offer.distanceRange = v ? String(v) : '';
 }
 
 function handleFoodTransportChange(value: SelectValue) {
@@ -169,10 +193,13 @@ async function handleSubmit() {
   isSubmitting.value = true;
 
   try {
+    const primaryTransportOffer = completeTransportOffers.value[0];
     const metadata = {
-      terrainType: terrainType.value,
-      distanceRange: distanceRange.value,
-      transportFee: transportFee.value,
+      terrainType: primaryTransportOffer.terrainType,
+      terrainTypes: completeTransportOffers.value.map(offer => offer.terrainType),
+      distanceRange: primaryTransportOffer.distanceRange,
+      transportFee: primaryTransportOffer.transportFee,
+      transportOffers: completeTransportOffers.value,
       sellingFee: sellingFee.value,
       foodTransportService: foodTransportService.value,
       transportCost: foodTransportService.value === 'karsi_taraf_saglasin' ? transportCost.value : null,
@@ -236,15 +263,7 @@ function goToListings() {
               </div>
               <div class="preview-detail">
                 <span class="preview-detail-label">Arazi Tipi</span>
-                <span class="preview-detail-value">{{ terrainOptions.find(o => o.value === terrainType)?.label }}</span>
-              </div>
-              <div class="preview-detail">
-                <span class="preview-detail-label">Mesafe</span>
-                <span class="preview-detail-value">{{ distanceRange }}</span>
-              </div>
-              <div class="preview-detail">
-                <span class="preview-detail-label">Taşıma Teklifi</span>
-                <span class="preview-detail-value highlight">{{ transportFee?.toLocaleString('tr-TR') }} TL/Ton</span>
+                <span class="preview-detail-value">{{ completeTransportOffers.map(formatTransportOffer).join(' / ') }}</span>
               </div>
               <div class="preview-detail">
                 <span class="preview-detail-label">Satma Teklifi</span>
@@ -344,48 +363,75 @@ function goToListings() {
                 </div>
               </div>
 
-              <div class="sub-step">
-                <label class="sub-step-label">Arazi Tipi</label>
-                <AppSelect
-                  :model-value="terrainType"
-                  :options="terrainOptions"
-                  placeholder="Arazi tipi seçin"
-                  required
-                  @update:model-value="handleTerrainChange"
-                />
-              </div>
+              <p class="optional-hint">En az 1 arazi tipi için teklif girin. İkinci arazi tipi isteğe bağlıdır.</p>
 
-              <Transition name="fade">
-                <div v-if="terrainType" class="sub-step">
-                  <label class="sub-step-label">Mesafe Aralığı</label>
+              <div
+                v-for="(offer, index) in transportOffers"
+                :key="index"
+                class="transport-offer-card"
+              >
+                <div class="transport-offer-header">
+                  <strong>{{ index + 1 }}. Arazi Tipi Teklifi</strong>
+                  <button
+                    v-if="transportOffers.length > 1"
+                    type="button"
+                    class="btn-remove-offer"
+                    @click="removeTransportOffer(index)"
+                  >
+                    Kaldır
+                  </button>
+                </div>
+
+                <div class="sub-step">
+                  <label class="sub-step-label">Arazi Tipi</label>
                   <AppSelect
-                    :model-value="distanceRange"
-                    :options="distanceOptions"
-                    placeholder="Mesafe seçin"
+                    :model-value="offer.terrainType"
+                    :options="getTerrainOptionsForOffer(index)"
+                    placeholder="Arazi tipi seçin"
                     required
-                    @update:model-value="handleDistanceChange"
+                    @update:model-value="value => handleTerrainChange(index, value)"
                   />
                 </div>
-              </Transition>
 
-              <Transition name="fade">
-                <div v-if="terrainType && distanceRange" class="sub-step">
-                  <label class="sub-step-label">Taşıma Ücret Teklifiniz</label>
-                  <div class="input-with-unit">
-                    <input
-                      v-model.number="transportFee"
-                      type="number"
-                      class="form-input"
-                      :placeholder="suggestedPrice ? `Önerilen: ${suggestedPrice}` : 'Ücret'"
-                      min="0"
+                <Transition name="fade">
+                  <div v-if="offer.terrainType" class="sub-step">
+                    <label class="sub-step-label">Mesafe Aralığı</label>
+                    <AppSelect
+                      :model-value="offer.distanceRange"
+                      :options="distanceOptions"
+                      placeholder="Mesafe seçin"
+                      required
+                      @update:model-value="value => handleDistanceChange(index, value)"
                     />
-                    <span class="input-unit">TL/Ton</span>
                   </div>
-                  <div v-if="suggestedPrice" class="suggestion-hint">
-                    💡 {{ terrainOptions.find(o => o.value === terrainType)?.label }} · {{ distanceRange }} için önerilen teklif: <strong>{{ suggestedPrice.toLocaleString('tr-TR') }} TL/Ton</strong>
+                </Transition>
+
+                <Transition name="fade">
+                  <div v-if="offer.terrainType && offer.distanceRange" class="sub-step">
+                    <label class="sub-step-label">Taşıma Ücret Teklifiniz</label>
+                    <div class="input-with-unit">
+                      <input
+                        v-model.number="offer.transportFee"
+                        type="number"
+                        class="form-input"
+                        placeholder="Ücret girin"
+                        min="0"
+                      />
+                      <span class="input-unit">TL/Ton</span>
+                    </div>
                   </div>
-                </div>
-              </Transition>
+                </Transition>
+              </div>
+
+              <button
+                v-if="transportOffers.length < terrainOptions.length"
+                type="button"
+                class="btn-add-offer"
+                :disabled="!transportOffers.every(isTransportOfferComplete)"
+                @click="addTransportOffer"
+              >
+                + İkinci arazi tipi için teklif ekle
+              </button>
 
               <div class="step-actions">
                 <div></div>
@@ -694,6 +740,62 @@ function goToListings() {
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-secondary);
   margin-bottom: var(--space-2);
+}
+
+.optional-hint {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.transport-offer-card {
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-secondary);
+}
+
+.transport-offer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  color: var(--color-text-primary);
+}
+
+.btn-remove-offer,
+.btn-add-offer {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-weight: var(--font-weight-semibold);
+  transition: all var(--transition-fast);
+}
+
+.btn-remove-offer {
+  padding: 6px 10px;
+  font-size: var(--font-size-xs);
+}
+
+.btn-add-offer {
+  width: 100%;
+  min-height: 44px;
+  margin-bottom: var(--space-4);
+}
+
+.btn-remove-offer:hover,
+.btn-add-offer:hover:not(:disabled) {
+  border-color: #7c3aed;
+  color: #7c3aed;
+}
+
+.btn-add-offer:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ── Form Inputs ── */

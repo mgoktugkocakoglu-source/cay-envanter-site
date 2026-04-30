@@ -166,7 +166,7 @@ async function deleteFirm() {
     deleteTarget.value = null;
 
     if (success) {
-        showSuccess(`${firmName} silindi`);
+        showSuccess(`${firmName} kaldirildi`);
     }
 }
 
@@ -258,8 +258,8 @@ onMounted(() => {
                         <button class="btn-secondary" type="button" @click="openEditForm(firm)">
                             Duzenle
                         </button>
-                        <button class="btn-danger" type="button" @click="confirmDeleteFirm(firm)">
-                            Sil
+                        <button class="btn-danger" type="button" title="Firmayi kaldir" @click="confirmDeleteFirm(firm)">
+                            Kaldir
                         </button>
                     </div>
                 </div>
@@ -346,9 +346,9 @@ onMounted(() => {
 
             <ConfirmModal
                 v-model="showDeleteConfirm"
-                title="Firmayi Sil"
-                :message="`${deleteTarget?.name || ''} firmasini silmek istediginize emin misiniz?`"
-                confirm-text="Sil"
+                title="Firmayi Kaldir"
+                :message="`${deleteTarget?.name || ''} firmasini kalici olarak kaldirmak istediginize emin misiniz?`"
+                confirm-text="Kaldir"
                 cancel-text="Vazgec"
                 variant="danger"
                 @confirm="deleteFirm"

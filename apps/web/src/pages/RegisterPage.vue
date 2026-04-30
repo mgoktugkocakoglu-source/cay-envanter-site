@@ -29,12 +29,6 @@ const userTypes: Array<{ value: UserType; label: string; description: string; ic
     description: 'Arazim yok, baskalarinin arazilerinde cay topluyorum veya yarilici olarak calisiyorum.',
     icon: '👷',
   },
-  {
-    value: 'self_farmer',
-    label: 'Kendi Isleyen',
-    description: 'Kendi arazimde cayi kendim topluyorum ve tum isleri kendim yurutuyorum.',
-    icon: '🌿',
-  },
 ];
 
 // Form data

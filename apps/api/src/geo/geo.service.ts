@@ -1,6 +1,6 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ProvinceDto, DistrictDto, NeighborhoodDto, ParcelDto, ParcelDetailDto } from '@/geo/dto';
+import { ProvinceDto, DistrictDto, NeighborhoodDto, RoadDto, ParcelDto, ParcelDetailDto } from '@/geo/dto';
 
 interface TkgmFeature {
     type: string;
@@ -37,6 +37,7 @@ export class GeoService {
     private provincesCache: ProvinceDto[] | null = null;
     private districtCache = new Map<string, DistrictDto[]>();
     private neighborhoodCache = new Map<string, NeighborhoodDto[]>();
+    private roadCache = new Map<string, RoadDto[]>();
 
     constructor(private readonly configService: ConfigService) { }
 
@@ -161,7 +162,12 @@ export class GeoService {
         }
     }
 
-    async getParcels(neighborhoodId: string): Promise<ParcelDto[]> {
+    async getRoads(neighborhoodId: string): Promise<RoadDto[]> {
+        const cacheKey = neighborhoodId;
+        if (this.roadCache.has(cacheKey)) {
+            return this.roadCache.get(cacheKey)!;
+        }
+
         try {
             const response = await fetch(
                 `${this.TKGM_BASE_URL}//maksIdariYapi/yolliste/${neighborhoodId}`,
@@ -169,24 +175,24 @@ export class GeoService {
 
             if (!response.ok) {
                 throw new HttpException(
-                    'Failed to fetch parcels from TKGM API',
+                    'Failed to fetch roads from TKGM API',
                     HttpStatus.BAD_GATEWAY,
                 );
             }
 
             const data = await response.json() as TkgmResponse;
 
-            const parcels: ParcelDto[] = data.features.map((feature) => ({
+            const roads: RoadDto[] = data.features.map((feature) => ({
                 id: feature.properties.id,
-                parcelNo: feature.properties.text || String(feature.properties['parselNo'] || ''),
-                polygon: feature.geometry.coordinates,
-                area: Number(feature.properties['alan'] || 0),
+                name: feature.properties.text,
+                geometry: feature.geometry.coordinates,
             }));
 
-            this.logger.log(`Fetched ${parcels.length} parcels for neighborhood ${neighborhoodId}`);
-            return parcels;
+            this.roadCache.set(cacheKey, roads);
+            this.logger.log(`Fetched ${roads.length} roads for neighborhood ${neighborhoodId}`);
+            return roads;
         } catch (error) {
-            this.logger.error(`Error fetching parcels for neighborhood ${neighborhoodId}`, error);
+            this.logger.error(`Error fetching roads for neighborhood ${neighborhoodId}`, error);
             if (error instanceof HttpException) {
                 throw error;
             }
@@ -195,6 +201,16 @@ export class GeoService {
                 HttpStatus.SERVICE_UNAVAILABLE,
             );
         }
+    }
+
+    async getParcels(neighborhoodId: string): Promise<ParcelDto[]> {
+        const roads = await this.getRoads(neighborhoodId);
+        return roads.map((road) => ({
+            id: road.id,
+            parcelNo: road.name,
+            polygon: road.geometry,
+            area: 0,
+        }));
     }
 
     async getParcelByCoordinates(lat: number, lng: number): Promise<ParcelDetailDto | null> {
@@ -260,6 +276,7 @@ export class GeoService {
         this.provincesCache = null;
         this.districtCache.clear();
         this.neighborhoodCache.clear();
+        this.roadCache.clear();
         this.logger.log('Geo cache cleared');
     }
 }

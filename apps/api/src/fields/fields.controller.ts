@@ -144,6 +144,30 @@ export class FieldsController {
         return this.fieldsService.updatePartner(id, partnerId, req.user.id, dto);
     }
 
+    @Post(':id/partners/:partnerId/accept')
+    @ApiOperation({ summary: 'Accept partner invitation' })
+    @ApiParam({ name: 'id', description: 'Field UUID' })
+    @ApiParam({ name: 'partnerId', description: 'Partner UUID' })
+    async acceptPartner(
+        @Request() req: AuthenticatedRequest,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('partnerId', ParseUUIDPipe) partnerId: string,
+    ): Promise<FieldPartner> {
+        return this.fieldsService.respondToPartnerInvitation(id, partnerId, req.user.id, 'accepted');
+    }
+
+    @Post(':id/partners/:partnerId/reject')
+    @ApiOperation({ summary: 'Reject partner invitation' })
+    @ApiParam({ name: 'id', description: 'Field UUID' })
+    @ApiParam({ name: 'partnerId', description: 'Partner UUID' })
+    async rejectPartner(
+        @Request() req: AuthenticatedRequest,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('partnerId', ParseUUIDPipe) partnerId: string,
+    ): Promise<FieldPartner> {
+        return this.fieldsService.respondToPartnerInvitation(id, partnerId, req.user.id, 'rejected');
+    }
+
     @Delete(':id/partners/:partnerId')
     @HttpCode(HttpStatus.NO_CONTENT)
     @ApiOperation({ summary: 'Remove partner from field' })

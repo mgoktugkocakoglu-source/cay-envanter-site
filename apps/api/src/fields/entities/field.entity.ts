@@ -39,6 +39,9 @@ export class Field {
     @Column({ type: 'varchar', length: 100 })
     neighborhood: string;
 
+    @Column({ type: 'varchar', length: 150, nullable: true })
+    road: string | null;
+
     @Column({ type: 'varchar', length: 50, nullable: true })
     parcelNo: string | null;
 
