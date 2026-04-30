@@ -125,6 +125,26 @@ watch(searchQuery, () => {
       </section>
 
       <!-- ── FILTERS ── -->
+      <section class="sharecropping-panel">
+        <button class="sharecropping-card" @click="router.push('/social/job-listings/job/create/tea-picking')">
+          <span class="sharecropping-icon">🌱</span>
+          <span class="sharecropping-content">
+            <span class="sharecropping-title">Yarılıkçı Bul</span>
+            <span class="sharecropping-desc">Araziniz için yarılık usulü çalışacak kişi arayın</span>
+          </span>
+          <svg class="sharecropping-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+
+        <button class="sharecropping-card" @click="router.push('/social/job-listings/worker/create/tea-picking')">
+          <span class="sharecropping-icon">👷</span>
+          <span class="sharecropping-content">
+            <span class="sharecropping-title">Yarılık İş Bul</span>
+            <span class="sharecropping-desc">Yarılıkçı olarak çalışmak için ilan oluşturun</span>
+          </span>
+          <svg class="sharecropping-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </section>
+
       <section class="filters-section">
         <!-- Main Tabs -->
         <div class="filter-tabs">
@@ -313,6 +333,77 @@ watch(searchQuery, () => {
 }
 
 /* ── Filters ── */
+.sharecropping-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin: calc(-1 * var(--space-4)) 0 var(--space-5);
+}
+
+.sharecropping-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  min-height: 76px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+}
+
+.sharecropping-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--color-primary);
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.sharecropping-icon {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  font-size: 24px;
+}
+
+.sharecropping-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.sharecropping-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.sharecropping-desc {
+  font-size: var(--font-size-xs);
+  line-height: 1.35;
+  color: var(--color-text-muted);
+}
+
+.sharecropping-arrow {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  transition: transform var(--transition-fast), color var(--transition-fast);
+}
+
+.sharecropping-card:hover .sharecropping-arrow {
+  transform: translateX(3px);
+  color: var(--color-primary);
+}
+
 .filters-section {
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
@@ -459,6 +550,11 @@ watch(searchQuery, () => {
 @media (max-width: 768px) {
   .action-cards {
     grid-template-columns: 1fr;
+  }
+
+  .sharecropping-panel {
+    grid-template-columns: 1fr;
+    margin-top: 0;
   }
   
   .filter-controls {

@@ -103,9 +103,57 @@ function switchToSocial() {
       </div>
     </header>
 
-    <main class="hub-content">
-      <slot />
-    </main>
+    <div class="hub-body">
+      <aside class="app-rail" aria-label="Çay işleri menüsü">
+        <RouterLink to="/tea/dashboard" class="app-nav-item" exact-active-class="router-link-active">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <span>Ana Sayfa</span>
+        </RouterLink>
+        <RouterLink to="/tea/fields" class="app-nav-item" active-class="router-link-active">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>Tarlalarım</span>
+        </RouterLink>
+        <RouterLink to="/tea/firms" class="app-nav-item" active-class="router-link-active">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <span>Firmalar</span>
+        </RouterLink>
+        <RouterLink to="/tea/harvests" class="app-nav-item" active-class="router-link-active">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          <span>Hasatlarım</span>
+        </RouterLink>
+        <RouterLink to="/tea/payments" class="app-nav-item" active-class="router-link-active">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <span>Ödemeler</span>
+        </RouterLink>
+      </aside>
+
+      <main class="hub-content">
+        <slot />
+      </main>
+    </div>
+
+    <nav class="bottom-tabs" aria-label="Çay işleri alt menüsü">
+      <RouterLink to="/tea/dashboard" class="bottom-tab" exact-active-class="router-link-active">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>Ana Sayfa</span>
+      </RouterLink>
+      <RouterLink to="/tea/fields" class="bottom-tab" active-class="router-link-active">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>Tarlalar</span>
+      </RouterLink>
+      <RouterLink to="/tea/firms" class="bottom-tab" active-class="router-link-active">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        <span>Firmalar</span>
+      </RouterLink>
+      <RouterLink to="/tea/harvests" class="bottom-tab" active-class="router-link-active">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        <span>Hasatlar</span>
+      </RouterLink>
+      <RouterLink to="/tea/payments" class="bottom-tab" active-class="router-link-active">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span>Ödemeler</span>
+      </RouterLink>
+    </nav>
   </div>
 </template>
 
@@ -174,6 +222,11 @@ function switchToSocial() {
   display: flex;
   align-items: center;
   gap: 2px;
+}
+
+.hub-nav > .nav-link:not(.nav-link--secondary),
+.hub-nav > .nav-divider {
+  display: none;
 }
 
 .nav-link {
@@ -299,6 +352,60 @@ function switchToSocial() {
   color: var(--color-text-primary);
 }
 
+.hub-body {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  min-height: calc(100vh - 64px - env(safe-area-inset-top));
+}
+
+.app-rail {
+  position: sticky;
+  top: calc(64px + env(safe-area-inset-top));
+  align-self: start;
+  height: calc(100vh - 64px - env(safe-area-inset-top));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-3);
+  background: var(--color-bg-secondary);
+  border-right: 1px solid var(--color-border);
+}
+
+.app-nav-item {
+  min-height: 76px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: var(--space-3) var(--space-2);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+  transition: color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.app-nav-item:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-tertiary);
+}
+
+.app-nav-item.router-link-active {
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.app-nav-item svg {
+  flex-shrink: 0;
+}
+
+.bottom-tabs {
+  display: none;
+}
+
 /* ── RESPONSIVE ── */
 @media (max-width: 1024px) {
   .nav-link span { display: none; }
@@ -308,6 +415,10 @@ function switchToSocial() {
 }
 
 @media (max-width: 768px) {
+  .hub-layout {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+  }
+
   .hub-header {
     height: calc(60px + env(safe-area-inset-top));
     padding: 8px 12px;
@@ -316,6 +427,51 @@ function switchToSocial() {
     padding-right: max(12px, env(safe-area-inset-right));
   }
   .mobile-menu-toggle { display: flex; }
+  .hub-body {
+    display: block;
+    min-height: auto;
+  }
+  .app-rail {
+    display: none;
+  }
+  .bottom-tabs {
+    position: fixed;
+    left: max(10px, env(safe-area-inset-left));
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    z-index: 70;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+    padding: 6px;
+    background: color-mix(in srgb, var(--color-bg-secondary) 94%, transparent);
+    border: 1px solid var(--color-border);
+    border-radius: 22px;
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(16px);
+  }
+  .bottom-tab {
+    min-width: 0;
+    min-height: 54px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border-radius: 16px;
+    color: var(--color-text-muted);
+    text-decoration: none;
+    font-size: 10px;
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.1;
+  }
+  .bottom-tab.router-link-active {
+    color: var(--color-primary);
+    background: var(--color-primary-light);
+  }
+  .bottom-tab svg {
+    flex-shrink: 0;
+  }
   .hub-nav {
     display: none;
     position: absolute;

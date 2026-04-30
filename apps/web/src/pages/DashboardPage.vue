@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useFieldsStore } from '@/stores/fieldsStore';
 import { useHarvestsStore } from '@/stores/harvestsStore';
 import { usePaymentsStore } from '@/stores/paymentsStore';
 import { useWeather } from '@/composables/useWeather';
-import { api, type YearlySummary, type MonthlyData, type FieldProfitability } from '@/services/api';
+import { api, type YearlySummary, type MonthlyData } from '@/services/api';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import WeatherWidget from '@/components/ui/WeatherWidget.vue';
 
@@ -19,7 +19,10 @@ const router = useRouter();
 const isLoading = ref(true);
 const yearlySummary = ref<YearlySummary | null>(null);
 const monthlyData = ref<MonthlyData[]>([]);
-const fieldProfitability = ref<FieldProfitability[]>([]);
+const currentTime = ref(new Date());
+const noonPrayerTime = ref('');
+const prayerError = ref('');
+let clockTimer: ReturnType<typeof setInterval> | null = null;
 
 const currentYear = new Date().getFullYear();
 
@@ -84,18 +87,6 @@ const pendingPayments = computed(() => {
   return paymentsStore.payments.filter(p => p.paymentStatus === 'pending');
 });
 
-const recentHarvests = computed(() => {
-  return [...harvestsStore.harvests]
-    .sort((a, b) => new Date(b.harvestDate).getTime() - new Date(a.harvestDate).getTime())
-    .slice(0, 5);
-});
-
-const recentPayments = computed(() => {
-  return [...paymentsStore.payments]
-    .sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime())
-    .slice(0, 5);
-});
-
 const maxMonthlyIncome = computed(() => {
   if (!monthlyData.value.length) return 1;
   return Math.max(...monthlyData.value.map(m => m.income), 1);
@@ -106,6 +97,88 @@ const maxMonthlyHarvest = computed(() => {
   return Math.max(...monthlyData.value.map(m => m.harvestKg), 1);
 });
 
+const formattedClock = computed(() =>
+  currentTime.value.toLocaleTimeString('tr-TR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+);
+
+const formattedToday = computed(() =>
+  currentTime.value.toLocaleDateString('tr-TR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  })
+);
+
+const noonPrayerCountdown = computed(() => {
+  if (!noonPrayerTime.value) return 'Yükleniyor';
+
+  const [hour, minute] = noonPrayerTime.value.split(':').map(Number);
+  const target = new Date(currentTime.value);
+  target.setHours(hour, minute, 0, 0);
+
+  const diffMs = target.getTime() - currentTime.value.getTime();
+  if (diffMs <= 0) return 'Öğlen ezanı geçti';
+
+  const totalMinutes = Math.ceil(diffMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours > 0 && minutes > 0) return `${hours} saat ${minutes} dakika`;
+  if (hours > 0) return `${hours} saat`;
+  return `${minutes} dakika`;
+});
+
+const nextPrayerNote = computed(() => {
+  if (prayerError.value) return prayerError.value;
+  return noonPrayerTime.value ? `Öğlen ezanı ${noonPrayerTime.value}` : 'Vakit bilgisi alınıyor';
+});
+
+function formatPrayerDate(date: Date): string {
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+function cleanPrayerTime(value: string | undefined): string {
+  return (value || '').match(/\d{2}:\d{2}/)?.[0] || '';
+}
+
+async function fetchPrayerTimes() {
+  prayerError.value = '';
+  try {
+    const params = new URLSearchParams({
+      latitude: weatherLat.value.toString(),
+      longitude: weatherLon.value.toString(),
+      method: '13',
+    });
+    const response = await fetch(`https://api.aladhan.com/v1/timings/${formatPrayerDate(currentTime.value)}?${params.toString()}`);
+    if (!response.ok) throw new Error('Prayer API error');
+    const data = await response.json();
+    noonPrayerTime.value = cleanPrayerTime(data?.data?.timings?.Dhuhr);
+    if (!noonPrayerTime.value) throw new Error('Missing Dhuhr time');
+  } catch {
+    noonPrayerTime.value = '';
+    prayerError.value = 'Öğlen vakti alınamadı';
+  }
+}
+
+function startClock() {
+  currentTime.value = new Date();
+  clockTimer = setInterval(() => {
+    currentTime.value = new Date();
+  }, 1000);
+}
+
+function stopClock() {
+  if (clockTimer) {
+    clearInterval(clockTimer);
+    clockTimer = null;
+  }
+}
 
 
 function formatCurrency(amount: number): string {
@@ -124,30 +197,6 @@ function formatKg(amount: number): string {
   }).format(amount);
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('tr-TR', {
-    day: 'numeric',
-    month: 'short',
-  });
-}
-
-function getQualityLabel(quality: string | null): string {
-  switch (quality) {
-    case 'shoot': return 'Surus';
-    case 'leaf': return 'Yaprak';
-    case 'mixed': return 'Karisik';
-    default: return '-';
-  }
-}
-
-function getStatusLabel(status: string): string {
-  switch (status) {
-    case 'received': return 'Alindi';
-    case 'pending': return 'Bekliyor';
-    default: return status;
-  }
-}
-
 async function loadDashboardData() {
   isLoading.value = true;
   try {
@@ -161,10 +210,8 @@ async function loadDashboardData() {
       api.getMonthlyIncome(currentYear).then(r => {
         if (r.data) monthlyData.value = r.data;
       }),
-      api.getFieldProfitability(currentYear).then(r => {
-        if (r.data) fieldProfitability.value = r.data;
-      }),
     ]);
+    await fetchPrayerTimes();
   } catch (e) {
     console.error('Dashboard load error:', e);
   } finally {
@@ -172,7 +219,12 @@ async function loadDashboardData() {
   }
 }
 
-onMounted(loadDashboardData);
+onMounted(() => {
+  startClock();
+  loadDashboardData();
+});
+
+onUnmounted(stopClock);
 </script>
 
 <template>
@@ -241,8 +293,8 @@ onMounted(loadDashboardData);
           </div>
         </header>
 
-        <!-- Weather Widget -->
-        <section class="weather-section">
+        <!-- Daily Info -->
+        <section class="daily-info-grid">
           <WeatherWidget
             :current="currentWeather"
             :hourly="hourlyForecast"
@@ -253,6 +305,23 @@ onMounted(loadDashboardData);
             :location-name="weatherLocationName"
             @retry="fetchWeather"
           />
+          <div class="time-card">
+            <div class="time-card-header">
+              <div>
+                <span class="time-eyebrow">Bugün</span>
+                <h2>{{ formattedClock }}</h2>
+              </div>
+              <div class="time-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+            </div>
+            <p class="time-date">{{ formattedToday }}</p>
+            <div class="prayer-countdown">
+              <span class="prayer-label">Öğlen Ezan Vaktine Kalan Süre</span>
+              <strong>{{ noonPrayerCountdown }}</strong>
+              <span class="prayer-note">{{ nextPrayerNote }}</span>
+            </div>
+          </div>
         </section>
 
         <!-- Stats Cards -->
@@ -358,108 +427,6 @@ onMounted(loadDashboardData);
           </div>
         </section>
 
-        <!-- Content Grid -->
-        <section class="content-grid">
-          <!-- Recent Harvests -->
-          <div class="content-card">
-            <div class="content-card-header">
-              <h3>Son Hasatlar</h3>
-              <RouterLink to="/tea/harvests" class="view-all">
-                Tumunu Gor
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-              </RouterLink>
-            </div>
-            <div v-if="recentHarvests.length" class="activity-list">
-              <div
-                v-for="harvest in recentHarvests"
-                :key="harvest.id"
-                class="activity-item"
-              >
-                <div class="activity-dot activity-dot--harvest"></div>
-                <div class="activity-info">
-                  <span class="activity-title">{{ harvest.fieldName || 'Tarla' }}</span>
-                  <span class="activity-meta">{{ formatDate(harvest.harvestDate) }} &middot; {{ getQualityLabel(harvest.quality) }}</span>
-                </div>
-                <div class="activity-value">{{ harvest.amountKg }} kg</div>
-              </div>
-            </div>
-            <div v-else class="empty-state">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-              <p>Henuz hasat kaydi yok</p>
-              <RouterLink to="/tea/harvests" class="empty-action">Hasat Kaydet</RouterLink>
-            </div>
-          </div>
-
-          <!-- Recent Payments -->
-          <div class="content-card">
-            <div class="content-card-header">
-              <h3>Son Odemeler</h3>
-              <RouterLink to="/tea/payments" class="view-all">
-                Tumunu Gor
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-              </RouterLink>
-            </div>
-            <div v-if="recentPayments.length" class="activity-list">
-              <div
-                v-for="payment in recentPayments"
-                :key="payment.id"
-                class="activity-item"
-              >
-                <div class="activity-dot" :class="payment.paymentStatus === 'received' ? 'activity-dot--success' : 'activity-dot--pending'"></div>
-                <div class="activity-info">
-                  <span class="activity-title">{{ formatCurrency(payment.totalPrice) }}</span>
-                  <span class="activity-meta">{{ formatDate(payment.paymentDate) }} &middot; {{ payment.totalAmountKg }} kg</span>
-                </div>
-                <div class="activity-badge" :class="payment.paymentStatus === 'received' ? 'badge--success' : 'badge--warning'">
-                  {{ getStatusLabel(payment.paymentStatus) }}
-                </div>
-              </div>
-            </div>
-            <div v-else class="empty-state">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-              <p>Henuz odeme kaydi yok</p>
-              <RouterLink to="/tea/payments" class="empty-action">Odeme Ekle</RouterLink>
-            </div>
-          </div>
-
-          <!-- Top Performing Field -->
-          <div class="content-card">
-            <div class="content-card-header">
-              <h3>Tarla Performansi</h3>
-              <RouterLink to="/tea/fields" class="view-all">
-                Tumunu Gor
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-              </RouterLink>
-            </div>
-            <div v-if="fieldProfitability.length" class="field-perf-list">
-              <div
-                v-for="field in fieldProfitability.slice(0, 4)"
-                :key="field.fieldId"
-                class="field-perf-item"
-              >
-                <div class="field-perf-info">
-                  <span class="field-perf-name">{{ field.fieldName }}</span>
-                  <span class="field-perf-meta">{{ field.area }} {{ field.areaUnit }} &middot; {{ formatKg(field.totalHarvestKg) }} kg</span>
-                </div>
-                <div class="field-perf-bar-wrap">
-                  <div class="field-perf-bar">
-                    <div
-                      class="field-perf-bar-fill"
-                      :style="{ width: Math.min(field.performanceScore, 100) + '%' }"
-                    ></div>
-                  </div>
-                  <span class="field-perf-score">{{ field.performanceScore.toFixed(0) }}</span>
-                </div>
-              </div>
-            </div>
-            <div v-else class="empty-state">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              <p>Henuz tarla kaydi yok</p>
-              <RouterLink to="/tea/fields/create" class="empty-action">Tarla Ekle</RouterLink>
-            </div>
-          </div>
-        </section>
-
         <!-- Quick Links -->
         <section class="quick-links">
           <RouterLink to="/social/community" class="quick-link-card">
@@ -493,8 +460,92 @@ onMounted(loadDashboardData);
 }
 
 /* ── Weather ── */
-.weather-section {
+.daily-info-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 0.9fr);
+  gap: var(--space-4);
   margin-bottom: var(--space-6);
+}
+
+.time-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 100%;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+}
+
+.time-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.time-eyebrow {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium);
+  margin-bottom: var(--space-1);
+}
+
+.time-card h2 {
+  font-size: 42px;
+  line-height: 1;
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-bold);
+}
+
+.time-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--color-warning);
+  background: rgba(245, 158, 11, 0.12);
+  border-radius: var(--radius-lg);
+}
+
+.time-date {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  text-transform: capitalize;
+  margin-bottom: var(--space-5);
+}
+
+.prayer-countdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.prayer-label {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.prayer-countdown strong {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xl);
+  line-height: 1.15;
+}
+
+.prayer-note {
+  color: var(--color-primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
 }
 
 /* ── Greeting ── */
@@ -1054,16 +1105,12 @@ onMounted(loadDashboardData);
 
 /* ── Responsive ── */
 @media (max-width: 1024px) {
+  .daily-info-grid {
+    grid-template-columns: 1fr;
+  }
+
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
-  }
-
-  .content-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .content-grid > :last-child {
-    grid-column: 1 / -1;
   }
 }
 
@@ -1103,14 +1150,6 @@ onMounted(loadDashboardData);
     grid-template-columns: 1fr;
   }
 
-  .content-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .content-grid > :last-child {
-    grid-column: auto;
-  }
-
   .quick-links {
     flex-direction: column;
   }
@@ -1123,6 +1162,10 @@ onMounted(loadDashboardData);
 
   .greeting-text h1 {
     font-size: var(--font-size-xl);
+  }
+
+  .time-card h2 {
+    font-size: 34px;
   }
 }
 </style>

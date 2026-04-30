@@ -34,9 +34,9 @@ export class CreatePaymentDto {
     @Type(() => HarvestAllocationDto)
     harvestAllocations: HarvestAllocationDto[];
 
-    @ApiProperty({ description: 'Total price in TL' })
+    @ApiProperty({ description: 'Total price in TL', minimum: 0 })
     @IsNumber()
-    @Min(0.01)
+    @Min(0)
     totalPrice: number;
 
     @ApiPropertyOptional({ description: 'Broker firm ID' })
@@ -60,10 +60,10 @@ export class CreatePaymentDto {
 }
 
 export class UpdatePaymentDto {
-    @ApiPropertyOptional({ description: 'Total price in TL' })
+    @ApiPropertyOptional({ description: 'Total price in TL', minimum: 0 })
     @IsOptional()
     @IsNumber()
-    @Min(0.01)
+    @Min(0)
     totalPrice?: number;
 
     @ApiPropertyOptional({ description: 'Payment date' })

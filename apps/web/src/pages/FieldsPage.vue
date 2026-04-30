@@ -1020,17 +1020,21 @@ function getFieldInitial(name: string) {
     }
 
     .toolbar {
-        flex-direction: column;
+        flex-direction: row;
         gap: var(--space-3);
+        align-items: stretch;
     }
 
     .search-wrap {
+        flex: 1 1 0;
+        min-width: 0;
         max-width: 100%;
     }
 
     .toolbar-right {
-        width: 100%;
-        justify-content: space-between;
+        flex: 0 0 140px;
+        min-width: 0;
+        justify-content: flex-end;
     }
 
     .fields-grid {

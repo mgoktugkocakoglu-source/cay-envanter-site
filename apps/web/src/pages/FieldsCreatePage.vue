@@ -165,6 +165,12 @@ const completedSteps = computed(() => {
     return steps;
 });
 
+const provinceOptions = computed(() =>
+    geoStore.provinces
+        .filter((province) => province.name !== 'Ordu')
+        .map((province) => ({ value: province.id.toString(), label: province.name }))
+);
+
 // ═══════ MAP ═══════
 onMounted(async () => {
     if (mapContainer.value) {
@@ -586,7 +592,7 @@ function goBack() {
                         </div>
                         <AppSelect
                             :model-value="geoStore.selectedProvinceId?.toString() || ''"
-                            :options="geoStore.provinces.map(p => ({ value: p.id.toString(), label: p.name }))"
+                            :options="provinceOptions"
                             placeholder="Il Secin"
                             :disabled="geoStore.isLoadingProvinces"
                             required

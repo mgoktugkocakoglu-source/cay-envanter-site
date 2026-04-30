@@ -551,7 +551,7 @@ async function resendVerification() {
 /* User Type Cards */
 .user-type-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: var(--space-3);
   margin-bottom: var(--space-2);
 }
