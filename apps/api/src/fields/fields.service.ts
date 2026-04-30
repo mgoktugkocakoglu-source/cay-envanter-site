@@ -76,22 +76,29 @@ export class FieldsService {
             .where('field.userId = :userId', { userId })
             .andWhere('field.deleted = :deleted', { deleted: false });
 
-        if (query.province) {
-            qb.andWhere('field.province = :province', { province: query.province });
+        const normalizedProvince = query.province?.trim();
+        if (normalizedProvince && normalizedProvince !== 'undefined' && normalizedProvince !== 'null') {
+            qb.andWhere('field.province = :province', { province: normalizedProvince });
         }
 
-        if (query.search) {
-            qb.andWhere('field.name ILIKE :search', { search: `%${query.search}%` });
+        const normalizedSearch = query.search?.trim();
+        if (normalizedSearch && normalizedSearch !== 'undefined' && normalizedSearch !== 'null') {
+            qb.andWhere('field.name ILIKE :search', { search: `%${normalizedSearch}%` });
         }
 
-        const allowedSortBy = new Set(['name', 'area', 'createdAt']);
+        const sortByMap: Record<string, string> = {
+            name: 'field.name',
+            area: 'field.area',
+            createdAt: 'field.createdAt',
+        };
+
         const requestedSortBy = query.sortBy?.trim();
-        const sortBy = requestedSortBy && allowedSortBy.has(requestedSortBy) ? requestedSortBy : 'createdAt';
+        const sortBy = (requestedSortBy && sortByMap[requestedSortBy]) || sortByMap.createdAt;
 
         const requestedSortOrder = query.sortOrder?.trim().toUpperCase();
         const sortOrder = requestedSortOrder === 'ASC' ? 'ASC' : 'DESC';
 
-        qb.orderBy(`field.${sortBy}`, sortOrder);
+        qb.orderBy(sortBy, sortOrder);
 
         return qb.getMany();
     }
