@@ -27,7 +27,8 @@ interface AuthResponse {
     user: User;
 }
 
-const API_BASE = '/api';
+// Capacitor (native) build'de mutlak URL gereklidir; web'de Vite proxy '/api' yeterlidir
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 export const useAuthStore = defineStore('auth', () => {
     // State - access token in memory only for security

@@ -43,6 +43,15 @@ const router = createRouter({
             name: 'confirm-deletion',
             component: () => import('@/pages/ConfirmDeletionPage.vue'),
         },
+        {
+            path: '/privacy-policy',
+            name: 'privacy-policy',
+            component: () => import('@/pages/PrivacyPolicyPage.vue'),
+        },
+        {
+            path: '/gizlilik-politikasi',
+            redirect: '/privacy-policy',
+        },
 
         // ═══════ HUB SELECTOR ═══════
         {
