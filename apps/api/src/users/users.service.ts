@@ -1,10 +1,18 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+    Injectable,
+    NotFoundException,
+    BadRequestException,
+    UnauthorizedException,
+    Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
+import * as bcrypt from 'bcrypt';
 import { User } from '@/users/entities/user.entity';
 import { Role } from '@/auth/enums';
 import { CommunityPost } from '@/community/entities/community-post.entity';
 import { CommunityComment } from '@/community/entities/community-comment.entity';
+import { MailService } from '@/mail/mail.service';
 
 export interface AdminUserListItem {
     id: string;
@@ -26,6 +34,8 @@ export interface AdminUserListQuery {
 
 @Injectable()
 export class UsersService {
+    private readonly logger = new Logger(UsersService.name);
+
     constructor(
         @InjectRepository(User)
         private readonly userRepository: Repository<User>,
@@ -33,6 +43,7 @@ export class UsersService {
         private readonly postRepository: Repository<CommunityPost>,
         @InjectRepository(CommunityComment)
         private readonly commentRepository: Repository<CommunityComment>,
+        private readonly mailService: MailService,
     ) { }
 
     async create(userData: Partial<User>): Promise<User> {
@@ -119,6 +130,52 @@ export class UsersService {
             resetPasswordToken: null,
             deletionToken: null,
         });
+    }
+
+    /**
+     * Permanent account deletion (Google Play Data Deletion compliance).
+     *
+     * Verifies the user's password, then removes the user row. All
+     * user-owned data (fields, harvests, payments, community posts,
+     * comments, reactions, sessions, job listings) is removed via
+     * `onDelete: CASCADE` on the foreign keys pointing to users.
+     */
+    async deleteAccount(
+        userId: string,
+        password: string,
+    ): Promise<{ message: string }> {
+        if (!password) {
+            throw new BadRequestException('Şifre gereklidir');
+        }
+
+        const user = await this.userRepository.findOne({
+            where: { id: userId, deleted: false },
+        });
+
+        if (!user) {
+            throw new NotFoundException('Kullanıcı bulunamadı');
+        }
+
+        const passwordMatches = await bcrypt.compare(password, user.password);
+        if (!passwordMatches) {
+            throw new UnauthorizedException('Şifre hatalı');
+        }
+
+        const emailToNotify = user.email;
+
+        await this.userRepository.delete({ id: user.id });
+
+        try {
+            await this.mailService.sendAccountDeletedEmail(emailToNotify);
+        } catch (error) {
+            this.logger.warn(
+                `Account deletion email failed for ${emailToNotify}: ${(error as Error).message}`,
+            );
+        }
+
+        this.logger.log(`Account hard-deleted: ${emailToNotify}`);
+
+        return { message: 'Hesabınız ve tüm verileriniz kalıcı olarak silindi' };
     }
 
     async listForAdmin(query: AdminUserListQuery = {}): Promise<AdminUserListItem[]> {

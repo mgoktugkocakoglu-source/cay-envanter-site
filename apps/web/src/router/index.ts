@@ -52,6 +52,15 @@ const router = createRouter({
             path: '/gizlilik-politikasi',
             redirect: '/privacy-policy',
         },
+        {
+            path: '/delete-account',
+            name: 'delete-account',
+            component: () => import('@/pages/DeleteAccountPage.vue'),
+        },
+        {
+            path: '/hesap-sil',
+            redirect: '/delete-account',
+        },
 
         // ═══════ HUB SELECTOR ═══════
         {

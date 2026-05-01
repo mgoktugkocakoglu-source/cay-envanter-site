@@ -477,6 +477,17 @@ export const api = {
             body: JSON.stringify({ token }),
         }),
 
+    /**
+     * Permanent in-app account deletion (Google Play Data Deletion).
+     * Requires the current password as a security check; on success the
+     * user row and all cascaded user-owned data is removed from the DB.
+     */
+    deleteOwnAccount: (password: string) =>
+        request<{ message: string }>('/users/me', {
+            method: 'DELETE',
+            body: JSON.stringify({ password }),
+        }),
+
     // Avatar endpoints
     uploadAvatar: async (file: File): Promise<ApiResponse<{ avatarUrl: string }>> => {
         const authStore = useAuthStore();

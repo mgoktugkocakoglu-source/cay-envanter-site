@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { api } from '@/services/api';
 import type { Session } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
@@ -9,6 +9,7 @@ import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
 
 const route = useRoute();
+const router = useRouter();
 const HubLayout = computed(() => {
   return route.meta?.hub === 'social' ? SocialBusinessLayout : TeaBusinessLayout;
 });
@@ -48,12 +49,14 @@ const sessionsError = ref('');
 const revokingSessionId = ref<string | null>(null);
 const revokeAllLoading = ref(false);
 
-// Deletion
+// Deletion (in-app, Google Play compliant)
 const showDeleteModal = ref(false);
-const deleteEmail = ref('');
+const deletePassword = ref('');
+const deleteConfirmText = ref('');
+const showDeletePassword = ref(false);
 const deleteError = ref('');
 const deleteLoading = ref(false);
-const deleteSuccess = ref(false);
+const DELETE_CONFIRM_PHRASE = 'SİL';
 
 // Avatar upload
 const avatarFileInput = ref<HTMLInputElement | null>(null);
@@ -303,33 +306,45 @@ function getDeviceIcon(deviceType: string) {
   return 'desktop';
 }
 
-// Delete handlers
-async function handleDeleteRequest() {
+// Delete handlers (in-app deletion: password + 'SİL' confirmation)
+function openDeleteModal() {
+  showDeleteModal.value = true;
+  deletePassword.value = '';
+  deleteConfirmText.value = '';
+  deleteError.value = '';
+  showDeletePassword.value = false;
+}
+
+function closeDeleteModal() {
+  if (deleteLoading.value) return;
+  showDeleteModal.value = false;
+}
+
+async function handleDeleteAccount() {
   deleteError.value = '';
 
-  if (!deleteEmail.value) {
-    deleteError.value = 'Email adresi gereklidir';
+  if (!deletePassword.value) {
+    deleteError.value = 'Şifrenizi girin';
     return;
   }
 
-  if (authStore.user && deleteEmail.value.toLowerCase() !== authStore.user.email.toLowerCase()) {
-    deleteError.value = 'Email adresi eslemiyor';
+  if (deleteConfirmText.value.trim().toUpperCase() !== DELETE_CONFIRM_PHRASE) {
+    deleteError.value = `Onaylamak için "${DELETE_CONFIRM_PHRASE}" yazın`;
     return;
   }
 
   deleteLoading.value = true;
-
-  const result = await api.requestDeletion(deleteEmail.value);
-
+  const result = await api.deleteOwnAccount(deletePassword.value);
   deleteLoading.value = false;
 
   if (result.error) {
-    deleteError.value = result.error.message;
+    deleteError.value = result.error.message || 'Hesap silinemedi';
     return;
   }
 
-  deleteSuccess.value = true;
   showDeleteModal.value = false;
+  await authStore.logout();
+  router.replace({ name: 'login', query: { deleted: '1' } });
 }
 
 // User type label
@@ -795,15 +810,12 @@ function switchTab(tab: typeof activeTab.value) {
               </h2>
             </div>
             <p class="danger-text">
-              Hesabınızı silmek geri alınamaz bir işlemdir. Tüm verileriniz kalıcı olarak silinecektir.
+              Hesabınızı silmek <strong>geri alınamaz</strong> bir işlemdir. Hesabınız ve
+              ona bağlı tüm veriler (tarlalar, hasatlar, ödemeler, ilanlar, topluluk
+              gönderileri, yorumlar) kalıcı olarak silinecektir.
             </p>
 
-            <div v-if="deleteSuccess" class="message-box message-info">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-              Silme onay e-postası gönderildi. Lütfen e-posta kutunuzu kontrol edin.
-            </div>
-
-            <button v-else class="btn btn-danger" @click="showDeleteModal = true">
+            <button class="btn btn-danger" @click="openDeleteModal">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
               Hesabımı Sil
             </button>
@@ -812,42 +824,82 @@ function switchTab(tab: typeof activeTab.value) {
       </main>
     </div>
 
-    <!-- Delete Modal -->
+    <!-- Delete Modal (in-app deletion: password + 'SİL' confirmation) -->
     <Teleport to="body">
-      <div v-if="showDeleteModal" class="modal-overlay" @click.self="showDeleteModal = false">
+      <div v-if="showDeleteModal" class="modal-overlay" @click.self="closeDeleteModal">
         <div class="modal">
           <div class="modal-header">
             <h2 class="modal-title danger-title">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
               Hesabı Sil
             </h2>
-            <button class="modal-close" aria-label="Kapat" @click="showDeleteModal = false">
+            <button class="modal-close" aria-label="Kapat" @click="closeDeleteModal" :disabled="deleteLoading">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
 
           <p>Hesabınızı silmek istediğinizden emin misiniz?</p>
-          <p class="modal-warning">Bu işlem geri alınamaz ve tüm verileriniz kalıcı olarak silinecektir.</p>
+          <p class="modal-warning">
+            Bu işlem geri alınamaz. Tüm verileriniz (tarlalar, hasatlar, ödemeler,
+            ilanlar, topluluk içerikleri) kalıcı olarak silinecektir.
+          </p>
 
           <div class="form-group">
-            <label class="form-label">Devam etmek için e-posta adresinizi girin:</label>
-            <input
-              v-model="deleteEmail"
-              type="email"
-              class="form-input"
-              :class="{ 'has-error': deleteError }"
-              placeholder="Email adresiniz"
-            />
-            <p v-if="deleteError" class="form-error">{{ deleteError }}</p>
+            <label class="form-label" for="deletePassword">Şifreniz (güvenlik doğrulaması)</label>
+            <div class="input-with-action">
+              <input
+                id="deletePassword"
+                v-model="deletePassword"
+                :type="showDeletePassword ? 'text' : 'password'"
+                class="form-input"
+                :class="{ 'has-error': deleteError && !deletePassword }"
+                placeholder="Mevcut şifreniz"
+                autocomplete="current-password"
+                :disabled="deleteLoading"
+                @keyup.enter="handleDeleteAccount"
+              />
+              <button
+                type="button"
+                class="input-action-btn"
+                @click="showDeletePassword = !showDeletePassword"
+                :disabled="deleteLoading"
+                aria-label="Şifreyi göster/gizle"
+              >
+                <svg v-if="showDeletePassword" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
           </div>
 
+          <div class="form-group">
+            <label class="form-label" for="deleteConfirm">
+              Onaylamak için <strong>SİL</strong> yazın:
+            </label>
+            <input
+              id="deleteConfirm"
+              v-model="deleteConfirmText"
+              type="text"
+              class="form-input"
+              placeholder="SİL"
+              autocomplete="off"
+              :disabled="deleteLoading"
+              @keyup.enter="handleDeleteAccount"
+            />
+          </div>
+
+          <p v-if="deleteError" class="form-error" role="alert">{{ deleteError }}</p>
+
           <div class="modal-actions">
-            <button class="btn btn-secondary" @click="showDeleteModal = false">
+            <button class="btn btn-secondary" @click="closeDeleteModal" :disabled="deleteLoading">
               İptal
             </button>
-            <button class="btn btn-danger" @click="handleDeleteRequest" :disabled="deleteLoading">
+            <button
+              class="btn btn-danger"
+              @click="handleDeleteAccount"
+              :disabled="deleteLoading || !deletePassword || deleteConfirmText.trim().toUpperCase() !== DELETE_CONFIRM_PHRASE"
+            >
               <span v-if="deleteLoading" class="spinner-sm"></span>
-              {{ deleteLoading ? 'Gonderiliyor...' : 'Silme Onayi Gonder' }}
+              {{ deleteLoading ? 'Siliniyor...' : 'Hesabımı Kalıcı Olarak Sil' }}
             </button>
           </div>
         </div>
