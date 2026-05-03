@@ -107,23 +107,26 @@ async function run() {
     .toFile(path.join(ASSETS_DIR, 'icon-background.png'));
   console.log('   ✓ icon-background.png');
 
-  // 4. splash.png - Açılış ekranı (2732x2732, açık mod)
-  console.log('🎨 splash.png üretiliyor (2732x2732)...');
-  const splashSvg = createSplashSvg(BRAND_GREEN, WHITE);
-  await sharp(Buffer.from(splashSvg))
-    .resize(2732, 2732)
-    .png()
-    .toFile(path.join(ASSETS_DIR, 'splash.png'));
-  console.log('   ✓ splash.png');
+  // 4. splash.png ve splash-dark.png kontrolü
+  console.log('🔍 Splash görselleri kontrol ediliyor...');
+  const splashPath = path.join(ASSETS_DIR, 'splash.png');
+  const splashDarkPath = path.join(ASSETS_DIR, 'splash-dark.png');
 
-  // 5. splash-dark.png - Açılış ekranı (koyu mod)
-  console.log('🎨 splash-dark.png üretiliyor (2732x2732)...');
-  const splashDarkSvg = createSplashSvg(BRAND_GREEN_DARK, WHITE);
-  await sharp(Buffer.from(splashDarkSvg))
-    .resize(2732, 2732)
-    .png()
-    .toFile(path.join(ASSETS_DIR, 'splash-dark.png'));
-  console.log('   ✓ splash-dark.png');
+  if (!fs.existsSync(splashPath)) {
+    console.log('🎨 splash.png üretiliyor (varsayılan)...');
+    const splashSvg = createSplashSvg(BRAND_GREEN, WHITE);
+    await sharp(Buffer.from(splashSvg)).resize(2732, 2732).png().toFile(splashPath);
+  } else {
+    console.log('   ✓ Mevcut splash.png kullanılıyor.');
+  }
+
+  if (!fs.existsSync(splashDarkPath)) {
+    console.log('🎨 splash-dark.png üretiliyor (varsayılan)...');
+    const splashDarkSvg = createSplashSvg(BRAND_GREEN_DARK, WHITE);
+    await sharp(Buffer.from(splashDarkSvg)).resize(2732, 2732).png().toFile(splashDarkPath);
+  } else {
+    console.log('   ✓ Mevcut splash-dark.png kullanılıyor.');
+  }
 
   console.log('\n✅ Kaynak varlıklar hazır! Şimdi platform ikonları üretiliyor...\n');
 

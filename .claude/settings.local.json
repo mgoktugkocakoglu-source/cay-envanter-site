@@ -22,7 +22,9 @@
       "Bash(pnpm build:*)",
       "Bash(echo \"API_EXIT=$?\")",
       "Bash(echo \"WEB_EXIT=$?\")",
-      "Bash(echo \"EXIT=$?\")"
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(rmdir \"C:/Users/Huseyin/OneDrive/Masaüstü/ugraq/src/app/sitemaps/provinces.xml\" \"C:/Users/Huseyin/OneDrive/Masaüstü/ugraq/src/app/sitemaps/districts.xml\" \"C:/Users/Huseyin/OneDrive/Masaüstü/ugraq/src/app/sitemaps/photos.xml\")",
+      "Read(//c/Users/Huseyin/OneDrive/Masaüstü/ugraq/src/app/sitemaps/**)"
     ]
   }
 }

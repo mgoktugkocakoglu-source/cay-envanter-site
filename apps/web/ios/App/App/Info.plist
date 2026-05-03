@@ -25,13 +25,17 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 
-	<!-- Cihaz Gereksinimleri -->
+	<!-- Cihaz Gereksinimleri (iOS 11+ tüm uygulamalar 64-bit zorunludur) -->
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
+		<string>arm64</string>
 	</array>
+
+	<!-- Şifreleme İhracat Uyumluluğu: Yalnızca HTTPS kullanıyoruz (muafiyet kapsamında) -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 
 	<!-- Ekran Yönleri -->
 	<key>UISupportedInterfaceOrientations</key>
@@ -53,14 +57,20 @@
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+
+	<!-- Status bar yönetimi: View controller bazlı (Capacitor StatusBar plugin'i ile uyumlu) -->
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
-
-	<!-- Safe area / notch desteği -->
 	<key>UIStatusBarHidden</key>
 	<false/>
-	<key>UIStatusBarStyle</key>
-	<string>UIStatusBarStyleDefault</string>
+
+	<!-- iPad multitasking: tam ekran zorunluluğu yok (yan yana / slide-over destekli) -->
+	<key>UIRequiresFullScreen</key>
+	<false/>
+
+	<!-- Web view'in Dynamic Type ile uyumu için -->
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
 
 	<!-- Gizlilik İzinleri (App Store zorunluluğu) -->
 

@@ -8,7 +8,7 @@ const config: CapacitorConfig = {
         SplashScreen: {
             launchShowDuration: 2000,
             launchAutoHide: true,
-            backgroundColor: '#16a34a',
+            backgroundColor: '#f8f9fa',
             androidSplashResourceName: 'splash',
             androidScaleType: 'CENTER_CROP',
             showSpinner: false,
@@ -27,6 +27,11 @@ const config: CapacitorConfig = {
         contentInset: 'always',
         backgroundColor: '#16a34a',
         overrideUserInterfaceStyle: 'automatic',
+        scrollEnabled: true,
+        limitsNavigationsToAppBoundDomains: false,
+        preferredContentMode: 'mobile',
+        handleApplicationNotifications: true,
+        webContentsDebuggingEnabled: false,
     },
     android: {
         backgroundColor: '#16a34a',
