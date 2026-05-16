@@ -30,7 +30,7 @@ const paymentTermLabels: Record<string, string> = {
 };
 
 const paymentTermIcons: Record<string, string> = {
-    'cash': '💵',
+    'cash': '₺',
     'weekly': '📅',
     'monthly': '🗓️',
     'custom': '📌',
@@ -435,11 +435,11 @@ onMounted(loadFirmData);
                 </header>
 
                 <!-- Tabs -->
-                <div class="tabs">
+                <div class="tabs app-tabs">
                     <button
                         v-if="authStore.isAdmin"
-                        class="tab-btn"
-                        :class="{ 'tab-btn--active': activeTab === 'tariffs' }"
+                        class="tab-btn app-tab-btn"
+                        :class="{ 'tab-btn--active app-tab-btn--active': activeTab === 'tariffs' }"
                         @click="activeTab = 'tariffs'"
                     >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -447,8 +447,8 @@ onMounted(loadFirmData);
                         <span class="tab-count">{{ firmsStore.currentTariffs.length }}</span>
                     </button>
                     <button
-                        class="tab-btn"
-                        :class="{ 'tab-btn--active': activeTab === 'locations' }"
+                        class="tab-btn app-tab-btn"
+                        :class="{ 'tab-btn--active app-tab-btn--active': activeTab === 'locations' }"
                         @click="activeTab = 'locations'"
                     >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -487,7 +487,7 @@ onMounted(loadFirmData);
                             <!-- Simple Tariff -->
                             <template v-if="!tariff.isSplitPayment">
                                 <div class="tariff-header">
-                                    <span class="tariff-term-icon">{{ paymentTermIcons[tariff.paymentTerm] || '💵' }}</span>
+                                    <span class="tariff-term-icon">{{ paymentTermIcons[tariff.paymentTerm] || '₺' }}</span>
                                     <span class="tariff-term">{{ paymentTermLabels[tariff.paymentTerm] || tariff.paymentTerm }}</span>
                                 </div>
                                 <div class="tariff-price">
@@ -875,13 +875,15 @@ onMounted(loadFirmData);
 .status-inactive { background: rgba(245, 158, 11, 0.15); color: var(--color-warning); }
 
 /* ── Tabs ── */
-.tabs { display: flex; gap: 4px; margin-bottom: 24px; background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 4px; }
-.tab-btn { display: flex; align-items: center; gap: 8px; padding: 10px 20px; border: none; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); font-weight: 600; font-size: 14px; cursor: pointer; transition: all var(--transition-fast); flex: 1; justify-content: center; }
-.tab-btn:hover { color: var(--color-text-primary); background: var(--color-bg-tertiary); }
-.tab-btn--active { background: var(--color-primary); color: white; }
-.tab-btn--active:hover { background: var(--color-primary-hover); color: white; }
+.tabs { display: flex; gap: var(--space-1); margin-bottom: 24px; background: var(--color-subtle-bg); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-1); box-shadow: var(--shadow-sm); }
+.tab-btn { position: relative; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 var(--space-5); border: 1px solid transparent; border-radius: calc(var(--radius-md) - 1px); background: transparent; color: var(--color-text-secondary); font-weight: 600; font-size: 14px; cursor: pointer; transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast); flex: 1; justify-content: center; }
+.tab-btn:hover { color: var(--color-text-primary); background: var(--color-bg-secondary); border-color: var(--color-border); }
+.tab-btn--active { background: var(--color-bg-secondary); border-color: var(--color-border-strong); color: var(--color-primary); box-shadow: var(--shadow-md); }
+.tab-btn--active::before { content: ''; position: absolute; left: 14px; right: 14px; bottom: 5px; height: 2px; border-radius: var(--radius-full); background: var(--color-primary); }
+.tab-btn--active:hover { background: var(--color-bg-secondary); color: var(--color-primary); }
 .tab-count { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: var(--radius-full); font-size: 11px; font-weight: 700; background: rgba(255, 255, 255, 0.2); }
 .tab-btn:not(.tab-btn--active) .tab-count { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
+.tab-btn--active .tab-count { background: var(--color-primary-light); color: var(--color-primary); }
 
 /* ── Tab Content ── */
 .tab-content { animation: fadeIn 0.2s ease; }
@@ -966,7 +968,7 @@ onMounted(loadFirmData);
 .form-group { display: flex; flex-direction: column; gap: 6px; }
 .form-label { font-size: 13px; font-weight: 600; color: var(--color-text-secondary); }
 .required { color: var(--color-danger); }
-.form-input { width: 100%; padding: 11px 14px; background: var(--color-bg-elevated, var(--color-bg-secondary)); border: 2px solid var(--color-border); border-radius: var(--radius-md); font-size: 14px; color: var(--color-text-primary); transition: border-color var(--transition-fast); font-family: inherit; box-sizing: border-box; }
+.form-input { width: 100%; height: var(--control-height); padding: 0 14px; background: var(--color-bg-elevated, var(--color-bg-secondary)); border: 2px solid var(--color-border); border-radius: var(--radius-md); font-size: 14px; color: var(--color-text-primary); transition: border-color var(--transition-fast); font-family: inherit; box-sizing: border-box; }
 .form-input:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-light); }
 .form-input::placeholder { color: var(--color-text-muted); }
 .form-textarea { resize: vertical; min-height: 60px; }

@@ -57,6 +57,69 @@ function timeAgo(d: string): string {
   return new Date(d).toLocaleDateString('tr-TR');
 }
 function userLabel(t: string) { return t === 'land_owner' ? 'Arazi Sahibi' : t === 'worker' ? 'İşçi' : t === 'self_farmer' ? 'Çiftçi' : ''; }
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function sanitizeRichText(value: string | null): string {
+  if (!value) return '';
+  const allowedTags = new Set(['P', 'H1', 'H2', 'STRONG', 'EM', 'UL', 'OL', 'LI', 'BR', 'A', 'SPAN']);
+  const richPattern = /<\/?(p|h1|h2|strong|em|ul|ol|li|br|a|span)\b/i;
+  if (!richPattern.test(value)) return escapeHtml(value);
+
+  const doc = new DOMParser().parseFromString(value, 'text/html');
+  const cleanUrl = (href: string | null) => {
+    if (!href) return '';
+    try {
+      const url = new URL(href, window.location.origin);
+      if (['http:', 'https:', 'mailto:'].includes(url.protocol)) return url.href;
+    } catch {
+      return '';
+    }
+    return '';
+  };
+  const isSafeCssColor = (color: string) => /^#[0-9a-f]{3,8}$/i.test(color) || /^rgba?\([\d\s,%.]+\)$/i.test(color);
+  const cleanNode = (node: Node): Node => {
+    if (node.nodeType === Node.TEXT_NODE) return document.createTextNode(node.textContent ?? '');
+    if (node.nodeType !== Node.ELEMENT_NODE) return document.createTextNode('');
+
+    const element = node as HTMLElement;
+    if (!allowedTags.has(element.tagName)) {
+      const fragment = document.createDocumentFragment();
+      Array.from(element.childNodes).forEach((child) => fragment.appendChild(cleanNode(child)));
+      return fragment;
+    }
+
+    const cleanElement = document.createElement(element.tagName.toLowerCase());
+    if (element.tagName === 'A') {
+      const href = cleanUrl(element.getAttribute('href'));
+      if (href) {
+        cleanElement.setAttribute('href', href);
+        cleanElement.setAttribute('target', '_blank');
+        cleanElement.setAttribute('rel', 'noopener noreferrer');
+      }
+    }
+    if (element.tagName === 'SPAN') {
+      const styles: string[] = [];
+      if (isSafeCssColor(element.style.color)) styles.push(`color: ${element.style.color}`);
+      if (isSafeCssColor(element.style.backgroundColor)) styles.push(`background-color: ${element.style.backgroundColor}`);
+      if (styles.length) cleanElement.setAttribute('style', styles.join('; '));
+    }
+    Array.from(element.childNodes).forEach((child) => cleanElement.appendChild(cleanNode(child)));
+    return cleanElement;
+  };
+
+  const fragment = document.createDocumentFragment();
+  Array.from(doc.body.childNodes).forEach((node) => fragment.appendChild(cleanNode(node)));
+  const wrapper = document.createElement('div');
+  wrapper.appendChild(fragment);
+  return wrapper.innerHTML;
+}
 </script>
 
 <template>
@@ -92,7 +155,7 @@ function userLabel(t: string) { return t === 'land_owner' ? 'Arazi Sahibi' : t =
             </button>
           </div>
 
-          <div v-if="store.currentPost.content" class="dcont">{{ store.currentPost.content }}</div>
+          <div v-if="store.currentPost.content" class="dcont" v-html="sanitizeRichText(store.currentPost.content)"></div>
 
           <div v-if="store.currentPost.mediaUrls?.length" class="dmedia" :class="`mc${Math.min(store.currentPost.mediaUrls.length, 4)}`">
             <template v-if="store.currentPost.type === 'photo'">
@@ -232,6 +295,16 @@ function userLabel(t: string) { return t === 'land_owner' ? 'Arazi Sahibi' : t =
   font-size: 15px; line-height: 1.7; color: var(--color-text-primary);
   margin-bottom: 16px; white-space: pre-wrap; word-break: break-word;
 }
+.dcont :deep(p) { margin: 0 0 10px; }
+.dcont :deep(p:last-child) { margin-bottom: 0; }
+.dcont :deep(h1),
+.dcont :deep(h2) { margin: 0 0 10px; line-height: 1.28; font-weight: 700; color: var(--color-text-primary); }
+.dcont :deep(h1) { font-size: 24px; }
+.dcont :deep(h2) { font-size: 20px; }
+.dcont :deep(ul),
+.dcont :deep(ol) { margin: 8px 0 10px 20px; padding: 0; }
+.dcont :deep(li) { margin: 3px 0; }
+.dcont :deep(a) { color: var(--color-secondary); text-decoration: underline; text-underline-offset: 2px; }
 
 /* Media */
 .dmedia { display: grid; gap: 4px; border-radius: 12px; overflow: hidden; margin-bottom: 16px; }

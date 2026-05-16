@@ -388,13 +388,13 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-3) var(--space-4);
+  height: var(--control-height);
+  padding: 0 var(--space-4);
   background: var(--color-input-bg);
   border: 1px solid var(--color-input-border);
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-fast);
-  min-height: 48px;
   user-select: none;
 }
 
@@ -499,7 +499,8 @@ onBeforeUnmount(() => {
 
 .app-select-search-input {
   width: 100%;
-  padding: var(--space-2) var(--space-3);
+  height: 32px;
+  padding: 0 var(--space-3);
   font-size: var(--font-size-sm);
   font-family: var(--font-family);
   color: var(--color-text-primary);
@@ -542,7 +543,9 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
+  min-height: var(--control-height);
+  padding: 0 var(--space-4);
+  box-sizing: border-box;
   cursor: pointer;
   transition: background var(--transition-fast);
   font-size: var(--font-size-base);
@@ -573,7 +576,11 @@ onBeforeUnmount(() => {
 }
 
 .app-select-empty {
-  padding: var(--space-4);
+  min-height: var(--control-height);
+  padding: 0 var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);

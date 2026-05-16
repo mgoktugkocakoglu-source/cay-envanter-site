@@ -783,7 +783,7 @@ function goToListings() {
 
 .btn-add-offer {
   width: 100%;
-  min-height: 44px;
+  min-height: var(--control-height);
   margin-bottom: var(--space-4);
 }
 
@@ -801,7 +801,8 @@ function goToListings() {
 /* ── Form Inputs ── */
 .form-input {
   width: 100%;
-  padding: var(--space-3) var(--space-4);
+  height: var(--control-height);
+  padding: 0 var(--space-4);
   background: var(--color-bg-tertiary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -809,7 +810,6 @@ function goToListings() {
   font-size: var(--font-size-base);
   font-family: var(--font-family);
   transition: all var(--transition-fast);
-  min-height: 48px;
 }
 
 .form-input:focus {

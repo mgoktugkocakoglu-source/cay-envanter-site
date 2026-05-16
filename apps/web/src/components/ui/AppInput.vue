@@ -113,7 +113,7 @@ defineExpose({ focus, inputRef })
   border: 1px solid var(--color-input-border);
   border-radius: var(--radius-md);
   transition: all var(--transition-fast);
-  min-height: 48px;
+  height: var(--control-height);
 }
 
 .app-input-container:hover:not(.is-disabled) {
@@ -158,14 +158,14 @@ defineExpose({ focus, inputRef })
 .app-input-field {
   flex: 1;
   width: 100%;
-  padding: var(--space-3) var(--space-4);
+  height: 100%;
+  padding: 0 var(--space-4);
   font-size: var(--font-size-base);
   font-family: var(--font-family);
   color: var(--color-text-primary);
   background: transparent;
   border: none;
   outline: none;
-  min-height: 46px;
 }
 
 .app-input-field::placeholder {

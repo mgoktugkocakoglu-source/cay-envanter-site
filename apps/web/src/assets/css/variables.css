@@ -89,6 +89,9 @@
   --line-height-normal: 1.5;
   --line-height-relaxed: 1.75;
 
+  /* Controls */
+  --control-height: 40px;
+
   /* Border Radius */
   --radius-sm: 4px;
   --radius-md: 8px;

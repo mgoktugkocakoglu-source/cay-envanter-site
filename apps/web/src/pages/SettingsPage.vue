@@ -415,9 +415,9 @@ function switchTab(tab: typeof activeTab.value) {
         </div>
 
         <!-- Tabs -->
-        <div class="settings-tabs">
+        <div class="settings-tabs app-tabs">
           <button
-            class="tab-btn"
+            class="tab-btn app-tab-btn"
             :class="{ active: activeTab === 'profile' }"
             @click="switchTab('profile')"
           >
@@ -425,7 +425,7 @@ function switchTab(tab: typeof activeTab.value) {
             Profil
           </button>
           <button
-            class="tab-btn"
+            class="tab-btn app-tab-btn"
             :class="{ active: activeTab === 'security' }"
             @click="switchTab('security')"
           >
@@ -433,7 +433,7 @@ function switchTab(tab: typeof activeTab.value) {
             Guvenlik
           </button>
           <button
-            class="tab-btn"
+            class="tab-btn app-tab-btn"
             :class="{ active: activeTab === 'sessions' }"
             @click="switchTab('sessions')"
           >
@@ -441,7 +441,7 @@ function switchTab(tab: typeof activeTab.value) {
             Oturumlar
           </button>
           <button
-            class="tab-btn"
+            class="tab-btn app-tab-btn"
             :class="{ active: activeTab === 'appearance' }"
             @click="switchTab('appearance')"
           >
@@ -449,7 +449,7 @@ function switchTab(tab: typeof activeTab.value) {
             Gorunum
           </button>
           <button
-            class="tab-btn"
+            class="tab-btn app-tab-btn"
             :class="{ active: activeTab === 'account' }"
             @click="switchTab('account')"
           >
@@ -1044,39 +1044,55 @@ function switchTab(tab: typeof activeTab.value) {
   display: flex;
   gap: var(--space-1);
   margin-bottom: var(--space-5);
-  background: var(--color-bg-secondary);
+  background: var(--color-subtle-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: 4px;
+  padding: var(--space-1);
+  box-shadow: var(--shadow-sm);
 }
 
 .tab-btn {
+  position: relative;
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
+  min-height: 44px;
+  padding: 0 var(--space-5);
   background: transparent;
-  border: none;
-  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-md) - 1px);
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-semibold);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
   white-space: nowrap;
 }
 
 .tab-btn:hover {
-  color: var(--color-text-secondary);
-  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
 }
 
 .tab-btn.active {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border-strong);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.tab-btn.active::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 5px;
+  height: 2px;
+  border-radius: var(--radius-full);
   background: var(--color-primary);
-  color: white;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
 }
 
 /* ── Card ── */
@@ -1148,7 +1164,8 @@ function switchTab(tab: typeof activeTab.value) {
 
 .form-input {
   width: 100%;
-  padding: var(--space-3) var(--space-4);
+  height: var(--control-height);
+  padding: 0 var(--space-4);
   background: var(--color-bg-tertiary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -1156,7 +1173,6 @@ function switchTab(tab: typeof activeTab.value) {
   font-size: var(--font-size-base);
   font-family: var(--font-family);
   transition: all var(--transition-fast);
-  min-height: 44px;
   box-sizing: border-box;
 }
 
@@ -1619,7 +1635,7 @@ function switchTab(tab: typeof activeTab.value) {
 
   .tab-btn {
     font-size: var(--font-size-xs);
-    padding: var(--space-2) var(--space-3);
+    padding: 0 var(--space-3);
   }
 
   .tab-btn svg {

@@ -3,6 +3,8 @@ import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
+import teaBusinessIcon from '@/assets/images/tea-business-icon.png';
+import socialBusinessIcon from '@/assets/images/social-business-icon.png';
 
 const authStore = useAuthStore();
 const themeStore = useThemeStore();
@@ -71,7 +73,7 @@ onBeforeUnmount(() => {
         </RouterLink>
         <div class="hub-divider-v" aria-hidden="true"></div>
         <div class="hub-context">
-          <span class="hub-context-icon">🍃</span>
+          <img class="hub-context-icon" :src="teaBusinessIcon" alt="" aria-hidden="true" />
           <span class="hub-context-text">Çay İşleri Hesabı</span>
         </div>
       </div>
@@ -82,7 +84,7 @@ onBeforeUnmount(() => {
       <!-- ─── RIGHT: Actions ─── -->
       <div class="hub-header-right">
         <button class="hub-switch-btn" type="button" @click="switchToSocial" title="Sosyal İş Hesabı'na geç">
-          <span class="hub-switch-icon">🤝</span>
+          <img class="hub-switch-icon" :src="socialBusinessIcon" alt="" aria-hidden="true" />
           <span class="hub-switch-label">Sosyal İş</span>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
@@ -161,7 +163,7 @@ onBeforeUnmount(() => {
           <span>Hasatlarım</span>
         </RouterLink>
         <RouterLink to="/tea/payments" class="app-nav-item" active-class="router-link-active">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <span class="currency-nav-icon" aria-hidden="true">₺</span>
           <span>Ödemeler</span>
         </RouterLink>
       </aside>
@@ -189,7 +191,7 @@ onBeforeUnmount(() => {
         <span>Hasatlar</span>
       </RouterLink>
       <RouterLink to="/tea/payments" class="bottom-tab" active-class="router-link-active">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span class="currency-nav-icon" aria-hidden="true">₺</span>
         <span>Ödemeler</span>
       </RouterLink>
     </nav>
@@ -254,7 +256,12 @@ onBeforeUnmount(() => {
   gap: 8px;
   min-width: 0;
 }
-.hub-context-icon { font-size: 16px; }
+.hub-context-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
 .hub-context-text {
   font-size: 14px;
   font-weight: 600;
@@ -281,22 +288,35 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 14px;
-  background: rgba(59, 130, 246, 0.08);
-  border: 1px solid rgba(59, 130, 246, 0.22);
+  min-height: 38px;
+  padding: 5px 14px 5px 7px;
+  background: linear-gradient(135deg, #fb923c 0%, #f59e0b 100%);
+  border: 1px solid rgba(251, 146, 60, 0.85);
   border-radius: var(--radius-full);
-  color: var(--color-info);
+  color: #fff;
+  box-shadow: 0 8px 18px -10px rgba(234, 88, 12, 0.8);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
 }
 .hub-switch-btn:hover {
-  background: rgba(59, 130, 246, 0.15);
-  border-color: rgba(59, 130, 246, 0.4);
+  background: linear-gradient(135deg, #f97316 0%, #f59e0b 100%);
+  border-color: rgba(249, 115, 22, 0.95);
+  box-shadow: 0 10px 22px -12px rgba(234, 88, 12, 0.95);
 }
-.hub-switch-icon { font-size: 15px; }
+.hub-switch-icon {
+  display: block;
+  width: 28px;
+  height: 28px;
+  margin-left: -1px;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 50%;
+  clip-path: circle(49% at 50% 50%);
+  flex-shrink: 0;
+}
 
 .icon-btn {
   display: inline-flex;
@@ -513,6 +533,18 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 
+.currency-nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
 .bottom-tabs {
   display: none;
 }
@@ -551,6 +583,9 @@ onBeforeUnmount(() => {
     padding: 0;
     justify-content: center;
     border-radius: var(--radius-md);
+  }
+  .hub-switch-icon {
+    margin-left: 0;
   }
 
   .hub-body {

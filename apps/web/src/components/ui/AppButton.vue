@@ -79,16 +79,16 @@ const buttonClasses = computed(() => [
 }
 
 .app-btn--md {
-  padding: var(--space-3) var(--space-6);
+  padding: 0 var(--space-6);
   font-size: var(--font-size-base);
-  min-height: 44px;
-  min-width: 44px;
+  min-height: var(--control-height);
+  min-width: var(--control-height);
 }
 
 .app-btn--lg {
-  padding: var(--space-4) var(--space-8);
+  padding: 0 var(--space-8);
   font-size: var(--font-size-lg);
-  min-height: 52px;
+  min-height: var(--control-height);
 }
 
 /* Variants */

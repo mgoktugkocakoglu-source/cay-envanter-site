@@ -1,6 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { EditorContent, useEditor } from '@tiptap/vue-3';
+import { Mark, mergeAttributes } from '@tiptap/core';
+import StarterKit from '@tiptap/starter-kit';
+import Link from '@tiptap/extension-link';
+import Placeholder from '@tiptap/extension-placeholder';
 import { useCommunityStore } from '@/stores/communityStore';
 import { useAuthStore } from '@/stores/authStore';
 import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
@@ -22,6 +27,78 @@ const searchQuery = ref('');
 const activeType = ref<CommunityPostType | ''>('');
 const activeTag = ref('');
 const sentinel = ref<HTMLElement | null>(null);
+const editorTextColors = ['#0F172A', '#15803D', '#1E3A8A', '#B45309'];
+const editorHighlightColors = ['#FFFFFF', '#DCFCE7', '#DBEAFE', '#FEF3C7'];
+
+const TextColor = Mark.create({
+  name: 'textColor',
+  addAttributes() {
+    return {
+      color: {
+        default: null,
+        parseHTML: element => element.style.color || null,
+        renderHTML: attributes => attributes.color ? { style: `color: ${attributes.color}` } : {},
+      },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'span[style*="color"]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['span', mergeAttributes(HTMLAttributes), 0];
+  },
+});
+
+const TextHighlight = Mark.create({
+  name: 'textHighlight',
+  addAttributes() {
+    return {
+      backgroundColor: {
+        default: null,
+        parseHTML: element => element.style.backgroundColor || null,
+        renderHTML: attributes => attributes.backgroundColor ? { style: `background-color: ${attributes.backgroundColor}` } : {},
+      },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'span[style*="background-color"]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['span', mergeAttributes(HTMLAttributes), 0];
+  },
+});
+
+const editor = useEditor({
+  content: '',
+  extensions: [
+    StarterKit.configure({
+      heading: { levels: [1, 2] },
+      blockquote: false,
+      code: false,
+      codeBlock: false,
+      horizontalRule: false,
+    }),
+    Link.configure({
+      autolink: true,
+      openOnClick: false,
+      protocols: ['http', 'https', 'mailto'],
+    }),
+    TextColor,
+    TextHighlight,
+    Placeholder.configure({
+      placeholder: 'Düşüncelerini net, kısa ve etkili şekilde paylaş...',
+    }),
+  ],
+  editorProps: {
+    attributes: {
+      class: 'cpf-editor-content',
+      'aria-label': 'Düşüncelerini paylaş',
+    },
+  },
+  onUpdate: ({ editor }) => {
+    newContent.value = editor.isEmpty ? '' : editor.getHTML();
+  },
+});
 
 onMounted(async () => {
   store.resetFeed();
@@ -32,6 +109,46 @@ onMounted(async () => {
     }, { rootMargin: '200px' }).observe(sentinel.value);
   }
 });
+
+onBeforeUnmount(() => {
+  editor.value?.destroy();
+});
+
+const contentHasBody = computed(() => editor.value ? !editor.value.isEmpty : !!newContent.value.trim());
+
+function setTextBlock(type: 'paragraph' | 'heading1' | 'heading2') {
+  if (!editor.value) return;
+  if (type === 'paragraph') editor.value.chain().focus().setParagraph().run();
+  if (type === 'heading1') editor.value.chain().focus().toggleHeading({ level: 1 }).run();
+  if (type === 'heading2') editor.value.chain().focus().toggleHeading({ level: 2 }).run();
+}
+
+function activeTextBlock(): 'paragraph' | 'heading1' | 'heading2' {
+  if (editor.value?.isActive('heading', { level: 1 })) return 'heading1';
+  if (editor.value?.isActive('heading', { level: 2 })) return 'heading2';
+  return 'paragraph';
+}
+
+function applyEditorMark(mark: 'textColor' | 'textHighlight', attribute: 'color' | 'backgroundColor', value: string) {
+  if (!editor.value) return;
+  if (value === '#FFFFFF' && mark === 'textHighlight') {
+    editor.value.chain().focus().unsetMark(mark).run();
+    return;
+  }
+  editor.value.chain().focus().setMark(mark, { [attribute]: value }).run();
+}
+
+function setEditorLink() {
+  if (!editor.value) return;
+  const previousUrl = editor.value.getAttributes('link').href as string | undefined;
+  const url = window.prompt('Link adresi', previousUrl || 'https://');
+  if (url === null) return;
+  if (!url.trim()) {
+    editor.value.chain().focus().extendMarkRange('link').unsetLink().run();
+    return;
+  }
+  editor.value.chain().focus().extendMarkRange('link').setLink({ href: url.trim() }).run();
+}
 
 function applyType(t: CommunityPostType | '') {
   activeType.value = t;
@@ -68,13 +185,14 @@ async function handleMedia(e: Event) {
 }
 
 async function submitPost() {
-  if (!newContent.value.trim() && newMediaUrls.value.length === 0) return;
+  const content = editor.value?.isEmpty ? '' : (editor.value?.getHTML().trim() ?? newContent.value.trim());
+  if (!content && newMediaUrls.value.length === 0) return;
   const p = await store.createPost({
-    content: newContent.value.trim() || undefined, type: newType.value,
+    content: content || undefined, type: newType.value,
     mediaUrls: newMediaUrls.value.length > 0 ? newMediaUrls.value : undefined,
     tagNames: newTags.value.length > 0 ? newTags.value : undefined,
   });
-  if (p) { newContent.value = ''; newType.value = 'text'; newMediaUrls.value = []; newTags.value = []; showCreateForm.value = false; }
+  if (p) { newContent.value = ''; editor.value?.commands.clearContent(); newType.value = 'text'; newMediaUrls.value = []; newTags.value = []; showCreateForm.value = false; }
 }
 
 async function react(postId: string, t: CommunityReactionType) {
@@ -102,6 +220,70 @@ function timeAgo(d: string): string {
 function userLabel(t: string) { return t === 'land_owner' ? 'Arazi Sahibi' : t === 'worker' ? 'İşçi' : t === 'self_farmer' ? 'Çiftçi' : ''; }
 
 const hasActiveFilter = () => activeType.value || activeTag.value || searchQuery.value;
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function sanitizeRichText(value: string | null): string {
+  if (!value) return '';
+  const allowedTags = new Set(['P', 'H1', 'H2', 'STRONG', 'EM', 'UL', 'OL', 'LI', 'BR', 'A', 'SPAN']);
+  const richPattern = /<\/?(p|h1|h2|strong|em|ul|ol|li|br|a|span)\b/i;
+  if (!richPattern.test(value)) return escapeHtml(value);
+
+  const doc = new DOMParser().parseFromString(value, 'text/html');
+  const cleanUrl = (href: string | null) => {
+    if (!href) return '';
+    try {
+      const url = new URL(href, window.location.origin);
+      if (['http:', 'https:', 'mailto:'].includes(url.protocol)) return url.href;
+    } catch {
+      return '';
+    }
+    return '';
+  };
+  const isSafeCssColor = (color: string) => /^#[0-9a-f]{3,8}$/i.test(color) || /^rgba?\([\d\s,%.]+\)$/i.test(color);
+  const cleanNode = (node: Node): Node => {
+    if (node.nodeType === Node.TEXT_NODE) return document.createTextNode(node.textContent ?? '');
+    if (node.nodeType !== Node.ELEMENT_NODE) return document.createTextNode('');
+
+    const element = node as HTMLElement;
+    if (!allowedTags.has(element.tagName)) {
+      const fragment = document.createDocumentFragment();
+      Array.from(element.childNodes).forEach((child) => fragment.appendChild(cleanNode(child)));
+      return fragment;
+    }
+
+    const cleanElement = document.createElement(element.tagName.toLowerCase());
+    if (element.tagName === 'A') {
+      const href = cleanUrl(element.getAttribute('href'));
+      if (href) {
+        cleanElement.setAttribute('href', href);
+        cleanElement.setAttribute('target', '_blank');
+        cleanElement.setAttribute('rel', 'noopener noreferrer');
+      }
+    }
+    if (element.tagName === 'SPAN') {
+      const styles: string[] = [];
+      if (isSafeCssColor(element.style.color)) styles.push(`color: ${element.style.color}`);
+      if (isSafeCssColor(element.style.backgroundColor)) styles.push(`background-color: ${element.style.backgroundColor}`);
+      if (styles.length) cleanElement.setAttribute('style', styles.join('; '));
+    }
+    Array.from(element.childNodes).forEach((child) => cleanElement.appendChild(cleanNode(child)));
+    return cleanElement;
+  };
+
+  const fragment = document.createDocumentFragment();
+  Array.from(doc.body.childNodes).forEach((node) => fragment.appendChild(cleanNode(node)));
+  const wrapper = document.createElement('div');
+  wrapper.appendChild(fragment);
+  return wrapper.innerHTML;
+}
 </script>
 
 <template>
@@ -211,7 +393,31 @@ const hasActiveFilter = () => activeType.value || activeTag.value || searchQuery
                   {{ pt==='text'?'Metin':pt==='photo'?'Fotoğraf':'Video' }}
                 </button>
               </div>
-              <textarea v-model="newContent" class="cpf-textarea" placeholder="Düşüncelerini paylaş..." rows="4"/>
+              <div class="cpf-editor-shell">
+                <div class="cpf-editor-toolbar" aria-label="Metin biçimlendirme">
+                  <select class="editor-select" :value="activeTextBlock()" title="Başlık stili" @change="setTextBlock(($event.target as HTMLSelectElement).value as 'paragraph' | 'heading1' | 'heading2')">
+                    <option value="paragraph">Metin</option>
+                    <option value="heading1">H1</option>
+                    <option value="heading2">H2</option>
+                  </select>
+                  <button class="editor-tool" :class="{ active: editor?.isActive('bold') }" type="button" title="Kalın" @click="editor?.chain().focus().toggleBold().run()">B</button>
+                  <button class="editor-tool italic" :class="{ active: editor?.isActive('italic') }" type="button" title="İtalik" @click="editor?.chain().focus().toggleItalic().run()">I</button>
+                  <button class="editor-tool" :class="{ active: editor?.isActive('bulletList') }" type="button" title="Liste" @click="editor?.chain().focus().toggleBulletList().run()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg>
+                  </button>
+                  <button class="editor-tool" :class="{ active: editor?.isActive('link') }" type="button" title="Link ekle" @click="setEditorLink">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                  </button>
+                  <span class="editor-divider"></span>
+                  <div class="editor-swatches" title="Metin rengi">
+                    <button v-for="color in editorTextColors" :key="`text-${color}`" class="editor-swatch" type="button" :style="{ color }" @click="applyEditorMark('textColor', 'color', color)">A</button>
+                  </div>
+                  <div class="editor-swatches" title="Metin arka planı">
+                    <button v-for="color in editorHighlightColors" :key="`bg-${color}`" class="editor-swatch bg" type="button" :style="{ backgroundColor: color }" @click="applyEditorMark('textHighlight', 'backgroundColor', color)">A</button>
+                  </div>
+                </div>
+                <EditorContent :editor="editor" class="cpf-rich-editor" />
+              </div>
               <div v-if="newType!=='text'" class="msec">
                 <div v-if="newMediaUrls.length" class="mprev"><div v-for="(u,i) in newMediaUrls" :key="i" class="mthumb"><img v-if="newType==='photo'" :src="u" alt="media"/><video v-else :src="u"/><button class="mrem" @click="newMediaUrls.splice(i,1)">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -236,7 +442,7 @@ const hasActiveFilter = () => activeType.value || activeTag.value || searchQuery
                 </div>
                 <p class="thint">Etiketler otomatik olarak da oluşturulabilir</p>
               </div>
-              <button class="spbtn" :disabled="store.createPostLoading||(!newContent.trim()&&newMediaUrls.length===0)" @click="submitPost">
+              <button class="spbtn" :disabled="store.createPostLoading||(!contentHasBody&&newMediaUrls.length===0)" @click="submitPost">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                 {{ store.createPostLoading?'Paylaşılıyor...':'Paylaş' }}
               </button>
@@ -275,7 +481,7 @@ const hasActiveFilter = () => activeType.value || activeTag.value || searchQuery
               </div>
             </div>
 
-            <div v-if="post.content" class="pcont" @click="goTo(post.id)">{{ post.content }}</div>
+            <div v-if="post.content" class="pcont" @click="goTo(post.id)" v-html="sanitizeRichText(post.content)"></div>
 
             <div v-if="post.mediaUrls?.length" class="pmedia" :class="`mc${Math.min(post.mediaUrls.length,4)}`" @click="goTo(post.id)">
               <template v-if="post.type==='photo'"><img v-for="(u,i) in post.mediaUrls.slice(0,4)" :key="i" :src="u" alt="Görsel" class="mimg"/></template>
@@ -390,7 +596,7 @@ const hasActiveFilter = () => activeType.value || activeTag.value || searchQuery
 .sbar-inner:focus-within { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(34,197,94,.1); }
 .sbar-icon { color: var(--color-text-muted); flex-shrink: 0; }
 .sinput {
-  flex: 1; padding: 10px 0; background: transparent; border: none;
+  flex: 1; height: var(--control-height); padding: 0; background: transparent; border: none;
   font-size: 14px; color: var(--color-text-primary); outline: none;
 }
 .sinput::placeholder { color: var(--color-text-muted); }
@@ -469,12 +675,65 @@ const hasActiveFilter = () => activeType.value || activeTag.value || searchQuery
   border-radius: 8px; font-size: 13px; color: var(--color-text-secondary); cursor: pointer; transition: all .2s;
 }
 .ptb.active { background: var(--color-primary-light); border-color: var(--color-primary); color: var(--color-primary); font-weight: 600; }
-.cpf-textarea {
-  padding: 14px; background: var(--color-bg-tertiary); border: 1px solid var(--color-border);
-  border-radius: 12px; font-size: 14px; color: var(--color-text-primary);
-  resize: vertical; min-height: 100px; font-family: inherit;
+.cpf-editor-shell {
+  background: #fff; border: 1px solid var(--color-border-strong);
+  border-radius: 8px; overflow: hidden; box-shadow: var(--shadow-sm);
+  transition: border-color .2s, box-shadow .2s;
 }
-.cpf-textarea:focus { outline: none; border-color: var(--color-primary); }
+.cpf-editor-shell:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(21,128,61,.08), var(--shadow-md);
+}
+.cpf-editor-toolbar {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  padding: 8px 10px; background: linear-gradient(180deg, #fff, #f8fafc);
+  border-bottom: 1px solid var(--color-border);
+}
+.editor-select {
+  height: var(--control-height); padding: 0 28px 0 10px; background: #fff; border: 1px solid var(--color-border);
+  border-radius: 6px; color: var(--color-text-secondary); font-size: 12px; font-weight: 600;
+  outline: none; cursor: pointer;
+}
+.editor-select:focus { border-color: var(--color-primary); }
+.editor-tool {
+  width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  color: var(--color-text-secondary); font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: all .15s;
+}
+.editor-tool.italic { font-style: italic; }
+.editor-tool:hover { background: var(--color-bg-tertiary); color: var(--color-text-primary); }
+.editor-tool.active {
+  background: rgba(21,128,61,.1); border-color: rgba(21,128,61,.22); color: var(--color-primary);
+}
+.editor-divider { width: 1px; height: 22px; margin: 0 4px; background: var(--color-border); }
+.editor-swatches { display: inline-flex; align-items: center; gap: 3px; }
+.editor-swatch {
+  width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+  background: #fff; border: 1px solid var(--color-border); border-radius: 6px;
+  font-size: 12px; font-weight: 800; cursor: pointer; transition: all .15s;
+}
+.editor-swatch.bg { color: var(--color-text-primary) !important; }
+.editor-swatch:hover { transform: translateY(-1px); border-color: var(--color-border-strong); box-shadow: var(--shadow-sm); }
+.cpf-rich-editor :deep(.cpf-editor-content) {
+  min-height: 118px; padding: 14px 16px; outline: none;
+  color: var(--color-text-primary); font-size: 14px; line-height: 1.65;
+}
+.cpf-rich-editor :deep(.cpf-editor-content h1),
+.cpf-rich-editor :deep(.cpf-editor-content h2) {
+  margin: 0 0 10px; color: var(--color-text-primary); line-height: 1.25; font-weight: 700;
+}
+.cpf-rich-editor :deep(.cpf-editor-content h1) { font-size: 22px; }
+.cpf-rich-editor :deep(.cpf-editor-content h2) { font-size: 18px; }
+.cpf-rich-editor :deep(.cpf-editor-content p) { margin: 0 0 8px; }
+.cpf-rich-editor :deep(.cpf-editor-content p:last-child) { margin-bottom: 0; }
+.cpf-rich-editor :deep(.cpf-editor-content ul) { margin: 6px 0 6px 18px; padding: 0; }
+.cpf-rich-editor :deep(.cpf-editor-content li) { margin: 3px 0; }
+.cpf-rich-editor :deep(.cpf-editor-content a) { color: var(--color-secondary); text-decoration: underline; text-underline-offset: 2px; }
+.cpf-rich-editor :deep(.is-editor-empty:first-child::before) {
+  color: var(--color-text-muted); content: attr(data-placeholder);
+  float: left; height: 0; pointer-events: none;
+}
 
 /* Media Upload */
 .msec { display: flex; flex-direction: column; gap: 10px; }
@@ -498,7 +757,7 @@ const hasActiveFilter = () => activeType.value || activeTag.value || searchQuery
 .trow { display: flex; gap: 8px; }
 .tinp-wrap {
   flex: 1; display: flex; align-items: center; gap: 4px;
-  padding: 0 12px; background: var(--color-bg-tertiary); border: 1px solid var(--color-border);
+  height: var(--control-height); padding: 0 12px; background: var(--color-bg-tertiary); border: 1px solid var(--color-border);
   border-radius: 8px; transition: all .2s;
 }
 .tinp-wrap:focus-within { border-color: var(--color-primary); }
@@ -557,6 +816,16 @@ const hasActiveFilter = () => activeType.value || activeTag.value || searchQuery
   font-size: 14px; line-height: 1.6; color: var(--color-text-primary);
   margin-bottom: 12px; cursor: pointer; white-space: pre-wrap; word-break: break-word;
 }
+.pcont :deep(p) { margin: 0 0 8px; }
+.pcont :deep(p:last-child) { margin-bottom: 0; }
+.pcont :deep(h1),
+.pcont :deep(h2) { margin: 0 0 8px; line-height: 1.28; font-weight: 700; color: var(--color-text-primary); }
+.pcont :deep(h1) { font-size: 20px; }
+.pcont :deep(h2) { font-size: 17px; }
+.pcont :deep(ul),
+.pcont :deep(ol) { margin: 6px 0 8px 18px; padding: 0; }
+.pcont :deep(li) { margin: 2px 0; }
+.pcont :deep(a) { color: var(--color-secondary); text-decoration: underline; text-underline-offset: 2px; }
 
 /* Media Grid */
 .pmedia { display: grid; gap: 4px; border-radius: 12px; overflow: hidden; margin-bottom: 12px; cursor: pointer; }

@@ -414,7 +414,8 @@ function formatDate(dateString: string) {
 
 .search-input {
     width: 100%;
-    padding: 12px 12px 12px 44px;
+    height: var(--control-height);
+    padding: 0 12px 0 44px;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 10px;
@@ -432,7 +433,8 @@ function formatDate(dateString: string) {
 }
 
 .filter-select {
-    padding: 12px 16px;
+    height: var(--control-height);
+    padding: 0 16px;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 10px;

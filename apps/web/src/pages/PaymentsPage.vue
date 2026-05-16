@@ -217,7 +217,7 @@ async function confirmDeletePayment() {
         </div>
 
         <div v-else-if="paymentsStore.payments.length === 0" class="empty-state">
-            <div class="empty-icon">💰</div>
+            <div class="empty-icon empty-icon--currency">₺</div>
             <h3>Henüz ödeme kaydı yok</h3>
             <p>İlk ödemenizi ekleyerek başlayın</p>
         </div>
@@ -745,6 +745,20 @@ async function confirmDeletePayment() {
 .empty-icon {
     font-size: 64px;
     margin-bottom: 16px;
+}
+
+.empty-icon--currency {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    border-radius: var(--radius-full);
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    font-size: 42px;
+    font-weight: 800;
+    line-height: 1;
 }
 
 /* ==================== Modal / Wizard ==================== */

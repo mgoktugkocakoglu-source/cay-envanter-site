@@ -410,12 +410,23 @@ onMounted(() => {
 .form-field textarea {
     width: 100%;
     box-sizing: border-box;
-    padding: 12px 14px;
+    padding: 0 14px;
     background: var(--color-bg-secondary);
     border: 1px solid var(--color-border);
     border-radius: 8px;
     color: var(--color-text-primary);
     font: inherit;
+}
+
+.search-input,
+.form-field input {
+    height: var(--control-height);
+}
+
+.form-field textarea {
+    min-height: 96px;
+    padding-top: 10px;
+    padding-bottom: 10px;
 }
 
 .search-input:focus,

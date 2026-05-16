@@ -344,7 +344,8 @@ function handleSubmit() {
 
 .form-input {
   width: 100%;
-  padding: 10px 12px;
+  height: var(--control-height);
+  padding: 0 12px;
   background: var(--color-bg-secondary, #f5f7fa);
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: var(--radius-md, 8px);

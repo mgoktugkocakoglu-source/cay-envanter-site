@@ -429,26 +429,26 @@ async function confirmDeleteHarvest() {
             </header>
 
             <!-- Main Tabs -->
-            <div class="main-tabs">
+            <div class="main-tabs app-tabs">
                 <button
-                    class="main-tab-btn"
-                    :class="{ 'main-tab-btn--active': activeMainTab === 'sell' }"
+                    class="main-tab-btn app-tab-btn"
+                    :class="{ 'main-tab-btn--active app-tab-btn--active': activeMainTab === 'sell' }"
                     @click="activeMainTab = 'sell'"
                 >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
                     Yaş Çay Sat
                 </button>
                 <button
-                    class="main-tab-btn"
-                    :class="{ 'main-tab-btn--active': activeMainTab === 'sales' }"
+                    class="main-tab-btn app-tab-btn"
+                    :class="{ 'main-tab-btn--active app-tab-btn--active': activeMainTab === 'sales' }"
                     @click="activeMainTab = 'sales'"
                 >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                     Satış Verilerim
                 </button>
                 <button
-                    class="main-tab-btn"
-                    :class="{ 'main-tab-btn--active': activeMainTab === 'analysis' }"
+                    class="main-tab-btn app-tab-btn"
+                    :class="{ 'main-tab-btn--active app-tab-btn--active': activeMainTab === 'analysis' }"
                     @click="activeMainTab = 'analysis'"
                 >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
@@ -966,27 +966,30 @@ async function confirmDeleteHarvest() {
 /* ═══════════════ Main Tabs ═══════════════ */
 .main-tabs {
     display: flex;
-    gap: 4px;
+    gap: var(--space-1);
     margin-bottom: 24px;
-    background: var(--color-bg-secondary);
+    background: var(--color-subtle-bg);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
-    padding: 4px;
+    padding: var(--space-1);
+    box-shadow: var(--shadow-sm);
 }
 
 .main-tab-btn {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 12px 20px;
-    border: none;
-    border-radius: var(--radius-md);
+    min-height: 44px;
+    padding: 0 var(--space-5);
+    border: 1px solid transparent;
+    border-radius: calc(var(--radius-md) - 1px);
     background: transparent;
     color: var(--color-text-secondary);
     font-weight: 600;
     font-size: 14px;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
     flex: 1;
     justify-content: center;
     white-space: nowrap;
@@ -994,17 +997,31 @@ async function confirmDeleteHarvest() {
 
 .main-tab-btn:hover {
     color: var(--color-text-primary);
-    background: var(--color-bg-tertiary);
+    background: var(--color-bg-secondary);
+    border-color: var(--color-border);
 }
 
 .main-tab-btn--active {
+    background: var(--color-bg-secondary);
+    border-color: var(--color-border-strong);
+    color: var(--color-primary);
+    box-shadow: var(--shadow-md);
+}
+
+.main-tab-btn--active::before {
+    content: '';
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: 5px;
+    height: 2px;
+    border-radius: var(--radius-full);
     background: var(--color-primary);
-    color: white;
 }
 
 .main-tab-btn--active:hover {
-    background: var(--color-primary-hover);
-    color: white;
+    background: var(--color-bg-secondary);
+    color: var(--color-primary);
 }
 
 /* ═══════════════ Tab Content ═══════════════ */
@@ -1341,17 +1358,18 @@ async function confirmDeleteHarvest() {
 .firm-chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--space-2);
 }
 
 .firm-chip {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 14px 8px 8px;
-    background: var(--color-bg-tertiary);
-    border: 1.5px solid var(--color-border);
-    border-radius: var(--radius-full);
+    gap: var(--space-2);
+    height: var(--control-height);
+    padding: 0 var(--space-4) 0 var(--space-2);
+    background: var(--color-input-bg);
+    border: 1px solid var(--color-input-border);
+    border-radius: var(--radius-md);
     color: var(--color-text-primary);
     font-size: 14px;
     font-weight: 500;
@@ -1362,9 +1380,9 @@ async function confirmDeleteHarvest() {
 }
 
 .firm-chip:hover {
-    border-color: var(--color-primary);
-    background: var(--color-primary-light);
-    color: var(--color-primary);
+    border-color: var(--color-border-strong);
+    background: var(--color-card-bg-hover);
+    color: var(--color-text-primary);
 }
 
 .firm-chip--active {
@@ -1383,9 +1401,9 @@ async function confirmDeleteHarvest() {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-md);
     background: var(--color-bg-secondary);
     color: var(--color-text-secondary);
     font-size: 11px;
@@ -1444,9 +1462,10 @@ async function confirmDeleteHarvest() {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 16px;
-    background: transparent;
-    border: 1.5px dashed var(--color-border);
+    height: var(--control-height);
+    padding: 0 var(--space-4);
+    background: var(--color-input-bg);
+    border: 1px dashed var(--color-input-border);
     border-radius: var(--radius-md);
     color: var(--color-text-secondary);
     font-size: 14px;
@@ -1477,7 +1496,7 @@ async function confirmDeleteHarvest() {
 
 /* ═══════════════ Tariff Panel ═══════════════ */
 .tariff-panel {
-    background: var(--color-bg-tertiary);
+    background: var(--color-card-bg-hover);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     padding: 20px;
@@ -1522,14 +1541,19 @@ async function confirmDeleteHarvest() {
     display: inline-flex;
     align-items: center;
     gap: 10px;
+    height: var(--control-height);
+    padding: 0 var(--space-3);
+    background: var(--color-input-bg);
+    border: 1px solid var(--color-input-border);
+    border-radius: var(--radius-md);
     color: var(--color-text-secondary);
     font-size: 14px;
     cursor: pointer;
 }
 
 .split-toggle-label input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     accent-color: var(--color-primary);
     cursor: pointer;
 }
@@ -1686,14 +1710,21 @@ async function confirmDeleteHarvest() {
 }
 
 .form-input {
-    padding: 12px 16px;
-    border: 2px solid var(--color-border);
+    width: 100%;
+    height: var(--control-height);
+    padding: 0 var(--space-4);
+    border: 1px solid var(--color-input-border);
     border-radius: var(--radius-md);
-    font-size: 14px;
-    background: var(--color-bg-elevated, var(--color-bg-secondary));
+    font-size: var(--font-size-base);
+    background: var(--color-input-bg);
     color: var(--color-text-primary);
-    transition: border-color var(--transition-fast);
+    transition: all var(--transition-fast);
     font-family: inherit;
+    box-sizing: border-box;
+}
+
+.form-input:hover {
+    border-color: var(--color-border-strong);
 }
 
 .form-input:focus {
@@ -1703,9 +1734,24 @@ async function confirmDeleteHarvest() {
 }
 
 .form-input--lg {
-    font-size: 20px;
-    font-weight: 700;
-    padding: 16px 20px;
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    padding: 0 var(--space-4);
+}
+
+.form-input::placeholder {
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-normal);
+}
+
+select.form-input {
+    appearance: none;
+    cursor: pointer;
+    padding-right: 40px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--color-text-muted) 50%), linear-gradient(135deg, var(--color-text-muted) 50%, transparent 50%);
+    background-position: calc(100% - 18px) 17px, calc(100% - 12px) 17px;
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
 }
 
 .kg-input-wrap {
@@ -1714,7 +1760,7 @@ async function confirmDeleteHarvest() {
 
 .kg-input-wrap input {
     width: 100%;
-    padding-right: 48px;
+    padding-right: 52px;
 }
 
 .kg-suffix {
@@ -2430,7 +2476,7 @@ async function confirmDeleteHarvest() {
 
     .main-tab-btn {
         justify-content: flex-start;
-        padding: 12px 16px;
+        padding: 0 var(--space-4);
     }
 
     .step-indicator {
@@ -2468,14 +2514,14 @@ async function confirmDeleteHarvest() {
     }
 
     .firm-chip {
-        min-height: 52px;
-        padding: 8px 14px 8px 8px;
+        height: var(--control-height);
+        padding: 0 var(--space-4) 0 var(--space-2);
         max-width: 100%;
     }
 
     .firm-chip-avatar {
-        width: 36px;
-        height: 36px;
+        width: 28px;
+        height: 28px;
         font-size: 12px;
     }
 

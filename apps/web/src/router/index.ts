@@ -90,6 +90,12 @@ const router = createRouter({
             meta: { requiresAuth: true, hub: 'tea' },
         },
         {
+            path: '/tea/fields/:id/edit',
+            name: 'tea-fields-edit',
+            component: () => import('@/pages/FieldsCreatePage.vue'),
+            meta: { requiresAuth: true, hub: 'tea' },
+        },
+        {
             path: '/tea/fields/:id',
             name: 'tea-field-detail',
             component: () => import('@/pages/FieldDetailPage.vue'),
@@ -246,6 +252,7 @@ const router = createRouter({
         { path: '/dashboard', redirect: '/tea/dashboard' },
         { path: '/fields', redirect: '/tea/fields' },
         { path: '/fields/create', redirect: '/tea/fields/create' },
+        { path: '/fields/:id/edit', redirect: to => `/tea/fields/${to.params.id}/edit` },
         { path: '/fields/:id', redirect: to => `/tea/fields/${to.params.id}` },
         { path: '/firms', redirect: '/tea/firms' },
         { path: '/firms/:id', redirect: to => `/tea/firms/${to.params.id}` },

@@ -778,7 +778,7 @@ onMounted(() => {
 .search-wrap { margin-bottom: 24px; }
 .search-box { position: relative; max-width: 400px; }
 .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--color-text-muted); pointer-events: none; }
-.search-input { width: 100%; padding: 12px 12px 12px 42px; background: var(--color-bg-secondary); border: 2px solid var(--color-border); border-radius: var(--radius-lg); font-size: 14px; color: var(--color-text-primary); transition: border-color var(--transition-fast); }
+.search-input { width: 100%; height: var(--control-height); padding: 0 12px 0 42px; background: var(--color-bg-secondary); border: 2px solid var(--color-border); border-radius: var(--radius-lg); font-size: 14px; color: var(--color-text-primary); transition: border-color var(--transition-fast); }
 .search-input:focus { outline: none; border-color: var(--color-primary); }
 .search-input::placeholder { color: var(--color-text-muted); }
 
@@ -949,7 +949,7 @@ onMounted(() => {
 .form-group { margin-bottom: 14px; }
 .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 6px; }
 .required { color: var(--color-danger); }
-.form-input { width: 100%; padding: 11px 14px; background: var(--color-bg-primary); border: 2px solid var(--color-border); border-radius: var(--radius-md); font-size: 14px; color: var(--color-text-primary); transition: border-color 0.2s; box-sizing: border-box; font-family: inherit; }
+.form-input { width: 100%; height: var(--control-height); padding: 0 14px; background: var(--color-bg-primary); border: 2px solid var(--color-border); border-radius: var(--radius-md); font-size: 14px; color: var(--color-text-primary); transition: border-color 0.2s; box-sizing: border-box; font-family: inherit; }
 .form-input:focus { outline: none; border-color: var(--color-primary); }
 .form-input::placeholder { color: var(--color-text-muted); }
 .form-textarea { resize: vertical; min-height: 60px; }

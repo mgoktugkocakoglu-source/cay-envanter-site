@@ -15,8 +15,8 @@
     border: none;
     border-radius: var(--radius-md);
     transition: all var(--transition-fast);
-    min-height: 44px;
-    min-width: 44px;
+    min-height: var(--control-height);
+    min-width: var(--control-height);
     white-space: nowrap;
 }
 
@@ -72,9 +72,9 @@
 }
 
 .btn-lg {
-    padding: var(--space-4) var(--space-8);
+    padding: 0 var(--space-8);
     font-size: var(--font-size-lg);
-    min-height: 52px;
+    min-height: var(--control-height);
 }
 
 .btn-block {
@@ -96,14 +96,15 @@
 
 .form-input {
     width: 100%;
-    padding: var(--space-3) var(--space-4);
+    height: var(--control-height);
+    padding: 0 var(--space-4);
     font-size: var(--font-size-base);
     color: var(--color-text-primary);
     background: var(--color-input-bg);
     border: 1px solid var(--color-input-border);
     border-radius: var(--radius-md);
     transition: all var(--transition-fast);
-    min-height: 48px;
+    box-sizing: border-box;
 }
 
 .form-input::placeholder {
@@ -128,6 +129,12 @@
     box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
 }
 
+select option,
+.form-input option {
+    min-height: var(--control-height);
+    padding: 10px var(--space-4);
+}
+
 .form-error {
     margin-top: var(--space-2);
     font-size: var(--font-size-sm);
@@ -138,6 +145,75 @@
     margin-top: var(--space-2);
     font-size: var(--font-size-sm);
     color: var(--color-text-muted);
+}
+
+/* Enterprise Tabs */
+.app-tabs {
+    display: flex;
+    gap: var(--space-1);
+    padding: var(--space-1);
+    background: var(--color-subtle-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.app-tab-btn {
+    position: relative;
+    flex: 1;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: 0 var(--space-5);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: calc(var(--radius-md) - 1px);
+    color: var(--color-text-secondary);
+    font-family: var(--font-family);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+    white-space: nowrap;
+}
+
+.app-tab-btn:hover {
+    color: var(--color-text-primary);
+    background: var(--color-bg-secondary);
+    border-color: var(--color-border);
+}
+
+.app-tab-btn--active,
+.app-tab-btn.active {
+    color: var(--color-primary);
+    background: var(--color-bg-secondary);
+    border-color: var(--color-border-strong);
+    box-shadow: var(--shadow-md);
+}
+
+.app-tab-btn--active::before,
+.app-tab-btn.active::before {
+    content: '';
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: 5px;
+    height: 2px;
+    border-radius: var(--radius-full);
+    background: var(--color-primary);
+}
+
+.app-tab-btn--active .tab-count,
+.app-tab-btn.active .tab-count {
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+}
+
+.app-tab-btn svg,
+.app-tab-btn .currency-nav-icon {
+    flex-shrink: 0;
 }
 
 /* Checkbox */

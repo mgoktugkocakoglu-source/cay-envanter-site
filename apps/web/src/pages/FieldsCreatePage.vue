@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useGeoStore } from '@/stores/geoStore';
 import { useFieldsStore } from '@/stores/fieldsStore';
 import { api } from '@/services/api';
@@ -11,11 +11,14 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 const router = useRouter();
+const route = useRoute();
 const geoStore = useGeoStore();
 const fieldsStore = useFieldsStore();
 
 // Form state
 const fieldName = ref('');
+const fieldArea = ref<number | null>(null);
+const fieldAreaUnit = ref<Field['areaUnit']>('m2');
 const notes = ref('');
 const partners = ref<Array<{ firstName: string; lastName: string; identityNumber: string; sharePercentage: number | null }>>([
     { firstName: '', lastName: '', identityNumber: '', sharePercentage: null }
@@ -23,6 +26,8 @@ const partners = ref<Array<{ firstName: string; lastName: string; identityNumber
 const isSubmitting = ref(false);
 const formError = ref<string | null>(null);
 const isPartnersOpen = ref(false);
+const editFieldId = computed(() => typeof route.params.id === 'string' ? route.params.id : '');
+const isEditMode = computed(() => route.name === 'tea-fields-edit' && !!editFieldId.value);
 
 // Map state
 const mapContainer = ref<HTMLDivElement | null>(null);
@@ -59,6 +64,9 @@ const TOTAL_STEPS = 6;
 
 // Check if a step's data is filled
 function isStepComplete(s: number): boolean {
+    if (isEditMode.value) {
+        return fieldName.value.trim() !== '' && !!fieldArea.value && fieldArea.value > 0;
+    }
     switch (s) {
         case 1: return fieldName.value.trim() !== '';
         case 2: return !!geoStore.selectedProvinceId;
@@ -153,6 +161,9 @@ const selectedArea = computed(() => {
 });
 
 const isFormValid = computed(() => {
+    if (isEditMode.value) {
+        return fieldName.value.trim() !== '' && !!fieldArea.value && fieldArea.value > 0;
+    }
     return fieldName.value.trim() !== '' &&
         geoStore.selectedProvinceId &&
         geoStore.selectedDistrictId &&
@@ -200,6 +211,20 @@ onMounted(async () => {
     }
 
     await geoStore.fetchProvinces();
+
+    if (isEditMode.value) {
+        await fieldsStore.fetchField(editFieldId.value);
+        const field = fieldsStore.currentField;
+        if (field) {
+            fieldName.value = field.name;
+            fieldArea.value = field.area;
+            fieldAreaUnit.value = field.areaUnit;
+            notes.value = field.notes || '';
+            activeStep.value = 6;
+        } else {
+            formError.value = fieldsStore.error || 'Tarla bilgisi bulunamadı';
+        }
+    }
 });
 
 onUnmounted(() => {
@@ -448,6 +473,30 @@ function hasPartnerValue(partner: { firstName: string; lastName: string; identit
 async function handleSubmit() {
     if (!isFormValid.value) return;
 
+    if (isEditMode.value) {
+        isSubmitting.value = true;
+        formError.value = null;
+        try {
+            const result = await fieldsStore.updateField(editFieldId.value, {
+                name: fieldName.value.trim(),
+                area: fieldArea.value || undefined,
+                areaUnit: fieldAreaUnit.value,
+                notes: notes.value.trim() || null,
+            });
+
+            if (result) {
+                router.push('/tea/fields');
+            } else {
+                formError.value = fieldsStore.error || 'Tarla güncellenemedi';
+            }
+        } catch {
+            formError.value = 'Bir hata oluştu';
+        } finally {
+            isSubmitting.value = false;
+        }
+        return;
+    }
+
     const filledPartners = partners.value.filter(hasPartnerValue);
     const invalidPartner = filledPartners.some((partner) =>
         !partner.firstName.trim() ||
@@ -495,7 +544,7 @@ async function handleSubmit() {
 
         const result = await fieldsStore.createField(fieldData as Parameters<typeof fieldsStore.createField>[0]);
         if (result) {
-            router.push('/fields');
+            router.push('/tea/fields');
         } else {
             formError.value = fieldsStore.error || 'Tarla oluşturulamadı';
         }
@@ -521,18 +570,18 @@ function goBack() {
                     Geri Dön
                 </button>
                 <div class="header-center">
-                    <h1>Yeni Tarla Ekle</h1>
-                    <p class="header-sub">Adım {{ activeStep }} / {{ TOTAL_STEPS }}</p>
+                    <h1>{{ isEditMode ? 'Tarlayı Düzenle' : 'Yeni Tarla Ekle' }}</h1>
+                    <p class="header-sub">{{ isEditMode ? 'Tarla bilgilerini güncelleyin' : `Adım ${activeStep} / ${TOTAL_STEPS}` }}</p>
                 </div>
             </header>
 
             <!-- Progress Bar -->
-            <div class="progress-track">
+            <div v-if="!isEditMode" class="progress-track">
                 <div class="progress-fill" :style="{ width: `${(activeStep / TOTAL_STEPS) * 100}%` }"></div>
             </div>
 
             <!-- Map - Always Visible -->
-            <div class="map-section">
+            <div v-if="!isEditMode" class="map-section">
                 <div class="map-card">
                     <div ref="mapContainer" class="map-container"></div>
                     <div class="map-status">
@@ -614,7 +663,7 @@ function goBack() {
                     <!-- Step 2: Province -->
                     <div v-else-if="activeStep === 2" key="step2" class="step-card">
                         <div class="step-header">
-                            <button type="button" class="btn-step-back" aria-label="Önceki adım" @click="prevStep">
+                            <button v-if="!isEditMode" type="button" class="btn-step-back" aria-label="Önceki adım" @click="prevStep">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
                             </button>
                             <div class="step-badge">2</div>
@@ -735,8 +784,32 @@ function goBack() {
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                             </div>
                             <div>
-                                <h2 class="step-title">Son Adım: Detaylar</h2>
-                                <p class="step-hint">Notlarinizi ve ortak bilgilerinizi ekleyin</p>
+                                <h2 class="step-title">{{ isEditMode ? 'Tarla Bilgileri' : 'Son Adım: Detaylar' }}</h2>
+                                <p class="step-hint">{{ isEditMode ? 'Ad, alan ve not bilgilerini düzenleyin' : 'Notlarinizi ve ortak bilgilerinizi ekleyin' }}</p>
+                            </div>
+                        </div>
+
+                        <div v-if="isEditMode" class="edit-fields-grid">
+                            <div class="detail-group">
+                                <label for="editFieldName" class="detail-label">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
+                                    Tarla Adı
+                                </label>
+                                <input id="editFieldName" v-model="fieldName" type="text" class="form-input" placeholder="Tarla adı" />
+                            </div>
+                            <div class="detail-group">
+                                <label for="editFieldArea" class="detail-label">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
+                                    Alan
+                                </label>
+                                <div class="area-edit-row">
+                                    <input id="editFieldArea" v-model.number="fieldArea" type="number" min="0.01" step="0.01" class="form-input" placeholder="Alan" />
+                                    <select v-model="fieldAreaUnit" class="form-input area-unit-select">
+                                        <option value="m2">m²</option>
+                                        <option value="donum">dönüm</option>
+                                        <option value="dekar">dekar</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
 
@@ -750,7 +823,7 @@ function goBack() {
                         </div>
 
                         <!-- Partners -->
-                        <div class="detail-group">
+                        <div v-if="!isEditMode" class="detail-group">
                             <button type="button" class="partners-toggle" @click="isPartnersOpen = !isPartnersOpen">
                                 <div class="partners-toggle-left">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -797,7 +870,7 @@ function goBack() {
                             <button type="submit" class="btn-submit" :disabled="!isFormValid || isSubmitting">
                                 <span v-if="isSubmitting" class="spinner"></span>
                                 <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                                {{ isSubmitting ? 'Kaydediliyor...' : 'Tarla Ekle' }}
+                                {{ isSubmitting ? 'Kaydediliyor...' : (isEditMode ? 'Değişiklikleri Kaydet' : 'Tarla Ekle') }}
                             </button>
                         </div>
                     </div>
@@ -1118,13 +1191,21 @@ function goBack() {
     font-size: var(--font-size-base);
     font-family: var(--font-family);
     transition: all var(--transition-fast);
-    min-height: 44px;
     box-sizing: border-box;
+}
+
+.form-input {
+    height: var(--control-height);
+    padding-top: 0;
+    padding-bottom: 0;
 }
 
 .form-input::placeholder, .form-textarea::placeholder { color: var(--color-text-muted); }
 .form-input:focus, .form-textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-light); }
 .form-textarea { resize: vertical; min-height: 80px; }
+.edit-fields-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: var(--space-4); margin-bottom: var(--space-4); }
+.area-edit-row { display: grid; grid-template-columns: 1fr 120px; gap: var(--space-3); }
+.area-unit-select { cursor: pointer; }
 
 .loading-text {
     display: flex; align-items: center; gap: var(--space-1);
@@ -1192,6 +1273,8 @@ function goBack() {
     }
     .map-section { position: static; }
     .step-card { padding: var(--space-4); }
+    .edit-fields-grid { grid-template-columns: 1fr; }
+    .area-edit-row { grid-template-columns: 1fr; }
     .partner-row { flex-wrap: wrap; }
     .partner-name-input,
     .partner-tc-input,

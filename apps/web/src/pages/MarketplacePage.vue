@@ -567,7 +567,7 @@ function listingHighlights(listing: MarketplaceListing) {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 42px;
+  min-height: var(--control-height);
   padding: 0 16px;
   color: #fff;
   background: var(--color-primary);
@@ -693,8 +693,7 @@ function listingHighlights(listing: MarketplaceListing) {
 .field input,
 .field textarea {
   width: 100%;
-  min-height: 40px;
-  padding: 10px 12px;
+  padding: 0 12px;
   color: var(--color-text-primary);
   background: var(--color-bg-tertiary);
   border: 1px solid var(--color-border);
@@ -702,7 +701,14 @@ function listingHighlights(listing: MarketplaceListing) {
   font: inherit;
 }
 
+.field input {
+  height: var(--control-height);
+}
+
 .field textarea {
+  min-height: 96px;
+  padding-top: 10px;
+  padding-bottom: 10px;
   resize: vertical;
 }
 
@@ -850,7 +856,7 @@ function listingHighlights(listing: MarketplaceListing) {
 
 .search-box input {
   width: 100%;
-  min-height: 42px;
+  height: var(--control-height);
   color: var(--color-text-primary);
   background: transparent;
   border: 0;
@@ -868,7 +874,7 @@ function listingHighlights(listing: MarketplaceListing) {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 42px;
+  min-height: var(--control-height);
   padding: 0 12px;
   color: var(--color-text-secondary);
   background: var(--color-bg-secondary);

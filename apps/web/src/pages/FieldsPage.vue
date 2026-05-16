@@ -62,7 +62,7 @@ function navigateToCreateParams() {
 
 function navigateToEdit(id: string, event: Event) {
     event.stopPropagation();
-    router.push(`/fields/${id}/edit`);
+    router.push(`/tea/fields/${id}/edit`);
 }
 
 function openDeleteModal(field: Field, event: Event) {
@@ -442,7 +442,8 @@ function getFieldInitial(name: string) {
 
 .search-input {
     width: 100%;
-    padding: var(--space-3) var(--space-4) var(--space-3) 40px;
+    height: var(--control-height);
+    padding: 0 var(--space-4) 0 40px;
     background: var(--color-bg-secondary);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
@@ -450,7 +451,6 @@ function getFieldInitial(name: string) {
     font-size: var(--font-size-sm);
     font-family: var(--font-family);
     transition: all var(--transition-fast);
-    min-height: 42px;
 }
 
 .search-input::placeholder {

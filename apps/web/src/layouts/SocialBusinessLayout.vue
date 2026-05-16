@@ -3,6 +3,8 @@ import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
+import teaBusinessIcon from '@/assets/images/tea-business-icon.png';
+import socialBusinessIcon from '@/assets/images/social-business-icon.png';
 
 const authStore = useAuthStore();
 const themeStore = useThemeStore();
@@ -71,7 +73,7 @@ onBeforeUnmount(() => {
         </RouterLink>
         <div class="hub-divider-v" aria-hidden="true"></div>
         <div class="hub-context">
-          <span class="hub-context-icon">🤝</span>
+          <img class="hub-context-icon" :src="socialBusinessIcon" alt="" aria-hidden="true" />
           <span class="hub-context-text">Sosyal İş Hesabı</span>
         </div>
       </div>
@@ -87,7 +89,7 @@ onBeforeUnmount(() => {
       <!-- ─── RIGHT: Actions ─── -->
       <div class="hub-header-right">
         <button class="hub-switch-btn" type="button" @click="switchToTea" title="Çay İşleri Hesabı'na geç">
-          <span class="hub-switch-icon">🍃</span>
+          <img class="hub-switch-icon" :src="teaBusinessIcon" alt="" aria-hidden="true" />
           <span class="hub-switch-label">Çay İşleri</span>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
@@ -211,7 +213,12 @@ onBeforeUnmount(() => {
   gap: 8px;
   min-width: 0;
 }
-.hub-context-icon { font-size: 16px; }
+.hub-context-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
 .hub-context-text {
   font-size: 14px;
   font-weight: 600;
@@ -281,7 +288,12 @@ onBeforeUnmount(() => {
   background: rgba(16, 185, 129, 0.15);
   border-color: rgba(16, 185, 129, 0.4);
 }
-.hub-switch-icon { font-size: 15px; }
+.hub-switch-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
 
 .icon-btn {
   display: inline-flex;

@@ -470,7 +470,8 @@ watch(searchQuery, () => {
 
 .search-input {
   width: 100%;
-  padding: 10px 14px 10px 40px;
+  height: var(--control-height);
+  padding: 0 14px 0 40px;
   border: 1px solid var(--color-border);
   background: var(--color-bg-tertiary);
   border-radius: var(--radius-lg);

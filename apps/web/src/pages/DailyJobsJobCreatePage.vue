@@ -655,10 +655,10 @@ function goToListings() { router.push('/social/job-listings'); }
 .pruning-offer-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); color: var(--color-text-primary); }
 .btn-remove-offer, .btn-add-offer { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-tertiary); color: var(--color-text-secondary); cursor: pointer; font-weight: var(--font-weight-semibold); transition: all var(--transition-fast); }
 .btn-remove-offer { padding: 6px 10px; font-size: var(--font-size-xs); }
-.btn-add-offer { width: 100%; min-height: 44px; margin-bottom: var(--space-4); }
+.btn-add-offer { width: 100%; min-height: var(--control-height); margin-bottom: var(--space-4); }
 .btn-remove-offer:hover, .btn-add-offer:hover:not(:disabled) { border-color: #e11d48; color: #e11d48; }
 .btn-add-offer:disabled { opacity: 0.5; cursor: not-allowed; }
-.form-input { width: 100%; padding: var(--space-3) var(--space-4); background: var(--color-bg-tertiary); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-text-primary); font-size: var(--font-size-base); font-family: var(--font-family); transition: all var(--transition-fast); min-height: 48px; }
+.form-input { width: 100%; height: var(--control-height); padding: 0 var(--space-4); background: var(--color-bg-tertiary); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-text-primary); font-size: var(--font-size-base); font-family: var(--font-family); transition: all var(--transition-fast); }
 .form-input:focus { outline: none; border-color: #e11d48; box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.15); }
 .form-input::placeholder { color: var(--color-text-muted); }
 .form-input[type="number"]::-webkit-outer-spin-button, .form-input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
