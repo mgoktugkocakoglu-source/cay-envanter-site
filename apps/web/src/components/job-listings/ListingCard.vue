@@ -336,7 +336,6 @@ function getEquipmentLabel(value: string): string {
   --accent-soft: rgba(22, 163, 74, 0.1);
   --accent-border: rgba(22, 163, 74, 0.22);
   width: 100%;
-  max-width: 430px;
   overflow: hidden;
   background: #ffffff;
   border: 1px solid #d9e2ef;

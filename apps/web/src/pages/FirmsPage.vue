@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { useFirmsStore } from '@/stores/firmsStore';
 import { useAuthStore } from '@/stores/authStore';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
+import AppEmptyState from '@/components/ui/AppEmptyState.vue';
 
 const firmsStore = useFirmsStore();
 const authStore = useAuthStore();
@@ -339,19 +340,16 @@ onMounted(() => {
             </div>
 
             <!-- Empty -->
-            <div v-else-if="filteredFirms.length === 0" class="empty-state">
-                <div class="empty-icon">
-                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-text-muted)">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                        <polyline points="9 22 9 12 15 12 15 22"/>
-                    </svg>
-                </div>
-                <h3>Henüz firma kaydedilmemiş</h3>
-                <p>Anlasmali firmalar burada listelenecektir</p>
+            <AppEmptyState
+                v-else-if="filteredFirms.length === 0"
+                icon="firm"
+                title="Henüz firma kaydedilmemiş"
+                description="Anlasmali firmalar burada listelenecektir"
+            >
                 <button v-if="authStore.isAdmin" class="btn-add-empty" @click="router.push('/admin/firms')">
                     Firma Yonetimine Git
                 </button>
-            </div>
+            </AppEmptyState>
 
             <!-- Firms Grid -->
             <div v-else class="firms-grid">

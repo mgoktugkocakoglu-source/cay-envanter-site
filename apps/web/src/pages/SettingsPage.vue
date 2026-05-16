@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
+import AppEmptyState from '@/components/ui/AppEmptyState.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -430,7 +431,7 @@ function switchTab(tab: typeof activeTab.value) {
             @click="switchTab('security')"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            Guvenlik
+            Güvenlik
           </button>
           <button
             class="tab-btn app-tab-btn"
@@ -446,7 +447,7 @@ function switchTab(tab: typeof activeTab.value) {
             @click="switchTab('appearance')"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-            Gorunum
+            Görünüm
           </button>
           <button
             class="tab-btn app-tab-btn"
@@ -715,10 +716,7 @@ function switchTab(tab: typeof activeTab.value) {
             </div>
 
             <!-- Empty -->
-            <div v-else class="sessions-empty">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-              <p>Aktif oturum bulunamadi</p>
-            </div>
+            <AppEmptyState v-else icon="document" title="Aktif oturum bulunamadi" />
           </div>
         </div>
 
@@ -729,7 +727,7 @@ function switchTab(tab: typeof activeTab.value) {
               <h2>Tema Ayarlari</h2>
             </div>
             <p class="card-description">
-              Uygulamanin gorunumunu tercihlerinize gore ayarlayin.
+              Uygulamanin görünümünü tercihlerinize göre ayarlayın.
             </p>
 
             <div class="theme-selector">

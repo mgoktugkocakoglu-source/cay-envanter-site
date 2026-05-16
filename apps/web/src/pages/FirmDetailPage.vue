@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/composables/useToast';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
+import AppEmptyState from '@/components/ui/AppEmptyState.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 
 const route = useRoute();
@@ -467,11 +468,12 @@ onMounted(loadFirmData);
                         </button>
                     </div>
 
-                    <div v-if="firmsStore.currentTariffs.length === 0" class="empty-state">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-text-muted)"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                        <h3>Guncel tarife bulunamadi</h3>
-                        <p>Bu firmanin aktif tarifeleri henuz belirlenmemis.</p>
-                    </div>
+                    <AppEmptyState
+                        v-if="firmsStore.currentTariffs.length === 0"
+                        icon="payment"
+                        title="Guncel tarife bulunamadi"
+                        description="Bu firmanin aktif tarifeleri henuz belirlenmemis."
+                    />
 
                     <div v-else class="tariffs-grid">
                         <div
@@ -549,12 +551,12 @@ onMounted(loadFirmData);
                         </button>
                     </div>
 
-                    <div v-if="filteredCollectionPoints.length === 0" class="empty-state">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-text-muted)"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                        <h3>Toplama noktası bulunamadı</h3>
-                        <p v-if="provinceFilter || districtFilter">Filtre kriterlerinize uygun sonuç yok. Filtreleri temizleyin.</p>
-                        <p v-else>Bu firmanın henüz kayıtlı toplama noktası yok.</p>
-                    </div>
+                    <AppEmptyState
+                        v-if="filteredCollectionPoints.length === 0"
+                        icon="firm"
+                        title="Toplama noktası bulunamadı"
+                        :description="provinceFilter || districtFilter ? 'Filtre kriterlerinize uygun sonuç yok. Filtreleri temizleyin.' : 'Bu firmanın henüz kayıtlı toplama noktası yok.'"
+                    />
 
                     <!-- Collection Points List -->
                     <div v-else class="collection-points-list">

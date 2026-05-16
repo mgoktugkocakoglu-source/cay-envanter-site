@@ -5,6 +5,7 @@ import { useHarvestsStore } from '@/stores/harvestsStore';
 import { useToast } from '@/composables/useToast';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
+import AppEmptyState from '@/components/ui/AppEmptyState.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 
 const paymentsStore = usePaymentsStore();
@@ -216,11 +217,12 @@ async function confirmDeletePayment() {
             <div class="spinner"></div>
         </div>
 
-        <div v-else-if="paymentsStore.payments.length === 0" class="empty-state">
-            <div class="empty-icon empty-icon--currency">₺</div>
-            <h3>Henüz ödeme kaydı yok</h3>
-            <p>İlk ödemenizi ekleyerek başlayın</p>
-        </div>
+        <AppEmptyState
+            v-else-if="paymentsStore.payments.length === 0"
+            icon="payment"
+            title="Henüz ödeme kaydı yok"
+            description="İlk ödemenizi ekleyerek başlayın"
+        />
 
         <!-- Desktop Table -->
         <template v-else>

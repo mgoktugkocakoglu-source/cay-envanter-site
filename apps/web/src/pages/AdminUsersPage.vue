@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { api, type AdminUser } from '@/services/api';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
+import AppEmptyState from '@/components/ui/AppEmptyState.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 
 const router = useRouter();
@@ -265,10 +266,11 @@ function formatDate(dateString: string) {
                 </div>
 
                 <!-- Empty State -->
-                <div v-if="filteredUsers.length === 0" class="empty-state">
-                    <span class="empty-icon">👥</span>
-                    <p>Kullanıcı bulunamadı</p>
-                </div>
+                <AppEmptyState
+                    v-if="filteredUsers.length === 0"
+                    icon="users"
+                    title="Kullanıcı bulunamadı"
+                />
             </div>
 
             <!-- User Detail Modal -->

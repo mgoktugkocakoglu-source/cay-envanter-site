@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
 import SocialWorkspaceLayout from '@/layouts/SocialWorkspaceLayout.vue';
+import AppEmptyState from '@/components/ui/AppEmptyState.vue';
 import { useAuthStore } from '@/stores/authStore';
 import {
   api,
@@ -579,10 +580,12 @@ function updateTypeLabel() {
           <p>Backend üzerinden yayınlanmış ekipman kayıtları getiriliyor.</p>
         </div>
 
-        <div v-else-if="filteredEquipment.length === 0" class="empty-state">
-          <h2>Henüz yayınlanmış ekipman yok</h2>
-          <p>İlk ekipmanı “Ekipman Ekle” ile gönderebilirsiniz. Kullanıcı gönderileri admin onayından sonra burada görünür.</p>
-        </div>
+        <AppEmptyState
+          v-else-if="filteredEquipment.length === 0"
+          icon="tool"
+          title="Henüz yayınlanmış ekipman yok"
+          description="İlk ekipmanı Ekipman Ekle ile gönderebilirsiniz. Kullanıcı gönderileri admin onayından sonra burada görünür."
+        />
 
         <section v-else-if="!isDetailView" class="equipment-market-grid" aria-label="Ekipman listesi">
           <div class="equipment-list" aria-label="Ekipman listesi">
@@ -737,11 +740,14 @@ function updateTypeLabel() {
           </aside>
         </section>
 
-        <div v-else class="empty-state">
-          <h2>Ekipman bulunamadı</h2>
-          <p>Aradığınız ekipman kaldırılmış veya henüz onaylanmamış olabilir.</p>
+        <AppEmptyState
+          v-else
+          icon="tool"
+          title="Ekipman bulunamadı"
+          description="Aradığınız ekipman kaldırılmış veya henüz onaylanmamış olabilir."
+        >
           <button class="primary-action" type="button" @click="goToEquipmentList">Listeye Dön</button>
-        </div>
+        </AppEmptyState>
 
         <section v-if="comparedEquipment.length" class="compare-section">
           <div class="panel-head compact">

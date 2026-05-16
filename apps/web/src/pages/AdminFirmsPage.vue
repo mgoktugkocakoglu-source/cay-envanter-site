@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import AppLayout from '@/layouts/AppLayout.vue';
+import AppEmptyState from '@/components/ui/AppEmptyState.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 import { useFirmsStore } from '@/stores/firmsStore';
 import { api, type Firm } from '@/services/api';
@@ -264,9 +265,11 @@ onMounted(() => {
                     </div>
                 </div>
 
-                <div v-if="filteredFirms.length === 0" class="empty-state">
-                    Firma bulunamadi
-                </div>
+                <AppEmptyState
+                    v-if="filteredFirms.length === 0"
+                    icon="firm"
+                    title="Firma bulunamadi"
+                />
             </div>
 
             <p v-if="firmsStore.error && !showCreateForm" class="error-message">

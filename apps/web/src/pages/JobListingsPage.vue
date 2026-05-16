@@ -3,6 +3,7 @@ import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
 import SocialWorkspaceLayout from '@/layouts/SocialWorkspaceLayout.vue';
+import AppEmptyState from '@/components/ui/AppEmptyState.vue';
 import ListingCard, { type JobListing } from '@/components/job-listings/ListingCard.vue';
 import { api } from '@/services/api';
 
@@ -214,11 +215,12 @@ watch(searchQuery, () => {
           <p>İlanlar getiriliyor, lütfen bekleyin.</p>
         </div>
 
-        <div v-else-if="listings.length === 0" class="feed-empty">
-          <div class="feed-empty-icon">📋</div>
-          <h3>Listelenecek İlan Bulunamadı</h3>
-          <p>Seçtiğiniz filtrelere uygun ilan bulunmuyor.</p>
-        </div>
+        <AppEmptyState
+          v-else-if="listings.length === 0"
+          icon="briefcase"
+          title="Listelenecek İlan Bulunamadı"
+          description="Seçtiğiniz filtrelere uygun ilan bulunmuyor."
+        />
         
         <div v-else class="listings-grid">
           <ListingCard 
@@ -518,9 +520,10 @@ watch(searchQuery, () => {
 /* ── Listings Feed ── */
 .listings-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-  gap: var(--space-6);
-  justify-items: center;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+  width: 100%;
 }
 
 .feed-empty {
@@ -575,6 +578,12 @@ watch(searchQuery, () => {
   
   .listings-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1200px) and (min-width: 769px) {
+  .listings-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

@@ -6,6 +6,7 @@ import { useToast } from '@/composables/useToast';
 import type { Field } from '@/services/api';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
+import AppEmptyState from '@/components/ui/AppEmptyState.vue';
 
 const router = useRouter();
 const fieldsStore = useFieldsStore();
@@ -164,7 +165,7 @@ function getFieldInitial(name: string) {
                             class="view-btn"
                             :class="{ active: viewMode === 'grid' }"
                             @click="viewMode = 'grid'"
-                            title="Izgara gorunumu"
+                            title="Izgara görünümü"
                         >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
                         </button>
@@ -172,7 +173,7 @@ function getFieldInitial(name: string) {
                             class="view-btn"
                             :class="{ active: viewMode === 'list' }"
                             @click="viewMode = 'list'"
-                            title="Liste gorunumu"
+                            title="Liste görünümü"
                         >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
                         </button>
@@ -193,17 +194,17 @@ function getFieldInitial(name: string) {
             </div>
 
             <!-- Empty -->
-            <div v-else-if="filteredFields.length === 0" class="empty-state">
-                <div class="empty-illustration">
-                    <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                </div>
-                <h3>Henüz tarla eklenmedi</h3>
-                <p>Ilk tarlanizi ekleyerek baslayin</p>
+            <AppEmptyState
+                v-else-if="filteredFields.length === 0"
+                icon="field"
+                title="Henüz tarla eklenmedi"
+                description="Ilk tarlanizi ekleyerek baslayin"
+            >
                 <button class="btn-create btn-create--sm" @click="navigateToCreateParams">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     Tarla Ekle
                 </button>
-            </div>
+            </AppEmptyState>
 
             <!-- Grid View -->
             <div v-else-if="viewMode === 'grid'" class="fields-grid">

@@ -9,6 +9,7 @@ import { api, type Harvest } from '@/services/api';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 import AppCheckbox from '@/components/ui/AppCheckbox.vue';
+import AppEmptyState from '@/components/ui/AppEmptyState.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 import caykurLogo from '@/assets/images/caykur.jpg';
 import ofcayLogo from '@/assets/images/ofcay.png';
@@ -734,14 +735,16 @@ async function confirmDeleteHarvest() {
                     <div class="spinner"></div>
                 </div>
 
-                <div v-else-if="harvestsStore.harvests.length === 0" class="empty-state">
-                    <div class="empty-icon">🍃</div>
-                    <h3>Henüz satış kaydı yok</h3>
-                    <p>Yaş Çay Sat sekmesinden ilk satışınızı kaydedin</p>
+                <AppEmptyState
+                    v-else-if="harvestsStore.harvests.length === 0"
+                    icon="leaf"
+                    title="Henüz satış kaydı yok"
+                    description="Yaş Çay Sat sekmesinden ilk satışınızı kaydedin"
+                >
                     <button class="btn-primary" style="margin-top: 16px;" @click="activeMainTab = 'sell'">
                         Yaş Çay Sat
                     </button>
-                </div>
+                </AppEmptyState>
 
                 <!-- Desktop Table -->
                 <template v-else>
@@ -835,11 +838,12 @@ async function confirmDeleteHarvest() {
                     <div class="spinner"></div>
                 </div>
 
-                <div v-else-if="analysisMonthRows.length === 0 && analysisYearRows.length === 0" class="empty-state">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-text-muted)"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-                    <h3>Analiz icin hasat verisi yok</h3>
-                    <p>Yaş Çay Sat sekmesinden hasat eklediğinizde verim değişimleri burada görünür.</p>
-                </div>
+                <AppEmptyState
+                    v-else-if="analysisMonthRows.length === 0 && analysisYearRows.length === 0"
+                    icon="bar-chart"
+                    title="Analiz icin hasat verisi yok"
+                    description="Yaş Çay Sat sekmesinden hasat eklediğinizde verim değişimleri burada görünür."
+                />
 
                 <template v-else>
                     <div v-if="analysisNotifications.length > 0" class="analysis-notifications">
@@ -1365,8 +1369,8 @@ async function confirmDeleteHarvest() {
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
-    height: var(--control-height);
-    padding: 0 var(--space-4) 0 var(--space-2);
+    min-height: 46px;
+    padding: 4px var(--space-4) 4px var(--space-2);
     background: var(--color-input-bg);
     border: 1px solid var(--color-input-border);
     border-radius: var(--radius-md);
@@ -1386,23 +1390,24 @@ async function confirmDeleteHarvest() {
 }
 
 .firm-chip--active {
-    background: var(--color-primary-light);
+    background: var(--color-input-bg);
     border-color: var(--color-primary);
-    color: var(--color-primary);
+    box-shadow: 0 0 0 1px var(--color-primary);
+    color: var(--color-text-primary);
     font-weight: 600;
 }
 
 .firm-chip--active .firm-chip-avatar {
-    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
-    color: white;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-secondary);
 }
 
 .firm-chip-avatar {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 34px;
+    height: 34px;
     border-radius: var(--radius-md);
     background: var(--color-bg-secondary);
     color: var(--color-text-secondary);
@@ -1415,7 +1420,8 @@ async function confirmDeleteHarvest() {
     background: white;
     color: transparent;
     overflow: hidden;
-    border: 1px solid rgba(148, 163, 184, 0.25);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    padding: 3px;
 }
 
 .firm-chip-logo {

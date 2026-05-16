@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
 import SocialWorkspaceLayout from '@/layouts/SocialWorkspaceLayout.vue';
+import AppEmptyState from '@/components/ui/AppEmptyState.vue';
 import { useAuthStore } from '@/stores/authStore';
 import { api, type MarketplaceListing, type MarketplaceListingCategory } from '@/services/api';
 
@@ -497,10 +498,12 @@ function listingHighlights(listing: MarketplaceListing) {
           </article>
         </section>
 
-        <div v-else class="empty-state">
-          <h2>Henüz ilan yok</h2>
-          <p>Bu alanda sadece backendden gelen gerçek pazar ilanları gösterilir. İlk ilanı “Ürün Sat” ile yayınlayabilirsiniz.</p>
-        </div>
+        <AppEmptyState
+          v-else
+          icon="cart"
+          title="Henüz ilan yok"
+          description="Bu alanda sadece backendden gelen gerçek pazar ilanları gösterilir. İlk ilanı Ürün Sat ile yayınlayabilirsiniz."
+        />
       </div>
     </SocialWorkspaceLayout>
   </SocialBusinessLayout>

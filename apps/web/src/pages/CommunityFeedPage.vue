@@ -10,6 +10,7 @@ import { useCommunityStore } from '@/stores/communityStore';
 import { useAuthStore } from '@/stores/authStore';
 import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
 import SocialWorkspaceLayout from '@/layouts/SocialWorkspaceLayout.vue';
+import AppEmptyState from '@/components/ui/AppEmptyState.vue';
 import type { CommunityPostType, CommunityReactionType } from '@/services/api';
 
 const store = useCommunityStore();
@@ -294,7 +295,7 @@ function sanitizeRichText(value: string | null): string {
           <nav class="side-nav">
             <button class="nav-item" :class="{ active: !activeType && !activeTag && !store.activeFilters.userId }" @click="clearAllFilters">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-              <span>Ana Sayfa</span>
+              <span>Tümü</span>
             </button>
             <button v-if="authStore.isAuthenticated" class="nav-item" :class="{ active: !!store.activeFilters.userId }" @click="filterMyPosts">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -458,11 +459,12 @@ function sanitizeRichText(value: string | null): string {
           </div>
 
           <!-- Empty State -->
-          <div v-else-if="store.posts.length===0&&!store.feedLoading" class="empty">
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="1.5" style="margin-bottom:16px;opacity:.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            <h3>Henüz paylaşım yok</h3>
-            <p>İlk paylaşımı yapan siz olun!</p>
-          </div>
+          <AppEmptyState
+            v-else-if="store.posts.length===0&&!store.feedLoading"
+            icon="users"
+            title="Henüz paylaşım yok"
+            description="İlk paylaşımı yapan siz olun!"
+          />
 
           <!-- Post Cards -->
           <article v-for="post in store.posts" :key="post.id" class="pcard">
