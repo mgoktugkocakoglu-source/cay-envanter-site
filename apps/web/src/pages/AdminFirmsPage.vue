@@ -308,8 +308,8 @@ onMounted(() => {
                     </div>
 
                     <div v-if="firmForm.logoUrl" class="logo-preview">
-                        <img :src="firmForm.logoUrl" alt="Logo onizleme" />
-                        <span>Logo onizleme</span>
+                        <img :src="firmForm.logoUrl" alt="Logo önizleme" />
+                        <span>Logo önizleme</span>
                     </div>
 
                     <div class="form-row">

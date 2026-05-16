@@ -51,7 +51,7 @@ const avatarFileFilter = (
     const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedMimes.includes(file.mimetype)) {
         return callback(
-            new BadRequestException('Sadece JPEG, PNG, GIF ve WebP dosyalari yuklenebilir.'),
+            new BadRequestException('Sadece JPEG, PNG, GIF ve WebP dosyalari yüklenebilir.'),
             false,
         );
     }
@@ -239,7 +239,7 @@ export class AuthController {
         @UploadedFile() file: Express.Multer.File,
     ) {
         if (!file) {
-            throw new BadRequestException('Dosya yuklenemedi.');
+            throw new BadRequestException('Dosya yüklenemedi.');
         }
 
         const uploaded = await this.r2StorageService.upload(file, 'avatars');

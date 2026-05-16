@@ -705,7 +705,7 @@ function goBack() {
                             @update:model-value="handleDistrictChange"
                         />
                         <span v-if="geoStore.isLoadingDistricts" class="loading-text">
-                            <span class="spinner-tiny"></span> Yukleniyor...
+                            <span class="spinner-tiny"></span> Yükleniyor...
                         </span>
                     </div>
 
@@ -731,7 +731,7 @@ function goBack() {
                             @update:model-value="handleNeighborhoodChange"
                         />
                         <span v-if="geoStore.isLoadingNeighborhoods" class="loading-text">
-                            <span class="spinner-tiny"></span> Yukleniyor...
+                            <span class="spinner-tiny"></span> Yükleniyor...
                         </span>
                     </div>
 

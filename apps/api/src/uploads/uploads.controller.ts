@@ -27,7 +27,7 @@ const imageFileFilter = (
     const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedMimes.includes(file.mimetype)) {
         return callback(
-            new BadRequestException('Sadece JPEG, PNG, GIF ve WebP dosyalari yuklenebilir.'),
+            new BadRequestException('Sadece JPEG, PNG, GIF ve WebP dosyaları yüklenebilir.'),
             false,
         );
     }
@@ -42,7 +42,7 @@ const videoFileFilter = (
     const allowedMimes = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo'];
     if (!allowedMimes.includes(file.mimetype)) {
         return callback(
-            new BadRequestException('Sadece MP4, WebM, MOV ve AVI video dosyalari yuklenebilir.'),
+            new BadRequestException('Sadece MP4, WebM, MOV ve AVI video dosyaları yüklenebilir.'),
             false,
         );
     }
@@ -64,7 +64,7 @@ export class UploadsController {
     )
     async uploadImage(@UploadedFile() file: Express.Multer.File) {
         if (!file) {
-            throw new BadRequestException('Dosya yuklenemedi.');
+            throw new BadRequestException('Dosya yüklenemedi.');
         }
         const uploaded = await this.r2StorageService.upload(file, 'images');
         return {
@@ -87,7 +87,7 @@ export class UploadsController {
     )
     async uploadVideo(@UploadedFile() file: Express.Multer.File) {
         if (!file) {
-            throw new BadRequestException('Video yuklenemedi.');
+            throw new BadRequestException('Video yüklenemedi.');
         }
         const uploaded = await this.r2StorageService.upload(file, 'videos');
         return {
