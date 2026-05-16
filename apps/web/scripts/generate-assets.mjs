@@ -155,7 +155,7 @@ async function createSolidImage(size, outputPath, color) {
 async function createSplash(outputPath) {
   const width = 2732;
   const height = 2732;
-  const logoSize = 620;
+  const logoSize = 520;
   const logo = await renderLogo(logoSize);
   const scene = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
   <defs>
@@ -186,11 +186,11 @@ async function createSplash(outputPath) {
   <circle cx="430" cy="410" r="240" fill="#eef8e8" opacity="0.55" filter="url(#soft)"/>
   <circle cx="2280" cy="1800" r="310" fill="#eaf7e7" opacity="0.72" filter="url(#soft)"/>
 
-  <text x="1366" y="1370" text-anchor="middle" font-family="Nunito, Arial, sans-serif" font-size="172" font-weight="800">
+  <text x="1366" y="1325" text-anchor="middle" font-family="Nunito, Arial, sans-serif" font-size="156" font-weight="800">
     <tspan fill="#66b82f">Çay</tspan><tspan fill="#064f35"> Hesabım</tspan>
   </text>
-  <text x="1366" y="1514" text-anchor="middle" font-family="Nunito, Arial, sans-serif" font-size="82" font-weight="500" fill="#454955">Çiftçiden veriye,</text>
-  <text x="1366" y="1622" text-anchor="middle" font-family="Nunito, Arial, sans-serif" font-size="82" font-weight="500" fill="#454955">gelecek nesillere.</text>
+  <text x="1366" y="1466" text-anchor="middle" font-family="Nunito, Arial, sans-serif" font-size="76" font-weight="500" fill="#454955">Çiftçiden veriye,</text>
+  <text x="1366" y="1566" text-anchor="middle" font-family="Nunito, Arial, sans-serif" font-size="76" font-weight="500" fill="#454955">gelecek nesillere.</text>
 
   <path d="M0 2055 C430 1900 720 2070 1060 1940 C1450 1792 1750 1998 2100 1850 C2350 1746 2540 1755 2732 1715 L2732 2732 L0 2732 Z" fill="#edf6e5"/>
   <path d="M0 2150 C310 2020 630 2075 900 1985 C1220 1875 1530 2060 1850 1948 C2200 1825 2475 1840 2732 1768 L2732 2732 L0 2732 Z" fill="url(#hillB)" opacity="0.78"/>
@@ -202,7 +202,7 @@ async function createSplash(outputPath) {
 </svg>`);
 
   await sharp(scene)
-    .composite([{ input: logo, top: 735, left: Math.round((width - logoSize) / 2) }])
+    .composite([{ input: logo, top: 680, left: Math.round((width - logoSize) / 2) }])
     .png()
     .toFile(outputPath);
 }
