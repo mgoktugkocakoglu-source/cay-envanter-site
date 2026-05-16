@@ -104,6 +104,38 @@ jobs:
               docker compose -f docker-compose.prod.yml build
               docker compose -f docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 180
             }
+            
+            show_diagnostics() {
+              echo "=== API Container Status ==="
+              docker inspect --format='{{.State.Status}} (health: {{.State.Health.Status}})' cayhesabim-api-prod 2>&1 || true
+              echo "=== Web Container Status ==="
+              docker inspect --format='{{.State.Status}} (health: {{.State.Health.Status}})' cayhesabim-web-prod 2>&1 || true
+              echo "=== API Container Logs ==="
+              docker logs cayhesabim-api-prod --tail 80 2>&1 || true
+              echo "=== Web Container Logs ==="
+              docker logs cayhesabim-web-prod --tail 80 2>&1 || true
+            }
+            
+            check_url() {
+              local name="$1"
+              shift
+
+              echo "Checking ${name}..."
+              for attempt in 1 2 3 4 5; do
+                if curl --fail --silent --show-error --max-time 10 "$@"; then
+                  echo
+                  echo "${name} is healthy."
+                  return 0
+                fi
+
+                echo "${name} check failed on attempt ${attempt}/5."
+                sleep 5
+              done
+
+              echo "${name} did not become healthy."
+              show_diagnostics
+              return 1
+            }
             trap rollback ERR
 
             # Build first while the currently running containers keep serving traffic.
@@ -113,15 +145,10 @@ jobs:
             docker compose -f docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 180
             
             # Show diagnostics after Compose confirms the services are healthy.
-            echo "=== API Container Status ==="
-            docker inspect --format='{{.State.Status}} (health: {{.State.Health.Status}})' cayhesabim-api-prod 2>&1 || true
-            echo "=== Web Container Status ==="
-            docker inspect --format='{{.State.Status}} (health: {{.State.Health.Status}})' cayhesabim-web-prod 2>&1 || true
-            echo "=== API Container Logs ==="
-            docker logs cayhesabim-api-prod --tail 80 2>&1 || true
+            show_diagnostics
             echo "=== Health Check ==="
-            curl -fsS http://127.0.0.1/health
-            curl -fsSk https://127.0.0.1/api/health
+            check_url "web health endpoint" http://127.0.0.1/health
+            check_url "api health endpoint through nginx" --insecure --header "Host: cayhesabim.com" https://127.0.0.1/api/health
             
             # Cleanup unused Docker resources
             docker system prune -f
