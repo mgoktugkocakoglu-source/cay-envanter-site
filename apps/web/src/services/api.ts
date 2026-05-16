@@ -389,6 +389,47 @@ export interface CommunityPostQuery {
     search?: string;
 }
 
+export type MarketplaceListingCategory = 'motor' | 'seedling';
+export type MarketplaceListingStatus = 'active' | 'sold' | 'inactive';
+
+export interface MarketplaceListing {
+    id: string;
+    sellerId: string;
+    category: MarketplaceListingCategory;
+    status: MarketplaceListingStatus;
+    title: string;
+    location: string;
+    description: string;
+    price: number;
+    priceUnit: string | null;
+    contactName: string;
+    contactPhone: string;
+    imageUrls: string[];
+    specs: Record<string, any>;
+    seller?: {
+        id: string;
+        fullName: string;
+        phone: string;
+        avatarUrl: string | null;
+        userType: string;
+    };
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateMarketplaceListingData {
+    category: MarketplaceListingCategory;
+    title: string;
+    location: string;
+    description: string;
+    price: number;
+    priceUnit?: string | null;
+    contactName: string;
+    contactPhone: string;
+    imageUrls?: string[];
+    specs?: Record<string, any>;
+}
+
 export interface CreateCommunityPostData {
     content?: string;
     type: CommunityPostType;
@@ -668,6 +709,18 @@ export const api = {
     updateJobListing: (id: string, data: any) =>
         request<any>(`/job-listings/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     deleteJobListing: (id: string) => request<void>(`/job-listings/${id}`, { method: 'DELETE' }),
+
+    // Marketplace
+    getMarketplaceListings: (params?: { category?: string; status?: string; search?: string }) => {
+        const query = new URLSearchParams(params as Record<string, string>).toString();
+        return request<MarketplaceListing[]>(`/marketplace${query ? `?${query}` : ''}`);
+    },
+    getMarketplaceListing: (id: string) => request<MarketplaceListing>(`/marketplace/${id}`),
+    createMarketplaceListing: (data: CreateMarketplaceListingData) =>
+        request<MarketplaceListing>('/marketplace', { method: 'POST', body: JSON.stringify(data) }),
+    updateMarketplaceListing: (id: string, data: Partial<CreateMarketplaceListingData> & { status?: MarketplaceListingStatus }) =>
+        request<MarketplaceListing>(`/marketplace/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    deleteMarketplaceListing: (id: string) => request<void>(`/marketplace/${id}`, { method: 'DELETE' }),
 
     // Users
     searchUser: (query: string, type: 'tc' | 'phone') =>

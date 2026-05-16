@@ -1,35 +1,34 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
 import SocialWorkspaceLayout from '@/layouts/SocialWorkspaceLayout.vue';
+import { useAuthStore } from '@/stores/authStore';
+import { api, type MarketplaceListing, type MarketplaceListingCategory } from '@/services/api';
 
-type ProductCategory = 'all' | 'motor' | 'seedling';
+type ProductCategory = 'all' | MarketplaceListingCategory;
 type MotorUse = 'tea-harvest' | 'tea-pruning' | 'grass-cutting' | 'wood-cutting';
 type MotorPower = 'electric' | 'gasoline';
 type ElectricPowerType = 'battery' | 'corded';
 
-interface Listing {
-  id: number;
-  category: 'motor' | 'seedling';
-  title: string;
-  location: string;
-  price: number;
-  priceSuffix?: string;
-  description: string;
-  seller: string;
-  postedAt: string;
-  highlights: string[];
-  imageTheme: 'yellow' | 'red' | 'green';
-  badge: string;
-}
+const authStore = useAuthStore();
 
 const activeCategory = ref<ProductCategory>('all');
 const query = ref('');
 const showSellPanel = ref(false);
+const listings = ref<MarketplaceListing[]>([]);
+const loading = ref(false);
+const submitting = ref(false);
+const uploading = ref(false);
+const errorMessage = ref('');
+const successMessage = ref('');
 
 const sellForm = reactive({
+  title: '',
+  description: '',
   location: '',
-  category: 'motor' as 'motor' | 'seedling',
+  category: 'motor' as MarketplaceListingCategory,
+  contactName: '',
+  contactPhone: '',
   motorUse: 'tea-harvest' as MotorUse,
   motorPower: 'electric' as MotorPower,
   electricPowerType: 'battery' as ElectricPowerType,
@@ -46,6 +45,7 @@ const sellForm = reactive({
   plantingDate: '',
   seedlingCount: '',
   seedlingUnitPrice: '',
+  imageUrls: [] as string[],
 });
 
 const motorUses = [
@@ -55,65 +55,23 @@ const motorUses = [
   { value: 'wood-cutting' as const, label: 'Ağaç Kesme Motoru' },
 ];
 
-const listings: Listing[] = [
-  {
-    id: 1,
-    category: 'motor',
-    title: 'Rewi X2 akülü çay toplama motoru',
-    location: 'Rize / Merkez',
-    price: 12500,
-    description: 'Geçen sezon son çayda alındı. Sıfıra yakın, her şeyi aktif. Pazarlık payı mevcut.',
-    seller: 'SeFa Kurt',
-    postedAt: '4 gün önce',
-    highlights: ['Akülü', '2025 model', 'Az kullanılmış'],
-    imageTheme: 'yellow',
-    badge: 'Çay toplama',
-  },
-  {
-    id: 2,
-    category: 'motor',
-    title: 'Hiç kullanılmamış büyük model motor',
-    location: 'Trabzon / Of',
-    price: 12500,
-    description: 'Büyük modeli alındı diye satılık. Kutusu ve aksesuarları duruyor, hiç kullanılmadı.',
-    seller: 'Nizam Kavalcı',
-    postedAt: '2 gün önce',
-    highlights: ['Sıfır ayarında', 'Benzinli', 'Kutulu'],
-    imageTheme: 'red',
-    badge: 'Budama',
-  },
-  {
-    id: 3,
-    category: 'seedling',
-    title: 'Of merkezde satılık çay fidesi',
-    location: 'Trabzon / Of / Kireçli',
-    price: 25,
-    priceSuffix: 'adet',
-    description: 'Poşetli, sağlıklı çay fidesi. Toplu alım için 1000-3000 adet arası teslim hazırlanır.',
-    seller: 'Hava Su Deniz',
-    postedAt: '5 saat önce',
-    highlights: ['Poşetli fide', 'Toplu satış', '1 yıllık bakım'],
-    imageTheme: 'green',
-    badge: 'Çay fidesi',
-  },
-];
-
-const categoryTabs = [
-  { key: 'all' as const, label: 'Tüm İlanlar', count: listings.length },
-  { key: 'motor' as const, label: 'Motor Ekipmanları', count: listings.filter(item => item.category === 'motor').length },
-  { key: 'seedling' as const, label: 'Çay Fidesi', count: listings.filter(item => item.category === 'seedling').length },
-];
+const categoryTabs = computed(() => [
+  { key: 'all' as const, label: 'Tüm İlanlar', count: listings.value.length },
+  { key: 'motor' as const, label: 'Motor Ekipmanları', count: listings.value.filter(item => item.category === 'motor').length },
+  { key: 'seedling' as const, label: 'Çay Fidesi', count: listings.value.filter(item => item.category === 'seedling').length },
+]);
 
 const filteredListings = computed(() => {
   const needle = query.value.trim().toLocaleLowerCase('tr-TR');
-  return listings.filter((listing) => {
+  return listings.value.filter((listing) => {
     const matchesCategory = activeCategory.value === 'all' || listing.category === activeCategory.value;
     const matchesQuery = !needle || [
       listing.title,
       listing.location,
       listing.description,
-      listing.seller,
-      listing.highlights.join(' '),
+      listing.contactName,
+      listing.seller?.fullName,
+      Object.values(listing.specs || {}).join(' '),
     ].join(' ').toLocaleLowerCase('tr-TR').includes(needle);
 
     return matchesCategory && matchesQuery;
@@ -141,8 +99,191 @@ const previewSpecs = computed(() => {
   ].filter(Boolean);
 });
 
-function formatPrice(value: number, suffix?: string) {
+watch(showSellPanel, (isOpen) => {
+  if (!isOpen) return;
+  sellForm.contactName = sellForm.contactName || authStore.user?.fullName || '';
+  sellForm.contactPhone = sellForm.contactPhone || authStore.user?.phone || '';
+  sellForm.location = sellForm.location || [authStore.user?.province, authStore.user?.district].filter(Boolean).join(' / ');
+});
+
+onMounted(() => {
+  fetchListings();
+});
+
+async function fetchListings() {
+  loading.value = true;
+  errorMessage.value = '';
+
+  const response = await api.getMarketplaceListings({ status: 'active' });
+  if (response.error) {
+    errorMessage.value = response.error.message;
+  } else {
+    listings.value = response.data || [];
+  }
+
+  loading.value = false;
+}
+
+async function handleImages(event: Event) {
+  const input = event.target as HTMLInputElement;
+  if (!input.files?.length) return;
+
+  uploading.value = true;
+  errorMessage.value = '';
+
+  const files = Array.from(input.files).slice(0, 6 - sellForm.imageUrls.length);
+  for (const file of files) {
+    const response = await api.uploadImage(file);
+    if (response.error) {
+      errorMessage.value = response.error.message;
+      break;
+    }
+    if (response.data?.url) sellForm.imageUrls.push(response.data.url);
+  }
+
+  uploading.value = false;
+  input.value = '';
+}
+
+async function publishListing() {
+  if (!authStore.isAuthenticated) {
+    errorMessage.value = 'İlan yayınlamak için giriş yapmalısınız.';
+    return;
+  }
+
+  const price = Number(sellForm.category === 'seedling' ? sellForm.seedlingUnitPrice : sellForm.price);
+  if (!sellForm.title || !sellForm.description || !sellForm.location || !sellForm.contactName || !sellForm.contactPhone || !price) {
+    errorMessage.value = 'Başlık, açıklama, konum, fiyat ve iletişim bilgileri zorunludur.';
+    return;
+  }
+
+  submitting.value = true;
+  errorMessage.value = '';
+  successMessage.value = '';
+
+  const response = await api.createMarketplaceListing({
+    category: sellForm.category,
+    title: sellForm.title.trim(),
+    description: sellForm.description.trim(),
+    location: sellForm.location.trim(),
+    price,
+    priceUnit: sellForm.category === 'seedling' ? 'adet' : null,
+    contactName: sellForm.contactName.trim(),
+    contactPhone: sellForm.contactPhone.trim(),
+    imageUrls: sellForm.imageUrls,
+    specs: buildSpecs(),
+  });
+
+  submitting.value = false;
+
+  if (response.error) {
+    errorMessage.value = response.error.message;
+    return;
+  }
+
+  if (response.data) {
+    listings.value = [response.data, ...listings.value];
+    successMessage.value = 'İlan yayınlandı.';
+    showSellPanel.value = false;
+    resetForm();
+  }
+}
+
+function buildSpecs() {
+  if (sellForm.category === 'seedling') {
+    return {
+      plantingDate: sellForm.plantingDate,
+      seedlingCount: numberOrNull(sellForm.seedlingCount),
+    };
+  }
+
+  return {
+    motorUse: sellForm.motorUse,
+    motorPower: sellForm.motorPower,
+    electricPowerType: sellForm.motorPower === 'electric' ? sellForm.electricPowerType : null,
+    brand: sellForm.brand,
+    model: sellForm.model,
+    modelYear: numberOrNull(sellForm.modelYear),
+    totalUseMonths: numberOrNull(sellForm.totalUse),
+    motorPowerValue: numberOrNull(sellForm.motorPowerValue),
+    motorPowerUnit: sellForm.motorPower === 'electric' ? 'Watt' : 'kW',
+    batteryCapacityMah: sellForm.motorPower === 'electric' ? numberOrNull(sellForm.batteryCapacity) : null,
+    rpm: numberOrNull(sellForm.rpm),
+    motorWeightKg: numberOrNull(sellForm.motorWeight),
+    batteryWeightKg: sellForm.motorPower === 'electric' ? numberOrNull(sellForm.batteryWeight) : null,
+  };
+}
+
+function numberOrNull(value: string) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && value !== '' ? parsed : null;
+}
+
+function resetForm() {
+  Object.assign(sellForm, {
+    title: '',
+    description: '',
+    location: [authStore.user?.province, authStore.user?.district].filter(Boolean).join(' / '),
+    category: 'motor',
+    contactName: authStore.user?.fullName || '',
+    contactPhone: authStore.user?.phone || '',
+    motorUse: 'tea-harvest',
+    motorPower: 'electric',
+    electricPowerType: 'battery',
+    brand: '',
+    model: '',
+    modelYear: '',
+    totalUse: '',
+    price: '',
+    motorPowerValue: '',
+    batteryCapacity: '',
+    rpm: '',
+    motorWeight: '',
+    batteryWeight: '',
+    plantingDate: '',
+    seedlingCount: '',
+    seedlingUnitPrice: '',
+    imageUrls: [],
+  });
+}
+
+function removeImage(url: string) {
+  sellForm.imageUrls = sellForm.imageUrls.filter(item => item !== url);
+}
+
+function formatPrice(value: number, suffix?: string | null) {
   return `${new Intl.NumberFormat('tr-TR').format(value)} TL${suffix ? ` / ${suffix}` : ''}`;
+}
+
+function timeAgo(date: string): string {
+  const minutes = Math.floor((Date.now() - new Date(date).getTime()) / 60000);
+  if (minutes < 1) return 'Az önce';
+  if (minutes < 60) return `${minutes} dk önce`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} saat önce`;
+  const days = Math.floor(hours / 24);
+  return `${days} gün önce`;
+}
+
+function motorUseLabel(value?: string) {
+  return motorUses.find(item => item.value === value)?.label || 'Motor ekipmanı';
+}
+
+function listingHighlights(listing: MarketplaceListing) {
+  if (listing.category === 'seedling') {
+    return [
+      listing.specs?.plantingDate && `Dikim: ${listing.specs.plantingDate}`,
+      listing.specs?.seedlingCount && `${listing.specs.seedlingCount} adet`,
+      'Çay fidesi',
+    ].filter(Boolean);
+  }
+
+  return [
+    motorUseLabel(listing.specs?.motorUse),
+    listing.specs?.motorPower === 'electric' ? 'Elektrikli' : 'Benzinli',
+    listing.specs?.brand && listing.specs?.model ? `${listing.specs.brand} ${listing.specs.model}` : listing.specs?.brand,
+    listing.specs?.totalUseMonths && `${listing.specs.totalUseMonths} ay kullanım`,
+  ].filter(Boolean);
 }
 </script>
 
@@ -156,7 +297,7 @@ function formatPrice(value: number, suffix?: string) {
             <h1>2. El Pazar</h1>
             <p>
               Üreticilerin yüksek maliyetli motor ekipmanlarını ve yoğun talep gören çay fidelerini
-              sade bir ilan akışıyla alıp satabileceği pazar alanı.
+              gerçek ilan verisiyle alıp satabileceği pazar alanı.
             </p>
           </div>
           <button class="sell-cta" type="button" @click="showSellPanel = !showSellPanel">
@@ -164,6 +305,9 @@ function formatPrice(value: number, suffix?: string) {
             Ürün Sat
           </button>
         </section>
+
+        <div v-if="errorMessage" class="alert error">{{ errorMessage }}</div>
+        <div v-if="successMessage" class="alert success">{{ successMessage }}</div>
 
         <section class="scope-band">
           <div>
@@ -180,7 +324,7 @@ function formatPrice(value: number, suffix?: string) {
           <div class="panel-head">
             <div>
               <h2>Satış Bilgileri</h2>
-              <p>İlan açmak için konum ve ürün tipine göre gerekli alanları doldurun.</p>
+              <p>İlan açmak için ürün, fiyat ve iletişim bilgilerini doldurun.</p>
             </div>
             <button class="icon-close" type="button" aria-label="Formu kapat" @click="showSellPanel = false">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -188,11 +332,18 @@ function formatPrice(value: number, suffix?: string) {
           </div>
 
           <div class="form-grid">
-            <label class="field">
-              <span>Konum</span>
-              <input v-model="sellForm.location" type="text" placeholder="Rize / Pazar" />
-            </label>
+            <label class="field"><span>İlan Başlığı</span><input v-model="sellForm.title" type="text" placeholder="Rewi Pro X5 satılık" /></label>
+            <label class="field"><span>Konum</span><input v-model="sellForm.location" type="text" placeholder="Rize / Pazar" /></label>
+            <label class="field"><span>İletişim Adı</span><input v-model="sellForm.contactName" type="text" placeholder="Ad Soyad" /></label>
+            <label class="field"><span>Telefon</span><input v-model="sellForm.contactPhone" type="tel" placeholder="05XX XXX XX XX" /></label>
+          </div>
 
+          <label class="field text-field">
+            <span>Açıklama</span>
+            <textarea v-model="sellForm.description" rows="3" placeholder="Ürünün durumu, kullanım geçmişi, pazarlık ve teslim bilgilerini yazın."></textarea>
+          </label>
+
+          <div class="form-grid">
             <div class="field">
               <span>Ürün Kategorisi</span>
               <div class="segmented">
@@ -236,8 +387,8 @@ function formatPrice(value: number, suffix?: string) {
 
             <div class="form-grid specs">
               <label class="field"><span>Marka</span><input v-model="sellForm.brand" type="text" placeholder="Rewi" /></label>
-              <label class="field"><span>Model</span><input v-model="sellForm.model" type="text" placeholder="Pro X2" /></label>
-              <label class="field"><span>Model Yılı</span><input v-model="sellForm.modelYear" type="number" placeholder="2025" /></label>
+              <label class="field"><span>Model</span><input v-model="sellForm.model" type="text" placeholder="Pro X5" /></label>
+              <label class="field"><span>Model Yılı</span><input v-model="sellForm.modelYear" type="number" placeholder="2026" /></label>
               <label class="field"><span>Toplam Kullanım Süresi</span><input v-model="sellForm.totalUse" type="number" placeholder="3" /></label>
               <label class="field"><span>Fiyat</span><input v-model="sellForm.price" type="number" placeholder="12500" /></label>
               <label class="field"><span>Devir Sayısı rpm</span><input v-model="sellForm.rpm" type="number" placeholder="6500" /></label>
@@ -255,10 +406,29 @@ function formatPrice(value: number, suffix?: string) {
             <label class="field"><span>Adet Fiyatı TL</span><input v-model="sellForm.seedlingUnitPrice" type="number" placeholder="25" /></label>
           </div>
 
+          <div class="upload-row">
+            <label class="upload-button">
+              <input type="file" accept="image/*" multiple hidden @change="handleImages" />
+              {{ uploading ? 'Yükleniyor...' : 'Fotoğraf Ekle' }}
+            </label>
+            <div v-if="sellForm.imageUrls.length" class="image-preview">
+              <div v-for="url in sellForm.imageUrls" :key="url">
+                <img :src="url" alt="İlan fotoğrafı" />
+                <button type="button" @click="removeImage(url)">×</button>
+              </div>
+            </div>
+          </div>
+
           <div class="preview-row">
             <span>İlan önizlemesi</span>
             <strong>{{ sellForm.category === 'motor' ? 'Motor ekipmanı' : 'Çay fidesi' }}</strong>
             <em v-for="spec in previewSpecs" :key="String(spec)">{{ spec }}</em>
+          </div>
+
+          <div class="publish-row">
+            <button class="publish-button" type="button" :disabled="submitting || uploading" @click="publishListing">
+              {{ submitting ? 'Yayınlanıyor...' : 'İlanı Yayınla' }}
+            </button>
           </div>
         </section>
 
@@ -281,11 +451,17 @@ function formatPrice(value: number, suffix?: string) {
           </div>
         </section>
 
-        <section class="listing-grid" aria-label="2. el pazar ilanları">
+        <div v-if="loading" class="empty-state">
+          <h2>İlanlar yükleniyor</h2>
+          <p>Güncel pazar ilanları getiriliyor.</p>
+        </div>
+
+        <section v-else-if="filteredListings.length" class="listing-grid" aria-label="2. el pazar ilanları">
           <article v-for="listing in filteredListings" :key="listing.id" class="listing-card">
-            <div class="listing-visual" :class="`theme-${listing.imageTheme}`">
-              <span class="badge">{{ listing.badge }}</span>
-              <div v-if="listing.category === 'seedling'" class="seedling-art" aria-hidden="true">
+            <div class="listing-visual" :class="listing.category === 'seedling' ? 'theme-green' : 'theme-yellow'">
+              <span class="badge">{{ listing.category === 'seedling' ? 'Çay fidesi' : motorUseLabel(listing.specs?.motorUse) }}</span>
+              <img v-if="listing.imageUrls?.length" :src="listing.imageUrls[0]" :alt="listing.title" />
+              <div v-else-if="listing.category === 'seedling'" class="seedling-art" aria-hidden="true">
                 <span v-for="n in 12" :key="n"></span>
               </div>
               <div v-else class="motor-art" aria-hidden="true">
@@ -296,8 +472,8 @@ function formatPrice(value: number, suffix?: string) {
             </div>
             <div class="listing-body">
               <div class="listing-topline">
-                <span>{{ listing.seller }}</span>
-                <small>{{ listing.postedAt }}</small>
+                <span>{{ listing.contactName || listing.seller?.fullName }}</span>
+                <small>{{ timeAgo(listing.createdAt) }}</small>
               </div>
               <h2>{{ listing.title }}</h2>
               <p>{{ listing.description }}</p>
@@ -306,18 +482,24 @@ function formatPrice(value: number, suffix?: string) {
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
                   {{ listing.location }}
                 </span>
-                <strong>{{ formatPrice(listing.price, listing.priceSuffix) }}</strong>
+                <strong>{{ formatPrice(listing.price, listing.priceUnit) }}</strong>
+              </div>
+              <div class="contact-row">
+                <a :href="`tel:${listing.contactPhone}`">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.08 4.18 2 2 0 0 1 4.06 2h3a2 2 0 0 1 2 1.72c.12.9.32 1.77.59 2.61a2 2 0 0 1-.45 2.11L7.91 9.73a16 16 0 0 0 6.36 6.36l1.29-1.29a2 2 0 0 1 2.11-.45c.84.27 1.71.47 2.61.59A2 2 0 0 1 22 16.92Z"/></svg>
+                  {{ listing.contactPhone }}
+                </a>
               </div>
               <div class="highlight-row">
-                <span v-for="item in listing.highlights" :key="item">{{ item }}</span>
+                <span v-for="item in listingHighlights(listing)" :key="String(item)">{{ item }}</span>
               </div>
             </div>
           </article>
         </section>
 
-        <div v-if="filteredListings.length === 0" class="empty-state">
-          <h2>Bu filtrelerde ilan yok</h2>
-          <p>Arama metnini temizleyerek veya kategori değiştirerek mevcut ilanları görebilirsiniz.</p>
+        <div v-else class="empty-state">
+          <h2>Henüz ilan yok</h2>
+          <p>Bu alanda sadece backendden gelen gerçek pazar ilanları gösterilir. İlk ilanı “Ürün Sat” ile yayınlayabilirsiniz.</p>
         </div>
       </div>
     </SocialWorkspaceLayout>
@@ -332,15 +514,23 @@ function formatPrice(value: number, suffix?: string) {
   width: 100%;
 }
 
+.market-hero,
+.sell-panel,
+.scope-band div,
+.listing-card,
+.empty-state,
+.alert {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
 .market-hero {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 18px;
   padding: 24px;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
 }
 
 .hero-copy {
@@ -371,7 +561,8 @@ function formatPrice(value: number, suffix?: string) {
   line-height: 1.6;
 }
 
-.sell-cta {
+.sell-cta,
+.publish-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -387,6 +578,29 @@ function formatPrice(value: number, suffix?: string) {
   white-space: nowrap;
 }
 
+.publish-button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.alert {
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.alert.error {
+  color: #ef4444;
+  background: rgba(239, 68, 68, .08);
+  border-color: rgba(239, 68, 68, .24);
+}
+
+.alert.success {
+  color: var(--color-primary);
+  background: rgba(34, 197, 94, .08);
+  border-color: rgba(34, 197, 94, .24);
+}
+
 .scope-band {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -398,9 +612,6 @@ function formatPrice(value: number, suffix?: string) {
   flex-direction: column;
   gap: 4px;
   padding: 16px;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
 }
 
 .scope-band strong {
@@ -416,9 +627,6 @@ function formatPrice(value: number, suffix?: string) {
 
 .sell-panel {
   padding: 18px;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
 }
 
 .panel-head {
@@ -472,16 +680,21 @@ function formatPrice(value: number, suffix?: string) {
   min-width: 0;
 }
 
+.text-field {
+  margin-bottom: 12px;
+}
+
 .field span {
   color: var(--color-text-secondary);
   font-size: 12px;
   font-weight: 700;
 }
 
-.field input {
+.field input,
+.field textarea {
   width: 100%;
   min-height: 40px;
-  padding: 0 12px;
+  padding: 10px 12px;
   color: var(--color-text-primary);
   background: var(--color-bg-tertiary);
   border: 1px solid var(--color-border);
@@ -489,7 +702,12 @@ function formatPrice(value: number, suffix?: string) {
   font: inherit;
 }
 
-.field input:focus {
+.field textarea {
+  resize: vertical;
+}
+
+.field input:focus,
+.field textarea:focus {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(34, 197, 94, .12);
@@ -527,6 +745,63 @@ function formatPrice(value: number, suffix?: string) {
   margin-bottom: 12px;
 }
 
+.upload-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 0;
+}
+
+.upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 38px;
+  padding: 0 14px;
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+  border: 1px dashed var(--color-primary);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.image-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.image-preview div {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-preview button {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  color: #fff;
+  background: rgba(0, 0, 0, .62);
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
 .preview-row {
   display: flex;
   flex-wrap: wrap;
@@ -545,6 +820,12 @@ function formatPrice(value: number, suffix?: string) {
   background: var(--color-bg-tertiary);
   border-radius: 8px;
   font-style: normal;
+}
+
+.publish-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
 
 .toolbar {
@@ -627,9 +908,6 @@ function formatPrice(value: number, suffix?: string) {
 
 .listing-card {
   overflow: hidden;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
 }
 
 .listing-visual {
@@ -641,8 +919,13 @@ function formatPrice(value: number, suffix?: string) {
   overflow: hidden;
 }
 
+.listing-visual > img {
+  width: 100%;
+  height: 240px;
+  object-fit: cover;
+}
+
 .theme-yellow { background: linear-gradient(135deg, #fff7d6, #f7c948); }
-.theme-red { background: linear-gradient(135deg, #fee2e2, #ef4444); }
 .theme-green { background: linear-gradient(135deg, #dcfce7, #4ade80); }
 
 .badge {
@@ -652,7 +935,7 @@ function formatPrice(value: number, suffix?: string) {
   z-index: 2;
   padding: 5px 9px;
   color: #172554;
-  background: rgba(255, 255, 255, .82);
+  background: rgba(255, 255, 255, .86);
   border: 1px solid rgba(255, 255, 255, .6);
   border-radius: 999px;
   font-size: 12px;
@@ -743,7 +1026,8 @@ function formatPrice(value: number, suffix?: string) {
 
 .listing-topline,
 .meta-row,
-.highlight-row {
+.highlight-row,
+.contact-row {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -782,10 +1066,11 @@ function formatPrice(value: number, suffix?: string) {
 .meta-row {
   justify-content: space-between;
   flex-wrap: wrap;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
-.meta-row span {
+.meta-row span,
+.contact-row a {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -796,6 +1081,19 @@ function formatPrice(value: number, suffix?: string) {
 .meta-row strong {
   color: var(--color-primary);
   font-size: 17px;
+}
+
+.contact-row {
+  margin-bottom: 12px;
+}
+
+.contact-row a {
+  padding: 7px 10px;
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+  border-radius: 8px;
+  font-weight: 800;
+  text-decoration: none;
 }
 
 .highlight-row {
@@ -814,9 +1112,6 @@ function formatPrice(value: number, suffix?: string) {
 .empty-state {
   padding: 32px;
   text-align: center;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
 }
 
 .empty-state h2 {
@@ -845,8 +1140,13 @@ function formatPrice(value: number, suffix?: string) {
     grid-template-columns: 1fr;
   }
 
-  .sell-cta {
+  .sell-cta,
+  .publish-button {
     width: 100%;
+  }
+
+  .publish-row {
+    justify-content: stretch;
   }
 }
 
