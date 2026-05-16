@@ -69,7 +69,7 @@ import { EquipmentModule } from '@/equipment/equipment.module';
                 password: configService.get<string>('DB_PASSWORD'),
                 database: configService.get<string>('DB_DATABASE'),
                 autoLoadEntities: true,
-                synchronize: configService.get<string>('NODE_ENV') === 'development',
+                synchronize: true,
                 logging: configService.get<string>('NODE_ENV') === 'development',
             }),
         }),

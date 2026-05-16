@@ -152,22 +152,89 @@ async function createSolidImage(size, outputPath, color) {
     .toFile(outputPath);
 }
 
-async function createSplash(outputPath, background, logoScale = 0.34) {
-  const size = 2732;
-  const logoSize = Math.round(size * logoScale);
+async function createSplash(outputPath) {
+  const width = 2732;
+  const height = 2732;
+  const logoSize = 620;
   const logo = await renderLogo(logoSize);
+  const scene = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbfcf7"/>
+      <stop offset="0.52" stop-color="#f7faf3"/>
+      <stop offset="1" stop-color="#e7f4df"/>
+    </linearGradient>
+    <linearGradient id="hillA" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#cde8bf"/>
+      <stop offset="1" stop-color="#79bf50"/>
+    </linearGradient>
+    <linearGradient id="hillB" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e8f4df"/>
+      <stop offset="1" stop-color="#9dd06f"/>
+    </linearGradient>
+    <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#c9f26c"/>
+      <stop offset="0.48" stop-color="#75bd34"/>
+      <stop offset="1" stop-color="#0d5a31"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+  </defs>
 
-  await sharp({
-    create: {
-      width: size,
-      height: size,
-      channels: 4,
-      background,
-    },
-  })
-    .composite([{ input: logo, gravity: 'center' }])
+  <rect width="${width}" height="${height}" fill="url(#sky)"/>
+  <circle cx="430" cy="410" r="240" fill="#eef8e8" opacity="0.55" filter="url(#soft)"/>
+  <circle cx="2280" cy="1800" r="310" fill="#eaf7e7" opacity="0.72" filter="url(#soft)"/>
+
+  <text x="1366" y="1370" text-anchor="middle" font-family="Nunito, Arial, sans-serif" font-size="172" font-weight="800">
+    <tspan fill="#66b82f">Çay</tspan><tspan fill="#064f35"> Hesabım</tspan>
+  </text>
+  <text x="1366" y="1514" text-anchor="middle" font-family="Nunito, Arial, sans-serif" font-size="82" font-weight="500" fill="#454955">Çiftçiden veriye,</text>
+  <text x="1366" y="1622" text-anchor="middle" font-family="Nunito, Arial, sans-serif" font-size="82" font-weight="500" fill="#454955">gelecek nesillere.</text>
+
+  <path d="M0 2055 C430 1900 720 2070 1060 1940 C1450 1792 1750 1998 2100 1850 C2350 1746 2540 1755 2732 1715 L2732 2732 L0 2732 Z" fill="#edf6e5"/>
+  <path d="M0 2150 C310 2020 630 2075 900 1985 C1220 1875 1530 2060 1850 1948 C2200 1825 2475 1840 2732 1768 L2732 2732 L0 2732 Z" fill="url(#hillB)" opacity="0.78"/>
+  <path d="M0 2268 C260 2156 560 2188 820 2095 C1160 1975 1432 2220 1815 2075 C2140 1955 2390 1990 2732 1900 L2732 2732 L0 2732 Z" fill="url(#hillA)" opacity="0.85"/>
+  <path d="M0 2352 C430 2256 790 2374 1180 2238 C1570 2100 1940 2262 2260 2160 C2460 2095 2615 2075 2732 2050 L2732 2732 L0 2732 Z" fill="#67b546" opacity="0.88"/>
+
+  ${teaRows(0, 2050, width)}
+  ${foregroundLeaves(width, height)}
+</svg>`);
+
+  await sharp(scene)
+    .composite([{ input: logo, top: 735, left: Math.round((width - logoSize) / 2) }])
     .png()
     .toFile(outputPath);
+}
+
+function teaRows(x, y, width) {
+  const rows = [];
+  for (let i = 0; i < 13; i += 1) {
+    const yy = y + i * 50;
+    const opacity = Math.max(0.18, 0.56 - i * 0.025);
+    rows.push(`<path d="M${x - 80} ${yy} C${width * 0.22} ${yy - 110} ${width * 0.42} ${yy + 80} ${width + 80} ${yy - 80}" fill="none" stroke="#2d8a3e" stroke-width="${18 + i}" stroke-linecap="round" opacity="${opacity}"/>`);
+  }
+  return rows.join('');
+}
+
+function foregroundLeaves(width, height) {
+  const leaves = [];
+  const positions = [
+    [120, 2540, -28, 1.25], [265, 2605, -12, 1.05], [430, 2510, 20, 1.2],
+    [2040, 2555, -24, 1.25], [2245, 2468, 10, 1.35], [2470, 2525, 28, 1.28],
+    [800, 2650, -18, 0.9], [1540, 2645, 18, 0.9]
+  ];
+
+  for (const [cx, cy, rotate, scale] of positions) {
+    leaves.push(`<g transform="translate(${cx} ${cy}) rotate(${rotate}) scale(${scale})">
+      <path d="M0 0 C-68 -210 18 -360 124 -500 C190 -308 166 -118 0 0 Z" fill="url(#leaf)"/>
+      <path d="M8 -28 C48 -168 82 -302 116 -452" fill="none" stroke="#e8ffd1" stroke-width="8" opacity="0.62"/>
+      <path d="M4 -110 C-42 -154 -76 -196 -104 -250" fill="none" stroke="#e8ffd1" stroke-width="6" opacity="0.45"/>
+    </g>`);
+  }
+
+  leaves.push(`<rect x="0" y="${height - 190}" width="${width}" height="190" fill="#064f35" opacity="0.18"/>`);
+  return leaves.join('');
 }
 
 async function createSocialImage(outputPath, width, height, variant = 'wide') {
@@ -254,8 +321,8 @@ async function run() {
   await createTransparentForeground(1024, path.join(ASSETS_DIR, 'icon-foreground.png'));
   await createSolidImage(1024, path.join(ASSETS_DIR, 'icon-background.png'), ICON_BG);
 
-  await createSplash(path.join(ASSETS_DIR, 'splash.png'), ICON_BG, 0.34);
-  await createSplash(path.join(ASSETS_DIR, 'splash-dark.png'), BRAND_GREEN_DARK, 0.34);
+  await createSplash(path.join(ASSETS_DIR, 'splash.png'));
+  await createSplash(path.join(ASSETS_DIR, 'splash-dark.png'));
 
   await createWebIcons();
 
