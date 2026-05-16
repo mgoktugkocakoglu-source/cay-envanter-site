@@ -463,6 +463,7 @@ export interface EquipmentItem {
     imageUrl: string;
     specs: EquipmentSpec[];
     comments: EquipmentComment[];
+    currentUserRating?: number | null;
     favorite: boolean;
     compared: boolean;
     createdAt: string;

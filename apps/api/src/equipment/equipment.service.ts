@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Role } from '@/auth/enums';
@@ -89,6 +89,10 @@ export class EquipmentService {
 
     async createReview(userId: string, equipmentId: string, dto: CreateEquipmentReviewDto): Promise<EquipmentReview> {
         await this.findApprovedEntity(equipmentId);
+        const existing = await this.reviewRepository.findOne({ where: { userId, equipmentId } });
+        if (existing) {
+            throw new ConflictException('Bu ekipman için daha önce değerlendirme yaptınız');
+        }
 
         const review = this.reviewRepository.create({
             ...dto,
@@ -158,7 +162,7 @@ export class EquipmentService {
             likes.forEach(like => likedReviewIds.add(like.reviewId));
         }
 
-        return items.map(item => this.toResponse(item, favoriteIds, likedReviewIds, categoryAverages[item.category]));
+        return items.map(item => this.toResponse(item, favoriteIds, likedReviewIds, categoryAverages[item.category], userId));
     }
 
     private async loadCategoryAverages(): Promise<Record<string, number>> {
@@ -181,9 +185,14 @@ export class EquipmentService {
         favoriteIds: Set<string>,
         likedReviewIds: Set<string>,
         categoryAverage?: number,
+        userId?: string | null,
     ) {
         const createdBy = item.createdBy;
-        const reviews = (item.reviews || []).map(review => ({
+        const uniqueReviews = this.getLatestReviewPerUser(item.reviews || []);
+        const currentUserReview = userId
+            ? uniqueReviews.find(review => review.userId === userId)
+            : null;
+        const reviews = uniqueReviews.map(review => ({
             id: review.id,
             author: review.user?.fullName || 'Üretici',
             text: review.text,
@@ -214,10 +223,27 @@ export class EquipmentService {
             imageUrl: item.imageUrl || '',
             specs: item.specs || [],
             comments: reviews,
+            currentUserRating: currentUserReview?.rating ?? null,
             favorite: favoriteIds.has(item.id),
             compared: false,
             createdAt: item.createdAt,
             updatedAt: item.updatedAt,
         };
+    }
+
+    private getLatestReviewPerUser(reviews: EquipmentReview[]): EquipmentReview[] {
+        const byUser = new Map<string, EquipmentReview>();
+
+        reviews.forEach(review => {
+            const current = byUser.get(review.userId);
+            if (!current || review.updatedAt > current.updatedAt) {
+                byUser.set(review.userId, review);
+            }
+        });
+
+        return [...byUser.values()].sort((a, b) => {
+            if (b.likeCount !== a.likeCount) return b.likeCount - a.likeCount;
+            return b.createdAt.getTime() - a.createdAt.getTime();
+        });
     }
 }

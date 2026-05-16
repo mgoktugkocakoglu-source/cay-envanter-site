@@ -204,6 +204,12 @@ const router = createRouter({
             meta: { requiresAuth: true, hub: 'social' },
         },
         {
+            path: '/social/equipment/:id',
+            name: 'social-equipment-detail',
+            component: () => import('@/pages/EquipmentPage.vue'),
+            meta: { requiresAuth: true, hub: 'social' },
+        },
+        {
             path: '/social/marketplace',
             name: 'social-marketplace',
             component: () => import('@/pages/MarketplacePage.vue'),

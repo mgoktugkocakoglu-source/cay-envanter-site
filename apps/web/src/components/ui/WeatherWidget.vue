@@ -205,7 +205,6 @@ function getSeverityClass(severity: string): string {
 .current-icon {
   font-size: 48px;
   line-height: 1;
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.15));
 }
 
 .current-temp-wrap {
@@ -218,7 +217,7 @@ function getSeverityClass(severity: string): string {
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
   line-height: 1;
-  letter-spacing: -2px;
+  letter-spacing: 0;
 }
 
 .current-label {
@@ -311,8 +310,8 @@ function getSeverityClass(severity: string): string {
 }
 
 .alert--info {
-  background: rgba(16, 185, 129, 0.06);
-  border-color: rgba(16, 185, 129, 0.15);
+  background: var(--color-primary-light);
+  border-color: rgba(21, 128, 61, 0.18);
 }
 
 .alert-icon {
@@ -387,7 +386,7 @@ function getSeverityClass(severity: string): string {
 
 .hour-card--now {
   background: var(--color-primary-light);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(21, 128, 61, 0.2);
 }
 
 .hour-time {
@@ -418,7 +417,7 @@ function getSeverityClass(severity: string): string {
   align-items: center;
   gap: 2px;
   font-size: 9px;
-  color: #3b82f6;
+  color: var(--color-info);
   font-weight: var(--font-weight-medium);
 }
 

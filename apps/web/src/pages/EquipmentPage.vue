@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
 import SocialWorkspaceLayout from '@/layouts/SocialWorkspaceLayout.vue';
 import { useAuthStore } from '@/stores/authStore';
@@ -12,6 +13,8 @@ import {
 } from '@/services/api';
 
 const authStore = useAuthStore();
+const route = useRoute();
+const router = useRouter();
 
 const categories = [
   { key: 'all', label: 'Tüm Ekipmanlar' },
@@ -43,6 +46,7 @@ const successMessage = ref('');
 const errorMessage = ref('');
 const loading = ref(false);
 const imageUploading = ref(false);
+const quickReviewSubmitting = ref<string | null>(null);
 const comparedIds = ref<string[]>([]);
 
 const newEquipment = reactive({
@@ -84,7 +88,12 @@ const filteredEquipment = computed(() => {
   }).sort((a, b) => fpScore(b) - fpScore(a));
 });
 
-const selectedEquipment = computed(() => approvedEquipment.value.find(item => item.id === selectedEquipmentId.value) || filteredEquipment.value[0] || approvedEquipment.value[0]);
+const routeEquipmentId = computed(() => typeof route.params.id === 'string' ? route.params.id : '');
+const isDetailView = computed(() => route.name === 'social-equipment-detail');
+const selectedEquipment = computed(() => {
+  const targetId = routeEquipmentId.value || selectedEquipmentId.value;
+  return approvedEquipment.value.find(item => item.id === targetId) || null;
+});
 
 const comparedEquipment = computed(() => approvedEquipment.value.filter(item => comparedIds.value.includes(item.id)).slice(0, 3));
 const selectedIsCompared = computed(() => selectedEquipment.value ? comparedIds.value.includes(selectedEquipment.value.id) : false);
@@ -111,7 +120,7 @@ const topComments = computed(() => {
 });
 
 watch(filteredEquipment, (items) => {
-  if (!items.some(item => item.id === selectedEquipmentId.value) && items[0]) selectedEquipmentId.value = items[0].id;
+  if (!items.some(item => item.id === selectedEquipmentId.value)) selectedEquipmentId.value = items[0]?.id || '';
 });
 
 onMounted(() => {
@@ -144,6 +153,14 @@ function averageRating(item: EquipmentItem) {
   return item.comments.reduce((sum, comment) => sum + comment.rating, 0) / item.comments.length;
 }
 
+function roundedRating(item: EquipmentItem) {
+  return Math.round(averageRating(item));
+}
+
+function hasUserReviewed(item: EquipmentItem) {
+  return item.currentUserRating !== null && item.currentUserRating !== undefined;
+}
+
 function averageUsageMonths(item: EquipmentItem) {
   if (!item.comments.length) return 0;
   return item.comments.reduce((sum, comment) => sum + comment.usageMonths, 0) / item.comments.length;
@@ -172,6 +189,11 @@ function formatPrice(value: number) {
 
 function selectEquipment(id: string) {
   selectedEquipmentId.value = id;
+  router.push({ name: 'social-equipment-detail', params: { id } });
+}
+
+function goToEquipmentList() {
+  router.push({ name: 'social-equipment' });
 }
 
 function toggleCompare(item: EquipmentItem) {
@@ -229,6 +251,10 @@ async function submitReview() {
     errorMessage.value = 'Değerlendirme yapmak için giriş yapmalısınız.';
     return;
   }
+  if (hasUserReviewed(selectedEquipment.value)) {
+    errorMessage.value = 'Bu ekipman için daha önce değerlendirme yaptınız.';
+    return;
+  }
   if (reviewForm.text.trim().length < 12) {
     errorMessage.value = 'Yorum en az 12 karakter olmalıdır.';
     return;
@@ -251,6 +277,35 @@ async function submitReview() {
   reviewForm.usageMonths = 12;
   reviewForm.text = '';
   successMessage.value = 'Değerlendirmeniz eklendi.';
+  errorMessage.value = '';
+  await fetchEquipment();
+}
+
+async function submitQuickReview(item: EquipmentItem, rating: number) {
+  if (!authStore.isAuthenticated) {
+    errorMessage.value = 'Değerlendirme yapmak için giriş yapmalısınız.';
+    return;
+  }
+  if (hasUserReviewed(item)) {
+    errorMessage.value = 'Bu ekipman için daha önce değerlendirme yaptınız.';
+    return;
+  }
+
+  quickReviewSubmitting.value = `${item.id}-${rating}`;
+  const response = await api.createEquipmentReview(item.id, {
+    rating,
+    usageStatus: 'using',
+    usageMonths: 12,
+    text: `Hızlı değerlendirme: ${rating}/5 puan.`,
+  });
+  quickReviewSubmitting.value = null;
+
+  if (response.error) {
+    errorMessage.value = response.error.message;
+    return;
+  }
+
+  successMessage.value = `${item.brand} ${item.model} için ${rating}/5 değerlendirme eklendi.`;
   errorMessage.value = '';
   await fetchEquipment();
 }
@@ -403,7 +458,7 @@ function updateTypeLabel() {
         <div v-if="successMessage" class="alert success">{{ successMessage }}</div>
         <div v-if="errorMessage" class="alert error">{{ errorMessage }}</div>
 
-        <section class="stats-row" aria-label="Ekipman özeti">
+        <section v-if="!isDetailView" class="stats-row" aria-label="Ekipman özeti">
           <button
             v-for="item in categoryStats"
             :key="item.key"
@@ -501,7 +556,7 @@ function updateTypeLabel() {
           </article>
         </section>
 
-        <section class="toolbar" aria-label="Ekipman filtreleri">
+        <section v-if="!isDetailView" class="toolbar" aria-label="Ekipman filtreleri">
           <div class="search-box">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input v-model="query" type="search" placeholder="Marka, model veya teknik özellik ara..." />
@@ -529,13 +584,12 @@ function updateTypeLabel() {
           <p>İlk ekipmanı “Ekipman Ekle” ile gönderebilirsiniz. Kullanıcı gönderileri admin onayından sonra burada görünür.</p>
         </div>
 
-        <section v-else class="main-grid">
+        <section v-else-if="!isDetailView" class="equipment-market-grid" aria-label="Ekipman listesi">
           <div class="equipment-list" aria-label="Ekipman listesi">
             <article
               v-for="item in filteredEquipment"
               :key="item.id"
               class="equipment-card"
-              :class="{ active: selectedEquipment?.id === item.id }"
               @click="selectEquipment(item.id)"
             >
               <div class="card-art" :class="`theme-${item.category}`">
@@ -545,25 +599,38 @@ function updateTypeLabel() {
                   <span class="body"></span>
                   <span class="handle"></span>
                 </div>
-                <span v-if="fpScore(item) >= 80" class="score-ribbon">F/P</span>
               </div>
               <div class="card-body">
-                <div class="card-topline">
-                  <span>{{ item.typeLabel }}</span>
-                  <strong>{{ fpScore(item) }}/100</strong>
+                <h2 :title="`${item.brand} ${item.model}`">{{ item.brand }} {{ item.model }}</h2>
+                <div class="card-meta">
+                  <span>{{ formatPrice(item.price) }}</span>
+                  <strong>{{ averageRating(item).toFixed(1) }}/5</strong>
                 </div>
-                <h2>{{ item.brand }} {{ item.model }}</h2>
-                <p>{{ formatPrice(item.price) }} - Segment ort. {{ formatPrice(item.segmentAverage) }}</p>
-                <div class="metric-row">
-                  <span>{{ averageRating(item).toFixed(1) }}/5</span>
-                  <span>{{ item.comments.length }} yorum</span>
-                  <span>{{ scoreLabel(item) }}</span>
+                <div class="quick-rating" aria-label="Hızlı değerlendirme" @click.stop>
+                  <button
+                    v-for="rating in 5"
+                    :key="rating"
+                    type="button"
+                    :class="{ filled: rating <= roundedRating(item), own: item.currentUserRating === rating }"
+                    :disabled="hasUserReviewed(item) || quickReviewSubmitting === `${item.id}-${rating}`"
+                    :aria-label="`${rating} puan ver`"
+                    :title="hasUserReviewed(item) ? `Oyunuz: ${item.currentUserRating}/5` : `${rating} puan ver`"
+                    @click="submitQuickReview(item, rating)"
+                  >
+                    ★
+                  </button>
                 </div>
               </div>
             </article>
           </div>
+        </section>
 
-          <aside v-if="selectedEquipment" class="detail-panel" aria-label="Ekipman değerlendirme kartı">
+        <section v-else-if="selectedEquipment" class="equipment-detail-shell">
+          <aside class="detail-panel" aria-label="Ekipman değerlendirme kartı">
+            <button class="back-link" type="button" @click="goToEquipmentList">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+              Listeye Dön
+            </button>
             <div class="detail-head">
               <div>
                 <span class="eyebrow">Değerlendirme Kartı</span>
@@ -627,6 +694,20 @@ function updateTypeLabel() {
 
             <section class="review-panel">
               <h3>Değerlendirme Yap</h3>
+              <div class="one-click-review" aria-label="Tek tıkla değerlendir">
+                <button
+                  v-for="rating in 5"
+                  :key="rating"
+                  type="button"
+                  :class="{ filled: rating <= roundedRating(selectedEquipment), own: selectedEquipment.currentUserRating === rating }"
+                  :disabled="hasUserReviewed(selectedEquipment) || quickReviewSubmitting === `${selectedEquipment.id}-${rating}`"
+                  :title="hasUserReviewed(selectedEquipment) ? `Oyunuz: ${selectedEquipment.currentUserRating}/5` : `${rating} puan ver`"
+                  @click="submitQuickReview(selectedEquipment, rating)"
+                >
+                  <span>{{ rating }}</span>
+                  ★
+                </button>
+              </div>
               <div class="review-controls">
                 <label>
                   <span>Puanla</span>
@@ -655,6 +736,12 @@ function updateTypeLabel() {
             </div>
           </aside>
         </section>
+
+        <div v-else class="empty-state">
+          <h2>Ekipman bulunamadı</h2>
+          <p>Aradığınız ekipman kaldırılmış veya henüz onaylanmamış olabilir.</p>
+          <button class="primary-action" type="button" @click="goToEquipmentList">Listeye Dön</button>
+        </div>
 
         <section v-if="comparedEquipment.length" class="compare-section">
           <div class="panel-head compact">
@@ -1096,34 +1183,32 @@ function updateTypeLabel() {
   border-color: var(--color-primary);
 }
 
-.main-grid {
+.equipment-list {
   display: grid;
-  grid-template-columns: minmax(0, .9fr) minmax(360px, 1.1fr);
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 14px 16px;
   align-items: start;
 }
 
-.equipment-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.equipment-market-grid {
+  width: 100%;
 }
 
 .equipment-card {
-  display: grid;
-  grid-template-columns: 140px minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
   cursor: pointer;
-  transition: border-color .2s, transform .2s;
+  transition: color .2s;
 }
 
-.equipment-card:hover,
-.equipment-card.active {
-  border-color: var(--color-primary);
-}
-
-.equipment-card:hover {
-  transform: translateY(-1px);
+.equipment-card:hover h2 {
+  color: var(--color-primary);
 }
 
 .card-art,
@@ -1136,7 +1221,11 @@ function updateTypeLabel() {
 }
 
 .card-art {
-  min-height: 145px;
+  aspect-ratio: 1 / .78;
+  min-height: 0;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
 }
 
 .card-art img,
@@ -1168,8 +1257,8 @@ function updateTypeLabel() {
 .equipment-art,
 .large-art {
   position: relative;
-  width: 110px;
-  height: 80px;
+  width: 78px;
+  height: 58px;
 }
 
 .large-art {
@@ -1244,59 +1333,115 @@ function updateTypeLabel() {
 }
 
 .card-body {
-  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
   min-width: 0;
 }
 
-.card-topline {
+.card-meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 8px;
+  gap: 6px;
+  min-width: 0;
 }
 
-.card-topline span,
-.card-body p {
+.card-meta span {
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.card-topline strong {
+.card-meta strong {
   color: var(--color-primary);
-  font-size: 14px;
+  font-size: 11px;
+  flex-shrink: 0;
 }
 
 .card-body h2 {
-  margin: 0 0 8px;
+  margin: 0;
   color: var(--color-text-primary);
-  font-size: 17px;
+  font-size: 13px;
+  font-weight: 500;
   line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.card-body p {
-  margin: 0 0 12px;
-  line-height: 1.45;
-}
-
-.metric-row {
+.quick-rating,
+.one-click-review {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  gap: 2px;
 }
 
-.metric-row span {
-  padding: 4px 7px;
-  color: var(--color-text-secondary);
-  background: var(--color-bg-tertiary);
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 700;
+.quick-rating button,
+.one-click-review button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #CBD5E1;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.quick-rating button.filled,
+.one-click-review button.filled {
+  color: #B45309;
+}
+
+.quick-rating button.own,
+.one-click-review button.own {
+  color: var(--color-primary);
+}
+
+.quick-rating button {
+  width: 18px;
+  height: 18px;
+}
+
+.quick-rating button:hover,
+.one-click-review button:hover {
+  background: rgba(180, 83, 9, .1);
+}
+
+.quick-rating button:disabled,
+.one-click-review button:disabled {
+  cursor: not-allowed;
+}
+
+.equipment-detail-shell {
+  display: block;
 }
 
 .detail-panel {
-  position: sticky;
-  top: calc(64px + env(safe-area-inset-top) + 16px);
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  margin-bottom: 14px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 .detail-visual {
@@ -1442,6 +1587,21 @@ function updateTypeLabel() {
   margin: 12px 0;
 }
 
+.one-click-review {
+  gap: 8px;
+  margin-top: 12px;
+  margin-bottom: 8px;
+}
+
+.one-click-review button {
+  gap: 4px;
+  min-height: 36px;
+  padding: 0 10px;
+  background: var(--color-primary-light);
+  border: 1px solid rgba(21, 128, 61, .2);
+  font-weight: 900;
+}
+
 .review-panel textarea {
   resize: vertical;
   margin-bottom: 10px;
@@ -1487,14 +1647,6 @@ function updateTypeLabel() {
 }
 
 @media (max-width: 980px) {
-  .main-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .detail-panel {
-    position: static;
-  }
-
   .stats-row,
   .compare-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1519,12 +1671,9 @@ function updateTypeLabel() {
     grid-template-columns: 1fr;
   }
 
-  .equipment-card {
-    grid-template-columns: 1fr;
-  }
-
-  .card-art {
-    min-height: 180px;
+  .equipment-list {
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: 12px;
   }
 
   .primary-action,

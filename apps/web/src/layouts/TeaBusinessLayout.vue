@@ -259,7 +259,7 @@ onBeforeUnmount(() => {
   font-size: 14px;
   font-weight: 600;
   color: var(--color-text-primary);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -350,7 +350,7 @@ onBeforeUnmount(() => {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #22c55e, #16a34a);
+  background: var(--color-primary);
   color: #fff;
   font-size: 13px;
   font-weight: 700;
@@ -385,7 +385,7 @@ onBeforeUnmount(() => {
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-md);
   z-index: 60;
 }
 
@@ -573,7 +573,7 @@ onBeforeUnmount(() => {
     background: color-mix(in srgb, var(--color-bg-secondary) 94%, transparent);
     border: 1px solid var(--color-border);
     border-radius: 22px;
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--shadow-md);
     backdrop-filter: blur(16px);
   }
   .bottom-tab {

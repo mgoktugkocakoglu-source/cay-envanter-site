@@ -9,12 +9,6 @@ const themeStore = useThemeStore();
 
 <template>
   <div class="home-page">
-    <!-- Background decoration -->
-    <div class="hp-bg">
-      <div class="hp-bg-shape hp-bg-1"></div>
-      <div class="hp-bg-shape hp-bg-2"></div>
-    </div>
-
     <header class="home-header">
       <RouterLink to="/" class="auth-logo">
         <img v-if="themeStore.theme === 'dark'" src="@/assets/images/logo-dark.svg" alt="Çay Hesabım Logo" class="home-logo-img" />
@@ -95,32 +89,6 @@ const themeStore = useThemeStore();
   overflow: hidden;
 }
 
-.hp-bg {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.hp-bg-shape {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(150px);
-  opacity: 0.06;
-}
-.hp-bg-1 {
-  width: 700px;
-  height: 700px;
-  background: #10B981;
-  top: -300px;
-  right: -200px;
-}
-.hp-bg-2 {
-  width: 500px;
-  height: 500px;
-  background: #3B82F6;
-  bottom: -200px;
-  left: -100px;
-}
-
 .home-header {
   display: flex;
   justify-content: space-between;
@@ -168,10 +136,7 @@ const themeStore = useThemeStore();
 }
 
 .hero-highlight {
-  background: linear-gradient(135deg, var(--color-primary-hover) 0%, var(--color-primary) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--color-primary);
 }
 
 .hero-subtitle {
@@ -201,16 +166,15 @@ const themeStore = useThemeStore();
   border-radius: var(--radius-xl);
   padding: var(--space-8) var(--space-6);
   text-align: left;
-  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .hub-showcase-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
+  background: var(--color-card-bg-hover);
 }
 
-.tea-showcase:hover { border-color: rgba(16, 185, 129, 0.4); }
-.social-showcase:hover { border-color: rgba(59, 130, 246, 0.4); }
+.tea-showcase:hover { border-color: var(--color-primary); }
+.social-showcase:hover { border-color: var(--color-secondary); }
 
 .showcase-icon {
   font-size: 40px;
@@ -222,8 +186,8 @@ const themeStore = useThemeStore();
   justify-content: center;
   border-radius: var(--radius-lg);
 }
-.tea-showcase .showcase-icon { background: rgba(16, 185, 129, 0.1); }
-.social-showcase .showcase-icon { background: rgba(59, 130, 246, 0.1); }
+.tea-showcase .showcase-icon { background: var(--color-primary-light); }
+.social-showcase .showcase-icon { background: rgba(30, 58, 138, 0.08); }
 
 .showcase-title {
   font-size: var(--font-size-xl);

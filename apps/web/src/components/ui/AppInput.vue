@@ -97,7 +97,7 @@ defineExpose({ focus, inputRef })
   display: block;
   margin-bottom: var(--space-2);
   font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-semibold);
   color: var(--color-text-secondary);
 }
 
@@ -109,15 +109,15 @@ defineExpose({ focus, inputRef })
 .app-input-container {
   display: flex;
   align-items: center;
-  background: var(--color-bg-tertiary);
-  border: 1px solid var(--color-border);
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-input-border);
   border-radius: var(--radius-md);
   transition: all var(--transition-fast);
   min-height: 48px;
 }
 
 .app-input-container:hover:not(.is-disabled) {
-  border-color: var(--color-text-muted);
+  border-color: var(--color-border-strong);
 }
 
 .app-input-container:focus-within:not(.is-disabled) {

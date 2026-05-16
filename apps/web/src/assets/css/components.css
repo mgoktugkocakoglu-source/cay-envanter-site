@@ -26,14 +26,14 @@
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
+    background: var(--color-primary);
     color: white;
-    box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.4);
+    border: 1px solid var(--color-primary);
 }
 
 .btn-primary:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px 0 rgba(16, 185, 129, 0.5);
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
 }
 
 .btn-primary:active:not(:disabled) {
@@ -41,14 +41,14 @@
 }
 
 .btn-secondary {
-    background: var(--color-bg-tertiary);
+    background: var(--color-bg-secondary);
     color: var(--color-text-primary);
     border: 1px solid var(--color-border);
 }
 
 .btn-secondary:hover:not(:disabled) {
-    background: var(--color-bg-elevated);
-    border-color: var(--color-text-muted);
+    background: var(--color-bg-tertiary);
+    border-color: var(--color-border-strong);
 }
 
 .btn-danger {
@@ -90,7 +90,7 @@
     display: block;
     margin-bottom: var(--space-2);
     font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-semibold);
     color: var(--color-text-secondary);
 }
 
@@ -99,8 +99,8 @@
     padding: var(--space-3) var(--space-4);
     font-size: var(--font-size-base);
     color: var(--color-text-primary);
-    background: var(--color-bg-tertiary);
-    border: 1px solid var(--color-border);
+    background: var(--color-input-bg);
+    border: 1px solid var(--color-input-border);
     border-radius: var(--radius-md);
     transition: all var(--transition-fast);
     min-height: 48px;
@@ -111,7 +111,7 @@
 }
 
 .form-input:hover {
-    border-color: var(--color-text-muted);
+    border-color: var(--color-border-strong);
 }
 
 .form-input:focus {
@@ -164,14 +164,14 @@
 
 /* Cards */
 .card {
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
+    background: var(--color-card-bg);
+    border: 1px solid var(--color-card-border);
     border-radius: var(--radius-lg);
     padding: var(--space-6);
 }
 
 .card-elevated {
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--shadow-sm);
 }
 
 /* Message Box */

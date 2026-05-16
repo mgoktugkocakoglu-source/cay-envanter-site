@@ -612,19 +612,17 @@ onUnmounted(stopClock);
 
 .action-btn--primary:hover {
   background: var(--color-primary-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
 .action-btn--secondary {
-  background: var(--color-bg-tertiary);
+  background: var(--color-bg-secondary);
   color: var(--color-text-primary);
   border: 1px solid var(--color-border);
 }
 
 .action-btn--secondary:hover {
-  background: var(--color-bg-secondary);
-  border-color: var(--color-text-muted);
+  background: var(--color-bg-tertiary);
+  border-color: var(--color-border-strong);
 }
 
 /* ── Stats Grid ── */
@@ -658,9 +656,8 @@ onUnmounted(stopClock);
 }
 
 .stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-  border-color: transparent;
+  background: var(--color-card-bg-hover);
+  border-color: var(--color-card-border-hover);
 }
 
 .stat-card:hover::before {
@@ -683,7 +680,7 @@ onUnmounted(stopClock);
 }
 
 .stat-icon--fields {
-  background: rgba(16, 185, 129, 0.12);
+  background: var(--color-primary-light);
   color: var(--color-primary);
 }
 
@@ -750,7 +747,7 @@ onUnmounted(stopClock);
 }
 
 .chart-header h3 {
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
 }
@@ -819,11 +816,11 @@ onUnmounted(stopClock);
 }
 
 .bar-fill--income {
-  background: linear-gradient(180deg, var(--color-primary), rgba(16, 185, 129, 0.4));
+  background: var(--color-primary);
 }
 
 .bar-fill--harvest {
-  background: linear-gradient(180deg, var(--color-secondary), rgba(99, 102, 241, 0.4));
+  background: var(--color-secondary);
 }
 
 .bar-label {
@@ -888,7 +885,7 @@ onUnmounted(stopClock);
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) 0;
-  border-bottom: 1px solid rgba(51, 65, 85, 0.4);
+  border-bottom: 1px solid var(--color-divider);
 }
 
 .activity-item:last-child {

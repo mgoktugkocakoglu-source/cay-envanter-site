@@ -93,14 +93,14 @@ const buttonClasses = computed(() => [
 
 /* Variants */
 .app-btn--primary {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
+  background: var(--color-primary);
   color: white;
-  box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.4);
+  border: 1px solid var(--color-primary);
 }
 
 .app-btn--primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px 0 rgba(16, 185, 129, 0.5);
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
 }
 
 .app-btn--primary:active:not(:disabled) {
@@ -108,14 +108,14 @@ const buttonClasses = computed(() => [
 }
 
 .app-btn--secondary {
-  background: var(--color-bg-tertiary);
+  background: var(--color-bg-secondary);
   color: var(--color-text-primary);
   border: 1px solid var(--color-border);
 }
 
 .app-btn--secondary:hover:not(:disabled) {
-  background: var(--color-bg-elevated);
-  border-color: var(--color-text-muted);
+  background: var(--color-bg-tertiary);
+  border-color: var(--color-border-strong);
 }
 
 .app-btn--danger {
@@ -125,7 +125,6 @@ const buttonClasses = computed(() => [
 
 .app-btn--danger:hover:not(:disabled) {
   opacity: 0.9;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
 .app-btn--link {
