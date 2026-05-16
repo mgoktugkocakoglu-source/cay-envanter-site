@@ -183,6 +183,7 @@ onMounted(async () => {
     if (mapContainer.value) {
         map = L.map(mapContainer.value, {
             zoomControl: false,
+            attributionControl: false,
             minZoom: MAP_MIN_ZOOM,
             maxZoom: MAP_MAX_ZOOM,
         }).setView(TURKEY_CENTER, TURKEY_ZOOM);
@@ -190,7 +191,6 @@ onMounted(async () => {
         L.control.zoom({ position: 'topright' }).addTo(map);
 
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            attribution: '&copy; <a href="https://www.esri.com/">Esri</a> &mdash; Source: Esri, Maxar, Earthstar Geographics',
             minZoom: MAP_MIN_ZOOM,
             maxZoom: MAP_MAX_ZOOM,
             maxNativeZoom: TILE_MAX_NATIVE_ZOOM,

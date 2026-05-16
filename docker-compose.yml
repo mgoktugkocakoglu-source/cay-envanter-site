@@ -46,9 +46,16 @@ services:
       MAILGUN_DOMAIN: ${MAILGUN_DOMAIN:-your-mailgun-domain}
       MAILGUN_FROM: Çay Üreticisi Platformu <noreply@cayplatformu.com>
       APP_URL: http://localhost:5173
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_ENDPOINT: ${R2_ENDPOINT:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET: ${R2_BUCKET:-}
+      R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
+      R2_PREFIX: ${R2_PREFIX:-cayhesabim-dev}
     volumes:
       - ./apps/api/src:/app/apps/api/src:ro
-      - api_uploads:/app/apps/api/uploads
+      - api_uploads:/app/apps/api/uploads:ro
     ports:
       - "3000:3000"
 

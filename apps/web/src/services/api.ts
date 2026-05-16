@@ -696,7 +696,7 @@ export const api = {
         }),
 
     // Uploads
-    uploadImage: async (file: File): Promise<ApiResponse<{ url: string; filename: string }>> => {
+    uploadImage: async (file: File): Promise<ApiResponse<{ url: string; filename: string; key?: string }>> => {
         const authStore = useAuthStore();
         const token = authStore.accessToken;
         const formData = new FormData();
@@ -761,7 +761,7 @@ export const api = {
         }),
 
     // Community Media Upload
-    uploadCommunityMedia: async (file: File): Promise<ApiResponse<{ url: string; filename: string }>> => {
+    uploadCommunityMedia: async (file: File): Promise<ApiResponse<{ url: string; filename: string; key?: string }>> => {
         const authStore = useAuthStore();
         const token = authStore.accessToken;
         const formData = new FormData();
@@ -771,11 +771,8 @@ export const api = {
         const isVideo = file.type.startsWith('video/');
         const endpoint = isVideo ? '/uploads/video' : '/uploads/image';
 
-        console.log('[uploadCommunityMedia] file:', file.name, 'type:', file.type, 'size:', file.size, 'isVideo:', isVideo, 'endpoint:', endpoint);
-
         try {
             const url = `${API_BASE}${endpoint}`;
-            console.log('[uploadCommunityMedia] Sending fetch to:', url);
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {
@@ -784,15 +781,12 @@ export const api = {
                 body: formData,
             });
 
-            console.log('[uploadCommunityMedia] Response status:', response.status);
             const data = await response.json();
-            console.log('[uploadCommunityMedia] Response data:', data);
             if (!response.ok) {
                 return { error: { message: data.message || 'Media upload failed', statusCode: response.status } };
             }
             return { data };
-        } catch (err) {
-            console.error('[uploadCommunityMedia] Error:', err);
+        } catch {
             return { error: { message: 'Network error during media upload', statusCode: 0 } };
         }
     },

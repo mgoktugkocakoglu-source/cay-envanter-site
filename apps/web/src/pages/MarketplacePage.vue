@@ -1,101 +1,324 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
 import SocialWorkspaceLayout from '@/layouts/SocialWorkspaceLayout.vue';
 
-const activeTab = ref<'all' | 'sell' | 'buy' | 'trade'>('all');
+type ProductCategory = 'all' | 'motor' | 'seedling';
+type MotorUse = 'tea-harvest' | 'tea-pruning' | 'grass-cutting' | 'wood-cutting';
+type MotorPower = 'electric' | 'gasoline';
+type ElectricPowerType = 'battery' | 'corded';
 
-const tabs = [
-  { key: 'all' as const, label: 'Tümü', icon: '📋' },
-  { key: 'sell' as const, label: 'Satılık', icon: '💰' },
-  { key: 'buy' as const, label: 'Aranıyor', icon: '🔍' },
-  { key: 'trade' as const, label: 'Takas', icon: '🔄' },
+interface Listing {
+  id: number;
+  category: 'motor' | 'seedling';
+  title: string;
+  location: string;
+  price: number;
+  priceSuffix?: string;
+  description: string;
+  seller: string;
+  postedAt: string;
+  highlights: string[];
+  imageTheme: 'yellow' | 'red' | 'green';
+  badge: string;
+}
+
+const activeCategory = ref<ProductCategory>('all');
+const query = ref('');
+const showSellPanel = ref(false);
+
+const sellForm = reactive({
+  location: '',
+  category: 'motor' as 'motor' | 'seedling',
+  motorUse: 'tea-harvest' as MotorUse,
+  motorPower: 'electric' as MotorPower,
+  electricPowerType: 'battery' as ElectricPowerType,
+  brand: '',
+  model: '',
+  modelYear: '',
+  totalUse: '',
+  price: '',
+  motorPowerValue: '',
+  batteryCapacity: '',
+  rpm: '',
+  motorWeight: '',
+  batteryWeight: '',
+  plantingDate: '',
+  seedlingCount: '',
+  seedlingUnitPrice: '',
+});
+
+const motorUses = [
+  { value: 'tea-harvest' as const, label: 'Çay Toplama Motoru' },
+  { value: 'tea-pruning' as const, label: 'Çay Budama Motoru' },
+  { value: 'grass-cutting' as const, label: 'Ot Kesme Motoru' },
+  { value: 'wood-cutting' as const, label: 'Ağaç Kesme Motoru' },
 ];
 
-const categories = [
-  { value: 'motor', label: '⚡ Çay Motorları' },
-  { value: 'makas', label: '✂️ Çay Makası' },
-  { value: 'tasima', label: '🚛 Taşıma Araçları' },
-  { value: 'gubre', label: '🌱 Gübre & İlaçlama' },
-  { value: 'diger', label: '🔩 Diğer' },
+const listings: Listing[] = [
+  {
+    id: 1,
+    category: 'motor',
+    title: 'Rewi X2 akülü çay toplama motoru',
+    location: 'Rize / Merkez',
+    price: 12500,
+    description: 'Geçen sezon son çayda alındı. Sıfıra yakın, her şeyi aktif. Pazarlık payı mevcut.',
+    seller: 'SeFa Kurt',
+    postedAt: '4 gün önce',
+    highlights: ['Akülü', '2025 model', 'Az kullanılmış'],
+    imageTheme: 'yellow',
+    badge: 'Çay toplama',
+  },
+  {
+    id: 2,
+    category: 'motor',
+    title: 'Hiç kullanılmamış büyük model motor',
+    location: 'Trabzon / Of',
+    price: 12500,
+    description: 'Büyük modeli alındı diye satılık. Kutusu ve aksesuarları duruyor, hiç kullanılmadı.',
+    seller: 'Nizam Kavalcı',
+    postedAt: '2 gün önce',
+    highlights: ['Sıfır ayarında', 'Benzinli', 'Kutulu'],
+    imageTheme: 'red',
+    badge: 'Budama',
+  },
+  {
+    id: 3,
+    category: 'seedling',
+    title: 'Of merkezde satılık çay fidesi',
+    location: 'Trabzon / Of / Kireçli',
+    price: 25,
+    priceSuffix: 'adet',
+    description: 'Poşetli, sağlıklı çay fidesi. Toplu alım için 1000-3000 adet arası teslim hazırlanır.',
+    seller: 'Hava Su Deniz',
+    postedAt: '5 saat önce',
+    highlights: ['Poşetli fide', 'Toplu satış', '1 yıllık bakım'],
+    imageTheme: 'green',
+    badge: 'Çay fidesi',
+  },
 ];
+
+const categoryTabs = [
+  { key: 'all' as const, label: 'Tüm İlanlar', count: listings.length },
+  { key: 'motor' as const, label: 'Motor Ekipmanları', count: listings.filter(item => item.category === 'motor').length },
+  { key: 'seedling' as const, label: 'Çay Fidesi', count: listings.filter(item => item.category === 'seedling').length },
+];
+
+const filteredListings = computed(() => {
+  const needle = query.value.trim().toLocaleLowerCase('tr-TR');
+  return listings.filter((listing) => {
+    const matchesCategory = activeCategory.value === 'all' || listing.category === activeCategory.value;
+    const matchesQuery = !needle || [
+      listing.title,
+      listing.location,
+      listing.description,
+      listing.seller,
+      listing.highlights.join(' '),
+    ].join(' ').toLocaleLowerCase('tr-TR').includes(needle);
+
+    return matchesCategory && matchesQuery;
+  });
+});
+
+const previewSpecs = computed(() => {
+  if (sellForm.category === 'seedling') {
+    return [
+      sellForm.plantingDate && `Dikim: ${sellForm.plantingDate}`,
+      sellForm.seedlingCount && `${sellForm.seedlingCount} adet`,
+      sellForm.seedlingUnitPrice && `${sellForm.seedlingUnitPrice} TL/adet`,
+    ].filter(Boolean);
+  }
+
+  const powerText = sellForm.motorPower === 'electric'
+    ? `Elektrikli - ${sellForm.electricPowerType === 'battery' ? 'Bataryalı' : 'Kablolu'}`
+    : 'Benzinli';
+
+  return [
+    motorUses.find(item => item.value === sellForm.motorUse)?.label,
+    powerText,
+    sellForm.brand && sellForm.model ? `${sellForm.brand} ${sellForm.model}` : sellForm.brand || sellForm.model,
+    sellForm.totalUse && `${sellForm.totalUse} ay kullanım`,
+  ].filter(Boolean);
+});
+
+function formatPrice(value: number, suffix?: string) {
+  return `${new Intl.NumberFormat('tr-TR').format(value)} TL${suffix ? ` / ${suffix}` : ''}`;
+}
 </script>
 
 <template>
   <SocialBusinessLayout>
     <SocialWorkspaceLayout>
       <div class="marketplace-page">
-      <header class="mp-header">
-        <h1 class="mp-title">
-          <span>🛒</span>
-          2. El Pazar
-        </h1>
-        <p class="mp-subtitle">
-          Kullanılmış ekipman ve tarım malzemelerini alın, satın veya takas edin
-        </p>
-      </header>
+        <section class="market-hero">
+          <div class="hero-copy">
+            <span class="eyebrow">Sosyal Hesabım</span>
+            <h1>2. El Pazar</h1>
+            <p>
+              Üreticilerin yüksek maliyetli motor ekipmanlarını ve yoğun talep gören çay fidelerini
+              sade bir ilan akışıyla alıp satabileceği pazar alanı.
+            </p>
+          </div>
+          <button class="sell-cta" type="button" @click="showSellPanel = !showSellPanel">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Ürün Sat
+          </button>
+        </section>
 
-      <!-- Coming Soon Banner -->
-      <div class="mp-banner">
-        <div class="mp-banner-icon">🚧</div>
-        <div class="mp-banner-content">
-          <h3>Bu modül aktif olarak geliştiriliyor</h3>
-          <p>
-            İlan verme, fotoğraf yükleme, fiyat belirleme ve mesajlaşma gibi
-            özellikler çok yakında kullanıma sunulacak.
-          </p>
+        <section class="scope-band">
+          <div>
+            <strong>Motor ekipmanları</strong>
+            <span>Çay toplama, budama, ot ve ağaç kesme motorları</span>
+          </div>
+          <div>
+            <strong>Çay fidesi</strong>
+            <span>Adet bazlı, toplu alıma uygun poşetli fide ilanları</span>
+          </div>
+        </section>
+
+        <section v-if="showSellPanel" class="sell-panel" aria-label="Ürün satış formu">
+          <div class="panel-head">
+            <div>
+              <h2>Satış Bilgileri</h2>
+              <p>İlan açmak için konum ve ürün tipine göre gerekli alanları doldurun.</p>
+            </div>
+            <button class="icon-close" type="button" aria-label="Formu kapat" @click="showSellPanel = false">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+
+          <div class="form-grid">
+            <label class="field">
+              <span>Konum</span>
+              <input v-model="sellForm.location" type="text" placeholder="Rize / Pazar" />
+            </label>
+
+            <div class="field">
+              <span>Ürün Kategorisi</span>
+              <div class="segmented">
+                <button type="button" :class="{ active: sellForm.category === 'motor' }" @click="sellForm.category = 'motor'">Motor</button>
+                <button type="button" :class="{ active: sellForm.category === 'seedling' }" @click="sellForm.category = 'seedling'">Çay Fidesi</button>
+              </div>
+            </div>
+          </div>
+
+          <template v-if="sellForm.category === 'motor'">
+            <div class="option-grid">
+              <button
+                v-for="item in motorUses"
+                :key="item.value"
+                type="button"
+                class="choice"
+                :class="{ active: sellForm.motorUse === item.value }"
+                @click="sellForm.motorUse = item.value"
+              >
+                {{ item.label }}
+              </button>
+            </div>
+
+            <div class="form-grid">
+              <div class="field">
+                <span>Ürün Tipi</span>
+                <div class="segmented">
+                  <button type="button" :class="{ active: sellForm.motorPower === 'electric' }" @click="sellForm.motorPower = 'electric'">Elektrikli</button>
+                  <button type="button" :class="{ active: sellForm.motorPower === 'gasoline' }" @click="sellForm.motorPower = 'gasoline'">Benzinli</button>
+                </div>
+              </div>
+
+              <div v-if="sellForm.motorPower === 'electric'" class="field">
+                <span>Elektrikli Tip</span>
+                <div class="segmented">
+                  <button type="button" :class="{ active: sellForm.electricPowerType === 'battery' }" @click="sellForm.electricPowerType = 'battery'">Bataryalı</button>
+                  <button type="button" :class="{ active: sellForm.electricPowerType === 'corded' }" @click="sellForm.electricPowerType = 'corded'">Kablolu</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-grid specs">
+              <label class="field"><span>Marka</span><input v-model="sellForm.brand" type="text" placeholder="Rewi" /></label>
+              <label class="field"><span>Model</span><input v-model="sellForm.model" type="text" placeholder="Pro X2" /></label>
+              <label class="field"><span>Model Yılı</span><input v-model="sellForm.modelYear" type="number" placeholder="2025" /></label>
+              <label class="field"><span>Toplam Kullanım Süresi</span><input v-model="sellForm.totalUse" type="number" placeholder="3" /></label>
+              <label class="field"><span>Fiyat</span><input v-model="sellForm.price" type="number" placeholder="12500" /></label>
+              <label class="field"><span>Devir Sayısı rpm</span><input v-model="sellForm.rpm" type="number" placeholder="6500" /></label>
+              <label class="field"><span>Motor Ağırlığı kg</span><input v-model="sellForm.motorWeight" type="number" placeholder="7" /></label>
+              <label v-if="sellForm.motorPower === 'electric'" class="field"><span>Motor Gücü Watt</span><input v-model="sellForm.motorPowerValue" type="number" placeholder="1200" /></label>
+              <label v-else class="field"><span>Motor Gücü kW</span><input v-model="sellForm.motorPowerValue" type="number" placeholder="1.7" /></label>
+              <label v-if="sellForm.motorPower === 'electric'" class="field"><span>Pil Kapasitesi mAh</span><input v-model="sellForm.batteryCapacity" type="number" placeholder="20000" /></label>
+              <label v-if="sellForm.motorPower === 'electric'" class="field"><span>Batarya Ağırlığı kg</span><input v-model="sellForm.batteryWeight" type="number" placeholder="2" /></label>
+            </div>
+          </template>
+
+          <div v-else class="form-grid specs">
+            <label class="field"><span>Dikim Tarihi</span><input v-model="sellForm.plantingDate" type="text" placeholder="04/2025" /></label>
+            <label class="field"><span>Satılık Adet Sayısı</span><input v-model="sellForm.seedlingCount" type="number" placeholder="2000" /></label>
+            <label class="field"><span>Adet Fiyatı TL</span><input v-model="sellForm.seedlingUnitPrice" type="number" placeholder="25" /></label>
+          </div>
+
+          <div class="preview-row">
+            <span>İlan önizlemesi</span>
+            <strong>{{ sellForm.category === 'motor' ? 'Motor ekipmanı' : 'Çay fidesi' }}</strong>
+            <em v-for="spec in previewSpecs" :key="String(spec)">{{ spec }}</em>
+          </div>
+        </section>
+
+        <section class="toolbar" aria-label="Pazar filtreleri">
+          <div class="search-box">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input v-model="query" type="search" placeholder="İlanlarda ara..." />
+          </div>
+          <div class="tabs">
+            <button
+              v-for="tab in categoryTabs"
+              :key="tab.key"
+              type="button"
+              :class="{ active: activeCategory === tab.key }"
+              @click="activeCategory = tab.key"
+            >
+              {{ tab.label }}
+              <span>{{ tab.count }}</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="listing-grid" aria-label="2. el pazar ilanları">
+          <article v-for="listing in filteredListings" :key="listing.id" class="listing-card">
+            <div class="listing-visual" :class="`theme-${listing.imageTheme}`">
+              <span class="badge">{{ listing.badge }}</span>
+              <div v-if="listing.category === 'seedling'" class="seedling-art" aria-hidden="true">
+                <span v-for="n in 12" :key="n"></span>
+              </div>
+              <div v-else class="motor-art" aria-hidden="true">
+                <span class="blade"></span>
+                <span class="body"></span>
+                <span class="handle"></span>
+              </div>
+            </div>
+            <div class="listing-body">
+              <div class="listing-topline">
+                <span>{{ listing.seller }}</span>
+                <small>{{ listing.postedAt }}</small>
+              </div>
+              <h2>{{ listing.title }}</h2>
+              <p>{{ listing.description }}</p>
+              <div class="meta-row">
+                <span>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                  {{ listing.location }}
+                </span>
+                <strong>{{ formatPrice(listing.price, listing.priceSuffix) }}</strong>
+              </div>
+              <div class="highlight-row">
+                <span v-for="item in listing.highlights" :key="item">{{ item }}</span>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <div v-if="filteredListings.length === 0" class="empty-state">
+          <h2>Bu filtrelerde ilan yok</h2>
+          <p>Arama metnini temizleyerek veya kategori değiştirerek mevcut ilanları görebilirsiniz.</p>
         </div>
-      </div>
-
-      <!-- Tabs Preview -->
-      <div class="mp-tabs">
-        <button
-          v-for="tab in tabs"
-          :key="tab.key"
-          class="mp-tab"
-          :class="{ active: activeTab === tab.key }"
-          @click="activeTab = tab.key"
-        >
-          <span class="mp-tab-icon">{{ tab.icon }}</span>
-          {{ tab.label }}
-        </button>
-      </div>
-
-      <!-- Category Filters -->
-      <div class="mp-categories">
-        <span
-          v-for="cat in categories"
-          :key="cat.value"
-          class="mp-category"
-        >
-          {{ cat.label }}
-        </span>
-      </div>
-
-      <!-- Empty State -->
-      <div class="mp-empty">
-        <div class="mp-empty-icon">📦</div>
-        <h3>Henüz İlan Yok</h3>
-        <p>2. El Pazar modülü hazırlanıyor. İlk ilanları çok yakında burada göreceksiniz!</p>
-        <div class="mp-empty-features">
-          <div class="mp-ef">
-            <span>📸</span>
-            <span>Fotoğraflı İlan</span>
-          </div>
-          <div class="mp-ef">
-            <span>💬</span>
-            <span>Mesajlaşma</span>
-          </div>
-          <div class="mp-ef">
-            <span>📍</span>
-            <span>Konum Bazlı</span>
-          </div>
-          <div class="mp-ef">
-            <span>🔔</span>
-            <span>Bildirimler</span>
-          </div>
-        </div>
-      </div>
       </div>
     </SocialWorkspaceLayout>
   </SocialBusinessLayout>
@@ -103,173 +326,543 @@ const categories = [
 
 <style scoped>
 .marketplace-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
   width: 100%;
 }
 
-.mp-header {
-  text-align: center;
-  margin-bottom: var(--space-8);
+.market-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 24px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
 }
 
-.mp-title {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-bold);
+.hero-copy {
+  max-width: 620px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  margin-bottom: 8px;
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.market-hero h1 {
+  margin: 0 0 8px;
   color: var(--color-text-primary);
-  display: flex;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.market-hero p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.sell-cta {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-2);
-}
-
-.mp-subtitle {
-  font-size: var(--font-size-base);
-  color: var(--color-text-muted);
-}
-
-/* ── Banner ── */
-.mp-banner {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-4);
-  padding: var(--space-5);
-  background: rgba(168, 85, 247, 0.06);
-  border: 1px solid rgba(168, 85, 247, 0.2);
-  border-radius: var(--radius-xl);
-  margin-bottom: var(--space-6);
-}
-
-.mp-banner-icon {
-  font-size: 28px;
-  flex-shrink: 0;
-}
-
-.mp-banner-content h3 {
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-bold);
-  color: #A855F7;
-  margin-bottom: var(--space-1);
-}
-
-.mp-banner-content p {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  line-height: var(--line-height-normal);
-}
-
-/* ── Tabs ── */
-.mp-tabs {
-  display: flex;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
-  padding-bottom: var(--space-4);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.mp-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-text-secondary);
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 16px;
+  color: #fff;
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: 8px;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  white-space: nowrap;
 }
 
-.mp-tab:hover {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text-primary);
+.scope-band {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
-.mp-tab.active {
-  background: rgba(168, 85, 247, 0.1);
-  border-color: rgba(168, 85, 247, 0.3);
-  color: #A855F7;
-  font-weight: 600;
-}
-
-/* ── Categories ── */
-.mp-categories {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-bottom: var(--space-6);
-}
-
-.mp-category {
-  padding: 6px 14px;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.mp-category:hover {
-  border-color: rgba(168, 85, 247, 0.3);
-  color: var(--color-text-primary);
-}
-
-/* ── Empty State ── */
-.mp-empty {
-  text-align: center;
-  padding: var(--space-16) var(--space-8);
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-}
-
-.mp-empty-icon {
-  font-size: 56px;
-  margin-bottom: var(--space-4);
-  opacity: 0.6;
-}
-
-.mp-empty h3 {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary);
-  margin-bottom: var(--space-2);
-}
-
-.mp-empty p {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  max-width: 400px;
-  margin: 0 auto var(--space-6);
-  line-height: var(--line-height-normal);
-}
-
-.mp-empty-features {
-  display: flex;
-  justify-content: center;
-  gap: var(--space-6);
-  flex-wrap: wrap;
-}
-
-.mp-ef {
+.scope-band div {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: 13px;
+  gap: 4px;
+  padding: 16px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.scope-band strong {
+  color: var(--color-text-primary);
+  font-size: 14px;
+}
+
+.scope-band span {
   color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
-.mp-ef span:first-child {
-  font-size: 24px;
+.sell-panel {
+  padding: 18px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
 }
 
-/* ── Responsive ── */
-@media (max-width: 640px) {
-  .mp-tabs { flex-wrap: wrap; }
-  .mp-empty-features { gap: var(--space-4); }
+.panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.panel-head h2 {
+  margin: 0 0 4px;
+  color: var(--color-text-primary);
+  font-size: 18px;
+}
+
+.panel-head p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.icon-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--color-text-muted);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.form-grid.specs {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.field span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.field input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  color: var(--color-text-primary);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font: inherit;
+}
+
+.field input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, .12);
+}
+
+.segmented,
+.option-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.segmented button,
+.choice {
+  min-height: 40px;
+  padding: 0 12px;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.segmented button.active,
+.choice.active {
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+
+.option-grid {
+  margin-bottom: 12px;
+}
+
+.preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.preview-row strong,
+.preview-row em {
+  padding: 5px 9px;
+  color: var(--color-text-primary);
+  background: var(--color-bg-tertiary);
+  border-radius: 8px;
+  font-style: normal;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 220px;
+  padding: 0 12px;
+  color: var(--color-text-muted);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+
+.search-box input {
+  width: 100%;
+  min-height: 42px;
+  color: var(--color-text-primary);
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font: inherit;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 12px;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tabs button.active {
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+
+.tabs span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  color: var(--color-text-primary);
+  background: var(--color-bg-tertiary);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.listing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.listing-card {
+  overflow: hidden;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.listing-visual {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 210px;
+  overflow: hidden;
+}
+
+.theme-yellow { background: linear-gradient(135deg, #fff7d6, #f7c948); }
+.theme-red { background: linear-gradient(135deg, #fee2e2, #ef4444); }
+.theme-green { background: linear-gradient(135deg, #dcfce7, #4ade80); }
+
+.badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  padding: 5px 9px;
+  color: #172554;
+  background: rgba(255, 255, 255, .82);
+  border: 1px solid rgba(255, 255, 255, .6);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.motor-art {
+  position: relative;
+  width: min(74%, 300px);
+  height: 118px;
+}
+
+.motor-art .blade {
+  position: absolute;
+  left: 0;
+  bottom: 16px;
+  width: 58%;
+  height: 34px;
+  background: rgba(255, 255, 255, .78);
+  border: 2px solid rgba(17, 24, 39, .22);
+  border-radius: 4px;
+  box-shadow: inset 0 -10px 0 rgba(17, 24, 39, .08);
+}
+
+.motor-art .body {
+  position: absolute;
+  right: 56px;
+  bottom: 26px;
+  width: 96px;
+  height: 56px;
+  background: #111827;
+  border-radius: 14px 14px 8px 8px;
+  box-shadow: inset 0 0 0 10px rgba(255, 255, 255, .12);
+}
+
+.motor-art .handle {
+  position: absolute;
+  right: 10px;
+  bottom: 42px;
+  width: 82px;
+  height: 18px;
+  background: #111827;
+  border-radius: 999px;
+  transform: rotate(-24deg);
+}
+
+.seedling-art {
+  display: grid;
+  grid-template-columns: repeat(6, 28px);
+  gap: 12px 14px;
+  align-items: end;
+  padding-top: 28px;
+}
+
+.seedling-art span {
+  position: relative;
+  display: block;
+  width: 24px;
+  height: 86px;
+  border-radius: 0 0 12px 12px;
+  background: #1f2937;
+}
+
+.seedling-art span::before,
+.seedling-art span::after {
+  content: "";
+  position: absolute;
+  top: -18px;
+  width: 28px;
+  height: 18px;
+  background: #166534;
+  border-radius: 100% 0 100% 0;
+}
+
+.seedling-art span::before {
+  left: -12px;
+  transform: rotate(18deg);
+}
+
+.seedling-art span::after {
+  right: -12px;
+  transform: rotate(78deg);
+}
+
+.listing-body {
+  padding: 16px;
+}
+
+.listing-topline,
+.meta-row,
+.highlight-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.listing-topline {
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.listing-topline span {
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.listing-topline small {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.listing-body h2 {
+  margin: 0 0 8px;
+  color: var(--color-text-primary);
+  font-size: 17px;
+  line-height: 1.3;
+}
+
+.listing-body p {
+  margin: 0 0 14px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.meta-row {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.meta-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.meta-row strong {
+  color: var(--color-primary);
+  font-size: 17px;
+}
+
+.highlight-row {
+  flex-wrap: wrap;
+}
+
+.highlight-row span {
+  padding: 5px 8px;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-tertiary);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.empty-state {
+  padding: 32px;
+  text-align: center;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.empty-state h2 {
+  margin: 0 0 6px;
+  color: var(--color-text-primary);
+  font-size: 18px;
+}
+
+.empty-state p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+@media (max-width: 860px) {
+  .market-hero,
+  .toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .scope-band,
+  .listing-grid,
+  .form-grid,
+  .form-grid.specs {
+    grid-template-columns: 1fr;
+  }
+
+  .sell-cta {
+    width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .market-hero,
+  .sell-panel,
+  .listing-body {
+    padding: 14px;
+  }
+
+  .market-hero h1 {
+    font-size: 24px;
+  }
+
+  .listing-visual {
+    min-height: 180px;
+  }
 }
 </style>

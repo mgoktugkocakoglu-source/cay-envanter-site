@@ -24,14 +24,12 @@ import {
     ApiConsumes,
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import { mkdirSync } from 'fs';
-import { v4 as uuid } from 'uuid';
+import { memoryStorage } from 'multer';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { AuthService, AuthResponse } from '@/auth/auth.service';
 import { UsersService } from '@/users/users.service';
+import { R2StorageService } from '@/uploads/r2-storage.service';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { CurrentUser, AuthenticatedUser } from '@/auth/decorators';
 import {
@@ -43,32 +41,6 @@ import {
     RequestDeletionDto,
     ConfirmDeletionDto,
 } from '@/auth/dto';
-
-const UPLOAD_DIR = join(process.cwd(), 'uploads');
-
-/** Multer storage configuration for avatar uploads */
-const avatarStorage = diskStorage({
-    destination: (
-        _req: Request,
-        _file: Express.Multer.File,
-        cb: (error: Error | null, destination: string) => void,
-    ): void => {
-        try {
-            mkdirSync(UPLOAD_DIR, { recursive: true });
-            cb(null, UPLOAD_DIR);
-        } catch (error) {
-            cb(error as Error, UPLOAD_DIR);
-        }
-    },
-    filename: (
-        _req: Request,
-        file: Express.Multer.File,
-        cb: (error: Error | null, filename: string) => void,
-    ): void => {
-        const uniqueName = `avatar-${uuid()}${extname(file.originalname)}`;
-        cb(null, uniqueName);
-    },
-});
 
 /** File filter allowing only image MIME types */
 const avatarFileFilter = (
@@ -92,6 +64,7 @@ export class AuthController {
     constructor(
         private readonly authService: AuthService,
         private readonly usersService: UsersService,
+        private readonly r2StorageService: R2StorageService,
     ) { }
 
     @Post('register')
@@ -256,7 +229,7 @@ export class AuthController {
     @ApiResponse({ status: 400, description: 'Invalid file' })
     @UseInterceptors(
         FileInterceptor('file', {
-            storage: avatarStorage,
+            storage: memoryStorage(),
             fileFilter: avatarFileFilter,
             limits: { fileSize: 2 * 1024 * 1024 }, // 2MB for avatars
         }),
@@ -269,7 +242,8 @@ export class AuthController {
             throw new BadRequestException('Dosya yuklenemedi.');
         }
 
-        const avatarUrl = `/api/uploads/file/${file.filename}`;
+        const uploaded = await this.r2StorageService.upload(file, 'avatars');
+        const avatarUrl = uploaded.url;
         await this.usersService.update(userId, { avatarUrl });
 
         return { avatarUrl };

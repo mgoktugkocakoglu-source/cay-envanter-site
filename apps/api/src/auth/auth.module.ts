@@ -10,12 +10,14 @@ import { RefreshTokenStrategy } from '@/auth/strategies/refresh-token.strategy';
 import { Session } from '@/auth/entities';
 import { UsersModule } from '@/users/users.module';
 import { MailModule } from '@/mail/mail.module';
+import { UploadsModule } from '@/uploads/uploads.module';
 
 @Module({
     imports: [
         TypeOrmModule.forFeature([Session]),
         UsersModule,
         MailModule,
+        UploadsModule,
         PassportModule.register({ defaultStrategy: 'jwt' }),
         JwtModule.registerAsync({
             imports: [ConfigModule],

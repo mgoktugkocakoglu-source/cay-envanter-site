@@ -317,11 +317,12 @@ async function initMap(containerId: string, lat: number, lng: number) {
         (mapInstances.value[containerId] as any).remove();
     }
 
-    const map = L.map(container).setView([lat, lng], 15);
+    const map = L.map(container, {
+        attributionControl: false,
+    }).setView([lat, lng], 15);
 
     // Satellite tile layer (Esri World Imagery)
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Esri',
         maxZoom: 19,
     }).addTo(map);
 

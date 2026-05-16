@@ -39,6 +39,7 @@ function initializeMap() {
         doubleClickZoom: false,
         touchZoom: false,
         zoomControl: false,
+        attributionControl: false,
         boxZoom: false,
         keyboard: false,
         dragging: true
@@ -46,7 +47,6 @@ function initializeMap() {
 
     // Satellite imagery tile layer
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: '&copy; <a href="https://www.esri.com/">Esri</a> &mdash; Source: Esri, Maxar, Earthstar Geographics',
         maxZoom: 19,
     }).addTo(map);
 

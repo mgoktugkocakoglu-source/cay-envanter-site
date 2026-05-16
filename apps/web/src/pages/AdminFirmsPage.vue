@@ -294,7 +294,7 @@ onMounted(() => {
 
                     <label class="form-field">
                         <span>Logo yolu</span>
-                        <input v-model="firmForm.logoUrl" maxlength="255" type="text" placeholder="/api/uploads/..." />
+                        <input v-model="firmForm.logoUrl" maxlength="255" type="text" placeholder="https://cdn.example.com/..." />
                     </label>
 
                     <div class="logo-upload-row">

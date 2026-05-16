@@ -11,13 +11,13 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '@/auth/guards';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import { v4 as uuid } from 'uuid';
-import { existsSync, mkdirSync } from 'fs';
-import { Response, Request } from 'express';
+import { memoryStorage } from 'multer';
+import { join } from 'path';
+import { existsSync } from 'fs';
+import { Request, Response } from 'express';
+import { R2StorageService } from './r2-storage.service';
 
-const UPLOAD_DIR = join(process.cwd(), 'uploads');
+const LEGACY_UPLOAD_DIR = join(process.cwd(), 'uploads');
 
 const imageFileFilter = (
     _req: Request,
@@ -49,47 +49,28 @@ const videoFileFilter = (
     callback(null, true);
 };
 
-const storage = diskStorage({
-    destination: (
-        _req: Request,
-        _file: Express.Multer.File,
-        cb: (error: Error | null, destination: string) => void,
-    ): void => {
-        try {
-            mkdirSync(UPLOAD_DIR, { recursive: true });
-            cb(null, UPLOAD_DIR);
-        } catch (error) {
-            cb(error as Error, UPLOAD_DIR);
-        }
-    },
-    filename: (
-        _req: Request,
-        file: Express.Multer.File,
-        cb: (error: Error | null, filename: string) => void,
-    ): void => {
-        const uniqueName = `${uuid()}${extname(file.originalname)}`;
-        cb(null, uniqueName);
-    },
-});
-
 @Controller('uploads')
 export class UploadsController {
+    constructor(private readonly r2StorageService: R2StorageService) {}
+
     @Post('image')
     @UseGuards(JwtAuthGuard)
     @UseInterceptors(
         FileInterceptor('file', {
-            storage,
+            storage: memoryStorage(),
             fileFilter: imageFileFilter,
             limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
         }),
     )
-    uploadImage(@UploadedFile() file: Express.Multer.File) {
+    async uploadImage(@UploadedFile() file: Express.Multer.File) {
         if (!file) {
             throw new BadRequestException('Dosya yuklenemedi.');
         }
+        const uploaded = await this.r2StorageService.upload(file, 'images');
         return {
-            url: `/api/uploads/file/${file.filename}`,
-            filename: file.filename,
+            url: uploaded.url,
+            filename: uploaded.filename,
+            key: uploaded.key,
             originalName: file.originalname,
             size: file.size,
         };
@@ -99,28 +80,29 @@ export class UploadsController {
     @UseGuards(JwtAuthGuard)
     @UseInterceptors(
         FileInterceptor('file', {
-            storage,
+            storage: memoryStorage(),
             fileFilter: videoFileFilter,
             limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
         }),
     )
-    uploadVideo(@UploadedFile() file: Express.Multer.File) {
+    async uploadVideo(@UploadedFile() file: Express.Multer.File) {
         if (!file) {
             throw new BadRequestException('Video yuklenemedi.');
         }
+        const uploaded = await this.r2StorageService.upload(file, 'videos');
         return {
-            url: `/api/uploads/file/${file.filename}`,
-            filename: file.filename,
+            url: uploaded.url,
+            filename: uploaded.filename,
+            key: uploaded.key,
             originalName: file.originalname,
             size: file.size,
         };
     }
 
     @Get('file/:filename')
-    getFile(@Param('filename') filename: string, @Res() res: Response) {
-        // Sanitize filename to prevent directory traversal
+    getLegacyFile(@Param('filename') filename: string, @Res() res: Response) {
         const sanitized = filename.replace(/[^a-zA-Z0-9._-]/g, '');
-        const filePath = join(UPLOAD_DIR, sanitized);
+        const filePath = join(LEGACY_UPLOAD_DIR, sanitized);
 
         if (!existsSync(filePath)) {
             return res.status(404).json({ message: 'Dosya bulunamadi.' });

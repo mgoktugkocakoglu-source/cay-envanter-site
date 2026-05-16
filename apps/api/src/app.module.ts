@@ -45,6 +45,13 @@ import { JobListingsModule } from '@/job-listings/job-listings.module';
                 JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
                 APP_URL: Joi.string().required(),
                 GROQ_API_KEY: Joi.string().optional().default(''),
+                R2_ACCOUNT_ID: Joi.string().optional().allow('').default(''),
+                R2_ENDPOINT: Joi.string().optional().allow('').default(''),
+                R2_ACCESS_KEY_ID: Joi.string().optional().allow('').default(''),
+                R2_SECRET_ACCESS_KEY: Joi.string().optional().allow('').default(''),
+                R2_BUCKET: Joi.string().optional().allow('').default(''),
+                R2_PUBLIC_URL: Joi.string().optional().allow('').default(''),
+                R2_PREFIX: Joi.string().optional().allow('').default(''),
             }),
         }),
 
