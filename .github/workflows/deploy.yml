@@ -65,7 +65,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
-            set -euo pipefail
+            set -Eeuo pipefail
 
             # Navigate to project directory
             cd ~/cayhesabim
@@ -97,23 +97,36 @@ jobs:
             R2_PREFIX=${{ secrets.R2_PREFIX }}
             EOF
             
-            rollback() {
-              trap - ERR
-              echo "Deployment failed. Rolling back to ${PREVIOUS_COMMIT}..."
-              git reset --hard "${PREVIOUS_COMMIT}"
-              docker compose -f docker-compose.prod.yml build
-              docker compose -f docker-compose.prod.yml up -d --remove-orphans
-            }
-            
             show_diagnostics() {
+              echo "=== Compose Services ==="
+              docker compose -f docker-compose.prod.yml ps -a 2>&1 || true
               echo "=== API Container Status ==="
-              docker inspect --format='{{.State.Status}} (health: {{.State.Health.Status}})' cayhesabim-api-prod 2>&1 || true
+              docker inspect --format='{{.State.Status}} (health: {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}) exit={{.State.ExitCode}} error={{.State.Error}}' cayhesabim-api-prod 2>&1 || true
               echo "=== Web Container Status ==="
-              docker inspect --format='{{.State.Status}} (health: {{.State.Health.Status}})' cayhesabim-web-prod 2>&1 || true
+              docker inspect --format='{{.State.Status}} (health: {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}) exit={{.State.ExitCode}} error={{.State.Error}}' cayhesabim-web-prod 2>&1 || true
               echo "=== API Container Logs ==="
               docker logs cayhesabim-api-prod --tail 80 2>&1 || true
               echo "=== Web Container Logs ==="
               docker logs cayhesabim-web-prod --tail 80 2>&1 || true
+            }
+
+            rollback() {
+              trap - ERR
+              echo "Rolling back to ${PREVIOUS_COMMIT}..."
+              git reset --hard "${PREVIOUS_COMMIT}"
+              docker compose -f docker-compose.prod.yml build
+              docker compose -f docker-compose.prod.yml up -d --remove-orphans --no-deps db api web
+            }
+
+            on_error() {
+              local line="$1"
+              local exit_code="$2"
+
+              trap - ERR
+              echo "Deployment failed at line ${line} with exit code ${exit_code}."
+              show_diagnostics
+              rollback
+              exit "${exit_code}"
             }
             
             check_url() {
@@ -165,15 +178,19 @@ jobs:
               show_diagnostics
               return 1
             }
-            trap rollback ERR
+            trap 'on_error $LINENO $?' ERR
 
             # Build first while the currently running containers keep serving traffic.
             docker compose -f docker-compose.prod.yml build
 
             # Do not run `down`: it removes the live containers before replacements are ready.
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            # Start services explicitly and wait ourselves so Compose dependency waiting
+            # cannot hide the real failure before diagnostics are printed.
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans --no-deps db
             wait_for_container_health cayhesabim-db-prod db
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans --no-deps api
             wait_for_container_health cayhesabim-api-prod api
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans --no-deps web
             wait_for_container_health cayhesabim-web-prod web
             
             # Show diagnostics after Compose confirms the services are healthy.
