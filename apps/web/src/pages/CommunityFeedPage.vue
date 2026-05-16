@@ -36,15 +36,15 @@ const TextColor = Mark.create({
     return {
       color: {
         default: null,
-        parseHTML: element => element.style.color || null,
-        renderHTML: attributes => attributes.color ? { style: `color: ${attributes.color}` } : {},
+        parseHTML: (element: HTMLElement) => element.style.color || null,
+        renderHTML: (attributes: Record<string, string | null>) => attributes.color ? { style: `color: ${attributes.color}` } : {},
       },
     };
   },
   parseHTML() {
     return [{ tag: 'span[style*="color"]' }];
   },
-  renderHTML({ HTMLAttributes }) {
+  renderHTML({ HTMLAttributes }: { HTMLAttributes: Record<string, unknown> }) {
     return ['span', mergeAttributes(HTMLAttributes), 0];
   },
 });
@@ -55,15 +55,15 @@ const TextHighlight = Mark.create({
     return {
       backgroundColor: {
         default: null,
-        parseHTML: element => element.style.backgroundColor || null,
-        renderHTML: attributes => attributes.backgroundColor ? { style: `background-color: ${attributes.backgroundColor}` } : {},
+        parseHTML: (element: HTMLElement) => element.style.backgroundColor || null,
+        renderHTML: (attributes: Record<string, string | null>) => attributes.backgroundColor ? { style: `background-color: ${attributes.backgroundColor}` } : {},
       },
     };
   },
   parseHTML() {
     return [{ tag: 'span[style*="background-color"]' }];
   },
-  renderHTML({ HTMLAttributes }) {
+  renderHTML({ HTMLAttributes }: { HTMLAttributes: Record<string, unknown> }) {
     return ['span', mergeAttributes(HTMLAttributes), 0];
   },
 });
