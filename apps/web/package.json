@@ -40,7 +40,6 @@
         "vue-router": "^4.2.5"
     },
     "devDependencies": {
-        "@capacitor/assets": "^3.0.5",
         "@capacitor/cli": "^8.3.1",
         "@types/leaflet": "^1.9.21",
         "@types/node": "^20.0.0",
