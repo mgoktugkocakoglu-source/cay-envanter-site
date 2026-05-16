@@ -391,6 +391,9 @@ export interface CommunityPostQuery {
 
 export type MarketplaceListingCategory = 'motor' | 'seedling';
 export type MarketplaceListingStatus = 'active' | 'sold' | 'inactive';
+export type EquipmentCategory = 'electric-motor' | 'gasoline-motor' | 'hand-shears' | 'wearable' | 'helper' | 'other';
+export type EquipmentStatus = 'approved' | 'pending' | 'rejected';
+export type EquipmentUsageStatus = 'used' | 'using';
 
 export interface MarketplaceListing {
     id: string;
@@ -428,6 +431,60 @@ export interface CreateMarketplaceListingData {
     contactPhone: string;
     imageUrls?: string[];
     specs?: Record<string, any>;
+}
+
+export interface EquipmentSpec {
+    label: string;
+    value: string;
+}
+
+export interface EquipmentComment {
+    id: string;
+    author: string;
+    text: string;
+    rating: number;
+    usageStatus: EquipmentUsageStatus;
+    usageMonths: number;
+    likes: number;
+    liked: boolean;
+    createdAt?: string;
+}
+
+export interface EquipmentItem {
+    id: string;
+    category: EquipmentCategory;
+    brand: string;
+    model: string;
+    typeLabel: string;
+    price: number;
+    segmentAverage: number;
+    status: EquipmentStatus;
+    addedBy: 'Admin' | 'Kullanıcı';
+    imageUrl: string;
+    specs: EquipmentSpec[];
+    comments: EquipmentComment[];
+    favorite: boolean;
+    compared: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateEquipmentData {
+    category: EquipmentCategory;
+    brand: string;
+    model: string;
+    typeLabel: string;
+    price: number;
+    segmentAverage?: number | null;
+    imageUrl?: string | null;
+    specs?: EquipmentSpec[];
+}
+
+export interface CreateEquipmentReviewData {
+    rating: number;
+    usageStatus: EquipmentUsageStatus;
+    usageMonths: number;
+    text: string;
 }
 
 export interface CreateCommunityPostData {
@@ -721,6 +778,24 @@ export const api = {
     updateMarketplaceListing: (id: string, data: Partial<CreateMarketplaceListingData> & { status?: MarketplaceListingStatus }) =>
         request<MarketplaceListing>(`/marketplace/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     deleteMarketplaceListing: (id: string) => request<void>(`/marketplace/${id}`, { method: 'DELETE' }),
+
+    // Equipment
+    getEquipment: (params?: { category?: string; status?: string; search?: string }) => {
+        const query = new URLSearchParams(params as Record<string, string>).toString();
+        return request<EquipmentItem[]>(`/equipment${query ? `?${query}` : ''}`);
+    },
+    createEquipment: (data: CreateEquipmentData) =>
+        request<EquipmentItem>('/equipment', { method: 'POST', body: JSON.stringify(data) }),
+    approveEquipment: (id: string) =>
+        request<EquipmentItem>(`/equipment/${id}/approve`, { method: 'PATCH' }),
+    rejectEquipment: (id: string) =>
+        request<EquipmentItem>(`/equipment/${id}/reject`, { method: 'PATCH' }),
+    createEquipmentReview: (id: string, data: CreateEquipmentReviewData) =>
+        request<EquipmentComment>(`/equipment/${id}/reviews`, { method: 'POST', body: JSON.stringify(data) }),
+    toggleEquipmentFavorite: (id: string) =>
+        request<{ favorite: boolean }>(`/equipment/${id}/favorite`, { method: 'POST' }),
+    toggleEquipmentReviewLike: (reviewId: string) =>
+        request<{ liked: boolean }>(`/equipment/reviews/${reviewId}/like`, { method: 'POST' }),
 
     // Users
     searchUser: (query: string, type: 'tc' | 'phone') =>

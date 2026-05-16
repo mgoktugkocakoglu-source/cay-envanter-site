@@ -1,14 +1,8 @@
 /**
- * Çay Hesabım - App Store / Play Store İkon ve Splash Screen Üretici
+ * CayHesabim brand asset generator.
  *
- * Kullanım:
- *   node scripts/generate-assets.mjs
- *
- * Bu script:
- *  1. SVG ikondan 1024x1024 PNG üretir (icon-only.png, icon-foreground.png)
- *  2. Arkaplan rengiyle icon-background.png üretir
- *  3. 2732x2732 splash.png ve splash-dark.png üretir
- *  4. @capacitor/assets ile tüm platform ikonlarını üretir
+ * Generates app icons, splash screens, PWA icons, and social share images from
+ * the canonical transparent logo at apps/web/assets/full_seffaf_ico.svg.
  */
 
 import { createRequire } from 'module';
@@ -24,134 +18,267 @@ const { execSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const ASSETS_DIR = path.join(ROOT, 'assets');
-const SVG_PATH = path.join(ROOT, 'src/assets/images/app-icon.svg');
+const PUBLIC_DIR = path.join(ROOT, 'public');
+const PUBLIC_ICONS_DIR = path.join(PUBLIC_DIR, 'icons');
+const PUBLIC_SOCIAL_DIR = path.join(PUBLIC_DIR, 'social');
+const PUBLIC_BRAND_DIR = path.join(PUBLIC_DIR, 'brand');
+const SRC_IMAGES_DIR = path.join(ROOT, 'src', 'assets', 'images');
+const SRC_ICONS_DIR = path.join(ROOT, 'src', 'assets', 'icons');
+const SOURCE_LOGO = path.join(ASSETS_DIR, 'full_seffaf_ico.svg');
 
 const BRAND_GREEN = '#16a34a';
-const BRAND_GREEN_DARK = '#15803d';
-const WHITE = '#ffffff';
+const BRAND_GREEN_DARK = '#14532d';
+const ICON_BG = '#f8faf8';
+const SOCIAL_BG = '#f8faf8';
+const SOCIAL_ACCENT = '#dcfce7';
+const TEXT_DARK = '#111827';
 
-// Splash screen arka planı SVG (2732x2732, logo ortada)
-function createSplashSvg(bgColor, textColor = '#ffffff') {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2732 2732" width="2732" height="2732">
-  <rect width="2732" height="2732" fill="${bgColor}"/>
-  <!-- Merkezi ikon (512x512 boyutunda, ortada) -->
-  <g transform="translate(1110, 1110)">
-    <!-- Fincan gövdesi -->
-    <rect x="62" y="130" width="400" height="260" rx="30" ry="30" fill="${textColor}" opacity="0.95"/>
-    <!-- Kulp -->
-    <path d="M462 180 Q550 180 550 260 Q550 340 462 340" fill="none" stroke="${textColor}" stroke-width="40" stroke-linecap="round" opacity="0.95"/>
-    <!-- Altlık -->
-    <rect x="12" y="390" width="500" height="30" rx="15" fill="${textColor}" opacity="0.85"/>
-    <rect x="62" y="420" width="400" height="20" rx="10" fill="${textColor}" opacity="0.70"/>
-    <!-- Buhar -->
-    <path d="M170 90 Q190 50 170 10" fill="none" stroke="${textColor}" stroke-width="20" stroke-linecap="round" opacity="0.75"/>
-    <path d="M262 90 Q282 50 262 10" fill="none" stroke="${textColor}" stroke-width="20" stroke-linecap="round" opacity="0.75"/>
-    <path d="M354 90 Q374 50 354 10" fill="none" stroke="${textColor}" stroke-width="20" stroke-linecap="round" opacity="0.75"/>
-    <!-- ₺ -->
-    <text x="262" y="295" font-family="Arial" font-size="140" font-weight="bold" fill="${bgColor}" text-anchor="middle" dominant-baseline="middle">₺</text>
-  </g>
-  <!-- Alt yazı -->
-  <text x="1366" y="1760" font-family="Arial, sans-serif" font-size="80" font-weight="600" fill="${textColor}" text-anchor="middle" opacity="0.9">Çay Hesabım</text>
-</svg>`;
+function ensureDir(dir) {
+  fs.mkdirSync(dir, { recursive: true });
 }
 
-async function run() {
-  console.log('📱 Çay Hesabım - App Store varlıkları üretiliyor...\n');
+function copyBrandSource() {
+  fs.copyFileSync(SOURCE_LOGO, path.join(SRC_IMAGES_DIR, 'app-icon.svg'));
+  fs.copyFileSync(SOURCE_LOGO, path.join(PUBLIC_BRAND_DIR, 'logo.svg'));
+}
 
-  if (!fs.existsSync(ASSETS_DIR)) {
-    fs.mkdirSync(ASSETS_DIR, { recursive: true });
-  }
+async function renderLogo(size) {
+  const rendered = await sharp(SOURCE_LOGO)
+    .resize(2048, 2048, { fit: 'contain' })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
 
-  // 1. icon-only.png (1024x1024) - şeffaf arka plan yok, tam ikon
-  console.log('🎨 icon-only.png üretiliyor (1024x1024)...');
-  const svgBuffer = fs.readFileSync(SVG_PATH);
-  await sharp(svgBuffer)
-    .resize(1024, 1024)
-    .png()
-    .toFile(path.join(ASSETS_DIR, 'icon-only.png'));
-  console.log('   ✓ icon-only.png');
+  const { data, info } = rendered;
 
-  // 2. icon-foreground.png - Android adaptive icon ön planı (1024x1024, ikon şekli)
-  console.log('🎨 icon-foreground.png üretiliyor...');
-  // Merkezi 70% boyutunda, şeffaf arka plan üzerinde
-  const fgSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-    <rect width="1024" height="1024" fill="none"/>
-    <g transform="translate(112, 112) scale(0.78)">
-      <rect x="312" y="460" width="400" height="260" rx="30" fill="white"/>
-      <path d="M712 510 Q800 510 800 590 Q800 670 712 670" fill="none" stroke="white" stroke-width="40" stroke-linecap="round"/>
-      <rect x="262" y="720" width="500" height="30" rx="15" fill="white" opacity="0.85"/>
-      <rect x="312" y="750" width="400" height="20" rx="10" fill="white" opacity="0.70"/>
-      <path d="M420 400 Q440 360 420 320 Q400 280 420 240" fill="none" stroke="white" stroke-width="22" stroke-linecap="round" opacity="0.75"/>
-      <path d="M512 400 Q532 360 512 320 Q492 280 512 240" fill="none" stroke="white" stroke-width="22" stroke-linecap="round" opacity="0.75"/>
-      <path d="M604 400 Q624 360 604 320 Q584 280 604 240" fill="none" stroke="white" stroke-width="22" stroke-linecap="round" opacity="0.75"/>
-      <text x="512" y="640" font-family="Arial" font-size="140" font-weight="bold" fill="${BRAND_GREEN}" text-anchor="middle" dominant-baseline="middle">₺</text>
-    </g>
-  </svg>`;
-  await sharp(Buffer.from(fgSvg))
-    .resize(1024, 1024)
-    .png()
-    .toFile(path.join(ASSETS_DIR, 'icon-foreground.png'));
-  console.log('   ✓ icon-foreground.png');
+  removeNearBlack(data);
 
-  // 3. icon-background.png - Android adaptive icon arka planı (düz renk)
-  console.log('🎨 icon-background.png üretiliyor...');
-  await sharp({
-    create: {
-      width: 1024,
-      height: 1024,
+  const cleaned = await sharp(data, {
+    raw: {
+      width: info.width,
+      height: info.height,
       channels: 4,
-      background: { r: 22, g: 163, b: 74, alpha: 1 }, // #16a34a
     },
   })
     .png()
-    .toFile(path.join(ASSETS_DIR, 'icon-background.png'));
-  console.log('   ✓ icon-background.png');
+    .toBuffer();
 
-  // 4. splash.png ve splash-dark.png kontrolü
-  console.log('🔍 Splash görselleri kontrol ediliyor...');
-  const splashPath = path.join(ASSETS_DIR, 'splash.png');
-  const splashDarkPath = path.join(ASSETS_DIR, 'splash-dark.png');
+  const resized = await sharp(cleaned)
+    .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .resize(size, size, { fit: 'contain' })
+    .png()
+    .toBuffer();
 
-  if (!fs.existsSync(splashPath)) {
-    console.log('🎨 splash.png üretiliyor (varsayılan)...');
-    const splashSvg = createSplashSvg(BRAND_GREEN, WHITE);
-    await sharp(Buffer.from(splashSvg)).resize(2732, 2732).png().toFile(splashPath);
-  } else {
-    console.log('   ✓ Mevcut splash.png kullanılıyor.');
+  return cleanNearBlackPng(resized);
+}
+
+function removeNearBlack(data) {
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+
+    if (r < 35 && g < 35 && b < 35) {
+      data[i + 3] = 0;
+    }
+  }
+}
+
+async function cleanNearBlackPng(buffer) {
+  const rendered = await sharp(buffer)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  removeNearBlack(rendered.data);
+
+  return sharp(rendered.data, {
+    raw: {
+      width: rendered.info.width,
+      height: rendered.info.height,
+      channels: 4,
+    },
+  })
+    .png()
+    .toBuffer();
+}
+
+async function createSquareIcon(size, outputPath, options = {}) {
+  const background = options.background ?? ICON_BG;
+  const logoScale = options.logoScale ?? 0.72;
+  const logoSize = Math.round(size * logoScale);
+  const logo = await renderLogo(logoSize);
+
+  await sharp({
+    create: {
+      width: size,
+      height: size,
+      channels: 4,
+      background,
+    },
+  })
+    .composite([{ input: logo, gravity: 'center' }])
+    .png()
+    .toFile(outputPath);
+}
+
+async function createTransparentForeground(size, outputPath) {
+  const logoSize = Math.round(size * 0.72);
+  const logo = await renderLogo(logoSize);
+
+  await sharp({
+    create: {
+      width: size,
+      height: size,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite([{ input: logo, gravity: 'center' }])
+    .png()
+    .toFile(outputPath);
+}
+
+async function createSolidImage(size, outputPath, color) {
+  await sharp({
+    create: {
+      width: size,
+      height: size,
+      channels: 4,
+      background: color,
+    },
+  })
+    .png()
+    .toFile(outputPath);
+}
+
+async function createSplash(outputPath, background, logoScale = 0.34) {
+  const size = 2732;
+  const logoSize = Math.round(size * logoScale);
+  const logo = await renderLogo(logoSize);
+
+  await sharp({
+    create: {
+      width: size,
+      height: size,
+      channels: 4,
+      background,
+    },
+  })
+    .composite([{ input: logo, gravity: 'center' }])
+    .png()
+    .toFile(outputPath);
+}
+
+async function createSocialImage(outputPath, width, height, variant = 'wide') {
+  const logoSize = variant === 'square'
+    ? Math.round(Math.min(width, height) * 0.54)
+    : Math.round(height * 0.56);
+  const logo = await renderLogo(logoSize);
+  const topAccent = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+    <rect width="${width}" height="${height}" fill="${SOCIAL_BG}"/>
+    <circle cx="${Math.round(width * 0.16)}" cy="${Math.round(height * 0.18)}" r="${Math.round(height * 0.18)}" fill="${SOCIAL_ACCENT}" opacity="0.7"/>
+    <circle cx="${Math.round(width * 0.88)}" cy="${Math.round(height * 0.82)}" r="${Math.round(height * 0.24)}" fill="${SOCIAL_ACCENT}" opacity="0.55"/>
+    <text x="${Math.round(width / 2)}" y="${Math.round(height * 0.84)}" text-anchor="middle" font-family="Nunito, Arial, sans-serif" font-size="${Math.round(height * 0.075)}" font-weight="700" fill="${TEXT_DARK}">ÇayHesabım</text>
+  </svg>`);
+
+  await sharp(topAccent)
+    .composite([{ input: logo, top: Math.round(height * 0.16), left: Math.round((width - logoSize) / 2) }])
+    .png()
+    .toFile(outputPath);
+}
+
+async function createWebIcons() {
+  const sizes = [48, 72, 96, 128, 180, 192, 256, 512];
+
+  for (const size of sizes) {
+    const pngPath = path.join(PUBLIC_ICONS_DIR, `icon-${size}.png`);
+    const webpPath = path.join(PUBLIC_ICONS_DIR, `icon-${size}.webp`);
+    await createSquareIcon(size, pngPath, { logoScale: 0.72 });
+    await sharp(pngPath).webp({ quality: 92 }).toFile(webpPath);
+
+    if (size !== 180) {
+      await fs.promises.copyFile(webpPath, path.join(SRC_ICONS_DIR, `icon-${size}.webp`));
+    }
   }
 
-  if (!fs.existsSync(splashDarkPath)) {
-    console.log('🎨 splash-dark.png üretiliyor (varsayılan)...');
-    const splashDarkSvg = createSplashSvg(BRAND_GREEN_DARK, WHITE);
-    await sharp(Buffer.from(splashDarkSvg)).resize(2732, 2732).png().toFile(splashDarkPath);
-  } else {
-    console.log('   ✓ Mevcut splash-dark.png kullanılıyor.');
-  }
+  await fs.promises.copyFile(path.join(PUBLIC_ICONS_DIR, 'icon-48.png'), path.join(PUBLIC_DIR, 'favicon-48.png'));
+  await fs.promises.copyFile(path.join(PUBLIC_ICONS_DIR, 'icon-180.png'), path.join(PUBLIC_DIR, 'apple-touch-icon.png'));
+}
 
-  console.log('\n✅ Kaynak varlıklar hazır! Şimdi platform ikonları üretiliyor...\n');
+function writeManifest() {
+  const iconSizes = [48, 72, 96, 128, 192, 256, 512];
+  const manifest = {
+    name: 'Çay Hesabım',
+    short_name: 'Çay Hesabım',
+    description: 'Çay üreticileri için dijital hesap ve iş takip platformu.',
+    lang: 'tr',
+    start_url: '/',
+    scope: '/',
+    display: 'standalone',
+    orientation: 'portrait',
+    background_color: ICON_BG,
+    theme_color: BRAND_GREEN,
+    icons: iconSizes.flatMap((size) => [
+      {
+        src: `/icons/icon-${size}.png`,
+        type: 'image/png',
+        sizes: `${size}x${size}`,
+        purpose: 'any maskable',
+      },
+      {
+        src: `/icons/icon-${size}.webp`,
+        type: 'image/webp',
+        sizes: `${size}x${size}`,
+        purpose: 'any maskable',
+      },
+    ]),
+  };
 
-  // 6. @capacitor/assets ile tüm platform ikonlarını üret
-  try {
-    execSync(
-      'npx @capacitor/assets generate ' +
-        '--iconBackgroundColor "#16a34a" ' +
-        '--iconBackgroundColorDark "#15803d" ' +
-        '--splashBackgroundColor "#16a34a" ' +
-        '--splashBackgroundColorDark "#15803d"',
-      { stdio: 'inherit', cwd: ROOT }
-    );
-    console.log('\n🎉 Tüm platform ikonları başarıyla üretildi!');
-  } catch (err) {
-    console.error('\n❌ @capacitor/assets hatası:', err.message);
-    process.exit(1);
-  }
+  fs.writeFileSync(
+    path.join(PUBLIC_DIR, 'manifest.webmanifest'),
+    `${JSON.stringify(manifest, null, 2)}\n`
+  );
 
-  console.log('\n📋 Sonraki adımlar:');
-  console.log('   iOS  : pnpm cap:ios   (Xcode açılır, App Store\'a gönder)');
-  console.log('   Android: pnpm cap:android (Android Studio açılır, Play Store\'a gönder)');
+  fs.copyFileSync(path.join(PUBLIC_DIR, 'manifest.webmanifest'), path.join(ROOT, 'src', 'manifest.webmanifest'));
+}
+
+async function run() {
+  console.log('Generating CayHesabim brand assets...');
+
+  [ASSETS_DIR, PUBLIC_DIR, PUBLIC_ICONS_DIR, PUBLIC_SOCIAL_DIR, PUBLIC_BRAND_DIR, SRC_IMAGES_DIR, SRC_ICONS_DIR].forEach(ensureDir);
+
+  copyBrandSource();
+
+  await createSquareIcon(1024, path.join(ASSETS_DIR, 'icon-only.png'));
+  await createTransparentForeground(1024, path.join(ASSETS_DIR, 'icon-foreground.png'));
+  await createSolidImage(1024, path.join(ASSETS_DIR, 'icon-background.png'), ICON_BG);
+
+  await createSplash(path.join(ASSETS_DIR, 'splash.png'), ICON_BG, 0.34);
+  await createSplash(path.join(ASSETS_DIR, 'splash-dark.png'), BRAND_GREEN_DARK, 0.34);
+
+  await createWebIcons();
+
+  await createSocialImage(path.join(PUBLIC_SOCIAL_DIR, 'og-image.png'), 1200, 630);
+  await createSocialImage(path.join(PUBLIC_SOCIAL_DIR, 'twitter-image.png'), 1200, 675);
+  await createSocialImage(path.join(PUBLIC_SOCIAL_DIR, 'whatsapp-image.png'), 1200, 630);
+  await createSocialImage(path.join(PUBLIC_SOCIAL_DIR, 'instagram-share.png'), 1200, 1200, 'square');
+
+  execSync(
+    'npx @capacitor/assets generate ' +
+      `--iconBackgroundColor "${ICON_BG}" ` +
+      `--iconBackgroundColorDark "${BRAND_GREEN_DARK}" ` +
+      `--splashBackgroundColor "${ICON_BG}" ` +
+      `--splashBackgroundColorDark "${BRAND_GREEN_DARK}"`,
+    { stdio: 'inherit', cwd: ROOT }
+  );
+
+  writeManifest();
+
+  console.log('Brand assets generated.');
 }
 
 run().catch((err) => {
-  console.error('Hata:', err);
+  console.error(err);
   process.exit(1);
 });

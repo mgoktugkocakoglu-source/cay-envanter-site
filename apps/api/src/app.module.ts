@@ -18,6 +18,7 @@ import { CommunityModule } from '@/community/community.module';
 import { HealthModule } from '@/health/health.module';
 import { JobListingsModule } from '@/job-listings/job-listings.module';
 import { MarketplaceModule } from '@/marketplace/marketplace.module';
+import { EquipmentModule } from '@/equipment/equipment.module';
 
 @Module({
     imports: [
@@ -88,6 +89,7 @@ import { MarketplaceModule } from '@/marketplace/marketplace.module';
         HealthModule,
         JobListingsModule,
         MarketplaceModule,
+        EquipmentModule,
     ],
     providers: [
         {
