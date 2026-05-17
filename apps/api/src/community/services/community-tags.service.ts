@@ -24,15 +24,22 @@ export class CommunityTagsService {
      * Falls back to overall most-used tags.
      */
     async findTrending(limit: number = 10): Promise<CommunityTag[]> {
-        return this.tagRepository
+        const { entities, raw } = await this.tagRepository
             .createQueryBuilder('tag')
             .innerJoin('community_post_tags', 'pt', 'pt."tagId" = tag.id')
             .innerJoin('community_posts', 'post', 'post.id = pt."postId"')
             .where('post."createdAt" > NOW() - INTERVAL \'7 days\'')
+            .andWhere('post."deletedAt" IS NULL')
+            .addSelect('COUNT(pt."postId")', 'postCount')
             .groupBy('tag.id')
             .orderBy('COUNT(pt."postId")', 'DESC')
             .limit(limit)
-            .getMany();
+            .getRawAndEntities();
+
+        return entities.map((tag, index) => ({
+            ...tag,
+            usageCount: Number(raw[index]?.postCount ?? tag.usageCount),
+        }));
     }
 
     async createTag(dto: CreateTagDto): Promise<CommunityTag> {

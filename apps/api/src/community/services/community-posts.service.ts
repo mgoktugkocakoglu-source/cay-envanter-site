@@ -58,11 +58,10 @@ export class CommunityPostsService {
                 savedPost.tags = tags;
                 await this.postRepository.save(savedPost);
 
-                /** Increment usage count on tags */
+                /** Keep denormalized tag totals in sync for all-tags sorting. */
                 for (const tag of tags) {
-                    tag.usageCount += 1;
+                    await this.tagRepository.increment({ id: tag.id }, 'usageCount', 1);
                 }
-                await this.taggingService.resolveTagEntities([]); // no-op but tags auto-saved above
             }
         } catch (error) {
             this.logger.warn(`Tagging failed for post ${savedPost.id}: ${error}`);
@@ -152,7 +151,10 @@ export class CommunityPostsService {
     }
 
     async deletePost(postId: string, userId: string, userRole: Role): Promise<void> {
-        const post = await this.postRepository.findOne({ where: { id: postId } });
+        const post = await this.postRepository.findOne({
+            where: { id: postId },
+            relations: { tags: true },
+        });
 
         if (!post) {
             throw new NotFoundException('Post not found');
@@ -163,6 +165,10 @@ export class CommunityPostsService {
         }
 
         await this.postRepository.softRemove(post);
+
+        for (const tag of post.tags ?? []) {
+            await this.tagRepository.decrement({ id: tag.id }, 'usageCount', 1);
+        }
     }
 
     async incrementCommentCount(postId: string): Promise<void> {
