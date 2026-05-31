@@ -126,6 +126,12 @@ const router = createRouter({
             meta: { requiresAuth: true, hub: 'tea' },
         },
         {
+            path: '/tea/ai-agent',
+            name: 'tea-ai-agent',
+            component: () => import('@/pages/TeaAiAgentPage.vue'),
+            meta: { requiresAuth: true, hub: 'tea' },
+        },
+        {
             path: '/tea/settings',
             name: 'tea-settings',
             component: () => import('@/pages/SettingsPage.vue'),
@@ -258,6 +264,7 @@ const router = createRouter({
         { path: '/firms/:id', redirect: to => `/tea/firms/${to.params.id}` },
         { path: '/harvests', redirect: '/tea/harvests' },
         { path: '/payments', redirect: '/tea/payments' },
+        { path: '/ai-agent', redirect: '/tea/ai-agent' },
         { path: '/settings', redirect: '/tea/settings' },
         { path: '/job-listings', redirect: '/social/job-listings' },
         { path: '/job-listings/worker/create', redirect: '/social/job-listings/worker/create' },
