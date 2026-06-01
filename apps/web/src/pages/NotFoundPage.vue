@@ -42,10 +42,7 @@ const router = useRouter();
 .not-found-code {
   font-size: 120px;
   font-weight: 800;
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--color-primary);
   margin: 0;
   line-height: 1;
 }

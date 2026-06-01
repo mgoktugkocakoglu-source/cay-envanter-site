@@ -94,7 +94,7 @@ const buttonClasses = computed(() => [
 /* Variants */
 .app-btn--primary {
   background: var(--color-primary);
-  color: white;
+  color: var(--color-on-primary);
   border: 1px solid var(--color-primary);
 }
 
@@ -120,7 +120,7 @@ const buttonClasses = computed(() => [
 
 .app-btn--danger {
   background: var(--color-danger);
-  color: white;
+  color: var(--color-on-danger);
 }
 
 .app-btn--danger:hover:not(:disabled) {

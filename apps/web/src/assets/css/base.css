@@ -86,5 +86,20 @@ ol {
 /* Selection */
 ::selection {
     background: var(--color-primary);
-    color: white;
+    color: var(--color-on-primary);
+}
+
+/* Reduced Motion — honor prefers-reduced-motion across the app.
+ * Safety net: near-instantly resolve transitions/animations for users
+ * who opt out (a crossfade/instant fallback everywhere at once).
+ * Per-animation refinements can layer on top of this later. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }
