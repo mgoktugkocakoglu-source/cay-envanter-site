@@ -263,20 +263,12 @@ onUnmounted(stopClock);
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
                 Arazilerim
               </RouterLink>
-              <RouterLink to="/social/job-listings/job/create" class="action-btn action-btn--secondary">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                İş İlanı Oluştur
-              </RouterLink>
             </template>
             <!-- Çay işçisi için -->
             <template v-else-if="authStore.user?.userType === 'worker'">
-              <RouterLink to="/social/job-listings/worker/create" class="action-btn action-btn--primary">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-                İşçi İlanı Oluştur
-              </RouterLink>
-              <RouterLink to="/social/job-listings/job/create" class="action-btn action-btn--secondary">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-                İş İlanı Oluştur
+              <RouterLink to="/tea/fields" class="action-btn action-btn--primary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                Tarlalarım
               </RouterLink>
             </template>
             <!-- Kendi Isleyen icin (varsayilan) -->
@@ -284,10 +276,6 @@ onUnmounted(stopClock);
               <RouterLink to="/tea/fields/create" class="action-btn action-btn--primary">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Tarla Ekle
-              </RouterLink>
-              <RouterLink to="/social/job-listings/worker/create" class="action-btn action-btn--secondary">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                İşçi İlanı Oluştur
               </RouterLink>
             </template>
           </div>
@@ -326,7 +314,7 @@ onUnmounted(stopClock);
 
         <!-- Stats Cards -->
         <section class="stats-grid">
-          <div class="stat-card" @click="router.push('/fields')">
+          <div class="stat-card" role="link" tabindex="0" @click="router.push('/fields')" @keydown.enter="router.push('/fields')">
             <div class="stat-icon stat-icon--fields">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
             </div>
@@ -337,7 +325,7 @@ onUnmounted(stopClock);
             <div class="stat-sub">{{ totalArea.toFixed(1) }} dekar toplam alan</div>
           </div>
 
-          <div class="stat-card" @click="router.push('/harvests')">
+          <div class="stat-card" role="link" tabindex="0" @click="router.push('/harvests')" @keydown.enter="router.push('/harvests')">
             <div class="stat-icon stat-icon--harvests">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
             </div>
@@ -348,7 +336,7 @@ onUnmounted(stopClock);
             <div class="stat-sub">{{ harvestsStore.harvestCount }} hasat kaydi</div>
           </div>
 
-          <div class="stat-card" @click="router.push('/payments')">
+          <div class="stat-card" role="link" tabindex="0" @click="router.push('/payments')" @keydown.enter="router.push('/payments')">
             <div class="stat-icon stat-icon--income">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
             </div>
@@ -362,7 +350,7 @@ onUnmounted(stopClock);
             </div>
           </div>
 
-          <div class="stat-card" @click="router.push('/payments')">
+          <div class="stat-card" role="link" tabindex="0" @click="router.push('/payments')" @keydown.enter="router.push('/payments')">
             <div class="stat-icon stat-icon--pending">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             </div>
@@ -429,10 +417,6 @@ onUnmounted(stopClock);
 
         <!-- Quick Links -->
         <section class="quick-links">
-          <RouterLink to="/social/community" class="quick-link-card">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            <span>Topluluk</span>
-          </RouterLink>
           <RouterLink to="/tea/settings" class="quick-link-card">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             <span>Ayarlar</span>
