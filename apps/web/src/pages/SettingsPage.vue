@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue';
+import { useFocusTrap } from '@/composables/useFocusTrap';
 import { useRouter } from 'vue-router';
 import { api } from '@/services/api';
 import type { Session } from '@/services/api';
@@ -49,6 +50,7 @@ const revokeAllLoading = ref(false);
 // Deletion (in-app, Google Play compliant)
 const showDeleteModal = ref(false);
 const deleteModalRef = ref<HTMLElement | null>(null);
+useFocusTrap(showDeleteModal, deleteModalRef);
 const deletePassword = ref('');
 const deleteConfirmText = ref('');
 const showDeletePassword = ref(false);

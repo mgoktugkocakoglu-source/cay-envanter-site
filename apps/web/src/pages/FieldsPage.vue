@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, nextTick, watch } from 'vue';
+import { useFocusTrap } from '@/composables/useFocusTrap';
 import { useRouter } from 'vue-router';
 import { useFieldsStore } from '@/stores/fieldsStore';
 import { useToast } from '@/composables/useToast';
@@ -19,6 +20,7 @@ const provinceFilter = ref('');
 const showDeleteModal = ref(false);
 const fieldDeleteModalRef = ref<HTMLElement | null>(null);
 watch(showDeleteModal, (v) => { if (v) nextTick(() => fieldDeleteModalRef.value?.focus()); });
+useFocusTrap(showDeleteModal, fieldDeleteModalRef);
 const fieldToDelete = ref<Field | null>(null);
 const isDeleting = ref(false);
 

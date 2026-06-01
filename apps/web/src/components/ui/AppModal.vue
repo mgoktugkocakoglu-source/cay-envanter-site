@@ -40,7 +40,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, useId } from 'vue'
+import { ref, watch, nextTick, useId, toRef } from 'vue'
+import { useFocusTrap } from '@/composables/useFocusTrap'
 
 interface Props {
   modelValue: boolean
@@ -63,6 +64,8 @@ const emit = defineEmits<{
 
 const modalRef = ref<HTMLElement | null>(null)
 const modalId = useId()
+
+useFocusTrap(toRef(props, 'modelValue'), modalRef)
 
 function close() {
   emit('update:modelValue', false)

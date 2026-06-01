@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick, watch } from 'vue';
+import { useFocusTrap } from '@/composables/useFocusTrap';
 import { useRouter } from 'vue-router';
 import { useFirmsStore } from '@/stores/firmsStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -15,6 +16,7 @@ const searchQuery = ref('');
 const showWizard = ref(false);
 const wizardRef = ref<HTMLElement | null>(null);
 watch(showWizard, (v) => { if (v) nextTick(() => wizardRef.value?.focus()); });
+useFocusTrap(showWizard, wizardRef);
 const wizardStep = ref(1); // 1: Firma Adı, 2: Tarifeler, 3: Konumlar
 const isSaving = ref(false);
 const formError = ref<string | null>(null);

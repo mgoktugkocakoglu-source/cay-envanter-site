@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, watch, nextTick } from 'vue';
+import { useFocusTrap } from '@/composables/useFocusTrap';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { api, type AdminUser } from '@/services/api';
@@ -23,6 +24,7 @@ const selectedUser = ref<AdminUser | null>(null);
 const showUserModal = ref(false);
 const userModalRef = ref<HTMLElement | null>(null);
 watch(showUserModal, (v) => { if (v) nextTick(() => userModalRef.value?.focus()); });
+useFocusTrap(showUserModal, userModalRef);
 const showBanConfirm = ref(false);
 const showRoleConfirm = ref(false);
 const banTargetUser = ref<AdminUser | null>(null);

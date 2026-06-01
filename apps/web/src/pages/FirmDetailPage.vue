@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick, watch } from 'vue';
+import { useFocusTrap } from '@/composables/useFocusTrap';
 import { useRoute, RouterLink } from 'vue-router';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -41,6 +42,7 @@ const paymentTermIcons: Record<string, string> = {
 const showTariffModal = ref(false);
 const tariffModalRef = ref<HTMLElement | null>(null);
 watch(showTariffModal, (v) => { if (v) nextTick(() => tariffModalRef.value?.focus()); });
+useFocusTrap(showTariffModal, tariffModalRef);
 type PaymentTermType = 'cash' | 'weekly' | 'monthly' | 'custom';
 const tariffForm = ref({
     paymentTerm: 'cash' as PaymentTermType,
@@ -64,6 +66,7 @@ const deleteTariffTargetId = ref('');
 const showCPModal = ref(false);
 const cpModalRef = ref<HTMLElement | null>(null);
 watch(showCPModal, (v) => { if (v) nextTick(() => cpModalRef.value?.focus()); });
+useFocusTrap(showCPModal, cpModalRef);
 const cpForm = ref({
     name: '',
     province: '',

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, nextTick, watch } from 'vue';
+import { useFocusTrap } from '@/composables/useFocusTrap';
 import { RouterLink } from 'vue-router';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AppEmptyState from '@/components/ui/AppEmptyState.vue';
@@ -13,6 +14,7 @@ const searchQuery = ref('');
 const showCreateForm = ref(false);
 const createFormRef = ref<HTMLElement | null>(null);
 watch(showCreateForm, (v) => { if (v) nextTick(() => createFormRef.value?.focus()); });
+useFocusTrap(showCreateForm, createFormRef);
 const isSubmitting = ref(false);
 const isUploadingLogo = ref(false);
 const formError = ref<string | null>(null);
