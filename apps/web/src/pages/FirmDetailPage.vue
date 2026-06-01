@@ -39,6 +39,8 @@ const paymentTermIcons: Record<string, string> = {
 
 // ─── Tariff Modal State ───
 const showTariffModal = ref(false);
+const tariffModalRef = ref<HTMLElement | null>(null);
+watch(showTariffModal, (v) => { if (v) nextTick(() => tariffModalRef.value?.focus()); });
 type PaymentTermType = 'cash' | 'weekly' | 'monthly' | 'custom';
 const tariffForm = ref({
     paymentTerm: 'cash' as PaymentTermType,
@@ -60,6 +62,8 @@ const deleteTariffTargetId = ref('');
 
 // ─── Collection Point Modal State ───
 const showCPModal = ref(false);
+const cpModalRef = ref<HTMLElement | null>(null);
+watch(showCPModal, (v) => { if (v) nextTick(() => cpModalRef.value?.focus()); });
 const cpForm = ref({
     name: '',
     province: '',
@@ -619,10 +623,10 @@ onMounted(loadFirmData);
             </div>
 
             <!-- ═══ Add Tariff Modal ═══ -->
-            <div v-if="showTariffModal" class="modal-overlay" @click.self="showTariffModal = false">
-                <div class="modal-content">
+            <div v-if="showTariffModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="tariff-modal-title" @click.self="showTariffModal = false" @keydown.esc="showTariffModal = false">
+                <div class="modal-content" ref="tariffModalRef" tabindex="-1">
                     <div class="modal-header-row">
-                        <h2>Yeni Tarife Ekle</h2>
+                        <h2 id="tariff-modal-title">Yeni Tarife Ekle</h2>
                         <button class="modal-close" aria-label="Kapat" @click="showTariffModal = false">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
@@ -737,10 +741,10 @@ onMounted(loadFirmData);
             </div>
 
             <!-- ═══ Add Collection Point Modal ═══ -->
-            <div v-if="showCPModal" class="modal-overlay" @click.self="showCPModal = false">
-                <div class="modal-content">
+            <div v-if="showCPModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="cp-modal-title" @click.self="showCPModal = false" @keydown.esc="showCPModal = false">
+                <div class="modal-content" ref="cpModalRef" tabindex="-1">
                     <div class="modal-header-row">
-                        <h2>Konum Ekle</h2>
+                        <h2 id="cp-modal-title">Konum Ekle</h2>
                         <button class="modal-close" aria-label="Kapat" @click="showCPModal = false">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>

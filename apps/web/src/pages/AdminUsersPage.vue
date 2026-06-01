@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, watch } from 'vue';
+import { onMounted, ref, computed, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { api, type AdminUser } from '@/services/api';
@@ -21,6 +21,8 @@ const filterRole = ref<'all' | 'user' | 'moderator' | 'admin'>('all');
 const filterStatus = ref<'all' | 'active' | 'banned'>('all');
 const selectedUser = ref<AdminUser | null>(null);
 const showUserModal = ref(false);
+const userModalRef = ref<HTMLElement | null>(null);
+watch(showUserModal, (v) => { if (v) nextTick(() => userModalRef.value?.focus()); });
 const showBanConfirm = ref(false);
 const showRoleConfirm = ref(false);
 const banTargetUser = ref<AdminUser | null>(null);
@@ -212,7 +214,6 @@ function formatDate(dateString: string) {
                 <div class="table-header">
                     <span class="col-user">Kullanıcı</span>
                     <span class="col-role">Rol</span>
-                    <span class="col-stats">İstatistikler</span>
                     <span class="col-status">Durum</span>
                     <span class="col-date">Kayıt Tarihi</span>
                     <span class="col-actions">İşlemler</span>
@@ -234,10 +235,6 @@ function formatDate(dateString: string) {
                         <span :class="['role-badge', getRoleBadgeClass(user.role)]">
                             {{ getRoleLabel(user.role) }}
                         </span>
-                    </span>
-                    <span class="col-stats">
-                        <span class="stat-item">📝 {{ user.topicCount }}</span>
-                        <span class="stat-item">💬 {{ user.replyCount }}</span>
                     </span>
                     <span class="col-status">
                         <span v-if="user.isBanned" class="status-banned">🚫 Yasaklı</span>
@@ -274,11 +271,11 @@ function formatDate(dateString: string) {
             </div>
 
             <!-- User Detail Modal -->
-            <div v-if="showUserModal && selectedUser" class="modal-overlay" @click.self="closeUserModal">
-                <div class="modal">
+            <div v-if="showUserModal && selectedUser" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="user-modal-title" @click.self="closeUserModal" @keydown.esc="closeUserModal">
+                <div class="modal" ref="userModalRef" tabindex="-1">
                     <div class="modal-header">
-                        <h2>Kullanıcı Detayı</h2>
-                        <button class="close-btn" @click="closeUserModal">✕</button>
+                        <h2 id="user-modal-title">Kullanıcı Detayı</h2>
+                        <button class="close-btn" aria-label="Kapat" @click="closeUserModal">✕</button>
                     </div>
                     <div class="modal-body">
                         <div class="user-profile">
@@ -301,14 +298,6 @@ function formatDate(dateString: string) {
                                 <span class="detail-value">
                                     {{ selectedUser.isBanned ? 'Yasaklı' : (selectedUser.isActive ? 'Aktif' : 'Pasif') }}
                                 </span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Toplam Konu</span>
-                                <span class="detail-value">{{ selectedUser.topicCount }}</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Toplam Cevap</span>
-                                <span class="detail-value">{{ selectedUser.replyCount }}</span>
                             </div>
                         </div>
                     </div>
@@ -503,7 +492,7 @@ function formatDate(dateString: string) {
 .table-header,
 .table-row {
     display: grid;
-    grid-template-columns: 2fr 120px 140px 100px 120px 120px;
+    grid-template-columns: 2fr 120px 100px 120px 120px;
     align-items: center;
     gap: 12px;
     padding: 14px 20px;
@@ -587,17 +576,6 @@ function formatDate(dateString: string) {
 .role-admin {
     background: rgba(168, 85, 247, 0.2);
     color: #a855f7;
-}
-
-/* Stats */
-.col-stats {
-    display: flex;
-    gap: 12px;
-}
-
-.stat-item {
-    font-size: 13px;
-    color: var(--color-text-secondary);
 }
 
 /* Status */
@@ -867,7 +845,7 @@ function formatDate(dateString: string) {
 @media (max-width: 1024px) {
     .table-header,
     .table-row {
-        grid-template-columns: 1.5fr 100px 100px 80px 100px;
+        grid-template-columns: 1.5fr 100px 80px 100px;
     }
 
     .col-date {
@@ -894,7 +872,6 @@ function formatDate(dateString: string) {
     }
 
     .col-role,
-    .col-stats,
     .col-status,
     .col-date {
         display: none;

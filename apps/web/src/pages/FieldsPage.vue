@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, nextTick, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useFieldsStore } from '@/stores/fieldsStore';
 import { useToast } from '@/composables/useToast';
@@ -17,6 +17,8 @@ const provinceFilter = ref('');
 
 // Delete modal state
 const showDeleteModal = ref(false);
+const fieldDeleteModalRef = ref<HTMLElement | null>(null);
+watch(showDeleteModal, (v) => { if (v) nextTick(() => fieldDeleteModalRef.value?.focus()); });
 const fieldToDelete = ref<Field | null>(null);
 const isDeleting = ref(false);
 
@@ -318,12 +320,12 @@ function getFieldInitial(name: string) {
             <!-- Delete Modal -->
             <Teleport to="body">
                 <Transition name="modal">
-                    <div v-if="showDeleteModal" class="modal-overlay" @click.self="closeDeleteModal">
-                        <div class="modal-card">
+                    <div v-if="showDeleteModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="field-delete-title" @click.self="closeDeleteModal" @keydown.esc="closeDeleteModal">
+                        <div class="modal-card" ref="fieldDeleteModalRef" tabindex="-1">
                             <div class="modal-icon-wrap">
                                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                             </div>
-                            <h2>Tarlayı Sil</h2>
+                            <h2 id="field-delete-title">Tarlayı Sil</h2>
                             <p>
                                 <strong>{{ fieldToDelete?.name }}</strong> tarlanizi silmek istediginize emin misiniz?
                             </p>

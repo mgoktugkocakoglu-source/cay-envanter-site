@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useFirmsStore } from '@/stores/firmsStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -13,6 +13,8 @@ const searchQuery = ref('');
 
 // ─── Wizard State ───
 const showWizard = ref(false);
+const wizardRef = ref<HTMLElement | null>(null);
+watch(showWizard, (v) => { if (v) nextTick(() => wizardRef.value?.focus()); });
 const wizardStep = ref(1); // 1: Firma Adı, 2: Tarifeler, 3: Konumlar
 const isSaving = ref(false);
 const formError = ref<string | null>(null);
@@ -396,11 +398,11 @@ onMounted(() => {
 
             <!-- ═══ FIRMA EKLEME WIZARD ═══ -->
             <Transition name="modal">
-                <div v-if="showWizard" class="modal-overlay" @click.self="closeWizard">
-                    <div class="wizard-container">
+                <div v-if="showWizard" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="firm-wizard-title" @click.self="closeWizard" @keydown.esc="closeWizard">
+                    <div class="wizard-container" ref="wizardRef" tabindex="-1">
                         <!-- Wizard Header -->
                         <div class="wizard-header">
-                            <h2>Yeni Firma Ekle</h2>
+                            <h2 id="firm-wizard-title">Yeni Firma Ekle</h2>
                             <button class="modal-close" @click="closeWizard" aria-label="Kapat">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <line x1="18" y1="6" x2="6" y2="18"/>

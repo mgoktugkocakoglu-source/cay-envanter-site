@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '@/services/api';
 import type { Session } from '@/services/api';
@@ -48,6 +48,7 @@ const revokeAllLoading = ref(false);
 
 // Deletion (in-app, Google Play compliant)
 const showDeleteModal = ref(false);
+const deleteModalRef = ref<HTMLElement | null>(null);
 const deletePassword = ref('');
 const deleteConfirmText = ref('');
 const showDeletePassword = ref(false);
@@ -310,6 +311,7 @@ function openDeleteModal() {
   deleteConfirmText.value = '';
   deleteError.value = '';
   showDeletePassword.value = false;
+  nextTick(() => deleteModalRef.value?.focus());
 }
 
 function closeDeleteModal() {
@@ -820,10 +822,10 @@ function switchTab(tab: typeof activeTab.value) {
 
     <!-- Delete Modal (in-app deletion: password + 'SİL' confirmation) -->
     <Teleport to="body">
-      <div v-if="showDeleteModal" class="modal-overlay" @click.self="closeDeleteModal">
-        <div class="modal">
+      <div v-if="showDeleteModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title" @click.self="closeDeleteModal" @keydown.esc="closeDeleteModal">
+        <div class="modal" ref="deleteModalRef" tabindex="-1">
           <div class="modal-header">
-            <h2 class="modal-title danger-title">
+            <h2 id="delete-modal-title" class="modal-title danger-title">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
               Hesabı Sil
             </h2>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, nextTick, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AppEmptyState from '@/components/ui/AppEmptyState.vue';
@@ -11,6 +11,8 @@ const firmsStore = useFirmsStore();
 
 const searchQuery = ref('');
 const showCreateForm = ref(false);
+const createFormRef = ref<HTMLElement | null>(null);
+watch(showCreateForm, (v) => { if (v) nextTick(() => createFormRef.value?.focus()); });
 const isSubmitting = ref(false);
 const isUploadingLogo = ref(false);
 const formError = ref<string | null>(null);
@@ -276,10 +278,10 @@ onMounted(() => {
                 {{ firmsStore.error }}
             </p>
 
-            <div v-if="showCreateForm" class="modal-overlay" @click.self="closeCreateForm">
-                <form class="modal" @submit.prevent="saveFirm">
+            <div v-if="showCreateForm" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="firm-create-title" @click.self="closeCreateForm" @keydown.esc="closeCreateForm">
+                <form class="modal" ref="createFormRef" tabindex="-1" @submit.prevent="saveFirm">
                     <div class="modal-header">
-                        <h2>{{ editTarget ? 'Firmayı Düzenle' : 'Yeni Firma' }}</h2>
+                        <h2 id="firm-create-title">{{ editTarget ? 'Firmayı Düzenle' : 'Yeni Firma' }}</h2>
                         <button type="button" class="close-btn" @click="closeCreateForm">Kapat</button>
                     </div>
 
