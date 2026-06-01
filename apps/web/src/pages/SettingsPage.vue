@@ -1,19 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRouter } from 'vue-router';
 import { api } from '@/services/api';
 import type { Session } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
-import SocialBusinessLayout from '@/layouts/SocialBusinessLayout.vue';
 import AppEmptyState from '@/components/ui/AppEmptyState.vue';
 
-const route = useRoute();
 const router = useRouter();
-const HubLayout = computed(() => {
-  return route.meta?.hub === 'social' ? SocialBusinessLayout : TeaBusinessLayout;
-});
+const HubLayout = computed(() => TeaBusinessLayout);
 
 const authStore = useAuthStore();
 const themeStore = useThemeStore();
@@ -374,7 +370,7 @@ function switchTab(tab: typeof activeTab.value) {
         <!-- Header -->
         <div class="settings-header-section">
           <div class="settings-avatar-wrapper">
-            <div class="settings-avatar" @click="handleAvatarClick" :class="{ 'has-avatar': authStore.user?.avatarUrl }">
+            <div class="settings-avatar" role="button" tabindex="0" aria-label="Profil fotoğrafını değiştir" @click="handleAvatarClick" @keydown.enter="handleAvatarClick" @keydown.space.prevent="handleAvatarClick" :class="{ 'has-avatar': authStore.user?.avatarUrl }">
               <img
                 v-if="authStore.user?.avatarUrl"
                 :src="authStore.user.avatarUrl"
