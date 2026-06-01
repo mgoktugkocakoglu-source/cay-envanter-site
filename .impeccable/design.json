@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-01T00:00:00Z",
+  "title": "Design System: Çay Hesabım",
+  "extensions": {
+    "colorMeta": {
+      "tea-green": {
+        "role": "primary",
+        "displayName": "Tea Green",
+        "canonical": "#15803D",
+        "tonalRamp": ["#14532D", "#166534", "#15803D", "#16A34A", "#22C55E", "#4ADE80", "#86EFAC", "#DCFCE7"]
+      },
+      "field-blue": {
+        "role": "secondary",
+        "displayName": "Field Blue",
+        "canonical": "#1E3A8A",
+        "tonalRamp": ["#1E3A8A", "#1E40AF", "#1D4ED8", "#2563EB", "#3B82F6", "#60A5FA", "#93C5FD", "#DBEAFE"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink (Slate)",
+        "canonical": "#0F172A",
+        "tonalRamp": ["#0F172A", "#1E293B", "#334155", "#475569", "#64748B", "#94A3B8", "#CBD5E1", "#F1F5F9"]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#F8FAFC",
+        "tonalRamp": ["#0F172A", "#1E293B", "#334155", "#475569", "#64748B", "#94A3B8", "#CBD5E1", "#F8FAFC"]
+      },
+      "success": { "role": "status", "displayName": "Success Green", "canonical": "#15803D" },
+      "warning": { "role": "status", "displayName": "Warning Amber", "canonical": "#B45309" },
+      "danger": { "role": "status", "displayName": "Danger Red", "canonical": "#B91C1C" },
+      "info": { "role": "status", "displayName": "Info Blue", "canonical": "#1E3A8A" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Largest figures and page-defining headings; rare." },
+      "headline": { "displayName": "Headline", "purpose": "Page titles." },
+      "title": { "displayName": "Title", "purpose": "Section and card headings, auth titles." },
+      "body": { "displayName": "Body", "purpose": "Default reading text; cap prose at 65-75ch." },
+      "label": { "displayName": "Label", "purpose": "Form labels, tab labels, metadata; sentence case." }
+    },
+    "shadows": [
+      { "name": "sm", "value": "0 1px 2px 0 rgba(15,23,42,0.04)", "purpose": "Resting elevated cards (.card-elevated), tab groups." },
+      { "name": "md", "value": "0 1px 3px 0 rgba(15,23,42,0.08)", "purpose": "Active tab, low hover lift." },
+      { "name": "lg", "value": "0 4px 10px -2px rgba(15,23,42,0.10)", "purpose": "Dropdowns, popovers." },
+      { "name": "xl", "value": "0 8px 18px -6px rgba(15,23,42,0.14)", "purpose": "Modals and the highest overlays." }
+    ],
+    "motion": [
+      { "name": "fast", "value": "150ms cubic-bezier(0.25, 0.1, 0.25, 1)", "purpose": "Buttons, inputs, tabs — immediate state feedback." },
+      { "name": "normal", "value": "250ms cubic-bezier(0.25, 0.1, 0.25, 1)", "purpose": "Larger state changes, panels." },
+      { "name": "slow", "value": "350ms cubic-bezier(0.25, 0.1, 0.25, 1)", "purpose": "Bars and progressive reveals." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single primary action on a screen. Solid working green.",
+      "html": "<button class=\"ds-btn-primary\">Hasat ekle</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 12px 24px; font-family: var(--font-family); font-size: 1rem; font-weight: 500; line-height: 1; color: #fff; background: var(--color-primary); border: 1px solid var(--color-primary); border-radius: var(--radius-md); cursor: pointer; transition: background 150ms ease, border-color 150ms ease; } .ds-btn-primary:hover { background: var(--color-primary-hover); border-color: var(--color-primary-hover); } .ds-btn-primary:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Lower-emphasis action beside a primary; cancel, back, alternate.",
+      "html": "<button class=\"ds-btn-secondary\">İptal</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 12px 24px; font-family: var(--font-family); font-size: 1rem; font-weight: 500; line-height: 1; color: var(--color-text-primary); background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: var(--radius-md); cursor: pointer; transition: background 150ms ease, border-color 150ms ease; } .ds-btn-secondary:hover { background: var(--color-bg-tertiary); border-color: var(--color-border-strong); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Standard single-line field with a green focus ring.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Tarla adı\" />",
+      "css": ".ds-input { width: 100%; height: 40px; padding: 0 16px; box-sizing: border-box; font-family: var(--font-family); font-size: 1rem; color: var(--color-text-primary); background: var(--color-input-bg); border: 1px solid var(--color-input-border); border-radius: var(--radius-md); transition: border-color 150ms ease, box-shadow 150ms ease; } .ds-input::placeholder { color: var(--color-text-muted); } .ds-input:hover { border-color: var(--color-border-strong); } .ds-input:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-light); }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Flat content container on a paper page; opts into shadow only when separation is needed.",
+      "html": "<div class=\"ds-card\"><h3 class=\"ds-card-title\">Çamlık Tarlası</h3><p class=\"ds-card-body\">Bu sezon 3 hasat · 1.240 kg</p></div>",
+      "css": ".ds-card { background: var(--color-card-bg); border: 1px solid var(--color-card-border); border-radius: var(--radius-lg); padding: 24px; } .ds-card-title { font-family: var(--font-family); font-size: 1.625rem; font-weight: 600; line-height: 1.25; color: var(--color-text-primary); margin: 0 0 8px; } .ds-card-body { font-family: var(--font-family); font-size: 1rem; line-height: 1.5; color: var(--color-text-secondary); margin: 0; }"
+    },
+    {
+      "name": "Tab Group",
+      "kind": "nav",
+      "refersTo": "app-tab-btn",
+      "description": "Signature segmented control in a sunken track; active tab carries a green underline.",
+      "html": "<div class=\"ds-tabs\"><button class=\"ds-tab ds-tab--active\">Tarlalar</button><button class=\"ds-tab\">Hasatlar</button><button class=\"ds-tab\">Ödemeler</button></div>",
+      "css": ".ds-tabs { display: inline-flex; gap: 4px; padding: 4px; background: var(--color-subtle-bg); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); } .ds-tab { position: relative; min-height: 44px; padding: 0 20px; display: inline-flex; align-items: center; font-family: var(--font-family); font-size: 0.875rem; font-weight: 600; color: var(--color-text-secondary); background: transparent; border: 1px solid transparent; border-radius: 7px; cursor: pointer; transition: background 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease; } .ds-tab:hover { color: var(--color-text-primary); background: var(--color-bg-secondary); border-color: var(--color-border); } .ds-tab--active { color: var(--color-primary); background: var(--color-bg-secondary); border-color: var(--color-border-strong); box-shadow: var(--shadow-md); } .ds-tab--active::before { content: ''; position: absolute; left: 14px; right: 14px; bottom: 5px; height: 2px; border-radius: 9999px; background: var(--color-primary); }"
+    },
+    {
+      "name": "Alert / Message Box",
+      "kind": "custom",
+      "refersTo": "message-box",
+      "description": "Tinted status banner; success shown. Four intents share the shape.",
+      "html": "<div class=\"ds-alert ds-alert--success\">Hasat kaydedildi.</div>",
+      "css": ".ds-alert { display: flex; align-items: flex-start; gap: 12px; padding: 16px 20px; border-radius: var(--radius-md); font-family: var(--font-family); font-size: 1rem; line-height: 1.5; } .ds-alert--success { background: rgba(34, 197, 94, 0.1); border: 1px solid var(--color-success); color: var(--color-success); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Field Ledger",
+    "overview": "Çay Hesabım is a record book you can trust, carried in a pocket and opened in a tea garden. Its job is to make the numbers that matter — harvest kilos, prices, and what a firm owes — plain, legible, and dependable. The visual system is built on a calm slate-neutral surface with a single working green that means go, done, and growing. Nothing decorates; everything reports. The interface is light by default because it is read outdoors in daylight, and it stays out of the way so the task, not the tool, holds attention. This system explicitly rejects the look of cold, complex corporate ERP and accounting software, and equally rejects generic-template SaaS dressing. Identity comes from being a focused, trustworthy field tool, not from ornament. Depth is quiet: surfaces are flat at rest and lift only when state demands it.",
+    "keyCharacteristics": [
+      "Light-first, slate-neutral surface tuned for outdoor daylight reading.",
+      "One working green (#15803D) reserved for actions and positive state.",
+      "Flat by default; shadow is a response to state, not a texture.",
+      "One typeface (Inter) carrying every role through weight and size.",
+      "8px spatial grid; gently rounded corners (8px); honest 1px borders.",
+      "Sturdy, predictable components with complete states."
+    ],
+    "rules": [
+      { "name": "The Working-Green Rule", "body": "Green is a verb, not a wallpaper. It marks what the user can do (primary action), what is (active/selected), and what went right (success). Never a decorative background or gradient. If a screen is more than a tenth green by area, the accent has become ornament.", "section": "colors" },
+      { "name": "The Numbers Stay Ink Rule", "body": "Money and harvest figures are always rendered in Ink (#0F172A), never muted gray for elegance. Muting a number is muting the product's promise.", "section": "colors" },
+      { "name": "The One Family Rule", "body": "Inter does every job — heading, button, label, body, and data. No display pairing, no second sans. If a screen seems to need another typeface, it needs better weight and size contrast instead.", "section": "typography" },
+      { "name": "The Plain Label Rule", "body": "Labels are sentence-case Turkish at 14px/600. No all-caps, no letter-tracking, no eyebrow kickers. A label names a thing; it does not decorate a section.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "A surface earns a shadow only by changing state or floating above the page. A card carrying shadow-lg while sitting still in content flow is decorative; remove it and let the tonal step do the work.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do render money and harvest figures in Ink (#0F172A) at full contrast. The numbers are the promise.",
+      "Do reserve Tea Green (#15803D) for primary actions, active/selected state, focus, and success — ≤10% of any screen by area.",
+      "Do keep surfaces flat at rest; add shadow only on hover, focus, or true overlay (modal/dropdown).",
+      "Do verify text contrast ≥4.5:1 (large ≥3:1) in both light and dark themes; light is the default and the daylight case.",
+      "Do make touch-critical controls reach ≥44×44px. The 40px control-height is a floor; pad primary tap targets up to 44px.",
+      "Do give every prefers-reduced-motion a crossfade or instant alternative; transitions are 150–250ms ease and convey state, not choreography.",
+      "Do write labels, errors, and empty states in plain, sentence-case Turkish that teaches the next step.",
+      "Do keep one typeface (Inter); build hierarchy with size and weight."
+    ],
+    "donts": [
+      "Don't let the interface drift toward cold, complex corporate ERP / accounting software: no crowded screens, no wall of menus, no density without a reason.",
+      "Don't apply generic-template SaaS dressing: no purple-to-blue gradients, no gradient text, no cards nested in cards, no tracked uppercase eyebrow over every section.",
+      "Don't use a colored border-left/border-right greater than 1px as a side-stripe accent. Use a full border or a background tint.",
+      "Don't mute a number to gray for elegance. Ink only.",
+      "Don't use Tea Green as a decorative background or fill large areas with it; it is an accent, not a wallpaper.",
+      "Don't introduce a second font family or all-caps tracked body/labels.",
+      "Don't ship a card floating on shadow-lg while at rest; flat is the resting state.",
+      "Don't invent custom scrollbars, exotic form controls, or modal-first flows where an inline/progressive pattern serves the task."
+    ]
+  }
+}
