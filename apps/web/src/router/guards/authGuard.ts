@@ -36,14 +36,14 @@ export async function authGuard(
         }
 
         if (!authStore.isAdmin) {
-            next({ path: '/hub' });
+            next({ path: '/tea/dashboard' });
             return;
         }
     }
 
     // Check if route is for guests only (login, register)
     if (to.meta.guest && authStore.isAuthenticated) {
-        next({ path: '/hub' });
+        next({ path: '/tea/dashboard' });
         return;
     }
 

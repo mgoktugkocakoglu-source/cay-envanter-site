@@ -14,11 +14,8 @@ import { PaymentsModule } from '@/payments/payments.module';
 import { ReportsModule } from '@/reports/reports.module';
 import { FirmsModule } from '@/firms/firms.module';
 import { UploadsModule } from '@/uploads/uploads.module';
-import { CommunityModule } from '@/community/community.module';
 import { HealthModule } from '@/health/health.module';
-import { JobListingsModule } from '@/job-listings/job-listings.module';
-import { MarketplaceModule } from '@/marketplace/marketplace.module';
-import { EquipmentModule } from '@/equipment/equipment.module';
+import { KnowledgeModule } from '@/knowledge/knowledge.module';
 
 @Module({
     imports: [
@@ -46,7 +43,11 @@ import { EquipmentModule } from '@/equipment/equipment.module';
                 JWT_REFRESH_SECRET: Joi.string().required(),
                 JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
                 APP_URL: Joi.string().required(),
-                GROQ_API_KEY: Joi.string().optional().default(''),
+                GROQ_API_KEY: Joi.string().optional().allow('').default(''),
+                GROQ_MODEL: Joi.string()
+                    .optional()
+                    .allow('')
+                    .default('llama-3.3-70b-versatile'),
                 R2_ACCOUNT_ID: Joi.string().optional().allow('').default(''),
                 R2_ENDPOINT: Joi.string().optional().allow('').default(''),
                 R2_ACCESS_KEY_ID: Joi.string().optional().allow('').default(''),
@@ -85,11 +86,8 @@ import { EquipmentModule } from '@/equipment/equipment.module';
         PaymentsModule,
         ReportsModule,
         UploadsModule,
-        CommunityModule,
         HealthModule,
-        JobListingsModule,
-        MarketplaceModule,
-        EquipmentModule,
+        KnowledgeModule,
     ],
     providers: [
         {

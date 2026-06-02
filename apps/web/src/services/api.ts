@@ -324,177 +324,6 @@ export interface FirmWithCurrentTariffs {
     }[];
 }
 
-// Community Types
-export type CommunityPostType = 'text' | 'photo' | 'video';
-export type CommunityReactionType = 'like' | 'dislike';
-
-export interface CommunityTag {
-    id: string;
-    name: string;
-    displayName: string;
-    usageCount: number;
-    isSystem: boolean;
-    createdAt: string;
-}
-
-export interface CommunityPost {
-    id: string;
-    userId: string;
-    content: string | null;
-    type: CommunityPostType;
-    mediaUrls: string[];
-    likeCount: number;
-    dislikeCount: number;
-    commentCount: number;
-    user: {
-        id: string;
-        fullName: string;
-        avatarUrl: string | null;
-        userType: string;
-    };
-    tags: CommunityTag[];
-    userReaction?: CommunityReactionType | null;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface CommunityComment {
-    id: string;
-    postId: string;
-    userId: string;
-    content: string;
-    likeCount: number;
-    dislikeCount: number;
-    user: {
-        id: string;
-        fullName: string;
-        avatarUrl: string | null;
-    };
-    createdAt: string;
-}
-
-export interface CommunityFeedResponse {
-    items: CommunityPost[];
-    nextCursor: string | null;
-    hasMore: boolean;
-    userReactions: Record<string, CommunityReactionType>;
-}
-
-export interface CommunityPostQuery {
-    cursor?: string;
-    limit?: number;
-    type?: CommunityPostType;
-    tag?: string;
-    userId?: string;
-    search?: string;
-}
-
-export type MarketplaceListingCategory = 'motor' | 'seedling';
-export type MarketplaceListingStatus = 'active' | 'sold' | 'inactive';
-export type EquipmentCategory = 'electric-motor' | 'gasoline-motor' | 'hand-shears' | 'wearable' | 'helper' | 'other';
-export type EquipmentStatus = 'approved' | 'pending' | 'rejected';
-export type EquipmentUsageStatus = 'used' | 'using';
-
-export interface MarketplaceListing {
-    id: string;
-    sellerId: string;
-    category: MarketplaceListingCategory;
-    status: MarketplaceListingStatus;
-    title: string;
-    location: string;
-    description: string;
-    price: number;
-    priceUnit: string | null;
-    contactName: string;
-    contactPhone: string;
-    imageUrls: string[];
-    specs: Record<string, any>;
-    seller?: {
-        id: string;
-        fullName: string;
-        phone: string;
-        avatarUrl: string | null;
-        userType: string;
-    };
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface CreateMarketplaceListingData {
-    category: MarketplaceListingCategory;
-    title: string;
-    location: string;
-    description: string;
-    price: number;
-    priceUnit?: string | null;
-    contactName: string;
-    contactPhone: string;
-    imageUrls?: string[];
-    specs?: Record<string, any>;
-}
-
-export interface EquipmentSpec {
-    label: string;
-    value: string;
-}
-
-export interface EquipmentComment {
-    id: string;
-    author: string;
-    text: string;
-    rating: number;
-    usageStatus: EquipmentUsageStatus;
-    usageMonths: number;
-    likes: number;
-    liked: boolean;
-    createdAt?: string;
-}
-
-export interface EquipmentItem {
-    id: string;
-    category: EquipmentCategory;
-    brand: string;
-    model: string;
-    typeLabel: string;
-    price: number;
-    segmentAverage: number;
-    status: EquipmentStatus;
-    addedBy: 'Admin' | 'Kullanıcı';
-    imageUrl: string;
-    specs: EquipmentSpec[];
-    comments: EquipmentComment[];
-    currentUserRating?: number | null;
-    favorite: boolean;
-    compared: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface CreateEquipmentData {
-    category: EquipmentCategory;
-    brand: string;
-    model: string;
-    typeLabel: string;
-    price: number;
-    segmentAverage?: number | null;
-    imageUrl?: string | null;
-    specs?: EquipmentSpec[];
-}
-
-export interface CreateEquipmentReviewData {
-    rating: number;
-    usageStatus: EquipmentUsageStatus;
-    usageMonths: number;
-    text: string;
-}
-
-export interface CreateCommunityPostData {
-    content?: string;
-    type: CommunityPostType;
-    mediaUrls?: string[];
-    tagNames?: string[];
-}
-
 export interface AdminUser {
     id: string;
     fullName: string;
@@ -503,8 +332,47 @@ export interface AdminUser {
     isActive: boolean;
     isBanned: boolean;
     createdAt: string;
-    topicCount: number;
-    replyCount: number;
+}
+
+// Knowledge / AI Agent Types
+export type KnowledgeDocumentStatus = 'processing' | 'ready' | 'failed';
+
+export interface KnowledgeDocument {
+    id: string;
+    title: string;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+    status: KnowledgeDocumentStatus;
+    charCount: number;
+    chunkCount: number;
+    errorMessage: string | null;
+    createdAt: string;
+}
+
+export interface KnowledgeChatSource {
+    documentId: string;
+    title: string;
+    snippet: string;
+}
+
+export interface KnowledgeChatHistoryMessage {
+    role: 'user' | 'assistant';
+    content: string;
+}
+
+export interface KnowledgeChatResponse {
+    answer: string;
+    sources: KnowledgeChatSource[];
+    usedAi: boolean;
+}
+
+export interface KnowledgeStatus {
+    aiConfigured: boolean;
+    model: string;
+    documentCount: number;
+    readyDocumentCount: number;
+    chunkCount: number;
 }
 
 export const api = {
@@ -756,48 +624,6 @@ export const api = {
         return request<unknown[]>(`/reports/year-comparison${query}`);
     },
 
-    // Job Listings
-    getJobListings: (params?: { type?: string; category?: string; status?: string; search?: string }) => {
-        const query = new URLSearchParams(params as Record<string, string>).toString();
-        return request<any[]>(`/job-listings${query ? `?${query}` : ''}`);
-    },
-    getJobListing: (id: string) => request<any>(`/job-listings/${id}`),
-    createJobListing: (data: any) =>
-        request<any>('/job-listings', { method: 'POST', body: JSON.stringify(data) }),
-    updateJobListing: (id: string, data: any) =>
-        request<any>(`/job-listings/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-    deleteJobListing: (id: string) => request<void>(`/job-listings/${id}`, { method: 'DELETE' }),
-
-    // Marketplace
-    getMarketplaceListings: (params?: { category?: string; status?: string; search?: string }) => {
-        const query = new URLSearchParams(params as Record<string, string>).toString();
-        return request<MarketplaceListing[]>(`/marketplace${query ? `?${query}` : ''}`);
-    },
-    getMarketplaceListing: (id: string) => request<MarketplaceListing>(`/marketplace/${id}`),
-    createMarketplaceListing: (data: CreateMarketplaceListingData) =>
-        request<MarketplaceListing>('/marketplace', { method: 'POST', body: JSON.stringify(data) }),
-    updateMarketplaceListing: (id: string, data: Partial<CreateMarketplaceListingData> & { status?: MarketplaceListingStatus }) =>
-        request<MarketplaceListing>(`/marketplace/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-    deleteMarketplaceListing: (id: string) => request<void>(`/marketplace/${id}`, { method: 'DELETE' }),
-
-    // Equipment
-    getEquipment: (params?: { category?: string; status?: string; search?: string }) => {
-        const query = new URLSearchParams(params as Record<string, string>).toString();
-        return request<EquipmentItem[]>(`/equipment${query ? `?${query}` : ''}`);
-    },
-    createEquipment: (data: CreateEquipmentData) =>
-        request<EquipmentItem>('/equipment', { method: 'POST', body: JSON.stringify(data) }),
-    approveEquipment: (id: string) =>
-        request<EquipmentItem>(`/equipment/${id}/approve`, { method: 'PATCH' }),
-    rejectEquipment: (id: string) =>
-        request<EquipmentItem>(`/equipment/${id}/reject`, { method: 'PATCH' }),
-    createEquipmentReview: (id: string, data: CreateEquipmentReviewData) =>
-        request<EquipmentComment>(`/equipment/${id}/reviews`, { method: 'POST', body: JSON.stringify(data) }),
-    toggleEquipmentFavorite: (id: string) =>
-        request<{ favorite: boolean }>(`/equipment/${id}/favorite`, { method: 'POST' }),
-    toggleEquipmentReviewLike: (reviewId: string) =>
-        request<{ liked: boolean }>(`/equipment/reviews/${reviewId}/like`, { method: 'POST' }),
-
     // Users
     searchUser: (query: string, type: 'tc' | 'phone') =>
         request<{ id: string; fullName: string; userType: string }>(
@@ -850,59 +676,30 @@ export const api = {
         }
     },
 
-    // Community Posts
-    getCommunityFeed: (query?: CommunityPostQuery) => {
-        const params = new URLSearchParams();
-        if (query?.cursor) params.append('cursor', query.cursor);
-        if (query?.limit) params.append('limit', query.limit.toString());
-        if (query?.type) params.append('type', query.type);
-        if (query?.tag) params.append('tag', query.tag);
-        if (query?.userId) params.append('userId', query.userId);
-        if (query?.search) params.append('search', query.search);
-        const queryString = params.toString();
-        return request<CommunityFeedResponse>(`/community/posts${queryString ? `?${queryString}` : ''}`);
-    },
-    getCommunityPost: (id: string) => request<CommunityPost>(`/community/posts/${id}`),
-    createCommunityPost: (data: CreateCommunityPostData) =>
-        request<CommunityPost>('/community/posts', { method: 'POST', body: JSON.stringify(data) }),
-    deleteCommunityPost: (id: string) =>
-        request<{ message: string }>(`/community/posts/${id}`, { method: 'DELETE' }),
-
-    // Community Tags
-    getCommunityTags: () => request<CommunityTag[]>('/community/tags'),
-    getTrendingTags: (limit?: number) =>
-        request<CommunityTag[]>(`/community/tags/trending${limit ? `?limit=${limit}` : ''}`),
-
-    // Community Comments
-    getCommunityComments: (postId: string) =>
-        request<CommunityComment[]>(`/community/posts/${postId}/comments`),
-    createCommunityComment: (postId: string, content: string) =>
-        request<CommunityComment>(`/community/posts/${postId}/comments`, {
-            method: 'POST', body: JSON.stringify({ content }),
+    // Knowledge / AI Agent
+    getKnowledgeStatus: () => request<KnowledgeStatus>('/knowledge/status'),
+    getKnowledgeDocuments: () => request<KnowledgeDocument[]>('/knowledge/documents'),
+    knowledgeChat: (message: string, history?: KnowledgeChatHistoryMessage[]) =>
+        request<KnowledgeChatResponse>('/knowledge/chat', {
+            method: 'POST',
+            body: JSON.stringify({ message, history }),
         }),
-    deleteCommunityComment: (id: string) =>
-        request<{ message: string }>(`/community/comments/${id}`, { method: 'DELETE' }),
-
-    // Community Reactions
-    toggleCommunityReaction: (data: { targetType: 'post' | 'comment'; targetId: string; reactionType: CommunityReactionType }) =>
-        request<{ action: string; reactionType: CommunityReactionType }>('/community/reactions', {
-            method: 'POST', body: JSON.stringify(data),
-        }),
-
-    // Community Media Upload
-    uploadCommunityMedia: async (file: File): Promise<ApiResponse<{ url: string; filename: string; key?: string }>> => {
+    deleteKnowledgeDocument: (id: string) =>
+        request<void>(`/knowledge/documents/${id}`, { method: 'DELETE' }),
+    uploadKnowledgeDocument: async (
+        file: File,
+        title?: string,
+    ): Promise<ApiResponse<KnowledgeDocument>> => {
         const authStore = useAuthStore();
         const token = authStore.accessToken;
         const formData = new FormData();
         formData.append('file', file);
-
-        /** Use /uploads/video for video files, /uploads/image for images */
-        const isVideo = file.type.startsWith('video/');
-        const endpoint = isVideo ? '/uploads/video' : '/uploads/image';
+        if (title) {
+            formData.append('title', title);
+        }
 
         try {
-            const url = `${API_BASE}${endpoint}`;
-            const response = await fetch(url, {
+            const response = await fetch(`${API_BASE}/knowledge/documents`, {
                 method: 'POST',
                 headers: {
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -912,11 +709,11 @@ export const api = {
 
             const data = await response.json();
             if (!response.ok) {
-                return { error: { message: data.message || 'Media upload failed', statusCode: response.status } };
+                return { error: { message: data.message || 'Belge yüklenemedi', statusCode: response.status } };
             }
             return { data };
         } catch {
-            return { error: { message: 'Network error during media upload', statusCode: 0 } };
+            return { error: { message: 'Belge yüklenirken hata oluştu', statusCode: 0 } };
         }
     },
 };

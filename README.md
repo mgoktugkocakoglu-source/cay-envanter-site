@@ -8,7 +8,7 @@
 - **Framework:** NestJS 10
 - **Database:** PostgreSQL + TypeORM
 - **Auth:** JWT (Passport.js)
-- **Email:** Mailgun
+- **Email:** Resend
 - **Validation:** class-validator
 
 ### Frontend (`apps/web`)

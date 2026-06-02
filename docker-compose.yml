@@ -42,9 +42,8 @@ services:
       JWT_SECRET: dev-jwt-secret-change-in-production
       JWT_REFRESH_SECRET: dev-jwt-refresh-secret-change-in-production
       JWT_EXPIRES_IN: 7d
-      MAILGUN_API_KEY: ${MAILGUN_API_KEY:-your-mailgun-api-key}
-      MAILGUN_DOMAIN: ${MAILGUN_DOMAIN:-your-mailgun-domain}
-      MAILGUN_FROM: Çay Üreticisi Platformu <noreply@cayplatformu.com>
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM: ${RESEND_FROM:-Çay Üreticisi Platformu <noreply@cayhesabim.com>}
       APP_URL: http://localhost:5173
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
       R2_ENDPOINT: ${R2_ENDPOINT:-}

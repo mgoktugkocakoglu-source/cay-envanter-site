@@ -83,7 +83,7 @@ async function handleSubmit() {
 
   if (result.data) {
     authStore.setAuth(result.data as { accessToken: string; refreshToken: string; user: any; });
-    router.push('/hub');
+    router.push('/tea/dashboard');
   }
 }
 

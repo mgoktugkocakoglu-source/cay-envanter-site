@@ -16,7 +16,7 @@ const themeStore = useThemeStore();
       </RouterLink>
       <nav class="home-nav">
         <template v-if="authStore.isAuthenticated">
-          <RouterLink to="/hub" class="btn btn-primary">Panele Git</RouterLink>
+          <RouterLink to="/tea/dashboard" class="btn btn-primary">Panele Git</RouterLink>
         </template>
         <template v-else>
           <RouterLink to="/login" class="btn btn-secondary">Giriş Yap</RouterLink>
@@ -32,11 +32,11 @@ const themeStore = useThemeStore();
           <br>Dijital Platform
         </h1>
         <p class="hero-subtitle">
-          Tarlalarınızı yönetin, hasatlarınızı takip edin, iş bulun ve toplulukla bağlantı kurun.
+          Tarlalarınızı yönetin, hasatlarınızı takip edin, ödemelerinizi kolayca kontrol edin.
         </p>
         <div class="hero-actions">
           <template v-if="authStore.isAuthenticated">
-            <RouterLink to="/hub" class="btn btn-primary btn-lg">
+            <RouterLink to="/tea/dashboard" class="btn btn-primary btn-lg">
               Panele Git
             </RouterLink>
           </template>
@@ -65,17 +65,6 @@ const themeStore = useThemeStore();
           </div>
         </div>
         
-        <div class="hub-showcase-card social-showcase">
-          <div class="showcase-icon">🤝</div>
-          <h2 class="showcase-title">Sosyal İş Hesabı</h2>
-          <p class="showcase-desc">İş bulun, toplulukla iletişim kurun ve ekipmanları değerlendirin</p>
-          <div class="showcase-features">
-            <span>💼 İş/İşçi Bulma</span>
-            <span>👥 Topluluk</span>
-            <span>🔧 Ekipman Değerlendirme</span>
-            <span>🛒 2. El Pazar</span>
-          </div>
-        </div>
       </div>
     </main>
   </div>
@@ -156,8 +145,10 @@ const themeStore = useThemeStore();
 /* ── Hub Showcase ── */
 .hub-showcase {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: var(--space-6);
+  max-width: 520px;
+  margin: 0 auto;
 }
 
 .hub-showcase-card {
@@ -174,7 +165,6 @@ const themeStore = useThemeStore();
 }
 
 .tea-showcase:hover { border-color: var(--color-primary); }
-.social-showcase:hover { border-color: var(--color-secondary); }
 
 .showcase-icon {
   font-size: 40px;
@@ -187,7 +177,6 @@ const themeStore = useThemeStore();
   border-radius: var(--radius-lg);
 }
 .tea-showcase .showcase-icon { background: var(--color-primary-light); }
-.social-showcase .showcase-icon { background: rgba(30, 58, 138, 0.08); }
 
 .showcase-title {
   font-size: var(--font-size-xl);

@@ -39,7 +39,7 @@ export function useAuth() {
             const result = await authStore.login(credentials.email, credentials.password);
 
             if (result.success) {
-                router.push('/hub');
+                router.push('/tea/dashboard');
                 return true;
             } else {
                 error.value = result.error || 'Login failed';

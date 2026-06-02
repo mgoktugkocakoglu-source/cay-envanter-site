@@ -116,7 +116,7 @@ async function confirmDeletion() {
             </div>
             
             <div class="action-buttons">
-              <RouterLink to="/hub" class="btn btn-secondary btn-lg">
+              <RouterLink to="/tea/dashboard" class="btn btn-secondary btn-lg">
                 Hayır, Vazgeç
               </RouterLink>
               <button 

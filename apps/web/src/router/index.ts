@@ -65,9 +65,7 @@ const router = createRouter({
         // ═══════ HUB SELECTOR ═══════
         {
             path: '/hub',
-            name: 'hub-selector',
-            component: () => import('@/pages/HubSelectorPage.vue'),
-            meta: { requiresAuth: true },
+            redirect: '/tea/dashboard',
         },
 
         // ═══════ ÇAY İŞLERİ HESABI (TEA BUSINESS HUB) ═══════
@@ -138,102 +136,6 @@ const router = createRouter({
             meta: { requiresAuth: true, hub: 'tea' },
         },
 
-        // ═══════ SOSYAL İŞ HESABI (SOCIAL BUSINESS HUB) ═══════
-        {
-            path: '/social/dashboard',
-            redirect: '/social/community',
-        },
-        {
-            path: '/social/job-listings',
-            name: 'social-job-listings',
-            component: () => import('@/pages/JobListingsPage.vue'),
-            meta: { requiresAuth: true, hub: 'social' },
-        },
-        {
-            path: '/social/job-listings/worker/create',
-            name: 'social-worker-listing-category',
-            component: () => import('@/pages/WorkerListingCategoryPage.vue'),
-            meta: { requiresAuth: true, hub: 'social' },
-        },
-        {
-            path: '/social/job-listings/job/create',
-            name: 'social-job-listing-category',
-            component: () => import('@/pages/JobListingCategoryPage.vue'),
-            meta: { requiresAuth: true, hub: 'social' },
-        },
-        {
-            path: '/social/job-listings/worker/create/tea-picking',
-            name: 'social-tea-picking-worker-create',
-            component: () => import('@/pages/TeaPickingWorkerCreatePage.vue'),
-            meta: { requiresAuth: true, hub: 'social' },
-        },
-        {
-            path: '/social/job-listings/job/create/tea-picking',
-            name: 'social-tea-picking-job-create',
-            component: () => import('@/pages/TeaPickingJobCreatePage.vue'),
-            meta: { requiresAuth: true, hub: 'social' },
-        },
-        {
-            path: '/social/job-listings/worker/create/tea-transport',
-            name: 'social-tea-transport-worker-create',
-            component: () => import('@/pages/TeaTransportWorkerCreatePage.vue'),
-            meta: { requiresAuth: true, hub: 'social' },
-        },
-        {
-            path: '/social/job-listings/job/create/tea-transport',
-            name: 'social-tea-transport-job-create',
-            component: () => import('@/pages/TeaTransportJobCreatePage.vue'),
-            meta: { requiresAuth: true, hub: 'social' },
-        },
-        {
-            path: '/social/job-listings/worker/create/daily-jobs',
-            name: 'social-daily-jobs-worker-create',
-            component: () => import('@/pages/DailyJobsWorkerCreatePage.vue'),
-            meta: { requiresAuth: true, hub: 'social' },
-        },
-        {
-            path: '/social/job-listings/job/create/daily-jobs',
-            name: 'social-daily-jobs-job-create',
-            component: () => import('@/pages/DailyJobsJobCreatePage.vue'),
-            meta: { requiresAuth: true, hub: 'social' },
-        },
-        {
-            path: '/social/community',
-            name: 'social-community',
-            component: () => import('@/pages/CommunityFeedPage.vue'),
-            meta: { requiresAuth: true, hub: 'social' },
-        },
-        {
-            path: '/social/community/post/:id',
-            name: 'social-community-post',
-            component: () => import('@/pages/CommunityPostPage.vue'),
-            meta: { requiresAuth: true, hub: 'social' },
-        },
-        {
-            path: '/social/equipment',
-            name: 'social-equipment',
-            component: () => import('@/pages/EquipmentPage.vue'),
-            meta: { requiresAuth: true, hub: 'social' },
-        },
-        {
-            path: '/social/equipment/:id',
-            name: 'social-equipment-detail',
-            component: () => import('@/pages/EquipmentPage.vue'),
-            meta: { requiresAuth: true, hub: 'social' },
-        },
-        {
-            path: '/social/marketplace',
-            name: 'social-marketplace',
-            component: () => import('@/pages/MarketplacePage.vue'),
-            meta: { requiresAuth: true, hub: 'social' },
-        },
-        {
-            path: '/social/settings',
-            name: 'social-settings',
-            component: () => import('@/pages/SettingsPage.vue'),
-            meta: { requiresAuth: true, hub: 'social' },
-        },
-
         // ═══════ ADMIN ROUTES ═══════
         {
             path: '/admin',
@@ -266,17 +168,6 @@ const router = createRouter({
         { path: '/payments', redirect: '/tea/payments' },
         { path: '/ai-agent', redirect: '/tea/ai-agent' },
         { path: '/settings', redirect: '/tea/settings' },
-        { path: '/job-listings', redirect: '/social/job-listings' },
-        { path: '/job-listings/worker/create', redirect: '/social/job-listings/worker/create' },
-        { path: '/job-listings/job/create', redirect: '/social/job-listings/job/create' },
-        { path: '/job-listings/worker/create/tea-picking', redirect: '/social/job-listings/worker/create/tea-picking' },
-        { path: '/job-listings/job/create/tea-picking', redirect: '/social/job-listings/job/create/tea-picking' },
-        { path: '/job-listings/worker/create/tea-transport', redirect: '/social/job-listings/worker/create/tea-transport' },
-        { path: '/job-listings/job/create/tea-transport', redirect: '/social/job-listings/job/create/tea-transport' },
-        { path: '/job-listings/worker/create/daily-jobs', redirect: '/social/job-listings/worker/create/daily-jobs' },
-        { path: '/job-listings/job/create/daily-jobs', redirect: '/social/job-listings/job/create/daily-jobs' },
-        { path: '/community', redirect: '/social/community' },
-        { path: '/community/post/:id', redirect: to => `/social/community/post/${to.params.id}` },
 
         // ═══════ 404 CATCH-ALL ═══════
         {

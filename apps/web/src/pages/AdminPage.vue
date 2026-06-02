@@ -137,10 +137,6 @@ function getActivityIcon(type: string) {
                                 <span class="action-icon">📋</span>
                                 <span>Raporları Gör</span>
                             </button>
-                            <button class="action-btn" @click="navigateTo('/community')">
-                                <span class="action-icon">🌐</span>
-                                <span>Topluluğa Git</span>
-                            </button>
                         </div>
                     </div>
 

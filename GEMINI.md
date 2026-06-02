@@ -13,7 +13,7 @@ This project is a digital platform for tea producers, built as a monorepo using 
 - **Framework:** NestJS 10 (TypeScript).
 - **Database:** PostgreSQL with TypeORM.
 - **Authentication:** JWT (Passport.js) with session/entity support.
-- **Email:** Resend / Mailgun integration.
+- **Email:** Resend integration.
 - **Validation:** `class-validator` and `class-transformer` with global `ValidationPipe`.
 - **Documentation:** OpenAPI (Swagger) available at `/api/docs`.
 - **Security:** Helmet, Throttler, and strict CORS policies.

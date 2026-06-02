@@ -10,8 +10,6 @@ import { Repository, In } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from '@/users/entities/user.entity';
 import { Role } from '@/auth/enums';
-import { CommunityPost } from '@/community/entities/community-post.entity';
-import { CommunityComment } from '@/community/entities/community-comment.entity';
 import { MailService } from '@/mail/mail.service';
 
 export interface AdminUserListItem {
@@ -22,8 +20,6 @@ export interface AdminUserListItem {
     isActive: boolean;
     isBanned: boolean;
     createdAt: Date;
-    topicCount: number;
-    replyCount: number;
 }
 
 export interface AdminUserListQuery {
@@ -39,10 +35,6 @@ export class UsersService {
     constructor(
         @InjectRepository(User)
         private readonly userRepository: Repository<User>,
-        @InjectRepository(CommunityPost)
-        private readonly postRepository: Repository<CommunityPost>,
-        @InjectRepository(CommunityComment)
-        private readonly commentRepository: Repository<CommunityComment>,
         private readonly mailService: MailService,
     ) { }
 
@@ -136,9 +128,8 @@ export class UsersService {
      * Permanent account deletion (Google Play Data Deletion compliance).
      *
      * Verifies the user's password, then removes the user row. All
-     * user-owned data (fields, harvests, payments, community posts,
-     * comments, reactions, sessions, job listings) is removed via
-     * `onDelete: CASCADE` on the foreign keys pointing to users.
+     * user-owned data (fields, harvests, payments, sessions) is removed
+     * via `onDelete: CASCADE` on the foreign keys pointing to users.
      */
     async deleteAccount(
         userId: string,
@@ -209,27 +200,6 @@ export class UsersService {
             return [];
         }
 
-        const userIds = users.map((u) => u.id);
-
-        const postCounts = await this.postRepository
-            .createQueryBuilder('post')
-            .select('post.userId', 'userId')
-            .addSelect('COUNT(*)::int', 'count')
-            .where('post.userId IN (:...userIds)', { userIds })
-            .groupBy('post.userId')
-            .getRawMany<{ userId: string; count: number }>();
-
-        const commentCounts = await this.commentRepository
-            .createQueryBuilder('comment')
-            .select('comment.userId', 'userId')
-            .addSelect('COUNT(*)::int', 'count')
-            .where('comment.userId IN (:...userIds)', { userIds })
-            .groupBy('comment.userId')
-            .getRawMany<{ userId: string; count: number }>();
-
-        const postCountMap = new Map(postCounts.map((p) => [p.userId, Number(p.count)]));
-        const commentCountMap = new Map(commentCounts.map((c) => [c.userId, Number(c.count)]));
-
         return users.map((u) => ({
             id: u.id,
             fullName: u.fullName,
@@ -238,8 +208,6 @@ export class UsersService {
             isActive: !u.suspended,
             isBanned: u.suspended,
             createdAt: u.createdAt,
-            topicCount: postCountMap.get(u.id) ?? 0,
-            replyCount: commentCountMap.get(u.id) ?? 0,
         }));
     }
 
@@ -269,25 +237,6 @@ export class UsersService {
     private async adminUserItems(ids: string[]): Promise<AdminUserListItem[]> {
         const users = await this.userRepository.find({ where: { id: In(ids) } });
 
-        const postCounts = await this.postRepository
-            .createQueryBuilder('post')
-            .select('post.userId', 'userId')
-            .addSelect('COUNT(*)::int', 'count')
-            .where('post.userId IN (:...ids)', { ids })
-            .groupBy('post.userId')
-            .getRawMany<{ userId: string; count: number }>();
-
-        const commentCounts = await this.commentRepository
-            .createQueryBuilder('comment')
-            .select('comment.userId', 'userId')
-            .addSelect('COUNT(*)::int', 'count')
-            .where('comment.userId IN (:...ids)', { ids })
-            .groupBy('comment.userId')
-            .getRawMany<{ userId: string; count: number }>();
-
-        const postCountMap = new Map(postCounts.map((p) => [p.userId, Number(p.count)]));
-        const commentCountMap = new Map(commentCounts.map((c) => [c.userId, Number(c.count)]));
-
         return users.map((u) => ({
             id: u.id,
             fullName: u.fullName,
@@ -296,8 +245,6 @@ export class UsersService {
             isActive: !u.suspended,
             isBanned: u.suspended,
             createdAt: u.createdAt,
-            topicCount: postCountMap.get(u.id) ?? 0,
-            replyCount: commentCountMap.get(u.id) ?? 0,
         }));
     }
 

@@ -4,7 +4,6 @@ import { RouterLink, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
 import teaBusinessIcon from '@/assets/images/tea-business-icon.png';
-import socialBusinessIcon from '@/assets/images/social-business-icon.png';
 
 const authStore = useAuthStore();
 const themeStore = useThemeStore();
@@ -34,11 +33,6 @@ async function handleLogout() {
   closeUserMenu();
   await authStore.logout();
   router.push('/login');
-}
-
-function switchToSocial() {
-  localStorage.setItem('cayhesabim_last_hub', 'social');
-  router.push('/social/community');
 }
 
 function handleClickOutside(event: MouseEvent) {
@@ -83,12 +77,6 @@ onBeforeUnmount(() => {
 
       <!-- ─── RIGHT: Actions ─── -->
       <div class="hub-header-right">
-        <button class="hub-switch-btn" type="button" @click="switchToSocial" title="Sosyal İş Hesabı'na geç">
-          <img class="hub-switch-icon" :src="socialBusinessIcon" alt="" aria-hidden="true" />
-          <span class="hub-switch-label">Sosyal İş</span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
-
         <button
           class="icon-btn"
           type="button"

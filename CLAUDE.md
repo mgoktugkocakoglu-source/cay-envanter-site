@@ -39,7 +39,7 @@ Web/mobile-specific (run with `pnpm --filter @cayhesabim/web <script>` or from `
 NestJS 10 + TypeORM + PostgreSQL. Bootstrap (`src/main.ts`) sets: global `/api` prefix, Helmet, permissive CORS (`origin: true`, credentials), Swagger at `/api/docs`, and a global `ValidationPipe` (`whitelist`, `forbidNonWhitelisted`, `transform`). `app.module.ts` validates **all env vars with a Joi schema** on startup and registers a global `ThrottlerGuard` (30 req/min default).
 
 - **Path alias:** `@/` → `src/` (configured in `apps/api/tsconfig.json`). Use it for all internal imports; no `../../`.
-- **Feature modules** under `src/<feature>/`: `auth`, `users`, `mail`, `geo`, `fields`, `firms`, `harvests`, `payments`, `reports`, `uploads`, `community`, `health`, `job-listings`, `marketplace`, `equipment`. Each follows `*.controller.ts` (thin, routing + Swagger only) + `*.service.ts` (business logic) + `dto/` + `entities/` + `enums/`. Larger modules (e.g. `community`) split into `controllers/` and `services/` subfolders with `index.ts` barrels.
+- **Feature modules** under `src/<feature>/`: `auth`, `users`, `mail`, `geo`, `fields`, `firms`, `harvests`, `payments`, `reports`, `uploads`, `health`. Each follows `*.controller.ts` (thin, routing + Swagger only) + `*.service.ts` (business logic) + `dto/` + `entities/` + `enums/`.
 - **Auth:** JWT access + refresh tokens via Passport. Access tokens are short-lived (`JWT_EXPIRES_IN`, default 30m); refresh tokens (`JWT_REFRESH_*`) are separate with their own secret. Strategies: `jwt.strategy.ts`, `refresh-token.strategy.ts`. Guards in `auth/guards/`: `JwtAuthGuard`, `JwtRefreshGuard`, `OptionalJwtAuthGuard`, `RolesGuard`. Use `@CurrentUser()` and `@Roles()` decorators. `Role` enum = `user|admin|moderator`; `UserType` enum = `land_owner|worker|self_farmer`. A `Session` entity backs sessions.
 - **Uploads:** Cloudflare R2 (S3-compatible) via `@aws-sdk/client-s3` in `uploads/r2-storage.service.ts`; Multer handles multipart. All `R2_*` env vars are optional (uploads degrade gracefully if unset).
 - **Mail:** uses **Resend** (`mail.service.ts`, env `RESEND_API_KEY` / `RESEND_FROM`); sending is silently disabled if no key is set.
@@ -53,13 +53,10 @@ All list endpoints **must** return `{ data: T[], meta: { total, page, limit, tot
 
 Vue 3 (Composition API + TS), Vite, Pinia, Vue Router. Path alias `@/` → `src/` (in `vite.config.ts`). Key libs: Leaflet (maps), Tiptap (rich text). Styling is hand-written CSS (dark theme).
 
-- **Two-hub structure** is the core organizing principle. Authenticated routes split into:
-  - `/tea/*` — **Tea Business Hub**: dashboard, fields, firms, harvests, payments, reports, ai-agent
-  - `/social/*` — **Social Hub**: job-listings, community, equipment, marketplace
-  - `/hub` is the selector page. Route `meta` carries `hub: 'tea' | 'social'`, plus `requiresAuth`, `requiresAdmin`, `guest`. Legacy flat paths (`/fields`, `/community`, …) redirect to their hub-prefixed equivalents. Layouts in `src/layouts/` (`TeaBusinessLayout`, `SocialBusinessLayout`, `SocialWorkspaceLayout`, `AppLayout`) match the hubs.
+- **Single hub (Tea Business).** Authenticated app routes live under `/tea/*` — dashboard, fields, firms, harvests, payments, reports, ai-agent, settings. (The former Social Hub — job-listings, community, equipment, marketplace — has been removed.) Route `meta` carries `hub: 'tea'`, plus `requiresAuth`, `requiresAdmin`, `guest`. Login lands on `/tea/dashboard`; `/hub` and legacy flat paths (`/fields`, `/settings`, …) redirect to their `/tea/*` equivalents. Layouts in `src/layouts/` (`TeaBusinessLayout`, `AppLayout`).
 - **Auth/token model** (`stores/authStore.ts`): only the **refresh token** is persisted (`localStorage['refresh_token']`); the access token lives in memory. On boot, `initialize()` exchanges the refresh token for an access token. `router/guards/authGuard.ts` enforces `requiresAuth`/`requiresAdmin`/`guest` and waits for `initialize()` when a refresh token is present.
 - **API client** (`services/api.ts`): a `fetch` wrapper that auto-attaches the Bearer token and, on a `401`, refreshes the token **once** then retries (with a single-flight lock); a failed refresh redirects to `/login`. `API_BASE = VITE_API_BASE_URL || '/api'`. In dev, Vite proxies `/api` → `localhost:3000`; **Capacitor builds need an absolute `VITE_API_BASE_URL`** because there's no proxy in the native WebView.
-- **State:** feature Pinia stores (`authStore`, `fieldsStore`, `harvestsStore`, `firmsStore`, `paymentsStore`, `communityStore`, `geoStore`, `themeStore`). Extract reusable logic into `composables/`.
+- **State:** feature Pinia stores (`authStore`, `fieldsStore`, `harvestsStore`, `firmsStore`, `paymentsStore`, `geoStore`, `themeStore`). Extract reusable logic into `composables/`.
 
 ## Conventions (from `.agent/rules/`)
 

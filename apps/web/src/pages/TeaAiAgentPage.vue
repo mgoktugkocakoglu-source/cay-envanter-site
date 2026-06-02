@@ -1,1002 +1,981 @@
 <script setup lang="ts">
-import { computed, nextTick, reactive, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import TeaBusinessLayout from "@/layouts/TeaBusinessLayout.vue";
-
-type KnowledgeType = "Doküman" | "Tez" | "Kılavuz" | "Yüklenen";
-type MessageRole = "assistant" | "user";
-
-interface KnowledgeDocument {
-  id: string;
-  title: string;
-  type: KnowledgeType;
-  author: string;
-  year: string;
-  source: string;
-  summary: string;
-  topics: string[];
-  recommendations: string[];
-}
+import { useAuthStore } from "@/stores/authStore";
+import {
+  api,
+  type KnowledgeChatHistoryMessage,
+  type KnowledgeChatSource,
+  type KnowledgeDocument,
+  type KnowledgeStatus,
+} from "@/services/api";
 
 interface ChatMessage {
   id: string;
-  role: MessageRole;
+  role: "assistant" | "user";
   text: string;
-  references: KnowledgeDocument[];
+  sources?: KnowledgeChatSource[];
+  sourceOnly?: boolean;
 }
 
-const STORAGE_KEY = "cayhesabim_tea_ai_uploaded_documents";
+const authStore = useAuthStore();
+const isAdmin = computed(() => authStore.isAdmin);
 
-const baseKnowledge: KnowledgeDocument[] = [
-  {
-    id: "organic-tea",
-    title: "Organik Çay Tarımı Esasları",
-    type: "Kılavuz",
-    author: "Tarım ve Orman Bakanlığı / saha uygulamaları özeti",
-    year: "Güncel uygulama notu",
-    source:
-      "Organik tarım mevzuatı, üretici kayıt süreçleri ve Doğu Karadeniz çay bahçesi saha pratikleri",
-    summary:
-      "Organik çay üretiminde geçiş süreci, kayıt tutma, kimyasal girdilerden kaçınma, bahçe tampon alanı ve sertifikasyon denetimleri öne çıkar.",
-    topics: ["organik", "sertifika", "geçiş", "kayıt", "gübre", "toprak"],
-    recommendations: [
-      "Başlamadan önce arazinin geçmiş girdi kullanımını ve komşu parsellerden bulaşma riskini kayıt altına al.",
-      "Organik üretime geçişte her işlem için tarihli kayıt, fatura ve uygulama notu tut.",
-      "Toprak analizini yılda en az bir kez planla ve gübrelemeyi analiz sonucuna göre yap.",
-    ],
-  },
-  {
-    id: "tea-economics",
-    title: "Çay İşletmelerinde Maliyet, Verim ve Gelir Yönetimi",
-    type: "Tez",
-    author:
-      "Çay ekonomisi ve tarımsal işletme tezlerinden derlenmiş karar notu",
-    year: "Literatür sentezi",
-    source:
-      "Çay üretim maliyetleri, işçilik, taşıma, alım fiyatı ve nakit akışı üzerine akademik çalışmalar",
-    summary:
-      "Kârlılık yalnızca yaş çay fiyatına değil; işçilik organizasyonu, hasat zamanlaması, nakliye, fire ve ödeme takibine bağlıdır.",
-    topics: [
-      "maliyet",
-      "gelir",
-      "işçilik",
-      "nakliye",
-      "ödeme",
-      "verim",
-      "fiyat",
-    ],
-    recommendations: [
-      "Dekar başına işçilik, taşıma ve bakım maliyetini ayrı ayrı hesapla.",
-      "Her sürgün için kg, alıcı firma, randıman, ödeme vadesi ve net gelir takibi yap.",
-      "Nakit akışı için gübre, budama ve işçilik giderlerini hasat gelirinden önce planla.",
-    ],
-  },
-  {
-    id: "soil-fertilization",
-    title: "Çay Bahçelerinde Toprak Verimliliği ve Gübreleme",
-    type: "Doküman",
-    author: "Toprak bilimi ve bitki besleme yayınları özeti",
-    year: "Saha rehberi",
-    source:
-      "Toprak analizi, pH yönetimi, organik madde ve dengeli besleme üzerine teknik dokümanlar",
-    summary:
-      "Çay bitkisi asidik topraklara uyumlu olsa da aşırı asitlenme, organik madde düşüklüğü ve bilinçsiz gübreleme verimi azaltır.",
-    topics: ["toprak", "ph", "gübre", "azot", "organik madde", "analiz"],
-    recommendations: [
-      "Toprak numunesini aynı bahçede benzer eğim ve yapıdaki alanlardan karışık örnek şeklinde al.",
-      "Gübre miktarını alışkanlıkla değil analiz raporu ve beklenen verime göre belirle.",
-      "Erozyon riski olan eğimli arazide organik maddeyi koruyacak örtü ve malç uygulamalarını değerlendir.",
-    ],
-  },
-  {
-    id: "harvest-quality",
-    title: "Yaş Çay Hasadı, Kalite ve Lojistik Yönetimi",
-    type: "Doküman",
-    author: "Çay teknolojisi ve hasat sonrası kalite kaynakları özeti",
-    year: "Uygulama rehberi",
-    source:
-      "Hasat standardı, bekletme süresi, taşıma koşulları ve kalite kaybı üzerine dokümanlar",
-    summary:
-      "Kaliteli yaş çay için doğru sürgün olgunluğu, temiz hasat, kısa bekleme süresi ve havadar taşıma koşulları kritik önemdedir.",
-    topics: ["hasat", "kalite", "sürgün", "taşıma", "randıman", "fire"],
-    recommendations: [
-      "Hasadı sürgün dönemine göre planla; kaba yaprak oranını ve yabancı maddeyi düşür.",
-      "Toplanan çayı güneşte ve kapalı çuvallarda uzun süre bekletme.",
-      "Teslim noktası, sıra, tartım ve alım belgesini aynı gün kaydet.",
-    ],
-  },
-  {
-    id: "pest-climate",
-    title: "İklim, Hastalık-Zararlı ve Risk Yönetimi",
-    type: "Tez",
-    author: "Bitki koruma ve iklim uyumu çalışmalarından sentez",
-    year: "Literatür sentezi",
-    source:
-      "Doğu Karadeniz iklim değişkenliği, zararlı takibi ve entegre mücadele notları",
-    summary:
-      "Aşırı yağış, sıcaklık dalgalanması, erozyon ve zararlı baskısı üretimde verim ve kalite riskini artırır.",
-    topics: ["iklim", "hastalık", "zararlı", "erozyon", "risk", "sigorta"],
-    recommendations: [
-      "Bahçe gözlemlerini haftalık tut; renk değişimi, yaprak deformasyonu ve drenaj sorunlarını fotoğrafla kaydet.",
-      "Kimyasal müdahaleden önce entegre mücadele ve yetkili teknik danışman görüşünü değerlendir.",
-      "Şiddetli yağış riski olan parsellerde drenaj ve teras bakımını hasat sezonu öncesinde kontrol et.",
-    ],
-  },
-];
-
-const roadmapSteps = [
-  {
-    title: "1. Arazi ve hedef analizi",
-    detail:
-      "Parsel konumu, eğim, yol erişimi, toprak analizi, mevcut çay yaşı ve yıllık iş gücü kapasitesini çıkar.",
-  },
-  {
-    title: "2. Resmi kayıt ve alıcı stratejisi",
-    detail:
-      "ÇKS/üretici kayıtlarını, alım yeri seçeneklerini, özel sektör ve kooperatif bağlantılarını netleştir.",
-  },
-  {
-    title: "3. Maliyet planı",
-    detail:
-      "Budama, gübreleme, işçilik, taşıma, ekipman, bakım ve beklenmeyen giderler için sezonluk bütçe oluştur.",
-  },
-  {
-    title: "4. Bahçe bakım takvimi",
-    detail:
-      "Toprak analizi, gübreleme, budama, yabancı ot kontrolü, drenaj ve hasat hazırlığını aylık takvime bağla.",
-  },
-  {
-    title: "5. Hasat ve kalite operasyonu",
-    detail:
-      "Sürgün dönemi, işçi planı, çuval/taşıma düzeni, tartım belgesi ve fire takibini standartlaştır.",
-  },
-  {
-    title: "6. Gelir, ödeme ve büyüme kararı",
-    detail:
-      "Dekar başı verim, kg başı net kâr, ödeme vadesi ve yıllık iyileştirme hedeflerini karşılaştır.",
-  },
-];
+const WELCOME_TEXT =
+  "Merhaba! Ben çay tarımı asistanınız. Yüklenen kaynak belgelere ve kendi tarım bilgime dayanarak; çaya başlama, bahçe bakımı, gübreleme, hasat kalitesi, maliyet ve risk yönetimi gibi konularda yardımcı olabilirim. Aşağıdan bir soru sorun.";
 
 const sampleQuestions = [
-  "Çay işine yeni başlayacağım, ilk 90 gün ne yapmalıyım?",
-  "Organik çay üretimine geçmek için nelere dikkat etmeliyim?",
-  "Dekar başı maliyetimi nasıl hesaplarım?",
-  "Hasatta kalite kaybını azaltmak için hangi adımları izlemeliyim?",
+  "Çay tarımına yeni başlıyorum, ilk olarak nelere dikkat etmeliyim?",
+  "Çay bahçesinde gübrelemeyi neye göre planlamalıyım?",
+  "Yaş çayda kalite kaybını nasıl azaltırım?",
+  "Dekar başına maliyetimi nasıl hesaplarım?",
 ];
 
-const question = ref("");
-const selectedTopic = ref("yol-haritasi");
 const messages = ref<ChatMessage[]>([
-  {
-    id: "welcome",
-    role: "assistant",
-    text: "Merhaba, ben Çay Bilgi AI. Çay üretimine başlama, organik üretim, maliyet, hasat kalitesi ve risk yönetimi konularında yüklenen doküman ve tez özetlerini referans alarak cevap verebilirim. Başlamak için yol haritası sorabilir veya kendi doküman notunu yükleyebilirsin.",
-    references: baseKnowledge.slice(0, 3),
-  },
+  { id: "welcome", role: "assistant", text: WELCOME_TEXT },
 ]);
-const chatEndRef = ref<HTMLElement | null>(null);
-const uploadStatus = ref("");
-const uploadForm = reactive({
-  title: "",
-  author: "",
-  source: "",
-  notes: "",
+const question = ref("");
+const sending = ref(false);
+const chatError = ref("");
+const chatScroll = ref<HTMLElement | null>(null);
+
+const status = ref<KnowledgeStatus | null>(null);
+const documents = ref<KnowledgeDocument[]>([]);
+const loadingDocuments = ref(true);
+
+const selectedFile = ref<File | null>(null);
+const uploadTitle = ref("");
+const uploading = ref(false);
+const uploadError = ref("");
+const uploadSuccess = ref("");
+const fileInput = ref<HTMLInputElement | null>(null);
+
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+const hasConversation = computed(() =>
+  messages.value.some((message) => message.role === "user"),
+);
+
+const aiBadge = computed(() => {
+  if (!status.value) return null;
+  return status.value.aiConfigured
+    ? { label: "Yapay zekâ aktif", tone: "active" as const }
+    : { label: "Kaynak modu", tone: "muted" as const };
 });
-const uploadedDocuments = ref<KnowledgeDocument[]>(loadUploadedDocuments());
 
-const allDocuments = computed(() => [
-  ...baseKnowledge,
-  ...uploadedDocuments.value,
-]);
-const documentStats = computed(() => [
-  { label: "Bilgi kaynağı", value: allDocuments.value.length.toString() },
-  {
-    label: "Tez / literatür",
-    value: allDocuments.value
-      .filter((doc) => doc.type === "Tez")
-      .length.toString(),
-  },
-  { label: "Başlangıç adımı", value: roadmapSteps.length.toString() },
-]);
-const visibleReferences = computed(() => allDocuments.value.slice(0, 8));
-
-function createId(prefix: string) {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto)
+function createId(prefix: string): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return `${prefix}-${crypto.randomUUID()}`;
+  }
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function normalize(value: string) {
-  return value.toLocaleLowerCase("tr-TR");
+function formatBytes(bytes: number): string {
+  if (!bytes) return "0 KB";
+  const units = ["B", "KB", "MB", "GB"];
+  const exponent = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    units.length - 1,
+  );
+  const value = bytes / Math.pow(1024, exponent);
+  return `${value.toFixed(value >= 10 || exponent === 0 ? 0 : 1)} ${units[exponent]}`;
 }
 
-function tokenize(value: string) {
-  return normalize(value)
-    .replace(/[^a-zçğıöşü0-9\s-]/gi, " ")
-    .split(/\s+/)
-    .filter((token) => token.length > 2);
-}
-
-function loadUploadedDocuments(): KnowledgeDocument[] {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return [];
-
-  const parsed = JSON.parse(raw) as KnowledgeDocument[];
-  return Array.isArray(parsed) ? parsed : [];
-}
-
-function persistUploadedDocuments() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(uploadedDocuments.value));
-}
-
-function findRelevantDocuments(prompt: string) {
-  const tokens = tokenize(prompt);
-  const scored = allDocuments.value.map((doc) => {
-    const haystack = normalize(
-      [
-        doc.title,
-        doc.type,
-        doc.author,
-        doc.source,
-        doc.summary,
-        doc.topics.join(" "),
-        doc.recommendations.join(" "),
-      ].join(" "),
-    );
-    const score = tokens.reduce(
-      (total, token) => total + (haystack.includes(token) ? 1 : 0),
-      0,
-    );
-    return { doc, score };
+function formatDate(value: string): string {
+  return new Date(value).toLocaleDateString("tr-TR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
-
-  const matches = scored
-    .filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .map((item) => item.doc);
-
-  return matches.length > 0
-    ? matches.slice(0, 3)
-    : allDocuments.value.slice(0, 3);
 }
 
-function buildRoadmapAnswer(references: KnowledgeDocument[]) {
-  const steps = roadmapSteps
-    .map((step) => `• ${step.title}: ${step.detail}`)
-    .join("\n");
-  const referenceHints = references
-    .flatMap((doc) => doc.recommendations.slice(0, 1))
-    .slice(0, 3)
-    .map((item) => `• ${item}`)
-    .join("\n");
-
-  return `Bu işe yeni başlamak için pratik yol haritası:\n\n${steps}\n\nDokümanlardan çıkan kritik uyarılar:\n${referenceHints}\n\nÖnerim: İlk sezon hedefin yüksek kârdan önce kayıt düzeni, alıcı ilişkisi, kalite standardı ve gerçek maliyetini öğrenmek olsun. Çay Hesabım içinde tarla, hasat ve ödeme kayıtlarını birlikte tutarsan ikinci sezon kararların daha netleşir.`;
+function documentKind(document: KnowledgeDocument): string {
+  const name = document.fileName.toLowerCase();
+  if (document.mimeType.includes("pdf") || name.endsWith(".pdf")) return "PDF";
+  if (document.mimeType.includes("word") || name.endsWith(".docx"))
+    return "Word";
+  if (name.endsWith(".md")) return "Markdown";
+  return "Metin";
 }
 
-function buildTopicAnswer(prompt: string, references: KnowledgeDocument[]) {
-  const intro = `Sorunu "${prompt}" olarak anladım. Yüklenen bilgi tabanında en alakalı ${references.length} kaynağa göre özet cevap:`;
-  const bullets = references
-    .flatMap((doc) => doc.recommendations)
-    .slice(0, 5)
-    .map((item) => `• ${item}`)
-    .join("\n");
-  const sources = references
-    .map((doc) => `• ${doc.title}: ${doc.summary}`)
-    .join("\n");
-
-  return `${intro}\n\n${bullets}\n\nReferans özeti:\n${sources}\n\nNot: Bu ekran karar desteği sağlar; resmi sertifikasyon, destek, ilaçlama veya mevzuat adımlarında yetkili kurum ve ziraat mühendisi görüşüyle doğrulama yap.`;
+async function loadKnowledge(): Promise<void> {
+  loadingDocuments.value = true;
+  const [statusResult, documentsResult] = await Promise.all([
+    api.getKnowledgeStatus(),
+    api.getKnowledgeDocuments(),
+  ]);
+  if (statusResult.data) status.value = statusResult.data;
+  if (documentsResult.data) documents.value = documentsResult.data;
+  loadingDocuments.value = false;
 }
 
-function isRoadmapQuestion(prompt: string) {
-  const value = normalize(`${prompt} ${selectedTopic.value}`);
-  return [
-    "başla",
-    "basla",
-    "yol",
-    "roadmap",
-    "ilk",
-    "kurmak",
-    "yeni",
-    "90",
-  ].some((keyword) => value.includes(keyword));
-}
-
-async function askAgent(customQuestion?: string) {
-  const prompt = (customQuestion || question.value).trim();
-  if (!prompt) return;
-
-  messages.value.push({
-    id: createId("user"),
-    role: "user",
-    text: prompt,
-    references: [],
-  });
-  question.value = "";
-
-  const references = findRelevantDocuments(prompt);
-  const answer = isRoadmapQuestion(prompt)
-    ? buildRoadmapAnswer(references)
-    : buildTopicAnswer(prompt, references);
-
-  messages.value.push({
-    id: createId("assistant"),
-    role: "assistant",
-    text: answer,
-    references,
-  });
+async function scrollToBottom(): Promise<void> {
   await nextTick();
-  chatEndRef.value?.scrollIntoView({ behavior: "smooth", block: "end" });
+  const el = chatScroll.value;
+  if (el) el.scrollTop = el.scrollHeight;
 }
 
-async function handleDocumentUpload(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file) return;
+function buildHistory(): KnowledgeChatHistoryMessage[] {
+  return messages.value
+    .filter((message) => message.id !== "welcome")
+    .slice(-8)
+    .map((message) => ({ role: message.role, content: message.text }));
+}
 
-  uploadStatus.value = "Doküman okunuyor...";
-  let extractedText = uploadForm.notes.trim();
+async function ask(prompt?: string): Promise<void> {
+  const text = (prompt ?? question.value).trim();
+  if (!text || sending.value) return;
 
-  if (file.type.startsWith("text/") || file.name.endsWith(".md")) {
-    extractedText = [extractedText, await file.text()]
-      .filter(Boolean)
-      .join("\n\n")
-      .slice(0, 4000);
+  chatError.value = "";
+  const history = buildHistory();
+  messages.value.push({ id: createId("user"), role: "user", text });
+  question.value = "";
+  sending.value = true;
+  await scrollToBottom();
+
+  const { data, error } = await api.knowledgeChat(text, history);
+
+  if (data) {
+    messages.value.push({
+      id: createId("assistant"),
+      role: "assistant",
+      text: data.answer,
+      sources: data.sources,
+      sourceOnly: !data.usedAi,
+    });
+  } else {
+    chatError.value =
+      error?.message ?? "Yanıt alınamadı. Lütfen tekrar deneyin.";
+    messages.value.push({
+      id: createId("assistant"),
+      role: "assistant",
+      text: "Şu anda yanıt veremiyorum. Bağlantınızı kontrol edip tekrar deneyebilirsiniz.",
+    });
   }
 
-  const doc: KnowledgeDocument = {
-    id: createId("uploaded"),
-    title: uploadForm.title.trim() || file.name,
-    type: "Yüklenen",
-    author: uploadForm.author.trim() || "Kullanıcı yüklemesi",
-    year: new Date().getFullYear().toString(),
-    source: uploadForm.source.trim() || file.name,
-    summary:
-      extractedText ||
-      "PDF/Word gibi tarayıcıda metni okunamayan dosyalar için başlık ve kaynak bilgisi referans olarak eklendi. Daha iyi cevap için not alanına özet ekleyin.",
-    topics: tokenize(
-      `${uploadForm.title} ${uploadForm.source} ${extractedText}`,
-    ).slice(0, 12),
-    recommendations: extractedText
-      ? extractedText
-          .split(/[.!?\n]/)
-          .map((item) => item.trim())
-          .filter((item) => item.length > 30)
-          .slice(0, 4)
-      : [
-          "Bu dokümanın ana bulgularını not alanına ekleyerek AI cevaplarında daha güçlü referans üretin.",
-        ],
-  };
-
-  uploadedDocuments.value.unshift(doc);
-  persistUploadedDocuments();
-  uploadStatus.value = "Doküman bilgi tabanına eklendi.";
-  uploadForm.title = "";
-  uploadForm.author = "";
-  uploadForm.source = "";
-  uploadForm.notes = "";
-  input.value = "";
+  sending.value = false;
+  await scrollToBottom();
 }
 
-function removeUploadedDocument(id: string) {
-  uploadedDocuments.value = uploadedDocuments.value.filter(
-    (doc) => doc.id !== id,
+function onInputKeydown(event: KeyboardEvent): void {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    void ask();
+  }
+}
+
+function onFileChange(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0] ?? null;
+  uploadError.value = "";
+  uploadSuccess.value = "";
+
+  if (file && file.size > MAX_UPLOAD_BYTES) {
+    uploadError.value = "Dosya en fazla 25 MB olabilir.";
+    selectedFile.value = null;
+    input.value = "";
+    return;
+  }
+  selectedFile.value = file;
+}
+
+async function uploadDocument(): Promise<void> {
+  if (!selectedFile.value || uploading.value) return;
+
+  uploading.value = true;
+  uploadError.value = "";
+  uploadSuccess.value = "";
+
+  const { data, error } = await api.uploadKnowledgeDocument(
+    selectedFile.value,
+    uploadTitle.value.trim() || undefined,
   );
-  persistUploadedDocuments();
+
+  if (data) {
+    uploadSuccess.value = `"${data.title}" bilgi tabanına eklendi (${data.chunkCount} bölüm).`;
+    selectedFile.value = null;
+    uploadTitle.value = "";
+    if (fileInput.value) fileInput.value.value = "";
+    await loadKnowledge();
+  } else {
+    uploadError.value = error?.message ?? "Belge yüklenemedi.";
+  }
+
+  uploading.value = false;
 }
+
+async function removeDocument(document: KnowledgeDocument): Promise<void> {
+  if (
+    !window.confirm(
+      `"${document.title}" belgesi bilgi tabanından kalıcı olarak kaldırılsın mı?`,
+    )
+  ) {
+    return;
+  }
+  const { error } = await api.deleteKnowledgeDocument(document.id);
+  if (error) {
+    uploadError.value = error.message;
+    return;
+  }
+  await loadKnowledge();
+}
+
+onMounted(loadKnowledge);
 </script>
 
 <template>
   <TeaBusinessLayout>
-    <div class="tea-ai-page">
-      <section class="ai-hero">
-        <div class="hero-copy">
-          <span class="eyebrow">Çay Bilgi AI Agent</span>
-          <h1>Doküman ve tez referanslı çay danışmanı</h1>
+    <div class="ai-page">
+      <header class="ai-header">
+        <div class="ai-header__intro">
+          <span class="eyebrow">Çay Bilgi Asistanı</span>
+          <h1>Belge destekli çay tarımı danışmanı</h1>
           <p>
-            Çay üretimine başlamak, bahçe bakımını planlamak, maliyetleri
-            hesaplamak ve hasat kalitesini artırmak için bilgi tabanına dayalı
-            cevaplar üretir. Kullanıcı kendi doküman notlarını da ekleyebilir.
+            Yöneticilerin yüklediği doküman ve ders notlarını referans alır,
+            kaynaklarda olmayan konularda kendi tarım bilgisiyle yanıt verir.
           </p>
-          <div class="hero-actions">
-            <button
-              class="btn btn-primary"
-              type="button"
-              @click="
-                askAgent(
-                  'Çay işine yeni başlayacağım, ilk 90 gün ne yapmalıyım?',
-                )
-              "
-            >
-              Yol haritası oluştur
-            </button>
-            <a class="btn btn-secondary" href="#document-upload"
-              >Doküman yükle</a
-            >
-          </div>
         </div>
-        <div class="hero-card" aria-label="Bilgi tabanı özeti">
-          <div v-for="stat in documentStats" :key="stat.label" class="stat-box">
-            <strong>{{ stat.value }}</strong>
-            <span>{{ stat.label }}</span>
+        <dl class="ai-stats" aria-label="Bilgi tabanı özeti">
+          <div class="ai-stat">
+            <dt>Belge</dt>
+            <dd>{{ status?.documentCount ?? "–" }}</dd>
           </div>
-        </div>
-      </section>
-
-      <section class="content-grid">
-        <div class="agent-panel">
-          <div class="panel-header">
-            <div>
-              <span class="eyebrow">Soru-cevap</span>
-              <h2>AI Agent'a sor</h2>
-            </div>
-            <select
-              v-model="selectedTopic"
-              class="topic-select"
-              aria-label="Konu seçimi"
-            >
-              <option value="yol-haritasi">Yol haritası</option>
-              <option value="organik">Organik üretim</option>
-              <option value="maliyet">Maliyet ve gelir</option>
-              <option value="hasat">Hasat kalitesi</option>
-              <option value="risk">Risk yönetimi</option>
-            </select>
+          <div class="ai-stat">
+            <dt>İndekslenen bölüm</dt>
+            <dd>{{ status?.chunkCount ?? "–" }}</dd>
           </div>
-
-          <div class="sample-questions" aria-label="Örnek sorular">
-            <button
-              v-for="sample in sampleQuestions"
-              :key="sample"
-              type="button"
-              @click="askAgent(sample)"
-            >
-              {{ sample }}
-            </button>
+          <div v-if="aiBadge" class="ai-stat">
+            <dt>Durum</dt>
+            <dd class="ai-stat__badge" :class="`is-${aiBadge.tone}`">
+              {{ aiBadge.label }}
+            </dd>
           </div>
+        </dl>
+      </header>
 
-          <div class="chat-window" aria-live="polite">
+      <div class="ai-layout">
+        <!-- Chat -->
+        <section class="chat" aria-label="Asistan sohbeti">
+          <div ref="chatScroll" class="chat__log" aria-live="polite">
             <article
               v-for="message in messages"
               :key="message.id"
-              class="chat-message"
-              :class="`chat-message--${message.role}`"
+              class="msg"
+              :class="`msg--${message.role}`"
             >
-              <div class="message-avatar">
+              <div class="msg__avatar" aria-hidden="true">
                 {{ message.role === "assistant" ? "AI" : "Siz" }}
               </div>
-              <div class="message-body">
-                <p>{{ message.text }}</p>
+              <div class="msg__body">
+                <p class="msg__text">{{ message.text }}</p>
+                <span v-if="message.sourceOnly" class="msg__note">
+                  Yapay zekâ yapılandırılmadığı için kaynak özetleri gösteriliyor.
+                </span>
                 <div
-                  v-if="message.references.length"
-                  class="message-references"
+                  v-if="message.sources && message.sources.length"
+                  class="msg__sources"
                 >
-                  <span>Referanslar:</span>
+                  <span class="msg__sources-title">Kaynaklar</span>
                   <ul>
                     <li
-                      v-for="reference in message.references"
-                      :key="reference.id"
+                      v-for="source in message.sources"
+                      :key="source.documentId"
                     >
-                      {{ reference.title }} · {{ reference.type }} ·
-                      {{ reference.year }}
+                      <strong>{{ source.title }}</strong>
+                      <span>{{ source.snippet }}</span>
                     </li>
                   </ul>
                 </div>
               </div>
             </article>
-            <div ref="chatEndRef"></div>
+
+            <article
+              v-if="sending"
+              class="msg msg--assistant"
+              aria-label="Asistan yazıyor"
+            >
+              <div class="msg__avatar" aria-hidden="true">AI</div>
+              <div class="msg__body">
+                <span class="typing" aria-hidden="true">
+                  <i></i><i></i><i></i>
+                </span>
+              </div>
+            </article>
           </div>
 
-          <form class="question-form" @submit.prevent="askAgent()">
+          <div v-if="!hasConversation" class="chat__samples">
+            <button
+              v-for="sample in sampleQuestions"
+              :key="sample"
+              type="button"
+              class="chip"
+              :disabled="sending"
+              @click="ask(sample)"
+            >
+              {{ sample }}
+            </button>
+          </div>
+
+          <form class="chat__form" @submit.prevent="ask()">
+            <label class="sr-only" for="ai-question">Sorunuz</label>
             <textarea
+              id="ai-question"
               v-model="question"
-              rows="3"
-              placeholder="Örn: Organik çaya geçmek için ilk yıl hangi kayıtları tutmalıyım?"
+              rows="2"
+              class="chat__input"
+              placeholder="Bir soru yazın… (Enter ile gönder, Shift+Enter ile yeni satır)"
+              :disabled="sending"
+              @keydown="onInputKeydown"
             />
-            <button class="btn btn-primary" type="submit">Sor</button>
+            <button
+              type="submit"
+              class="btn btn-primary chat__send"
+              :disabled="sending || !question.trim()"
+            >
+              {{ sending ? "Yanıtlanıyor…" : "Gönder" }}
+            </button>
           </form>
-        </div>
+          <p v-if="chatError" class="chat__error" role="alert">
+            {{ chatError }}
+          </p>
+        </section>
 
-        <aside class="side-panel">
-          <div class="roadmap-card">
-            <span class="eyebrow">Başlangıç planı</span>
-            <h2>Çay işine başlama yol haritası</h2>
-            <ol>
-              <li v-for="step in roadmapSteps" :key="step.title">
-                <strong>{{ step.title }}</strong>
-                <span>{{ step.detail }}</span>
-              </li>
-            </ol>
-          </div>
-
-          <div id="document-upload" class="upload-card">
-            <span class="eyebrow">Bilgi tabanı</span>
-            <h2>Doküman / tez yükle</h2>
-            <p>
-              TXT ve Markdown dosyalarının metni okunur. PDF/Word için not
-              alanına özet ekleyerek referans kalitesini artırabilirsiniz.
+        <!-- Knowledge base -->
+        <aside class="kb" aria-label="Bilgi tabanı">
+          <section v-if="isAdmin" class="kb__card kb__upload">
+            <h2>Belge yükle</h2>
+            <p class="kb__hint">
+              PDF, Word (.docx), TXT veya MD. Yüklenen belge metni asistanın
+              hafızasına eklenir.
             </p>
             <input
-              v-model="uploadForm.title"
-              class="form-input"
-              type="text"
-              placeholder="Doküman başlığı"
+              ref="fileInput"
+              type="file"
+              class="sr-only"
+              accept=".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+              @change="onFileChange"
             />
-            <input
-              v-model="uploadForm.author"
-              class="form-input"
-              type="text"
-              placeholder="Yazar / kurum"
-            />
-            <input
-              v-model="uploadForm.source"
-              class="form-input"
-              type="text"
-              placeholder="Kaynak linki veya açıklama"
-            />
-            <textarea
-              v-model="uploadForm.notes"
-              class="upload-notes"
-              rows="4"
-              placeholder="Ana bulgular, alıntı notları veya özet"
-            />
-            <label class="file-upload">
-              <input
-                type="file"
-                accept=".txt,.md,.pdf,.doc,.docx"
-                @change="handleDocumentUpload"
-              />
-              Dosya seç ve ekle
-            </label>
-            <p v-if="uploadStatus" class="upload-status">{{ uploadStatus }}</p>
-          </div>
-        </aside>
-      </section>
-
-      <section class="reference-library">
-        <div class="panel-header">
-          <div>
-            <span class="eyebrow">Referans kütüphanesi</span>
-            <h2>AI cevaplarında kullanılan kaynaklar</h2>
-          </div>
-        </div>
-        <div class="reference-grid">
-          <article
-            v-for="doc in visibleReferences"
-            :key="doc.id"
-            class="reference-card"
-          >
-            <div class="reference-meta">
-              <span>{{ doc.type }}</span>
-              <span>{{ doc.year }}</span>
-            </div>
-            <h3>{{ doc.title }}</h3>
-            <p>{{ doc.summary }}</p>
-            <div class="topic-list">
-              <span v-for="topic in doc.topics.slice(0, 4)" :key="topic"
-                >#{{ topic }}</span
-              >
-            </div>
             <button
-              v-if="doc.type === 'Yüklenen'"
-              class="remove-doc"
               type="button"
-              @click="removeUploadedDocument(doc.id)"
+              class="kb__filepick"
+              @click="fileInput?.click()"
             >
-              Kaldır
+              <span>{{ selectedFile ? selectedFile.name : "Dosya seç" }}</span>
+              <span v-if="selectedFile" class="kb__filesize">
+                {{ formatBytes(selectedFile.size) }}
+              </span>
             </button>
-          </article>
-        </div>
-      </section>
+            <label class="sr-only" for="ai-doc-title">Başlık</label>
+            <input
+              id="ai-doc-title"
+              v-model="uploadTitle"
+              type="text"
+              class="kb__title-input"
+              placeholder="Başlık (opsiyonel)"
+            />
+            <button
+              type="button"
+              class="btn btn-primary kb__upload-btn"
+              :disabled="!selectedFile || uploading"
+              @click="uploadDocument"
+            >
+              {{ uploading ? "Yükleniyor…" : "Bilgi tabanına ekle" }}
+            </button>
+            <p v-if="uploadError" class="kb__msg is-error" role="alert">
+              {{ uploadError }}
+            </p>
+            <p v-if="uploadSuccess" class="kb__msg is-success" role="status">
+              {{ uploadSuccess }}
+            </p>
+          </section>
+
+          <section class="kb__card">
+            <div class="kb__head">
+              <h2>Bilgi tabanı</h2>
+              <span class="kb__count">{{ documents.length }} belge</span>
+            </div>
+
+            <p v-if="loadingDocuments" class="kb__empty">Yükleniyor…</p>
+            <p v-else-if="!documents.length" class="kb__empty">
+              Henüz belge yok.
+              <template v-if="!isAdmin">
+                Belgeleri yalnızca yöneticiler ekleyebilir.
+              </template>
+            </p>
+
+            <ul v-else class="kb__list">
+              <li v-for="document in documents" :key="document.id" class="doc">
+                <div class="doc__main">
+                  <span class="doc__kind">{{ documentKind(document) }}</span>
+                  <div class="doc__text">
+                    <strong class="doc__title">{{ document.title }}</strong>
+                    <span class="doc__meta">
+                      {{ document.chunkCount }} bölüm ·
+                      {{ formatBytes(document.fileSize) }} ·
+                      {{ formatDate(document.createdAt) }}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  v-if="isAdmin"
+                  type="button"
+                  class="doc__remove"
+                  :aria-label="`${document.title} belgesini kaldır`"
+                  @click="removeDocument(document)"
+                >
+                  Kaldır
+                </button>
+              </li>
+            </ul>
+          </section>
+        </aside>
+      </div>
     </div>
   </TeaBusinessLayout>
 </template>
 
 <style scoped>
-.tea-ai-page {
-  max-width: 1440px;
+.ai-page {
+  max-width: 1180px;
   margin: 0 auto;
   padding: var(--space-6);
   color: var(--color-text-primary);
 }
 
-.ai-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Header */
+.ai-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
   gap: var(--space-6);
-  align-items: stretch;
   margin-bottom: var(--space-6);
 }
 
-.hero-copy,
-.agent-panel,
-.side-panel > *,
-.reference-library {
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 24px;
-  box-shadow: var(--shadow-md);
-}
-
-.hero-copy {
-  padding: clamp(24px, 4vw, 48px);
-  background:
-    radial-gradient(
-      circle at top right,
-      rgba(34, 197, 94, 0.16),
-      transparent 34%
-    ),
-    linear-gradient(135deg, var(--color-bg-secondary), var(--color-bg-tertiary));
-}
-
 .eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
+  display: inline-block;
+  margin-bottom: var(--space-2);
   color: var(--color-primary);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-.hero-copy h1,
-.panel-header h2,
-.roadmap-card h2,
-.upload-card h2,
-.reference-library h2 {
-  margin: var(--space-2) 0 var(--space-3);
-  color: var(--color-text-primary);
-  line-height: 1.12;
+.ai-header h1 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-3xl);
+  line-height: var(--line-height-tight);
 }
 
-.hero-copy h1 {
-  max-width: 760px;
-  font-size: clamp(2rem, 5vw, 4.25rem);
-}
-
-.hero-copy p {
-  max-width: 760px;
+.ai-header__intro p {
+  max-width: 60ch;
+  margin: 0;
   color: var(--color-text-secondary);
-  font-size: var(--font-size-lg);
-  line-height: var(--line-height-relaxed);
+  line-height: var(--line-height-normal);
 }
 
-.hero-actions,
-.sample-questions,
-.reference-meta,
-.topic-list {
+.ai-stats {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: var(--space-3);
+  margin: 0;
 }
 
-.hero-actions {
-  margin-top: var(--space-6);
-}
-
-.hero-card {
-  display: grid;
-  gap: var(--space-4);
-}
-
-.stat-box {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-height: 120px;
-  padding: var(--space-6);
+.ai-stat {
+  min-width: 92px;
+  padding: var(--space-3) var(--space-4);
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
-  border-radius: 24px;
-  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-lg);
 }
 
-.stat-box strong {
-  color: var(--color-primary);
-  font-size: 2.5rem;
-  line-height: 1;
-}
-
-.stat-box span {
-  margin-top: var(--space-2);
-  color: var(--color-text-secondary);
+.ai-stat dt {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
 }
 
-.content-grid {
+.ai-stat dd {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  line-height: 1;
+}
+
+.ai-stat__badge {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ai-stat__badge.is-active {
+  color: var(--color-primary);
+}
+
+.ai-stat__badge.is-muted {
+  color: var(--color-text-muted);
+}
+
+/* Layout */
+.ai-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 420px;
+  grid-template-columns: minmax(0, 1fr) 360px;
   gap: var(--space-6);
   align-items: start;
 }
 
-.agent-panel,
-.reference-library {
-  padding: var(--space-6);
-}
-
-.panel-header {
+/* Chat */
+.chat {
   display: flex;
-  justify-content: space-between;
-  gap: var(--space-4);
-  align-items: center;
-  margin-bottom: var(--space-5);
+  flex-direction: column;
+  min-height: 540px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
 }
 
-.topic-select {
-  min-height: var(--control-height);
-  padding: 0 var(--space-4);
-  color: var(--color-text-primary);
-  background: var(--color-input-bg);
+.chat__log {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-height: 56vh;
+  overflow-y: auto;
+  padding-right: var(--space-2);
+}
+
+.msg {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.msg--user {
+  grid-template-columns: minmax(0, 1fr) 36px;
+}
+
+.msg__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
+.msg--user .msg__avatar {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.msg--user .msg__body {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.msg__body {
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-primary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
 }
 
-.sample-questions {
-  margin-bottom: var(--space-5);
-}
-
-.sample-questions button,
-.topic-list span,
-.reference-meta span {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
+.msg--user .msg__body {
   background: var(--color-bg-tertiary);
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
 }
 
-.sample-questions button {
-  padding: 8px 12px;
-  cursor: pointer;
-}
-
-.sample-questions button:hover {
-  color: var(--color-primary);
-  border-color: var(--color-primary);
-}
-
-.chat-window {
-  display: grid;
-  gap: var(--space-4);
-  max-height: 620px;
-  overflow: auto;
-  padding: var(--space-4);
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
-  border-radius: 18px;
-}
-
-.chat-message {
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  gap: var(--space-3);
-}
-
-.chat-message--user {
-  grid-template-columns: minmax(0, 1fr) 44px;
-}
-
-.chat-message--user .message-avatar {
-  grid-column: 2;
-  grid-row: 1;
-  background: var(--color-secondary);
-}
-
-.chat-message--user .message-body {
-  grid-column: 1;
-  grid-row: 1;
-  background: var(--color-primary-light);
-}
-
-.message-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  background: var(--color-primary);
-  color: white;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
-}
-
-.message-body {
-  padding: var(--space-4);
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 18px;
-}
-
-.message-body p {
+.msg__text {
   margin: 0;
-  color: var(--color-text-secondary);
-  line-height: var(--line-height-relaxed);
-  white-space: pre-line;
+  color: var(--color-text-primary);
+  line-height: var(--line-height-normal);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
-.message-references {
-  margin-top: var(--space-4);
+.msg__note {
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--color-warning);
+  font-size: var(--font-size-xs);
+}
+
+.msg__sources {
+  margin-top: var(--space-3);
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-border);
+}
+
+.msg__sources-title {
+  display: block;
+  margin-bottom: var(--space-2);
   color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-}
-
-.message-references span {
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.msg__sources ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.msg__sources li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.msg__sources strong {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+
+.msg__sources span {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  line-height: var(--line-height-normal);
+}
+
+.typing {
+  display: inline-flex;
+  gap: 5px;
+  padding: var(--space-1) 0;
+}
+
+.typing i {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--color-text-muted);
+  opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .typing i {
+    animation: typing-bounce 1.2s infinite ease-in-out;
+  }
+  .typing i:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+  .typing i:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+  @keyframes typing-bounce {
+    0%,
+    60%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.4;
+    }
+    30% {
+      transform: translateY(-4px);
+      opacity: 0.9;
+    }
+  }
+}
+
+.chat__samples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.chip {
+  min-height: 36px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
   color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
 }
 
-.message-references ul {
-  margin: var(--space-2) 0 0;
-  padding-left: var(--space-5);
+.chip:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
-.question-form {
+.chip:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.chat__form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-3);
   margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
 }
 
-.question-form textarea,
-.upload-notes {
+.chat__input {
   width: 100%;
   resize: vertical;
+  min-height: var(--control-height);
   padding: var(--space-3) var(--space-4);
+  font: inherit;
   color: var(--color-text-primary);
   background: var(--color-input-bg);
   border: 1px solid var(--color-input-border);
   border-radius: var(--radius-md);
-  font: inherit;
 }
 
-.side-panel {
-  display: grid;
+.chat__input:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+}
+
+.chat__send {
+  align-self: end;
+  min-height: var(--control-height);
+  white-space: nowrap;
+}
+
+.chat__error {
+  margin: var(--space-3) 0 0;
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+}
+
+/* Knowledge base */
+.kb {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-6);
 }
 
-.roadmap-card,
-.upload-card {
-  padding: var(--space-6);
-}
-
-.roadmap-card ol {
-  display: grid;
-  gap: var(--space-4);
-  margin: 0;
-  padding-left: 1.25rem;
-}
-
-.roadmap-card li::marker {
-  color: var(--color-primary);
-  font-weight: var(--font-weight-bold);
-}
-
-.roadmap-card strong,
-.roadmap-card span {
-  display: block;
-}
-
-.roadmap-card span,
-.upload-card p,
-.reference-card p {
-  color: var(--color-text-secondary);
-  line-height: var(--line-height-relaxed);
-}
-
-.upload-card {
-  scroll-margin-top: 90px;
-}
-
-.upload-card .form-input,
-.upload-card .upload-notes {
-  margin-top: var(--space-3);
-}
-
-.file-upload {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-height: var(--control-height);
-  margin-top: var(--space-3);
-  border: 1px dashed var(--color-primary);
-  border-radius: var(--radius-md);
-  color: var(--color-primary);
-  font-weight: var(--font-weight-bold);
-  cursor: pointer;
-}
-
-.file-upload input {
-  display: none;
-}
-
-.upload-status {
-  margin-bottom: 0;
-  color: var(--color-success) !important;
-  font-weight: var(--font-weight-semibold);
-}
-
-.reference-library {
-  margin-top: var(--space-6);
-}
-
-.reference-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-4);
-}
-
-.reference-card {
-  position: relative;
-  min-height: 260px;
-  padding: var(--space-5);
+.kb__card {
+  background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
-  border-radius: 18px;
-  background: var(--color-bg-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
 }
 
-.reference-meta span,
-.topic-list span {
-  padding: 5px 9px;
-}
-
-.reference-card h3 {
-  margin: var(--space-4) 0 var(--space-2);
+.kb__card h2 {
+  margin: 0 0 var(--space-2);
   font-size: var(--font-size-lg);
 }
 
-.remove-doc {
+.kb__hint {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
+.kb__filepick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--control-height);
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  background: var(--color-bg-primary);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.kb__filepick:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.kb__filesize {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.kb__title-input {
+  width: 100%;
+  min-height: var(--control-height);
   margin-top: var(--space-3);
-  padding: 6px 10px;
-  color: var(--color-danger);
-  background: transparent;
-  border: 1px solid currentColor;
+  padding: var(--space-3) var(--space-4);
+  font: inherit;
+  color: var(--color-text-primary);
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-input-border);
   border-radius: var(--radius-md);
 }
 
-@media (max-width: 1180px) {
-  .ai-hero,
-  .content-grid {
+.kb__title-input:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+}
+
+.kb__upload-btn {
+  width: 100%;
+  min-height: var(--control-height);
+  margin-top: var(--space-3);
+}
+
+.kb__msg {
+  margin: var(--space-3) 0 0;
+  font-size: var(--font-size-sm);
+}
+
+.kb__msg.is-error {
+  color: var(--color-danger);
+}
+
+.kb__msg.is-success {
+  color: var(--color-primary);
+}
+
+.kb__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.kb__head h2 {
+  margin: 0;
+}
+
+.kb__count {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.kb__empty {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
+.kb__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.doc {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.doc__main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.doc__kind {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.02em;
+}
+
+.doc__text {
+  min-width: 0;
+}
+
+.doc__title {
+  display: block;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc__meta {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.doc__remove {
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.doc__remove:hover {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+/* Responsive */
+@media (max-width: 960px) {
+  .ai-layout {
     grid-template-columns: 1fr;
-  }
-
-  .hero-card {
-    grid-template-columns: repeat(3, 1fr);
-  }
-
-  .reference-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 768px) {
-  .tea-ai-page {
+@media (max-width: 600px) {
+  .ai-page {
     padding: var(--space-4);
   }
-
-  .hero-card,
-  .reference-grid {
+  .ai-header h1 {
+    font-size: var(--font-size-2xl);
+  }
+  .chat__form {
     grid-template-columns: 1fr;
   }
-
-  .panel-header,
-  .question-form {
-    grid-template-columns: 1fr;
-    display: grid;
-  }
-
-  .chat-message,
-  .chat-message--user {
-    grid-template-columns: 1fr;
-  }
-
-  .chat-message--user .message-avatar,
-  .chat-message--user .message-body {
-    grid-column: auto;
-    grid-row: auto;
+  .chat__send {
+    width: 100%;
   }
 }
 </style>
