@@ -19,8 +19,15 @@ interface ChecklistItem {
   status: 'done' | 'warning' | 'pending';
 }
 
+interface MapPoint {
+  x: number;
+  y: number;
+}
+
 const selectedMethod = ref<MeasurementMethod>('map');
 const selectedFieldId = ref<string | number | null>(null);
+const pruningPoints = ref<MapPoint[]>([]);
+const drawingMessage = ref('');
 const fieldsStore = useFieldsStore();
 
 const methods: MethodOption[] = [
@@ -59,10 +66,12 @@ const checklist = computed<ChecklistItem[]>(() => [
   },
   {
     label:
-      selectedMethod.value === 'gps'
+      pruningPoints.value.length >= 3
+        ? `${formatSquareMeters(pruningAreaM2.value)} budama alanı çizildi`
+        : selectedMethod.value === 'gps'
         ? 'GPS doğruluğu 2.8 metre'
         : 'Harita çizimi saha kontrolü bekliyor',
-    status: selectedMethod.value === 'gps' ? 'done' : 'warning',
+    status: pruningPoints.value.length >= 3 || selectedMethod.value === 'gps' ? 'done' : 'warning',
   },
   { label: 'Üretici onayı alınacak', status: 'pending' },
 ]);
@@ -91,9 +100,26 @@ const selectedFieldAreaM2 = computed(() => {
 
 const targetPruningArea = computed(() => selectedFieldAreaM2.value / 10);
 
-const fieldPolygonPoints = computed(() => {
+const pruningAreaM2 = computed(() => {
+  if (!selectedFieldAreaM2.value || pruningPoints.value.length < 3 || fieldViewPoints.value.length < 3) {
+    return 0;
+  }
+
+  const fieldArea = Math.abs(calculatePolygonArea(fieldViewPoints.value));
+  const prunedArea = Math.abs(calculatePolygonArea(pruningPoints.value));
+  if (!fieldArea) return 0;
+
+  return selectedFieldAreaM2.value * (prunedArea / fieldArea);
+});
+
+const pruningRatio = computed(() => {
+  if (!selectedFieldAreaM2.value || !pruningAreaM2.value) return 0;
+  return (pruningAreaM2.value / selectedFieldAreaM2.value) * 100;
+});
+
+const fieldViewPoints = computed<MapPoint[]>(() => {
   const ring = selectedField.value?.coordinates?.[0] ?? [];
-  if (ring.length < 3) return '';
+  if (ring.length < 3) return [];
 
   const lngs = ring.map(([lng]) => lng);
   const lats = ring.map(([, lat]) => lat);
@@ -104,13 +130,22 @@ const fieldPolygonPoints = computed(() => {
   const lngSpan = maxLng - minLng || 1;
   const latSpan = maxLat - minLat || 1;
 
-  return ring
-    .map(([lng, lat]) => {
-      const x = 10 + ((lng - minLng) / lngSpan) * 80;
-      const y = 90 - ((lat - minLat) / latSpan) * 80;
-      return `${x.toFixed(2)},${y.toFixed(2)}`;
-    })
-    .join(' ');
+  return ring.map(([lng, lat]) => ({
+    x: 10 + ((lng - minLng) / lngSpan) * 80,
+    y: 90 - ((lat - minLat) / latSpan) * 80,
+  }));
+});
+
+const fieldPolygonPoints = computed(() => formatSvgPoints(fieldViewPoints.value));
+const pruningPolygonPoints = computed(() => formatSvgPoints(pruningPoints.value));
+const pruningPolylinePoints = computed(() => formatSvgPoints(pruningPoints.value));
+
+const pruningStatusText = computed(() => {
+  if (!selectedField.value) return 'Harita için bir tarla seçin.';
+  if (!fieldPolygonPoints.value) return 'Bu tarlada koordinat bilgisi bulunamadı.';
+  if (pruningPoints.value.length === 0) return 'Budama alanının köşelerine dokunun.';
+  if (pruningPoints.value.length < 3) return 'Alan oluşturmak için en az 3 nokta seçin.';
+  return `${formatSquareMeters(pruningAreaM2.value)} alan çizildi (${pruningRatio.value.toLocaleString('tr-TR', { maximumFractionDigits: 1 })}%).`;
 });
 
 const fieldLocation = computed(() => {
@@ -143,6 +178,60 @@ function formatSquareMeters(area: number): string {
   return `${area.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} m²`;
 }
 
+function formatSvgPoints(points: MapPoint[]): string {
+  return points.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(' ');
+}
+
+function calculatePolygonArea(points: MapPoint[]): number {
+  return points.reduce((sum, point, index) => {
+    const next = points[(index + 1) % points.length];
+    return sum + point.x * next.y - next.x * point.y;
+  }, 0) / 2;
+}
+
+function isPointInPolygon(point: MapPoint, polygon: MapPoint[]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const current = polygon[i];
+    const previous = polygon[j];
+    const intersects =
+      current.y > point.y !== previous.y > point.y &&
+      point.x < ((previous.x - current.x) * (point.y - current.y)) / (previous.y - current.y) + current.x;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function addPruningPoint(event: PointerEvent): void {
+  if (!selectedField.value || !fieldViewPoints.value.length) return;
+
+  const target = event.currentTarget as SVGSVGElement;
+  const rect = target.getBoundingClientRect();
+  const point = {
+    x: ((event.clientX - rect.left) / rect.width) * 100,
+    y: ((event.clientY - rect.top) / rect.height) * 100,
+  };
+
+  if (!isPointInPolygon(point, fieldViewPoints.value)) {
+    drawingMessage.value = 'Nokta parsel sınırının dışında kaldı.';
+    return;
+  }
+
+  event.preventDefault();
+  drawingMessage.value = '';
+  pruningPoints.value.push(point);
+}
+
+function undoPruningPoint(): void {
+  pruningPoints.value.pop();
+  drawingMessage.value = '';
+}
+
+function clearPruningPoints(): void {
+  pruningPoints.value = [];
+  drawingMessage.value = '';
+}
+
 function selectFirstFieldIfNeeded(): void {
   if (!selectedFieldId.value && fieldsStore.fields[0]) {
     selectedFieldId.value = fieldsStore.fields[0].id;
@@ -164,6 +253,10 @@ watch(
     }
   },
 );
+
+watch(selectedFieldId, () => {
+  clearPruningPoints();
+});
 </script>
 
 <template>
@@ -201,6 +294,10 @@ watch(
           <strong>{{ selectedField ? formatArea(selectedField.area, selectedField.areaUnit) : '-' }}</strong>
         </div>
         <div class="summary-item">
+          <span>Budanan alan</span>
+          <strong>{{ pruningAreaM2 ? formatSquareMeters(pruningAreaM2) : '-' }}</strong>
+        </div>
+        <div class="summary-item">
           <span>1/10 hedef</span>
           <strong>{{ selectedField ? formatSquareMeters(targetPruningArea) : '-' }}</strong>
         </div>
@@ -233,6 +330,17 @@ watch(
             </div>
             <span class="method-pill">{{ selectedMethodLabel }}</span>
           </div>
+          <div class="drawing-toolbar" aria-label="Budama alanı çizim kontrolleri">
+            <span>{{ pruningStatusText }}</span>
+            <div class="drawing-actions">
+              <button type="button" :disabled="pruningPoints.length === 0" @click="undoPruningPoint">
+                Geri al
+              </button>
+              <button type="button" :disabled="pruningPoints.length === 0" @click="clearPruningPoints">
+                Temizle
+              </button>
+            </div>
+          </div>
 
           <div class="map-canvas" aria-label="Seçilen tarla parsel haritası">
             <svg
@@ -241,13 +349,36 @@ watch(
               viewBox="0 0 100 100"
               role="img"
               :aria-label="`${selectedField.name} parsel sınırı`"
+              @pointerdown="addPruningPoint"
             >
+              <rect class="drawing-hit-area" x="0" y="0" width="100" height="100" />
               <polygon class="parcel-polygon" :points="fieldPolygonPoints" />
+              <polygon
+                v-if="pruningPoints.length >= 3"
+                class="pruning-polygon"
+                :points="pruningPolygonPoints"
+              />
+              <polyline
+                v-if="pruningPoints.length > 1"
+                class="pruning-line"
+                :points="pruningPolylinePoints"
+              />
+              <circle
+                v-for="(point, index) in pruningPoints"
+                :key="`${point.x}-${point.y}-${index}`"
+                class="pruning-point"
+                :cx="point.x"
+                :cy="point.y"
+                r="1.8"
+              />
             </svg>
-            <div v-if="selectedField && fieldPolygonPoints" class="map-empty-note">
-              Budanan alan henüz çizilmedi.
+            <div v-if="drawingMessage" class="map-message is-warning">
+              {{ drawingMessage }}
             </div>
-            <div v-else class="map-empty-note">
+            <div v-else-if="selectedField && fieldPolygonPoints && pruningPoints.length === 0" class="map-message">
+              Budama alanı için haritada noktalara dokunun.
+            </div>
+            <div v-else-if="!fieldPolygonPoints" class="map-message">
               {{ selectedField ? 'Bu tarlada koordinat bilgisi bulunamadı.' : 'Harita için bir tarla seçin.' }}
             </div>
             <span v-if="selectedField" class="parcel-label">{{ selectedField.parcelNo ?? selectedField.name }}</span>
@@ -387,7 +518,7 @@ watch(
 
 .summary-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: var(--space-3);
 }
 
@@ -477,6 +608,47 @@ watch(
   font-size: var(--font-size-sm);
 }
 
+.drawing-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.drawing-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.drawing-actions button {
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.drawing-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.drawing-actions button:not(:disabled):hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
 .method-pill,
 .method-badge {
   display: inline-flex;
@@ -514,8 +686,20 @@ watch(
 
 .parcel-svg {
   position: absolute;
-  inset: 38px 52px;
+  left: 52px;
+  right: 52px;
+  top: 38px;
+  bottom: 38px;
+  width: calc(100% - 104px);
+  height: calc(100% - 76px);
   z-index: 1;
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+
+.drawing-hit-area {
+  fill: transparent;
 }
 
 .parcel-polygon {
@@ -523,9 +707,37 @@ watch(
   stroke: var(--color-primary);
   stroke-width: 1.4;
   vector-effect: non-scaling-stroke;
+  pointer-events: none;
 }
 
-.map-empty-note {
+.pruning-polygon {
+  fill: rgba(180, 83, 9, 0.24);
+  stroke: var(--color-warning);
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.pruning-line {
+  fill: none;
+  stroke: var(--color-warning);
+  stroke-dasharray: 3 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.pruning-point {
+  fill: var(--color-warning);
+  stroke: var(--color-bg-secondary);
+  stroke-width: 0.8;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.map-message {
   position: absolute;
   left: 50%;
   top: 50%;
@@ -541,6 +753,13 @@ watch(
   font-weight: var(--font-weight-medium);
   text-align: center;
   box-shadow: var(--shadow-sm);
+  pointer-events: none;
+}
+
+.map-message.is-warning {
+  border-color: color-mix(in srgb, var(--color-warning) 34%, var(--color-border));
+  background: color-mix(in srgb, var(--color-warning) 12%, var(--color-bg-secondary));
+  color: var(--color-warning);
 }
 
 .parcel-label,
@@ -742,12 +961,27 @@ watch(
     flex-direction: column;
   }
 
+  .drawing-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .drawing-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
   .map-canvas {
     min-height: 300px;
   }
 
   .parcel-svg {
-    inset: 28px 18px;
+    left: 18px;
+    right: 18px;
+    top: 28px;
+    bottom: 28px;
+    width: calc(100% - 36px);
+    height: calc(100% - 56px);
   }
 
   .process-list {
