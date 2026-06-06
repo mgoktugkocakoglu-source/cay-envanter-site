@@ -150,6 +150,10 @@ onBeforeUnmount(() => {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
           <span>Hasatlarım</span>
         </RouterLink>
+        <RouterLink to="/tea/pruning" class="app-nav-item" active-class="router-link-active">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14l6-6"/><path d="M8 18l6-6"/><path d="M14 6l4-4"/><path d="M16 8l4-4"/><path d="M4 20l16-16"/></svg>
+          <span>Budama</span>
+        </RouterLink>
         <RouterLink to="/tea/payments" class="app-nav-item" active-class="router-link-active">
           <span class="currency-nav-icon" aria-hidden="true">₺</span>
           <span>Ödemeler</span>
@@ -181,6 +185,10 @@ onBeforeUnmount(() => {
       <RouterLink to="/tea/harvests" class="bottom-tab" active-class="router-link-active">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
         <span>Hasatlar</span>
+      </RouterLink>
+      <RouterLink to="/tea/pruning" class="bottom-tab" active-class="router-link-active">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14l6-6"/><path d="M8 18l6-6"/><path d="M14 6l4-4"/><path d="M16 8l4-4"/><path d="M4 20l16-16"/></svg>
+        <span>Budama</span>
       </RouterLink>
       <RouterLink to="/tea/payments" class="bottom-tab" active-class="router-link-active">
         <span class="currency-nav-icon" aria-hidden="true">₺</span>
@@ -598,7 +606,7 @@ onBeforeUnmount(() => {
     bottom: max(10px, env(safe-area-inset-bottom));
     z-index: 70;
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(7, 1fr);
     gap: 4px;
     padding: 6px;
     background: color-mix(in srgb, var(--color-bg-secondary) 94%, transparent);

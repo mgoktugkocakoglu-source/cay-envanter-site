@@ -23,6 +23,20 @@ It exists because tea production today is tracked on paper, from memory, or scat
 
 **What success looks like:** a producer, standing in their field with one hand on their phone, can see the state of their gardens, log a harvest, know exactly what a firm owes them, and find a worker, without a manual, a desk, or a perfect signal.
 
+## Budama Ölçüm Modülü
+
+Çay Hesabım, Çaykur personelinin çay budama ölçümünü sahada dijital olarak kaydedebileceği bir **Budama Ölçüm Modülü** içermelidir. Modülün amacı yalnızca budanan alanın metrekare değerini almak değil; üretici, ada/parsel, budanan bölüm geometrisi, ölçüm yöntemi, personel bilgisi, tarih/saat, GPS doğruluğu, fotoğraf ve üretici onayını aynı güvenilir kayıt altında toplamaktır.
+
+Personel akışı: personel girişi yapılır, üretici ve ada/parsel seçilir, parsel haritada görüntülenir, ölçüm yöntemi seçilir, budanan alan çizilir veya GPS noktalarıyla oluşturulur, sistem alanı ve 1/10 budama oranını hesaplar, uyarıları gösterir ve kayıt üretici/personel onayıyla tamamlanır.
+
+Ölçüm yöntemleri:
+
+- **Haritadan işaretleme:** Açık ve uydu görüntüsünde net görünen arazilerde budanan alan poligon olarak çizilir.
+- **GPS ile saha ölçümü:** Ağaç altı veya görüntüden seçilemeyen alanlarda personel alan çevresinde yürür ya da köşe noktalarını işaretler.
+- **Kontrollü kayıt:** Şüpheli ölçümlerde fotoğraf, konum doğruluğu ve personel notu zorunlu hale gelir.
+
+Sistem personeli aktif olarak uyarmalıdır: çizilen alan parsel dışına taşıyorsa, GPS doğruluğu düşükse, yıllık 1/10 oranı yakalanmıyorsa veya önceki yıl budanan alanla yüksek çakışma varsa kayıt onayından önce durum açıkça gösterilmelidir.
+
 ## Brand Personality
 
 **Reliable, simple, practical.** (Güvenilir, sade, pratik.)
