@@ -45,9 +45,11 @@ function initializeMap() {
         dragging: true
     }).setView([39.0, 35.0], 6);
 
-    // Satellite imagery tile layer
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 19,
+    // Satellite imagery tile layer (Google Satellite — sharper, free, no API key)
+    L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        maxNativeZoom: 20,
+        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
     }).addTo(map);
 
     L.control.zoom({ position: 'topright' }).addTo(map);

@@ -42,8 +42,8 @@ const isLoadingParcel = ref(false);
 const TURKEY_CENTER: L.LatLngExpression = [39.0, 35.0];
 const TURKEY_ZOOM = 6;
 const MAP_MIN_ZOOM = 6;
-const MAP_MAX_ZOOM = 18;
-const TILE_MAX_NATIVE_ZOOM = 17;
+const MAP_MAX_ZOOM = 20;
+const TILE_MAX_NATIVE_ZOOM = 20;
 const SELECTED_PARCEL_FIT_OPTIONS: L.FitBoundsOptions = {
     padding: [16, 16],
     maxZoom: MAP_MAX_ZOOM,
@@ -201,10 +201,12 @@ onMounted(async () => {
 
         L.control.zoom({ position: 'topright' }).addTo(map);
 
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        // Google Satellite — sharper than Esri in rural Turkey, free, no API key.
+        L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
             minZoom: MAP_MIN_ZOOM,
             maxZoom: MAP_MAX_ZOOM,
             maxNativeZoom: TILE_MAX_NATIVE_ZOOM,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
         }).addTo(map);
 
         map.on('click', handleMapClick);
