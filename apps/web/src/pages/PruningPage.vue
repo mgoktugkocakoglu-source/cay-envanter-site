@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import { useFieldsStore } from '@/stores/fieldsStore';
+import type { Field } from '@/services/api';
 
 type MeasurementMethod = 'map' | 'gps' | 'assisted';
 
@@ -17,6 +20,8 @@ interface ChecklistItem {
 }
 
 const selectedMethod = ref<MeasurementMethod>('map');
+const selectedFieldId = ref<string | number | null>(null);
+const fieldsStore = useFieldsStore();
 
 const methods: MethodOption[] = [
   {
@@ -40,8 +45,18 @@ const methods: MethodOption[] = [
 ];
 
 const checklist = computed<ChecklistItem[]>(() => [
-  { label: 'Üretici ve ada/parsel seçildi', status: 'done' },
-  { label: 'Budanan alan parsel içinde kaldı', status: 'done' },
+  {
+    label: selectedField.value
+      ? `${selectedField.value.name} seçildi`
+      : 'Ölçüm yapılacak tarla seçilecek',
+    status: selectedField.value ? 'done' : 'pending',
+  },
+  {
+    label: selectedField.value?.parcelNo
+      ? `Parsel: ${selectedField.value.parcelNo}`
+      : 'Ada/parsel bilgisi eksikse ölçüm öncesi tamamlanacak',
+    status: selectedField.value?.parcelNo ? 'done' : 'warning',
+  },
   {
     label:
       selectedMethod.value === 'gps'
@@ -54,6 +69,100 @@ const checklist = computed<ChecklistItem[]>(() => [
 
 const selectedMethodLabel = computed(
   () => methods.find((method) => method.id === selectedMethod.value)?.title ?? '',
+);
+
+const fieldOptions = computed(() =>
+  fieldsStore.fields.map((field) => ({
+    value: field.id,
+    label: `${field.name}${field.parcelNo ? ` · ${field.parcelNo}` : ''}`,
+  })),
+);
+
+const selectedField = computed<Field | null>(() =>
+  fieldsStore.fields.find((field) => field.id === selectedFieldId.value) ?? null,
+);
+
+const hasFields = computed(() => fieldsStore.fields.length > 0);
+
+const selectedFieldAreaM2 = computed(() => {
+  if (!selectedField.value) return 0;
+  return toSquareMeters(selectedField.value.area, selectedField.value.areaUnit);
+});
+
+const targetPruningArea = computed(() => selectedFieldAreaM2.value / 10);
+
+const fieldPolygonPoints = computed(() => {
+  const ring = selectedField.value?.coordinates?.[0] ?? [];
+  if (ring.length < 3) return '';
+
+  const lngs = ring.map(([lng]) => lng);
+  const lats = ring.map(([, lat]) => lat);
+  const minLng = Math.min(...lngs);
+  const maxLng = Math.max(...lngs);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const lngSpan = maxLng - minLng || 1;
+  const latSpan = maxLat - minLat || 1;
+
+  return ring
+    .map(([lng, lat]) => {
+      const x = 10 + ((lng - minLng) / lngSpan) * 80;
+      const y = 90 - ((lat - minLat) / latSpan) * 80;
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(' ');
+});
+
+const fieldLocation = computed(() => {
+  if (!selectedField.value) return 'Tarla seçilmedi';
+  return [
+    selectedField.value.province,
+    selectedField.value.district,
+    selectedField.value.neighborhood,
+  ].filter(Boolean).join(' / ');
+});
+
+function toSquareMeters(area: number, unit: Field['areaUnit']): number {
+  if (unit === 'm2') return Number(area);
+  return Number(area) * 1000;
+}
+
+function formatArea(area: number, unit: Field['areaUnit']): string {
+  const formatted = Number(area).toLocaleString('tr-TR', {
+    maximumFractionDigits: 2,
+  });
+  const unitLabels: Record<Field['areaUnit'], string> = {
+    donum: 'dönüm',
+    dekar: 'dekar',
+    m2: 'm²',
+  };
+  return `${formatted} ${unitLabels[unit]}`;
+}
+
+function formatSquareMeters(area: number): string {
+  return `${area.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} m²`;
+}
+
+function selectFirstFieldIfNeeded(): void {
+  if (!selectedFieldId.value && fieldsStore.fields[0]) {
+    selectedFieldId.value = fieldsStore.fields[0].id;
+  }
+}
+
+onMounted(async () => {
+  await fieldsStore.fetchFields();
+  selectFirstFieldIfNeeded();
+});
+
+watch(
+  () => fieldsStore.fields,
+  () => {
+    const stillExists = fieldsStore.fields.some((field) => field.id === selectedFieldId.value);
+    if (!stillExists) {
+      selectedFieldId.value = null;
+      selectFirstFieldIfNeeded();
+    }
+  },
 );
 </script>
 
@@ -69,7 +178,7 @@ const selectedMethodLabel = computed(
             ve onay sürecini tek ekranda tamamla.
           </p>
         </div>
-        <button class="primary-action" type="button">
+        <button class="primary-action" type="button" :disabled="!selectedField">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 5v14" />
             <path d="M5 12h14" />
@@ -80,20 +189,38 @@ const selectedMethodLabel = computed(
 
       <section class="summary-strip" aria-label="Budama kaydı özeti">
         <div class="summary-item">
+          <span>Seçilen tarla</span>
+          <strong>{{ selectedField?.name ?? 'Seçilmedi' }}</strong>
+        </div>
+        <div class="summary-item">
           <span>Parsel</span>
-          <strong>131/17</strong>
+          <strong>{{ selectedField?.parcelNo ?? 'Eksik' }}</strong>
         </div>
         <div class="summary-item">
           <span>Toplam alan</span>
-          <strong>780,8 m²</strong>
+          <strong>{{ selectedField ? formatArea(selectedField.area, selectedField.areaUnit) : '-' }}</strong>
         </div>
         <div class="summary-item">
-          <span>Budanan alan</span>
-          <strong>280 m²</strong>
+          <span>1/10 hedef</span>
+          <strong>{{ selectedField ? formatSquareMeters(targetPruningArea) : '-' }}</strong>
         </div>
-        <div class="summary-item">
-          <span>Oran</span>
-          <strong>%35,9</strong>
+      </section>
+
+      <section class="field-selector" aria-label="Ölçüm yapılacak tarla seçimi">
+        <AppSelect
+          v-model="selectedFieldId"
+          :options="fieldOptions"
+          label="Ölçüm yapılacak tarla"
+          placeholder="Tarla seçin"
+          :searchable="true"
+          :disabled="fieldsStore.isLoading || !hasFields"
+          :helper-text="selectedField ? fieldLocation : 'Budama ölçümü için önce kayıtlı bir tarla seçin.'"
+        />
+        <div class="selector-state">
+          <span v-if="fieldsStore.isLoading">Tarlalar yükleniyor...</span>
+          <span v-else-if="fieldsStore.error">{{ fieldsStore.error }}</span>
+          <span v-else-if="!hasFields">Kayıtlı tarla bulunamadı. Önce Tarlalarım ekranından tarla ekleyin.</span>
+          <span v-else>{{ fieldsStore.fields.length }} kayıtlı tarla arasından seçim yapılıyor.</span>
         </div>
       </section>
 
@@ -101,18 +228,30 @@ const selectedMethodLabel = computed(
         <section class="map-panel" aria-label="Parsel üzerinde budama alanı">
           <div class="map-toolbar">
             <div>
-              <h2>Parsel konumu</h2>
-              <p>Budanan bölüm parsel geometrisi üzerinde saklanır.</p>
+              <h2>{{ selectedField?.name ?? 'Tarla konumu' }}</h2>
+              <p>{{ selectedField ? fieldLocation : 'Tarla seçildiğinde parsel geometrisi burada gösterilir.' }}</p>
             </div>
             <span class="method-pill">{{ selectedMethodLabel }}</span>
           </div>
 
-          <div class="map-canvas" aria-label="Örnek parsel haritası">
-            <div class="parcel-shape">
-              <div class="pruned-area"></div>
-              <span class="parcel-label">131/17</span>
-              <span class="area-label">280 m²</span>
+          <div class="map-canvas" aria-label="Seçilen tarla parsel haritası">
+            <svg
+              v-if="selectedField && fieldPolygonPoints"
+              class="parcel-svg"
+              viewBox="0 0 100 100"
+              role="img"
+              :aria-label="`${selectedField.name} parsel sınırı`"
+            >
+              <polygon class="parcel-polygon" :points="fieldPolygonPoints" />
+            </svg>
+            <div v-if="selectedField && fieldPolygonPoints" class="map-empty-note">
+              Budanan alan henüz çizilmedi.
             </div>
+            <div v-else class="map-empty-note">
+              {{ selectedField ? 'Bu tarlada koordinat bilgisi bulunamadı.' : 'Harita için bir tarla seçin.' }}
+            </div>
+            <span v-if="selectedField" class="parcel-label">{{ selectedField.parcelNo ?? selectedField.name }}</span>
+            <span v-if="selectedField" class="area-label">{{ formatArea(selectedField.area, selectedField.areaUnit) }}</span>
             <div class="map-grid" aria-hidden="true"></div>
           </div>
         </section>
@@ -241,6 +380,11 @@ const selectedMethodLabel = computed(
   border-color: var(--color-primary-hover);
 }
 
+.primary-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
 .summary-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -268,6 +412,30 @@ const selectedMethodLabel = computed(
   color: var(--color-text-primary);
   font-size: var(--font-size-xl);
   line-height: var(--line-height-tight);
+  overflow-wrap: anywhere;
+}
+
+.field-selector {
+  display: grid;
+  grid-template-columns: minmax(280px, 460px) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: end;
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-secondary);
+}
+
+.selector-state {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .workbench {
@@ -336,6 +504,7 @@ const selectedMethodLabel = computed(
 .map-grid {
   position: absolute;
   inset: 0;
+  z-index: 0;
   background-image:
     linear-gradient(var(--color-border) 1px, transparent 1px),
     linear-gradient(90deg, var(--color-border) 1px, transparent 1px);
@@ -343,30 +512,41 @@ const selectedMethodLabel = computed(
   opacity: 0.55;
 }
 
-.parcel-shape {
+.parcel-svg {
   position: absolute;
-  inset: 56px 84px 46px 68px;
+  inset: 38px 52px;
   z-index: 1;
-  clip-path: polygon(16% 12%, 82% 4%, 94% 46%, 72% 91%, 24% 84%, 4% 42%);
-  border: 2px solid var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 9%, var(--color-bg-secondary));
 }
 
-.pruned-area {
+.parcel-polygon {
+  fill: color-mix(in srgb, var(--color-primary) 12%, var(--color-bg-secondary));
+  stroke: var(--color-primary);
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+}
+
+.map-empty-note {
   position: absolute;
-  left: 8%;
-  top: 21%;
-  width: 48%;
-  height: 55%;
-  clip-path: polygon(7% 15%, 78% 5%, 96% 48%, 61% 96%, 12% 79%);
-  border: 2px solid var(--color-warning);
-  background: rgba(180, 83, 9, 0.18);
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  max-width: min(340px, calc(100% - 48px));
+  transform: translate(-50%, -50%);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-bg-secondary) 94%, transparent);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  text-align: center;
+  box-shadow: var(--shadow-sm);
 }
 
 .parcel-label,
 .area-label {
   position: absolute;
-  z-index: 2;
+  z-index: 3;
   display: inline-flex;
   align-items: center;
   min-height: 30px;
@@ -380,13 +560,13 @@ const selectedMethodLabel = computed(
 }
 
 .parcel-label {
-  right: 18%;
-  top: 18%;
+  right: var(--space-5);
+  top: var(--space-5);
 }
 
 .area-label {
-  left: 18%;
-  top: 40%;
+  left: var(--space-5);
+  bottom: var(--space-5);
 }
 
 .side-panel {
@@ -532,6 +712,10 @@ const selectedMethodLabel = computed(
     grid-template-columns: 1fr;
   }
 
+  .field-selector {
+    grid-template-columns: 1fr;
+  }
+
   .map-canvas {
     min-height: 360px;
   }
@@ -562,8 +746,8 @@ const selectedMethodLabel = computed(
     min-height: 300px;
   }
 
-  .parcel-shape {
-    inset: 42px 28px 36px 26px;
+  .parcel-svg {
+    inset: 28px 18px;
   }
 
   .process-list {
