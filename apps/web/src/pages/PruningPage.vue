@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 import { useFieldsStore } from '@/stores/fieldsStore';
 import type { Field } from '@/services/api';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 type MeasurementMethod = 'map' | 'gps' | 'assisted';
+type BaseLayer = 'satellite' | 'street';
 
 interface MethodOption {
   id: MeasurementMethod;
@@ -19,16 +22,33 @@ interface ChecklistItem {
   status: 'done' | 'warning' | 'pending';
 }
 
-interface MapPoint {
-  x: number;
-  y: number;
+interface LatLngPoint {
+  lat: number;
+  lng: number;
 }
 
 const selectedMethod = ref<MeasurementMethod>('map');
 const selectedFieldId = ref<string | number | null>(null);
-const pruningPoints = ref<MapPoint[]>([]);
+const pruningPoints = ref<LatLngPoint[]>([]);
+const selectedPointIndex = ref<number | null>(null);
 const drawingMessage = ref('');
+const baseLayer = ref<BaseLayer>('satellite');
 const fieldsStore = useFieldsStore();
+
+// ─── Leaflet (kept outside reactivity on purpose) ───
+const mapContainer = ref<HTMLDivElement | null>(null);
+let map: L.Map | null = null;
+let satelliteTiles: L.TileLayer | null = null;
+let streetTiles: L.TileLayer | null = null;
+let fieldLayer: L.GeoJSON | null = null;
+let prunePolygon: L.Polygon | null = null;
+let vertexMarkers: L.Marker[] = [];
+let isDragging = false;
+
+const MAP_MAX_ZOOM = 20;
+const TILE_MAX_NATIVE_ZOOM = 18;
+const TURKEY_CENTER: L.LatLngExpression = [39.0, 35.0];
+const TURKEY_ZOOM = 6;
 
 const methods: MethodOption[] = [
   {
@@ -100,13 +120,24 @@ const selectedFieldAreaM2 = computed(() => {
 
 const targetPruningArea = computed(() => selectedFieldAreaM2.value / 10);
 
+// Parcel boundary as {lat,lng} points (stored coordinates are GeoJSON [lng,lat]).
+const fieldRing = computed<LatLngPoint[]>(() =>
+  (selectedField.value?.coordinates?.[0] ?? [])
+    .filter((pair) => Array.isArray(pair) && pair.length >= 2)
+    .map(([lng, lat]) => ({ lat, lng })),
+);
+
+const hasFieldGeometry = computed(() => fieldRing.value.length >= 3);
+
 const pruningAreaM2 = computed(() => {
-  if (!selectedFieldAreaM2.value || pruningPoints.value.length < 3 || fieldViewPoints.value.length < 3) {
+  if (!selectedFieldAreaM2.value || pruningPoints.value.length < 3 || !hasFieldGeometry.value) {
     return 0;
   }
 
-  const fieldArea = Math.abs(calculatePolygonArea(fieldViewPoints.value));
-  const prunedArea = Math.abs(calculatePolygonArea(pruningPoints.value));
+  // Area ratio is projection-independent for two polygons at the same latitude,
+  // so the parcel's known real area scales the drawn fraction directly.
+  const fieldArea = polygonAreaDeg(fieldRing.value);
+  const prunedArea = polygonAreaDeg(pruningPoints.value);
   if (!fieldArea) return 0;
 
   return selectedFieldAreaM2.value * (prunedArea / fieldArea);
@@ -117,35 +148,16 @@ const pruningRatio = computed(() => {
   return (pruningAreaM2.value / selectedFieldAreaM2.value) * 100;
 });
 
-const fieldViewPoints = computed<MapPoint[]>(() => {
-  const ring = selectedField.value?.coordinates?.[0] ?? [];
-  if (ring.length < 3) return [];
-
-  const lngs = ring.map(([lng]) => lng);
-  const lats = ring.map(([, lat]) => lat);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const lngSpan = maxLng - minLng || 1;
-  const latSpan = maxLat - minLat || 1;
-
-  return ring.map(([lng, lat]) => ({
-    x: 10 + ((lng - minLng) / lngSpan) * 80,
-    y: 90 - ((lat - minLat) / latSpan) * 80,
-  }));
-});
-
-const fieldPolygonPoints = computed(() => formatSvgPoints(fieldViewPoints.value));
-const pruningPolygonPoints = computed(() => formatSvgPoints(pruningPoints.value));
-const pruningPolylinePoints = computed(() => formatSvgPoints(pruningPoints.value));
+const pruningRatioText = computed(() =>
+  pruningRatio.value.toLocaleString('tr-TR', { maximumFractionDigits: 1 }),
+);
 
 const pruningStatusText = computed(() => {
-  if (!selectedField.value) return 'Harita için bir tarla seçin.';
-  if (!fieldPolygonPoints.value) return 'Bu tarlada koordinat bilgisi bulunamadı.';
-  if (pruningPoints.value.length === 0) return 'Budama alanının köşelerine dokunun.';
-  if (pruningPoints.value.length < 3) return 'Alan oluşturmak için en az 3 nokta seçin.';
-  return `${formatSquareMeters(pruningAreaM2.value)} alan çizildi (${pruningRatio.value.toLocaleString('tr-TR', { maximumFractionDigits: 1 })}%).`;
+  if (!selectedField.value) return 'Ölçüm için bir tarla seçin.';
+  if (!hasFieldGeometry.value) return 'Bu tarlada parsel koordinatı bulunamadı.';
+  if (pruningPoints.value.length === 0) return 'Budanan alanın köşelerine dokunarak çizmeye başlayın.';
+  if (pruningPoints.value.length < 3) return 'Alan oluşturmak için en az 3 köşe işaretleyin.';
+  return `${formatSquareMeters(pruningAreaM2.value)} · parselin %${pruningRatioText.value}'i`;
 });
 
 const fieldLocation = computed(() => {
@@ -178,58 +190,240 @@ function formatSquareMeters(area: number): string {
   return `${area.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} m²`;
 }
 
-function formatSvgPoints(points: MapPoint[]): string {
-  return points.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(' ');
+// Shoelace area in degrees² (x = lng, y = lat). Used only as a ratio.
+function polygonAreaDeg(points: LatLngPoint[]): number {
+  if (points.length < 3) return 0;
+  let sum = 0;
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    sum += a.lng * b.lat - b.lng * a.lat;
+  }
+  return Math.abs(sum) / 2;
 }
 
-function calculatePolygonArea(points: MapPoint[]): number {
-  return points.reduce((sum, point, index) => {
-    const next = points[(index + 1) % points.length];
-    return sum + point.x * next.y - next.x * point.y;
-  }, 0) / 2;
-}
-
-function isPointInPolygon(point: MapPoint, polygon: MapPoint[]): boolean {
+function isInsideField(point: LatLngPoint): boolean {
+  const poly = fieldRing.value;
   let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const current = polygon[i];
-    const previous = polygon[j];
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const current = poly[i];
+    const previous = poly[j];
     const intersects =
-      current.y > point.y !== previous.y > point.y &&
-      point.x < ((previous.x - current.x) * (point.y - current.y)) / (previous.y - current.y) + current.x;
+      current.lat > point.lat !== previous.lat > point.lat &&
+      point.lng <
+        ((previous.lng - current.lng) * (point.lat - current.lat)) /
+          (previous.lat - current.lat) +
+          current.lng;
     if (intersects) inside = !inside;
   }
   return inside;
 }
 
-function addPruningPoint(event: PointerEvent): void {
-  if (!selectedField.value || !fieldViewPoints.value.length) return;
+function getCssVar(name: string, fallback: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
 
-  const target = event.currentTarget as SVGSVGElement;
-  const rect = target.getBoundingClientRect();
-  const point = {
-    x: ((event.clientX - rect.left) / rect.width) * 100,
-    y: ((event.clientY - rect.top) / rect.height) * 100,
+// ─── Map setup ───
+function initMap(): void {
+  if (!mapContainer.value || map) return;
+
+  map = L.map(mapContainer.value, {
+    zoomControl: false,
+    attributionControl: false,
+    scrollWheelZoom: false,
+    doubleClickZoom: false,
+    maxZoom: MAP_MAX_ZOOM,
+  }).setView(TURKEY_CENTER, TURKEY_ZOOM);
+
+  L.control.zoom({ position: 'topright' }).addTo(map);
+
+  satelliteTiles = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    { maxZoom: MAP_MAX_ZOOM, maxNativeZoom: TILE_MAX_NATIVE_ZOOM },
+  );
+  streetTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: MAP_MAX_ZOOM,
+    maxNativeZoom: 19,
+  });
+
+  applyBaseLayer();
+  map.on('click', handleMapClick);
+}
+
+function applyBaseLayer(): void {
+  if (!map || !satelliteTiles || !streetTiles) return;
+  const active = baseLayer.value === 'satellite' ? satelliteTiles : streetTiles;
+  const inactive = baseLayer.value === 'satellite' ? streetTiles : satelliteTiles;
+  if (map.hasLayer(inactive)) map.removeLayer(inactive);
+  if (!map.hasLayer(active)) active.addTo(map);
+}
+
+function drawField(): void {
+  if (!map) return;
+  if (fieldLayer) {
+    map.removeLayer(fieldLayer);
+    fieldLayer = null;
+  }
+  if (!hasFieldGeometry.value || !selectedField.value) return;
+
+  const primary = getCssVar('--color-primary', '#15803D');
+  const geoJson: GeoJSON.Feature = {
+    type: 'Feature',
+    properties: {},
+    geometry: { type: 'Polygon', coordinates: selectedField.value.coordinates },
   };
 
-  if (!isPointInPolygon(point, fieldViewPoints.value)) {
-    drawingMessage.value = 'Nokta parsel sınırının dışında kaldı.';
+  // interactive:false lets clicks fall through to the map so points can be added over the fill.
+  fieldLayer = L.geoJSON(geoJson, {
+    interactive: false,
+    style: { color: primary, weight: 2, fillColor: primary, fillOpacity: 0.12 },
+  }).addTo(map);
+
+  fitFieldBounds();
+}
+
+function fitFieldBounds(): void {
+  if (!map || !fieldLayer) return;
+  requestAnimationFrame(() => {
+    if (!map || !fieldLayer) return;
+    map.invalidateSize();
+    const bounds = fieldLayer.getBounds();
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 18, animate: true });
+    }
+  });
+}
+
+// ─── Pruning area (polygon + draggable vertices) ───
+function redrawPrunePolygon(latlngs?: L.LatLngExpression[]): void {
+  if (!map) return;
+  const pts = latlngs ?? pruningPoints.value.map((p) => [p.lat, p.lng] as L.LatLngExpression);
+
+  if (pts.length < 2) {
+    if (prunePolygon) {
+      map.removeLayer(prunePolygon);
+      prunePolygon = null;
+    }
     return;
   }
 
-  event.preventDefault();
+  const color = getCssVar('--color-warning', '#B45309');
+  if (!prunePolygon) {
+    prunePolygon = L.polygon(pts, {
+      interactive: false,
+      color,
+      weight: 2,
+      fillColor: color,
+      fillOpacity: 0.3,
+    }).addTo(map);
+  } else {
+    prunePolygon.setLatLngs(pts);
+  }
+}
+
+function vertexIcon(index: number): L.DivIcon {
+  const selected = selectedPointIndex.value === index;
+  return L.divIcon({
+    className: 'prune-vertex-wrap',
+    html: `<span class="prune-vertex${selected ? ' is-selected' : ''}">${index + 1}</span>`,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+  });
+}
+
+function refreshMarkerIcons(): void {
+  vertexMarkers.forEach((marker, index) => marker.setIcon(vertexIcon(index)));
+}
+
+// Full rebuild on structural changes (add/remove); drag updates in place to stay smooth.
+function rebuildMarkers(): void {
+  if (!map) return;
+  vertexMarkers.forEach((marker) => map?.removeLayer(marker));
+  vertexMarkers = [];
+
+  pruningPoints.value.forEach((point, index) => {
+    const marker = L.marker([point.lat, point.lng], {
+      draggable: true,
+      keyboard: false,
+      icon: vertexIcon(index),
+    }).addTo(map as L.Map);
+
+    marker.on('click', () => selectPoint(index));
+    marker.on('dragstart', () => {
+      isDragging = true;
+      selectedPointIndex.value = index;
+      drawingMessage.value = '';
+    });
+    marker.on('drag', () => {
+      redrawPrunePolygon(vertexMarkers.map((m) => m.getLatLng()));
+    });
+    marker.on('dragend', () => {
+      const { lat, lng } = marker.getLatLng();
+      pruningPoints.value.splice(index, 1, { lat, lng });
+      isDragging = false;
+      refreshMarkerIcons();
+    });
+
+    vertexMarkers.push(marker);
+  });
+}
+
+function selectPoint(index: number): void {
+  selectedPointIndex.value = selectedPointIndex.value === index ? null : index;
+  refreshMarkerIcons();
+}
+
+function handleMapClick(event: L.LeafletMouseEvent): void {
+  if (isDragging) return;
+  if (!selectedField.value) {
+    drawingMessage.value = 'Önce bir tarla seçin.';
+    return;
+  }
+  if (!hasFieldGeometry.value) {
+    drawingMessage.value = 'Bu tarlada parsel koordinatı bulunamadı.';
+    return;
+  }
+
+  const point: LatLngPoint = { lat: event.latlng.lat, lng: event.latlng.lng };
+  if (!isInsideField(point)) {
+    drawingMessage.value = 'Köşe parsel sınırının dışında kaldı.';
+    return;
+  }
+
   drawingMessage.value = '';
   pruningPoints.value.push(point);
+  rebuildMarkers();
+  redrawPrunePolygon();
 }
 
 function undoPruningPoint(): void {
   pruningPoints.value.pop();
+  selectedPointIndex.value = null;
   drawingMessage.value = '';
+  rebuildMarkers();
+  redrawPrunePolygon();
+}
+
+function removeSelectedPoint(): void {
+  if (selectedPointIndex.value === null) return;
+  pruningPoints.value.splice(selectedPointIndex.value, 1);
+  selectedPointIndex.value = null;
+  drawingMessage.value = '';
+  rebuildMarkers();
+  redrawPrunePolygon();
 }
 
 function clearPruningPoints(): void {
   pruningPoints.value = [];
+  selectedPointIndex.value = null;
   drawingMessage.value = '';
+  rebuildMarkers();
+  redrawPrunePolygon();
+}
+
+function startNewMeasurement(): void {
+  clearPruningPoints();
+  fitFieldBounds();
 }
 
 function selectFirstFieldIfNeeded(): void {
@@ -239,8 +433,22 @@ function selectFirstFieldIfNeeded(): void {
 }
 
 onMounted(async () => {
+  initMap();
   await fieldsStore.fetchFields();
   selectFirstFieldIfNeeded();
+  nextTick(() => requestAnimationFrame(() => map?.invalidateSize()));
+});
+
+onUnmounted(() => {
+  if (map) {
+    map.remove();
+    map = null;
+  }
+  satelliteTiles = null;
+  streetTiles = null;
+  fieldLayer = null;
+  prunePolygon = null;
+  vertexMarkers = [];
 });
 
 watch(
@@ -256,7 +464,10 @@ watch(
 
 watch(selectedFieldId, () => {
   clearPruningPoints();
+  drawField();
 });
+
+watch(baseLayer, applyBaseLayer);
 </script>
 
 <template>
@@ -271,7 +482,12 @@ watch(selectedFieldId, () => {
             ve onay sürecini tek ekranda tamamla.
           </p>
         </div>
-        <button class="primary-action" type="button" :disabled="!selectedField">
+        <button
+          class="primary-action"
+          type="button"
+          :disabled="!selectedField || !hasFieldGeometry"
+          @click="startNewMeasurement"
+        >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 5v14" />
             <path d="M5 12h14" />
@@ -326,13 +542,41 @@ watch(selectedFieldId, () => {
           <div class="map-toolbar">
             <div>
               <h2>{{ selectedField?.name ?? 'Tarla konumu' }}</h2>
-              <p>{{ selectedField ? fieldLocation : 'Tarla seçildiğinde parsel geometrisi burada gösterilir.' }}</p>
+              <p>{{ selectedField ? fieldLocation : 'Tarla seçildiğinde parsel uydu görüntüsü üzerinde açılır.' }}</p>
             </div>
-            <span class="method-pill">{{ selectedMethodLabel }}</span>
+            <div class="toolbar-controls">
+              <div class="layer-switch" role="group" aria-label="Harita görünümü">
+                <button
+                  type="button"
+                  :class="{ 'is-active': baseLayer === 'satellite' }"
+                  :aria-pressed="baseLayer === 'satellite'"
+                  @click="baseLayer = 'satellite'"
+                >
+                  Uydu
+                </button>
+                <button
+                  type="button"
+                  :class="{ 'is-active': baseLayer === 'street' }"
+                  :aria-pressed="baseLayer === 'street'"
+                  @click="baseLayer = 'street'"
+                >
+                  Harita
+                </button>
+              </div>
+              <span class="method-pill">{{ selectedMethodLabel }}</span>
+            </div>
           </div>
           <div class="drawing-toolbar" aria-label="Budama alanı çizim kontrolleri">
-            <span>{{ pruningStatusText }}</span>
+            <span class="drawing-status">{{ pruningStatusText }}</span>
             <div class="drawing-actions">
+              <button
+                v-if="selectedPointIndex !== null"
+                type="button"
+                class="is-danger"
+                @click="removeSelectedPoint"
+              >
+                Seçili noktayı sil
+              </button>
               <button type="button" :disabled="pruningPoints.length === 0" @click="undoPruningPoint">
                 Geri al
               </button>
@@ -342,48 +586,31 @@ watch(selectedFieldId, () => {
             </div>
           </div>
 
-          <div class="map-canvas" aria-label="Seçilen tarla parsel haritası">
-            <svg
-              v-if="selectedField && fieldPolygonPoints"
-              class="parcel-svg"
-              viewBox="0 0 100 100"
-              role="img"
-              :aria-label="`${selectedField.name} parsel sınırı`"
-              @pointerdown="addPruningPoint"
-            >
-              <rect class="drawing-hit-area" x="0" y="0" width="100" height="100" />
-              <polygon class="parcel-polygon" :points="fieldPolygonPoints" />
-              <polygon
-                v-if="pruningPoints.length >= 3"
-                class="pruning-polygon"
-                :points="pruningPolygonPoints"
-              />
-              <polyline
-                v-if="pruningPoints.length > 1"
-                class="pruning-line"
-                :points="pruningPolylinePoints"
-              />
-              <circle
-                v-for="(point, index) in pruningPoints"
-                :key="`${point.x}-${point.y}-${index}`"
-                class="pruning-point"
-                :cx="point.x"
-                :cy="point.y"
-                r="1.8"
-              />
-            </svg>
-            <div v-if="drawingMessage" class="map-message is-warning">
+          <div class="map-shell">
+            <div ref="mapContainer" class="map-canvas" aria-label="Seçilen tarla uydu haritası"></div>
+
+            <div v-if="drawingMessage" class="map-message is-warning" role="alert">
               {{ drawingMessage }}
             </div>
-            <div v-else-if="selectedField && fieldPolygonPoints && pruningPoints.length === 0" class="map-message">
-              Budama alanı için haritada noktalara dokunun.
+            <div v-else-if="!selectedField" class="map-message">
+              Ölçüm için bir tarla seçin.
             </div>
-            <div v-else-if="!fieldPolygonPoints" class="map-message">
-              {{ selectedField ? 'Bu tarlada koordinat bilgisi bulunamadı.' : 'Harita için bir tarla seçin.' }}
+            <div v-else-if="!hasFieldGeometry" class="map-message">
+              Bu tarlada parsel koordinatı bulunamadı. GPS yöntemini kullanabilirsiniz.
             </div>
-            <span v-if="selectedField" class="parcel-label">{{ selectedField.parcelNo ?? selectedField.name }}</span>
-            <span v-if="selectedField" class="area-label">{{ formatArea(selectedField.area, selectedField.areaUnit) }}</span>
-            <div class="map-grid" aria-hidden="true"></div>
+            <div
+              v-else-if="pruningPoints.length === 0"
+              class="map-hint"
+            >
+              Budanan alanın köşelerine dokunun · noktaları sürükleyerek düzeltin
+            </div>
+
+            <div v-if="selectedField && hasFieldGeometry" class="map-readout" aria-live="polite">
+              <span>Budanan alan</span>
+              <strong>{{ pruningPoints.length >= 3 ? formatSquareMeters(pruningAreaM2) : '—' }}</strong>
+              <small v-if="pruningPoints.length >= 3">parselin %{{ pruningRatioText }}'i</small>
+              <small v-else>en az 3 köşe işaretleyin</small>
+            </div>
           </div>
         </section>
 
@@ -608,6 +835,41 @@ watch(selectedFieldId, () => {
   font-size: var(--font-size-sm);
 }
 
+.toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.layer-switch {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-tertiary);
+}
+
+.layer-switch button {
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.layer-switch button.is-active {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
 .drawing-toolbar {
   display: flex;
   align-items: center;
@@ -618,6 +880,11 @@ watch(selectedFieldId, () => {
   background: var(--color-bg-secondary);
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
+}
+
+.drawing-status {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .drawing-actions {
@@ -636,6 +903,7 @@ watch(selectedFieldId, () => {
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
+  cursor: pointer;
 }
 
 .drawing-actions button:disabled {
@@ -647,6 +915,18 @@ watch(selectedFieldId, () => {
   border-color: var(--color-border-strong);
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
+}
+
+.drawing-actions button.is-danger {
+  border-color: color-mix(in srgb, var(--color-warning) 40%, var(--color-border));
+  background: color-mix(in srgb, var(--color-warning) 14%, var(--color-bg-secondary));
+  color: var(--color-warning);
+}
+
+.drawing-actions button.is-danger:hover {
+  border-color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 22%, var(--color-bg-secondary));
+  color: var(--color-warning);
 }
 
 .method-pill,
@@ -664,84 +944,23 @@ watch(selectedFieldId, () => {
   white-space: nowrap;
 }
 
-.map-canvas {
+.map-shell {
   position: relative;
-  min-height: 430px;
+}
+
+.map-canvas {
+  height: 460px;
+  width: 100%;
   overflow: hidden;
-  background:
-    linear-gradient(135deg, rgba(21, 128, 61, 0.08), transparent 42%),
-    var(--color-bg-tertiary);
-}
-
-.map-grid {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background-image:
-    linear-gradient(var(--color-border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--color-border) 1px, transparent 1px);
-  background-size: 40px 40px;
-  opacity: 0.55;
-}
-
-.parcel-svg {
-  position: absolute;
-  left: 52px;
-  right: 52px;
-  top: 38px;
-  bottom: 38px;
-  width: calc(100% - 104px);
-  height: calc(100% - 76px);
-  z-index: 1;
-  cursor: crosshair;
-  touch-action: none;
-  user-select: none;
-}
-
-.drawing-hit-area {
-  fill: transparent;
-}
-
-.parcel-polygon {
-  fill: color-mix(in srgb, var(--color-primary) 12%, var(--color-bg-secondary));
-  stroke: var(--color-primary);
-  stroke-width: 1.4;
-  vector-effect: non-scaling-stroke;
-  pointer-events: none;
-}
-
-.pruning-polygon {
-  fill: rgba(180, 83, 9, 0.24);
-  stroke: var(--color-warning);
-  stroke-width: 1.4;
-  vector-effect: non-scaling-stroke;
-  pointer-events: none;
-}
-
-.pruning-line {
-  fill: none;
-  stroke: var(--color-warning);
-  stroke-dasharray: 3 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.2;
-  vector-effect: non-scaling-stroke;
-  pointer-events: none;
-}
-
-.pruning-point {
-  fill: var(--color-warning);
-  stroke: var(--color-bg-secondary);
-  stroke-width: 0.8;
-  vector-effect: non-scaling-stroke;
-  pointer-events: none;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  background: var(--color-bg-tertiary);
 }
 
 .map-message {
   position: absolute;
   left: 50%;
   top: 50%;
-  z-index: 2;
+  z-index: 1100;
   max-width: min(340px, calc(100% - 48px));
   transform: translate(-50%, -50%);
   padding: var(--space-3) var(--space-4);
@@ -762,30 +981,112 @@ watch(selectedFieldId, () => {
   color: var(--color-warning);
 }
 
-.parcel-label,
-.area-label {
+.map-hint {
   position: absolute;
-  z-index: 3;
-  display: inline-flex;
-  align-items: center;
-  min-height: 30px;
-  padding: 0 var(--space-3);
+  left: 50%;
+  top: var(--space-4);
+  z-index: 1100;
+  max-width: calc(100% - 96px);
+  transform: translateX(-50%);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
-  background: var(--color-bg-secondary);
-  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-bg-secondary) 92%, transparent);
+  color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+}
+
+.map-readout {
+  position: absolute;
+  left: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-bg-secondary) 94%, transparent);
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+}
+
+.map-readout span {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.map-readout strong {
+  margin-top: 2px;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-tight);
+}
+
+.map-readout small {
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+/* Leaflet injects its own DOM, so reach it through :deep() from the scoped container. */
+.map-canvas :deep(.prune-vertex-wrap) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+}
+
+.map-canvas :deep(.prune-vertex) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  background: var(--color-warning);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 1px 5px rgba(15, 23, 42, 0.45);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.map-canvas :deep(.prune-vertex.is-selected) {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-warning) 45%, transparent);
+}
+
+.map-canvas :deep(.leaflet-marker-icon) {
+  cursor: grab;
+}
+
+.map-canvas :deep(.leaflet-dragging .leaflet-marker-draggable) {
+  cursor: grabbing;
+}
+
+.map-canvas :deep(.leaflet-bar) {
+  border-color: var(--color-border);
   box-shadow: var(--shadow-sm);
 }
 
-.parcel-label {
-  right: var(--space-5);
-  top: var(--space-5);
+.map-canvas :deep(.leaflet-bar a) {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  border-bottom-color: var(--color-border);
 }
 
-.area-label {
-  left: var(--space-5);
-  bottom: var(--space-5);
+.map-canvas :deep(.leaflet-bar a:hover) {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
 }
 
 .side-panel {
@@ -936,7 +1237,7 @@ watch(selectedFieldId, () => {
   }
 
   .map-canvas {
-    min-height: 360px;
+    height: 420px;
   }
 }
 
@@ -961,6 +1262,11 @@ watch(selectedFieldId, () => {
     flex-direction: column;
   }
 
+  .toolbar-controls {
+    justify-content: space-between;
+    width: 100%;
+  }
+
   .drawing-toolbar {
     align-items: stretch;
     flex-direction: column;
@@ -972,16 +1278,7 @@ watch(selectedFieldId, () => {
   }
 
   .map-canvas {
-    min-height: 300px;
-  }
-
-  .parcel-svg {
-    left: 18px;
-    right: 18px;
-    top: 28px;
-    bottom: 28px;
-    width: calc(100% - 36px);
-    height: calc(100% - 56px);
+    height: 360px;
   }
 
   .process-list {
