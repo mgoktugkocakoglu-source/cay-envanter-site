@@ -16,6 +16,7 @@ import { FirmsModule } from '@/firms/firms.module';
 import { UploadsModule } from '@/uploads/uploads.module';
 import { HealthModule } from '@/health/health.module';
 import { KnowledgeModule } from '@/knowledge/knowledge.module';
+import { PruningModule } from '@/pruning/pruning.module';
 
 @Module({
     imports: [
@@ -88,6 +89,7 @@ import { KnowledgeModule } from '@/knowledge/knowledge.module';
         UploadsModule,
         HealthModule,
         KnowledgeModule,
+        PruningModule,
     ],
     providers: [
         {

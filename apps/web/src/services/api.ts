@@ -127,6 +127,51 @@ export interface FieldPartner {
     invitationStatus: 'pending' | 'accepted' | 'rejected';
 }
 
+export type PruningMethod = 'map' | 'gps' | 'assisted';
+export type PruningAccuracyLevel = 'high' | 'medium' | 'low';
+
+export interface PruningMeasurement {
+    id: string;
+    fieldId: string;
+    userId: string;
+    method: PruningMethod;
+    geometry: number[][];
+    prunedAreaM2: number;
+    fieldAreaM2: number;
+    ratioPercent: number;
+    accuracyLevel: PruningAccuracyLevel | null;
+    fieldCheckDone: boolean;
+    gpsAccuracyMeters: number | null;
+    photoUrl: string | null;
+    producerApproved: boolean;
+    staffApproved: boolean;
+    producerName: string | null;
+    parcelNo: string | null;
+    notes: string | null;
+    measuredAt: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreatePruningMeasurementPayload {
+    fieldId: string;
+    method: PruningMethod;
+    geometry: number[][];
+    prunedAreaM2: number;
+    fieldAreaM2: number;
+    ratioPercent: number;
+    accuracyLevel?: PruningAccuracyLevel;
+    fieldCheckDone?: boolean;
+    gpsAccuracyMeters?: number | null;
+    photoUrl?: string | null;
+    producerApproved?: boolean;
+    staffApproved?: boolean;
+    producerName?: string | null;
+    parcelNo?: string | null;
+    notes?: string | null;
+    measuredAt?: string;
+}
+
 export interface Harvest {
     id: string;
     fieldId: string;
@@ -533,6 +578,18 @@ export const api = {
         request<FieldPartner>(`/fields/${fieldId}/partners/${partnerId}/reject`, { method: 'POST' }),
     removeFieldPartner: (fieldId: string, partnerId: string) =>
         request<void>(`/fields/${fieldId}/partners/${partnerId}`, { method: 'DELETE' }),
+
+    // Pruning measurement endpoints
+    createPruningMeasurement: (data: CreatePruningMeasurementPayload) =>
+        request<PruningMeasurement>('/pruning', { method: 'POST', body: JSON.stringify(data) }),
+    getPruningMeasurements: (fieldId: string) =>
+        request<PruningMeasurement[]>(`/pruning/field/${fieldId}`),
+    updatePruningApproval: (
+        id: string,
+        data: { producerApproved?: boolean; staffApproved?: boolean },
+    ) => request<PruningMeasurement>(`/pruning/${id}/approve`, { method: 'PATCH', body: JSON.stringify(data) }),
+    deletePruningMeasurement: (id: string) =>
+        request<void>(`/pruning/${id}`, { method: 'DELETE' }),
 
     // Harvests endpoints
     getHarvests: (params?: { fieldId?: string; year?: number; status?: string }) => {
