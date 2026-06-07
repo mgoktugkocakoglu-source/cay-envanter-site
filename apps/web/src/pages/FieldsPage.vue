@@ -499,6 +499,7 @@ function getFieldInitial(name: string) {
 
 .view-toggle {
     display: flex;
+    height: var(--control-height);
     background: var(--color-bg-secondary);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
