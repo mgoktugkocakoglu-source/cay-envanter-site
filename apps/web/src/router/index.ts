@@ -162,6 +162,26 @@ const router = createRouter({
             meta: { requiresAuth: true, requiresAdmin: true },
         },
 
+        // ═══════ ÇAYKUR COMMAND CENTER (MÜSTAHSİL İZLEME) ═══════
+        {
+            path: '/caykur',
+            name: 'caykur-overview',
+            component: () => import('@/pages/caykur/CaykurOverviewPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true },
+        },
+        {
+            path: '/caykur/producers',
+            name: 'caykur-producers',
+            component: () => import('@/pages/caykur/CaykurProducersPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true },
+        },
+        {
+            path: '/caykur/producers/:id',
+            name: 'caykur-producer-detail',
+            component: () => import('@/pages/caykur/CaykurProducerDetailPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true },
+        },
+
         // ═══════ BACKWARD COMPATIBILITY REDIRECTS ═══════
         { path: '/dashboard', redirect: '/tea/dashboard' },
         { path: '/fields', redirect: '/tea/fields' },

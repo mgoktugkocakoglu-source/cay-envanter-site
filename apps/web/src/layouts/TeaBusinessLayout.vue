@@ -34,6 +34,11 @@ function goToAdmin() {
   router.push('/admin');
 }
 
+function goToCaykur() {
+  closeUserMenu();
+  router.push('/caykur');
+}
+
 async function handleLogout() {
   closeUserMenu();
   await authStore.logout();
@@ -122,6 +127,10 @@ onBeforeUnmount(() => {
                 </div>
               </div>
               <div class="user-menu-divider"></div>
+              <button v-if="authStore.isAdmin" class="user-menu-item" type="button" role="menuitem" @click="goToCaykur">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/></svg>
+                <span>Çaykur Paneli</span>
+              </button>
               <button v-if="authStore.isAdmin" class="user-menu-item" type="button" role="menuitem" @click="goToAdmin">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
                 <span>Admin Panel</span>
