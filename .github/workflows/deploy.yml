@@ -99,6 +99,7 @@ jobs:
             R2_BUCKET=${{ secrets.R2_BUCKET }}
             R2_PUBLIC_URL=${{ secrets.R2_PUBLIC_URL }}
             R2_PREFIX=${{ secrets.R2_PREFIX }}
+            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
             EOF
             
             show_diagnostics() {

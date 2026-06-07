@@ -44,11 +44,11 @@ import { PruningModule } from '@/pruning/pruning.module';
                 JWT_REFRESH_SECRET: Joi.string().required(),
                 JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
                 APP_URL: Joi.string().required(),
-                GROQ_API_KEY: Joi.string().optional().allow('').default(''),
-                GROQ_MODEL: Joi.string()
+                GEMINI_API_KEY: Joi.string().optional().allow('').default(''),
+                GEMINI_MODEL: Joi.string()
                     .optional()
                     .allow('')
-                    .default('llama-3.3-70b-versatile'),
+                    .default('gemini-3.1-flash-lite'),
                 R2_ACCOUNT_ID: Joi.string().optional().allow('').default(''),
                 R2_ENDPOINT: Joi.string().optional().allow('').default(''),
                 R2_ACCESS_KEY_ID: Joi.string().optional().allow('').default(''),

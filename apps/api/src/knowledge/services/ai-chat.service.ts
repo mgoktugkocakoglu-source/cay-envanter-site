@@ -9,38 +9,39 @@ export interface RetrievedChunk {
     content: string;
 }
 
-interface GroqMessage {
-    role: 'system' | 'user' | 'assistant';
-    content: string;
+/** A turn in Gemini's `contents` array. Note Gemini uses `model`, not `assistant`. */
+interface GeminiContent {
+    role: 'user' | 'model';
+    parts: Array<{ text: string }>;
 }
 
 const MAX_CONTEXT_CHARS_PER_CHUNK = 900;
 const MAX_HISTORY_TURNS = 8;
+const GEMINI_API_BASE =
+    'https://generativelanguage.googleapis.com/v1beta/models';
 
 /**
- * Talks to the Groq LLM API (OpenAI-compatible) to answer tea-farming
- * questions, grounded in retrieved knowledge-base passages plus the model's
- * own agronomy knowledge. Degrades gracefully to a retrieval-only answer when
- * no API key is configured or the request fails.
+ * Talks to the Google Gemini API to answer tea-farming questions, grounded in
+ * retrieved knowledge-base passages plus the model's own agronomy knowledge.
+ * Degrades gracefully to a retrieval-only answer when no API key is configured
+ * or the request fails.
  */
 @Injectable()
 export class AiChatService {
     private readonly logger = new Logger(AiChatService.name);
-    private readonly groqApiUrl =
-        'https://api.groq.com/openai/v1/chat/completions';
-    private readonly groqApiKey: string;
+    private readonly apiKey: string;
     private readonly model: string;
 
     constructor(private readonly configService: ConfigService) {
-        this.groqApiKey = this.configService.get<string>('GROQ_API_KEY', '');
+        this.apiKey = this.configService.get<string>('GEMINI_API_KEY', '');
         this.model = this.configService.get<string>(
-            'GROQ_MODEL',
-            'llama-3.3-70b-versatile',
+            'GEMINI_MODEL',
+            'gemini-3.1-flash-lite',
         );
     }
 
     get isConfigured(): boolean {
-        return !!this.groqApiKey;
+        return !!this.apiKey;
     }
 
     get modelName(): string {
@@ -61,21 +62,32 @@ export class AiChatService {
         }
 
         try {
-            const messages: GroqMessage[] = [
-                { role: 'system', content: this.buildSystemPrompt(chunks) },
+            const contents: GeminiContent[] = [
                 ...history.slice(-MAX_HISTORY_TURNS).map((turn) => ({
-                    role: turn.role,
-                    content: turn.content,
+                    role: (turn.role === 'assistant' ? 'model' : 'user') as
+                        | 'user'
+                        | 'model',
+                    parts: [{ text: turn.content }],
                 })),
-                { role: 'user', content: message },
+                { role: 'user', parts: [{ text: message }] },
             ];
 
-            const text = (await this.callGroqApi(messages)).trim();
+            // Gemini requires the conversation to begin with a user turn.
+            while (contents.length > 1 && contents[0].role === 'model') {
+                contents.shift();
+            }
+
+            const text = (
+                await this.callGeminiApi(
+                    this.buildSystemPrompt(chunks),
+                    contents,
+                )
+            ).trim();
             return text
                 ? { answer: text, usedAi: true }
                 : { answer: this.buildFallbackAnswer(chunks), usedAi: false };
         } catch (error) {
-            this.logger.warn(`Groq chat request failed: ${error}`);
+            this.logger.warn(`Gemini chat request failed: ${error}`);
             return { answer: this.buildFallbackAnswer(chunks), usedAi: false };
         }
     }
@@ -124,28 +136,40 @@ ${context}`;
         return `Yapay zekâ yanıtı şu an üretilemiyor; bunun yerine bilgi tabanından sorunuzla en ilgili bölümleri getirdim:\n\n${excerpts}`;
     }
 
-    private async callGroqApi(messages: GroqMessage[]): Promise<string> {
-        const response = await fetch(this.groqApiUrl, {
+    private async callGeminiApi(
+        systemPrompt: string,
+        contents: GeminiContent[],
+    ): Promise<string> {
+        const url = `${GEMINI_API_BASE}/${this.model}:generateContent`;
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${this.groqApiKey}`,
+                'x-goog-api-key': this.apiKey,
             },
             body: JSON.stringify({
-                model: this.model,
-                messages,
-                temperature: 0.4,
-                max_tokens: 1024,
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                contents,
+                generationConfig: {
+                    temperature: 0.4,
+                    maxOutputTokens: 2048,
+                },
             }),
         });
 
         if (!response.ok) {
-            throw new Error(`Groq API returned status ${response.status}`);
+            throw new Error(`Gemini API returned status ${response.status}`);
         }
 
         const data = (await response.json()) as {
-            choices?: Array<{ message?: { content?: string } }>;
+            candidates?: Array<{
+                content?: { parts?: Array<{ text?: string }> };
+            }>;
         };
-        return data.choices?.[0]?.message?.content ?? '';
+        return (
+            data.candidates?.[0]?.content?.parts
+                ?.map((part) => part.text ?? '')
+                .join('') ?? ''
+        );
     }
 }
