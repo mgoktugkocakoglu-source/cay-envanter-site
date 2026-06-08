@@ -18,6 +18,8 @@ let fieldLayer: L.GeoJSON | null = null;
 // Get field ID from route
 const fieldId = computed(() => route.params.id as string);
 
+const fieldDisplayName = computed(() => fieldsStore.currentField?.name?.trim() || 'İsimsiz Arazi');
+
 // Load field data
 onMounted(async () => {
     await fieldsStore.fetchField(fieldId.value);
@@ -122,7 +124,7 @@ function goBack() {
         <div v-if="fieldsStore.isLoading" class="loading-state">
             <div class="loading-card">
                 <div class="spinner"></div>
-                <p>Tarla bilgileri yükleniyor...</p>
+                <p>Arazi bilgileri yükleniyor...</p>
             </div>
         </div>
 
@@ -151,10 +153,10 @@ function goBack() {
             <header class="page-header">
                 <button class="btn-back" @click="goBack">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                    Tarlalar
+                    Araziler
                 </button>
                 <div class="header-info">
-                    <h1>{{ fieldsStore.currentField.name }}</h1>
+                    <h1>{{ fieldDisplayName }}</h1>
                     <p class="header-meta">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                         {{ fieldsStore.currentField.province }}, {{ fieldsStore.currentField.district }}
@@ -191,13 +193,13 @@ function goBack() {
                         <span class="stat-value">{{ fieldsStore.currentField.partners.length }}</span>
                     </div>
                 </div>
-                <div class="stat-card stat-parcel" v-if="fieldsStore.currentField.parcelNo">
+                <div class="stat-card stat-parcel" v-if="fieldsStore.currentField.adaNo || fieldsStore.currentField.parcelNo">
                     <div class="stat-icon">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
                     </div>
                     <div class="stat-content">
-                        <span class="stat-label">Parsel No</span>
-                        <span class="stat-value">{{ fieldsStore.currentField.parcelNo }}</span>
+                        <span class="stat-label">Ada / Parsel No</span>
+                        <span class="stat-value">{{ fieldsStore.currentField.adaNo || '—' }} / {{ fieldsStore.currentField.parcelNo || '—' }}</span>
                     </div>
                 </div>
                 <div class="stat-card stat-date">
@@ -237,6 +239,10 @@ function goBack() {
                         <div v-if="fieldsStore.currentField.road" class="detail-row">
                             <span class="detail-label">Yol</span>
                             <span class="detail-value">{{ fieldsStore.currentField.road }}</span>
+                        </div>
+                        <div v-if="fieldsStore.currentField.adaNo" class="detail-row">
+                            <span class="detail-label">Ada No</span>
+                            <span class="detail-value highlight">{{ fieldsStore.currentField.adaNo }}</span>
                         </div>
                         <div v-if="fieldsStore.currentField.parcelNo" class="detail-row">
                             <span class="detail-label">Parsel No</span>

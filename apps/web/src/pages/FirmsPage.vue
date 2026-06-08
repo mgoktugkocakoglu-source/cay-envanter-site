@@ -6,6 +6,10 @@ import { useFirmsStore } from '@/stores/firmsStore';
 import { useAuthStore } from '@/stores/authStore';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import AppEmptyState from '@/components/ui/AppEmptyState.vue';
+import { paymentTermLabel, getFirmLogo, getFirmInitials, MONTH_NAMES_TR } from '@/utils/tariff';
+import type { PaymentTerm } from '@/services/api';
+
+const DEFAULT_QUOTA_PER_DEKAR = 30;
 
 const firmsStore = useFirmsStore();
 const authStore = useAuthStore();
@@ -33,16 +37,19 @@ const firmForm = ref({
 });
 
 // Step 2: Tarifeler
-type PaymentTermType = 'cash' | 'weekly' | 'monthly' | 'custom';
+type PaymentTermType = 'cash' | 'weekly' | 'monthly';
+const termOptions: PaymentTermType[] = ['cash', 'weekly', 'monthly'];
+const monthOptions = MONTH_NAMES_TR.map((name, i) => ({ value: i + 1, label: name }));
+
 interface TariffEntry {
     paymentTerm: PaymentTermType;
     pricePerKg: number | null;
-    customPaymentDate: string;
+    paymentMonth: number;
     isSplitPayment: boolean;
     splits: Array<{
         percentage: number | null;
         paymentTerm: PaymentTermType;
-        deferredMonths: number | null;
+        paymentMonth: number;
         pricePerKg: number | null;
     }>;
 }
@@ -53,10 +60,14 @@ function addTariff() {
     tariffs.value.push({
         paymentTerm: 'cash',
         pricePerKg: null,
-        customPaymentDate: '',
+        paymentMonth: 7,
         isSplitPayment: false,
         splits: [],
     });
+}
+
+function termLabel(term: PaymentTerm, paymentMonth?: number): string {
+    return paymentTermLabel({ paymentTerm: term, paymentMonth });
 }
 
 function removeTariff(index: number) {
@@ -68,8 +79,8 @@ function toggleSplitPayment(index: number) {
     t.isSplitPayment = !t.isSplitPayment;
     if (t.isSplitPayment && t.splits.length === 0) {
         t.splits = [
-            { percentage: 50, paymentTerm: 'cash', deferredMonths: null, pricePerKg: null },
-            { percentage: 50, paymentTerm: 'monthly', deferredMonths: 2, pricePerKg: null },
+            { percentage: 50, paymentTerm: 'cash', paymentMonth: 7, pricePerKg: null },
+            { percentage: 50, paymentTerm: 'monthly', paymentMonth: 10, pricePerKg: null },
         ];
     }
 }
@@ -78,7 +89,7 @@ function addSplit(tariffIndex: number) {
     tariffs.value[tariffIndex].splits.push({
         percentage: null,
         paymentTerm: 'monthly',
-        deferredMonths: 1,
+        paymentMonth: 10,
         pricePerKg: null,
     });
 }
@@ -121,21 +132,38 @@ function removeLocation(index: number) {
 }
 
 // ─── Computed ───
-const filteredFirms = computed(() => {
-    if (!searchQuery.value) return firmsStore.firms;
-    const q = searchQuery.value.toLowerCase();
-    return firmsStore.firms.filter(f =>
-        f.name.toLowerCase().includes(q) ||
-        (f.description && f.description.toLowerCase().includes(q))
-    );
+type CardTariff = { paymentTerm: PaymentTerm; pricePerKg: number; paymentMonth: number | null };
+
+const tariffsByFirmId = computed(() => {
+    const map = new Map<string, CardTariff[]>();
+    for (const f of firmsStore.firmsWithTariffs) {
+        map.set(f.id, f.currentTariffs.map(t => ({
+            paymentTerm: t.paymentTerm,
+            pricePerKg: t.pricePerKg,
+            paymentMonth: t.paymentMonth,
+        })));
+    }
+    return map;
 });
 
-const paymentTermLabels: Record<string, string> = {
-    'cash': 'Peşin',
-    'weekly': 'Haftalık',
-    'monthly': 'Aylık',
-    'custom': 'Özel Tarih',
-};
+const filteredFirms = computed(() => {
+    let list = firmsStore.firms;
+    if (searchQuery.value) {
+        const q = searchQuery.value.toLowerCase();
+        list = list.filter(f =>
+            f.name.toLowerCase().includes(q) ||
+            (f.description && f.description.toLowerCase().includes(q))
+        );
+    }
+    return list.map(f => ({ ...f, currentTariffs: tariffsByFirmId.value.get(f.id) ?? [] }));
+});
+
+// Çaykur per-dekar quota (kontenjan) shown on the Çaykur card instead of tariffs.
+const caykurQuota = computed(() => authStore.user?.quotaPerDekarKg ?? DEFAULT_QUOTA_PER_DEKAR);
+
+function formatTariffPrice(price: number): string {
+    return `₺${price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 const canProceedStep1 = computed(() => firmForm.value.name.trim().length > 0);
 const canProceedStep2 = computed(() => {
@@ -151,10 +179,6 @@ const canProceedStep2 = computed(() => {
 // ─── Actions ───
 function navigateToFirm(id: string) {
     router.push(`/firms/${id}`);
-}
-
-function getInitials(name: string): string {
-    return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
 
 function openWizard() {
@@ -224,7 +248,7 @@ async function handleStep2Next() {
                 splitDetails: t.splits.map(s => ({
                     percentage: s.percentage,
                     paymentTerm: s.paymentTerm,
-                    deferredMonths: s.deferredMonths || undefined,
+                    paymentMonth: s.paymentTerm === 'monthly' ? s.paymentMonth : undefined,
                     pricePerKg: s.pricePerKg,
                 })),
             };
@@ -236,8 +260,8 @@ async function handleStep2Next() {
                 effectiveDate: today,
                 isSplitPayment: false,
             };
-            if (t.paymentTerm === 'custom' && t.customPaymentDate) {
-                tariffData.customPaymentDate = t.customPaymentDate;
+            if (t.paymentTerm === 'monthly') {
+                tariffData.paymentMonth = t.paymentMonth;
             }
             await firmsStore.createTariff(createdFirmId.value, tariffData);
         }
@@ -296,6 +320,7 @@ const provinceOptions = [
 
 onMounted(() => {
     firmsStore.fetchFirms();
+    firmsStore.fetchFirmsWithTariffs();
 });
 </script>
 
@@ -365,9 +390,9 @@ onMounted(() => {
                 >
                     <div class="firm-card-top">
                         <div class="firm-logo-wrap" :class="{ 'firm-logo-wrap--inactive': !firm.isActive }">
-                            <img v-if="firm.logoUrl" :src="firm.logoUrl" :alt="`${firm.name} logosu`" class="firm-logo" />
+                            <img v-if="getFirmLogo(firm)" :src="getFirmLogo(firm) || ''" :alt="`${firm.name} logosu`" class="firm-logo" />
                             <div v-else class="firm-avatar-lg">
-                                {{ getInitials(firm.name) }}
+                                {{ getFirmInitials(firm.name) }}
                             </div>
                         </div>
                         <span class="firm-status" :class="firm.isActive ? 'firm-status--active' : 'firm-status--inactive'">
@@ -378,16 +403,30 @@ onMounted(() => {
                         <h3 class="firm-name">{{ firm.name }}</h3>
                         <p class="firm-description">{{ firm.description || 'Firma detaylarini ve toplama noktalarini goruntuleyin.' }}</p>
                     </div>
-                    <div class="firm-card-meta">
-                        <span v-if="firm.phone" class="firm-meta-item">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                            {{ firm.phone }}
-                        </span>
-                        <span v-if="firm.email" class="firm-meta-item">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                            {{ firm.email }}
-                        </span>
+
+                    <!-- Çaykur: kontenjan; private firms: yaş çay alım tarifeleri -->
+                    <div class="firm-tariffs">
+                        <template v-if="firm.isCaykur">
+                            <span class="tariffs-caption">Kontenjan</span>
+                            <div class="tariff-pill tariff-pill--quota">
+                                <span class="tariff-pill-term">Dekar başına</span>
+                                <span class="tariff-pill-price">{{ caykurQuota }} kg</span>
+                            </div>
+                        </template>
+                        <template v-else-if="firm.currentTariffs.length">
+                            <span class="tariffs-caption">Yaş Çay Alım Tarifeleri</span>
+                            <div class="tariff-pills">
+                                <div v-for="(t, ti) in firm.currentTariffs.slice(0, 3)" :key="ti" class="tariff-pill">
+                                    <span class="tariff-pill-term">{{ paymentTermLabel({ paymentTerm: t.paymentTerm, paymentMonth: t.paymentMonth }) }}</span>
+                                    <span class="tariff-pill-price">{{ formatTariffPrice(t.pricePerKg) }}/kg <small>Brüt</small></span>
+                                </div>
+                            </div>
+                        </template>
+                        <template v-else>
+                            <span class="tariffs-empty">Henüz tarife girilmemiş</span>
+                        </template>
                     </div>
+
                     <span class="firm-location-hint">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                         Firma detaylarini gor
@@ -522,34 +561,36 @@ onMounted(() => {
                                 <!-- Simple tariff -->
                                 <template v-if="!tariff.isSplitPayment">
                                     <div class="form-group">
-                                        <label>Ödeme Tarihi <span class="required">*</span></label>
+                                        <label>Ödeme Şekli <span class="required">*</span></label>
                                         <div class="payment-term-options">
                                             <button
-                                                v-for="term in (['cash', 'weekly', 'monthly', 'custom'] as PaymentTermType[])"
+                                                v-for="term in termOptions"
                                                 :key="term"
                                                 type="button"
                                                 class="term-btn"
                                                 :class="{ 'term-btn--active': tariff.paymentTerm === term }"
                                                 @click="tariff.paymentTerm = term"
                                             >
-                                                {{ paymentTermLabels[term] }}
+                                                {{ termLabel(term) }}
                                             </button>
                                         </div>
                                     </div>
 
-                                    <div v-if="tariff.paymentTerm === 'custom'" class="form-group">
-                                        <label>Özel Ödeme Tarihi</label>
-                                        <input type="date" v-model="tariff.customPaymentDate" class="form-input" />
+                                    <div v-if="tariff.paymentTerm === 'monthly'" class="form-group">
+                                        <label>Ödeme Ayı <span class="required">*</span></label>
+                                        <select v-model.number="tariff.paymentMonth" class="form-input">
+                                            <option v-for="m in monthOptions" :key="m.value" :value="m.value">{{ m.label }} Ayı Ödeme</option>
+                                        </select>
                                     </div>
 
                                     <div class="form-group">
-                                        <label>Fiyat (TL/kg) <span class="required">*</span></label>
+                                        <label>Fiyat (TL/kg, Brüt) <span class="required">*</span></label>
                                         <input
                                             type="number"
                                             v-model.number="tariff.pricePerKg"
                                             min="0.01"
                                             step="0.01"
-                                            placeholder="Örneğin: 21"
+                                            placeholder="Örneğin: 35"
                                             class="form-input"
                                         />
                                     </div>
@@ -571,12 +612,11 @@ onMounted(() => {
                                                 <input type="number" v-model.number="split.percentage" min="1" max="100" placeholder="50" class="form-input" />
                                             </div>
                                             <div class="form-group">
-                                                <label>Ödeme Türü</label>
+                                                <label>Ödeme Şekli</label>
                                                 <select v-model="split.paymentTerm" class="form-input">
-                                                    <option value="cash">Peşin</option>
-                                                    <option value="weekly">Haftalık</option>
-                                                    <option value="monthly">Aylık</option>
-                                                    <option value="custom">Özel</option>
+                                                    <option value="cash">Peşin Ödeme</option>
+                                                    <option value="weekly">Haftalık Ödeme</option>
+                                                    <option value="monthly">Aylık Ödeme</option>
                                                 </select>
                                             </div>
                                             <div class="form-group">
@@ -585,9 +625,11 @@ onMounted(() => {
                                             </div>
                                         </div>
 
-                                        <div v-if="split.paymentTerm !== 'cash'" class="form-group">
-                                            <label>Kac Ay Sonra?</label>
-                                            <input type="number" v-model.number="split.deferredMonths" min="1" max="24" placeholder="2" class="form-input" />
+                                        <div v-if="split.paymentTerm === 'monthly'" class="form-group">
+                                            <label>Ödeme Ayı</label>
+                                            <select v-model.number="split.paymentMonth" class="form-input">
+                                                <option v-for="m in monthOptions" :key="m.value" :value="m.value">{{ m.label }} Ayı Ödeme</option>
+                                            </select>
                                         </div>
                                     </div>
 
@@ -891,6 +933,64 @@ onMounted(() => {
 }
 .firm-meta-item svg {
     flex-shrink: 0;
+}
+
+/* ── Tariff / Kontenjan summary on card ── */
+.firm-tariffs {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.tariffs-caption {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-text-muted);
+}
+.tariff-pills {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.tariff-pill {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 10px;
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+.tariff-pill-term {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+.tariff-pill-price {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    white-space: nowrap;
+}
+.tariff-pill-price small {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    margin-left: 2px;
+}
+.tariff-pill--quota {
+    background: var(--color-primary-light);
+    border-color: var(--color-primary);
+}
+.tariff-pill--quota .tariff-pill-price {
+    color: var(--color-primary);
+}
+.tariffs-empty {
+    font-size: 12px;
+    font-style: italic;
+    color: var(--color-text-muted);
 }
 .firm-location-hint {
     display: inline-flex;

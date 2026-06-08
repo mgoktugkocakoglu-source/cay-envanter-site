@@ -3,7 +3,7 @@ import { type PropType } from 'vue';
 import type {
   CurrentWeather,
   HourlyForecast,
-  AgriculturalAlert,
+  DailyForecast,
 } from '@/composables/useWeather';
 
 defineProps({
@@ -15,8 +15,8 @@ defineProps({
     type: Array as PropType<HourlyForecast[]>,
     default: () => [],
   },
-  alerts: {
-    type: Array as PropType<AgriculturalAlert[]>,
+  daily: {
+    type: Array as PropType<DailyForecast[]>,
     default: () => [],
   },
   isLoading: {
@@ -53,15 +53,8 @@ function formatLastUpdated(date: Date | null): string {
   });
 }
 
-function getSeverityClass(severity: string): string {
-  switch (severity) {
-    case 'critical':
-      return 'alert--critical';
-    case 'warning':
-      return 'alert--warning';
-    default:
-      return 'alert--info';
-  }
+function formatDayName(date: Date): string {
+  return date.toLocaleDateString('tr-TR', { weekday: 'short' });
 }
 </script>
 
@@ -126,25 +119,25 @@ function getSeverityClass(severity: string): string {
           </div>
         </div>
 
-        <!-- Alerts Section -->
-        <div v-if="alerts.length" class="alerts-section">
-          <div class="alerts-title">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            <span>Zirai Uyarilar</span>
+        <!-- 5-Day Forecast Section -->
+        <div v-if="daily.length" class="daily-section">
+          <div class="daily-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span>5 Günlük Tahmin</span>
           </div>
-          <div class="alerts-list">
+          <div class="daily-list">
             <div
-              v-for="alert in alerts"
-              :key="alert.id"
-              class="alert-card"
-              :class="getSeverityClass(alert.severity)"
+              v-for="(day, idx) in daily.slice(0, 5)"
+              :key="idx"
+              class="daily-row"
+              :class="{ 'daily-row--today': idx === 0 }"
             >
-              <span class="alert-icon">{{ alert.icon }}</span>
-              <div class="alert-content">
-                <span class="alert-title">{{ alert.title }}</span>
-                <span class="alert-desc">{{ alert.description }}</span>
-                <span v-if="alert.timeRange" class="alert-time">{{ alert.timeRange }}</span>
-              </div>
+              <span class="daily-day">{{ idx === 0 ? 'Bugün' : formatDayName(day.date) }}</span>
+              <span class="daily-icon">{{ day.icon }}</span>
+              <span class="daily-rain">
+                <template v-if="day.precipitation > 0">💧 {{ day.precipitation.toFixed(0) }} mm</template>
+              </span>
+              <span class="daily-temps"><strong>{{ Math.round(day.tempMax) }}°</strong> / {{ Math.round(day.tempMin) }}°</span>
             </div>
           </div>
         </div>
@@ -190,7 +183,7 @@ function getSeverityClass(severity: string): string {
 }
 
 .current-section,
-.alerts-section {
+.daily-section {
   background: var(--color-bg-secondary);
   padding: var(--space-5);
 }
@@ -263,14 +256,14 @@ function getSeverityClass(severity: string): string {
   border-radius: var(--radius-full);
 }
 
-/* ── Alerts ── */
-.alerts-section {
+/* ── 5-Day Forecast ── */
+.daily-section {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
 }
 
-.alerts-title {
+.daily-title {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -281,69 +274,59 @@ function getSeverityClass(severity: string): string {
   letter-spacing: 0.5px;
 }
 
-.alerts-list {
+.daily-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  flex: 1;
-  overflow-y: auto;
-  max-height: 180px;
+  gap: var(--space-1);
 }
 
-.alert-card {
-  display: flex;
-  align-items: flex-start;
+.daily-row {
+  display: grid;
+  grid-template-columns: 64px 28px 1fr auto;
+  align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-lg);
-  border: 1px solid transparent;
 }
 
-.alert--critical {
-  background: rgba(239, 68, 68, 0.08);
-  border-color: rgba(239, 68, 68, 0.2);
-}
-
-.alert--warning {
-  background: rgba(245, 158, 11, 0.08);
-  border-color: rgba(245, 158, 11, 0.2);
-}
-
-.alert--info {
+.daily-row--today {
   background: var(--color-primary-light);
-  border-color: rgba(21, 128, 61, 0.18);
+  border: 1px solid rgba(21, 128, 61, 0.18);
 }
 
-.alert-icon {
+.daily-day {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  text-transform: capitalize;
+}
+
+.daily-row--today .daily-day {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.daily-icon {
   font-size: 18px;
   line-height: 1;
-  flex-shrink: 0;
-  margin-top: 1px;
 }
 
-.alert-content {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.alert-title {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-}
-
-.alert-desc {
+.daily-rain {
   font-size: 11px;
-  color: var(--color-text-muted);
-  line-height: 1.4;
+  color: var(--color-info);
+  font-weight: var(--font-weight-medium);
 }
 
-.alert-time {
-  font-size: 10px;
+.daily-temps {
+  font-size: var(--font-size-xs);
   color: var(--color-text-muted);
-  opacity: 0.7;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.daily-temps strong {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
 }
 
 /* ── Hourly Strip ── */
@@ -520,10 +503,6 @@ function getSeverityClass(severity: string): string {
 
   .current-temp {
     font-size: 32px;
-  }
-
-  .alerts-list {
-    max-height: 140px;
   }
 }
 

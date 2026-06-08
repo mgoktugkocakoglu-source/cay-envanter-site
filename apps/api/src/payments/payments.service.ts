@@ -133,6 +133,7 @@ export class PaymentsService {
         const qb = this.paymentRepository
             .createQueryBuilder('payment')
             .leftJoinAndSelect('payment.brokerFirm', 'brokerFirm')
+            .leftJoinAndSelect('payment.firm', 'firm')
             .leftJoin('payment.harvestAllocations', 'allocations')
             .leftJoin('allocations.harvest', 'harvest')
             .leftJoin('harvest.field', 'field')
@@ -152,7 +153,11 @@ export class PaymentsService {
             }))
             .groupBy('payment.id')
             .addGroupBy('brokerFirm.id')
-            .addSelect('COUNT(DISTINCT allocations.id)', 'harvestCount');
+            .addGroupBy('firm.id')
+            .addSelect('COUNT(DISTINCT allocations.id)', 'harvestCount')
+            // A Çaykur delivery has at most one assigned land; surface it for the box.
+            .addSelect('MAX(field.id::text)', 'assignedFieldId')
+            .addSelect('MAX(field.name)', 'assignedFieldName');
 
         if (query.brokerFirmId) {
             qb.andWhere('payment.brokerFirmId = :brokerFirmId', { brokerFirmId: query.brokerFirmId });
@@ -166,32 +171,54 @@ export class PaymentsService {
             qb.andWhere('payment.paymentStatus = :status', { status: query.paymentStatus });
         }
 
+        if (query.source) {
+            qb.andWhere('payment.source = :source', { source: query.source });
+        }
+
         const sortBy = query.sortBy || 'paymentDate';
         const sortOrder = query.sortOrder || 'DESC';
         qb.orderBy(`payment.${sortBy}`, sortOrder);
 
         const results = await qb.getRawAndEntities();
 
-        return results.entities.map((payment, index) => ({
-            id: payment.id,
-            totalAmountKg: Number(payment.totalAmountKg),
-            totalPrice: Number(payment.totalPrice),
-            pricePerKg: payment.pricePerKg,
-            brokerFirm: payment.brokerFirm
-                ? { id: payment.brokerFirm.id, firmName: payment.brokerFirm.firmName }
-                : null,
-            paymentDate: payment.paymentDate,
-            paymentStatus: payment.paymentStatus,
-            notes: payment.notes,
-            harvestCount: parseInt(results.raw[index]?.harvestCount || '0', 10),
-            createdAt: payment.createdAt,
-        }));
+        return results.entities.map((payment, index) => {
+            const harvestCount = parseInt(results.raw[index]?.harvestCount || '0', 10);
+            const assignedFieldId = results.raw[index]?.assignedFieldId || null;
+            return {
+                id: payment.id,
+                totalAmountKg: Number(payment.totalAmountKg),
+                totalPrice: Number(payment.totalPrice),
+                pricePerKg: payment.pricePerKg,
+                brokerFirm: payment.brokerFirm
+                    ? { id: payment.brokerFirm.id, firmName: payment.brokerFirm.firmName }
+                    : null,
+                firm: payment.firm
+                    ? {
+                        id: payment.firm.id,
+                        name: payment.firm.name,
+                        logoUrl: payment.firm.logoUrl,
+                        isCaykur: payment.firm.isCaykur,
+                    }
+                    : null,
+                tariffLabel: payment.tariffLabel,
+                source: payment.source,
+                paymentDate: payment.paymentDate,
+                paymentStatus: payment.paymentStatus,
+                notes: payment.notes,
+                harvestCount,
+                assigned: harvestCount > 0,
+                assignedField: assignedFieldId
+                    ? { id: assignedFieldId, name: results.raw[index]?.assignedFieldName }
+                    : null,
+                createdAt: payment.createdAt,
+            };
+        });
     }
 
     async findOne(id: string, userId: string): Promise<Payment> {
         const payment = await this.paymentRepository.findOne({
             where: { id },
-            relations: ['brokerFirm', 'harvestAllocations', 'harvestAllocations.harvest', 'harvestAllocations.harvest.field'],
+            relations: ['brokerFirm', 'firm', 'harvestAllocations', 'harvestAllocations.harvest', 'harvestAllocations.harvest.field'],
         });
 
         if (!payment) {
@@ -238,6 +265,93 @@ export class PaymentsService {
         // Delete payment (cascades to payment_harvests)
         await this.paymentRepository.remove(payment);
         this.logger.log(`Payment deleted: ${id}`);
+    }
+
+    /**
+     * Attribute an auto-dropped Çaykur delivery to one of the producer's lands.
+     * Creates the Harvest for the chosen field and links it to the payment.
+     */
+    async assignField(id: string, userId: string, fieldId: string): Promise<PaymentWithDetails> {
+        const payment = await this.findOne(id, userId);
+
+        if (payment.userId !== userId) {
+            throw new ForbiddenException('Access denied');
+        }
+
+        if ((payment.harvestAllocations?.length ?? 0) > 0) {
+            throw new BadRequestException('Bu teslimat zaten bir araziye atanmış');
+        }
+
+        const field = await this.fieldRepository.findOne({ where: { id: fieldId, deleted: false } });
+        if (!field) {
+            throw new NotFoundException('Field not found');
+        }
+        if (field.userId !== userId) {
+            throw new ForbiddenException('Access denied');
+        }
+
+        const queryRunner = this.dataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
+        try {
+            const harvest = queryRunner.manager.create(Harvest, {
+                fieldId,
+                harvestDate: payment.paymentDate,
+                amountKg: payment.totalAmountKg,
+            });
+            const savedHarvest = await queryRunner.manager.save(harvest);
+
+            await queryRunner.manager.save(
+                queryRunner.manager.create(PaymentHarvest, {
+                    paymentId: payment.id,
+                    harvestId: savedHarvest.id,
+                    usedAmountKg: payment.totalAmountKg,
+                }),
+            );
+
+            await queryRunner.commitTransaction();
+        } catch (error) {
+            await queryRunner.rollbackTransaction();
+            throw error;
+        } finally {
+            await queryRunner.release();
+        }
+
+        this.logger.log(`Delivery ${id} assigned to field ${fieldId}`);
+        return this.toPaymentDetails(await this.findOne(id, userId));
+    }
+
+    private toPaymentDetails(payment: Payment): PaymentWithDetails {
+        const allocations = payment.harvestAllocations ?? [];
+        const assignedFieldEntity = allocations[0]?.harvest?.field ?? null;
+        return {
+            id: payment.id,
+            totalAmountKg: Number(payment.totalAmountKg),
+            totalPrice: Number(payment.totalPrice),
+            pricePerKg: payment.pricePerKg,
+            brokerFirm: payment.brokerFirm
+                ? { id: payment.brokerFirm.id, firmName: payment.brokerFirm.firmName }
+                : null,
+            firm: payment.firm
+                ? {
+                    id: payment.firm.id,
+                    name: payment.firm.name,
+                    logoUrl: payment.firm.logoUrl,
+                    isCaykur: payment.firm.isCaykur,
+                }
+                : null,
+            tariffLabel: payment.tariffLabel,
+            source: payment.source,
+            paymentDate: payment.paymentDate,
+            paymentStatus: payment.paymentStatus,
+            notes: payment.notes,
+            harvestCount: allocations.length,
+            assigned: allocations.length > 0,
+            assignedField: assignedFieldEntity
+                ? { id: assignedFieldEntity.id, name: assignedFieldEntity.name }
+                : null,
+            createdAt: payment.createdAt,
+        };
     }
 
     // Broker firms

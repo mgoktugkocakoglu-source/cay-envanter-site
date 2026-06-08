@@ -2,87 +2,32 @@
 import { ref, onMounted, computed } from 'vue';
 import { useHarvestsStore } from '@/stores/harvestsStore';
 import { useFieldsStore } from '@/stores/fieldsStore';
-import { useFirmsStore } from '@/stores/firmsStore';
 import { usePaymentsStore } from '@/stores/paymentsStore';
 import { useToast } from '@/composables/useToast';
 import { api, type Harvest } from '@/services/api';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
-import AppCheckbox from '@/components/ui/AppCheckbox.vue';
 import AppEmptyState from '@/components/ui/AppEmptyState.vue';
-import ConfirmModal from '@/components/ui/ConfirmModal.vue';
-import caykurLogo from '@/assets/images/caykur.jpg';
-import ofcayLogo from '@/assets/images/ofcay.png';
+import DeliveryBox from '@/components/harvests/DeliveryBox.vue';
 
 const harvestsStore = useHarvestsStore();
 const fieldsStore = useFieldsStore();
-const firmsStore = useFirmsStore();
 const paymentsStore = usePaymentsStore();
 const toast = useToast();
 
 // ─── Main Tab State ───
-const activeMainTab = ref<'sell' | 'sales' | 'analysis'>('sell');
+const activeMainTab = ref<'harvests' | 'analysis' | 'payments'>('harvests');
 
-// ─── Yaş Çay Sat Form State ───
-const selectedFirmId = ref('');
-const saleKg = ref<number | null>(null);
-const saleFieldId = ref('');
-const useCustomDate = ref(false);
-const saleDate = ref(new Date().toISOString().split('T')[0]);
-const isSaving = ref(false);
-const saleSuccess = ref(false);
-const saleSummary = ref<{ firmName: string; tariffLabel: string; kg: number; fieldName: string; totalPrice: number | null; date: string } | null>(null);
+// ─── Arazi ekle (land assignment) modal ───
+const showFieldPicker = ref(false);
+const pickerDeliveryId = ref('');
+const pickerFieldId = ref('');
+const isAssigning = ref(false);
 
-// ─── Inline Tariff Panel State ───
-const showTariffPanel = ref(false);
-type PaymentTermType = 'cash' | 'weekly' | 'monthly';
-const paymentTermLabels: Record<PaymentTermType, string> = {
-    cash: 'Peşin',
-    weekly: 'Haftalık',
-    monthly: 'Ay Sonu',
-};
-const tariffEntry = ref({
-    paymentTerm: 'cash' as PaymentTermType,
-    pricePerKg: null as number | null,
-    isSplitPayment: false,
-    splits: [] as Array<{
-        percentage: number | null;
-        paymentTerm: PaymentTermType;
-        deferredMonths: number | null;
-        pricePerKg: number | null;
-    }>,
-});
-
-function toggleTariffPanel() {
-    showTariffPanel.value = !showTariffPanel.value;
-    if (!showTariffPanel.value) {
-        tariffEntry.value = { paymentTerm: 'cash', pricePerKg: null, isSplitPayment: false, splits: [] };
-    }
-}
-
-function toggleSplitPayment() {
-    tariffEntry.value.isSplitPayment = !tariffEntry.value.isSplitPayment;
-    if (tariffEntry.value.isSplitPayment && tariffEntry.value.splits.length === 0) {
-        tariffEntry.value.splits = [
-            { percentage: 50, paymentTerm: 'cash', deferredMonths: null, pricePerKg: null },
-            { percentage: 50, paymentTerm: 'monthly', deferredMonths: 2, pricePerKg: null },
-        ];
-    }
-}
-
-function addSplit() {
-    tariffEntry.value.splits.push({ percentage: null, paymentTerm: 'monthly', deferredMonths: 1, pricePerKg: null });
-}
-
-function removeSplit(index: number) {
-    tariffEntry.value.splits.splice(index, 1);
-}
-
-// ─── Satış Verilerim Tab State ───
+// ─── Shared filter / analysis state ───
 const fieldFilter = ref('');
 const yearFilter = ref(new Date().getFullYear());
-const showDeleteConfirm = ref(false);
-const deleteTargetId = ref('');
+const statusFilter = ref('');
 const analysisHarvests = ref<Harvest[]>([]);
 const isLoadingAnalysis = ref(false);
 
@@ -112,16 +57,22 @@ const yearOptions = computed(() =>
 );
 
 const fieldFilterOptions = computed(() => [
-    { value: '', label: 'Tüm Tarlalar' },
-    ...fieldsStore.fields.map(f => ({ value: f.id, label: f.name }))
+    { value: '', label: 'Tüm Araziler' },
+    ...fieldsStore.fields.map(f => ({ value: f.id, label: f.name?.trim() || 'İsimsiz Arazi' }))
 ]);
 
-const fieldSelectOptions = computed(() => [
+const statusOptions = [
+    { value: '', label: 'Tüm Durumlar' },
+    { value: 'received', label: 'Ödendi' },
+    { value: 'pending', label: 'Bekliyor' },
+];
+
+const fieldPickerOptions = computed(() => [
     { value: '', label: 'Arazi seçiniz...' },
     ...fieldsStore.fields.map(f => ({
         value: f.id,
-        label: `${f.name} (${f.area} ${f.areaUnit})`
-    }))
+        label: f.name?.trim() || `İsimsiz Arazi (Parsel ${f.parcelNo ?? '—'})`,
+    })),
 ]);
 
 const analysisMonthRows = computed(() => {
@@ -212,125 +163,57 @@ const analysisNotifications = computed(() =>
         .slice(0, 4)
 );
 
-// ─── Form Computed ───
-const selectedFirm = computed(() =>
-    firmsStore.firms.find(f => f.id === selectedFirmId.value)
-);
+// ─── Deliveries (auto-dropped Çaykur sales) ───
+const deliveries = computed(() => paymentsStore.payments);
+const unassignedCount = computed(() => paymentsStore.unassignedDeliveries.length);
 
-const selectedField = computed(() =>
-    fieldsStore.fields.find(f => f.id === saleFieldId.value)
-);
-
-const canSubmitSale = computed(() =>
-    selectedFirmId.value && saleKg.value && saleKg.value > 0 && saleFieldId.value
-);
-
-const firmLogoMap: Record<string, string> = {
-    'caykur': caykurLogo,
-    'çaykur': caykurLogo,
-    'ofcay': ofcayLogo,
-    'ofçay': ofcayLogo,
-};
+// Payments tab list honours the status filter (year is applied server-side).
+const filteredPayments = computed(() => {
+    if (!statusFilter.value) return paymentsStore.payments;
+    return paymentsStore.payments.filter(p => p.paymentStatus === statusFilter.value);
+});
 
 // ─── Lifecycle ───
 onMounted(() => {
-    firmsStore.fetchFirms({ isActive: true });
     fieldsStore.fetchFields();
     harvestsStore.fetchHarvests({ year: yearFilter.value });
-    paymentsStore.fetchBrokerFirms();
+    paymentsStore.fetchPayments({ year: yearFilter.value });
     loadAnalysisData();
 });
 
-// ─── Form Actions ───
-async function completeSale() {
-    if (!selectedFirm.value || !saleKg.value || !saleFieldId.value) return;
+// ─── Arazi ekle (assign land to a delivery) ───
+function openFieldPicker(deliveryId: string) {
+    pickerDeliveryId.value = deliveryId;
+    pickerFieldId.value = '';
+    showFieldPicker.value = true;
+}
 
-    isSaving.value = true;
-    try {
-        const harvestDate = useCustomDate.value ? saleDate.value : new Date().toISOString().split('T')[0];
-
-        // 1. Create harvest record
-        const harvest = await harvestsStore.createHarvest({
-            fieldId: saleFieldId.value,
-            harvestDate,
-            amountKg: saleKg.value,
-        });
-
-        if (!harvest) {
-            toast.error('Hasat kaydı oluşturulurken hata oluştu');
-            return;
-        }
-
-        // 2. Find or create broker firm
-        let brokerFirm = paymentsStore.brokerFirms.find(
-            bf => bf.firmName === selectedFirm.value!.name
-        );
-        if (!brokerFirm) {
-            brokerFirm = await paymentsStore.createBrokerFirm(selectedFirm.value.name) ?? undefined;
-        }
-
-        // 3. Build payment data — tariff is optional
-        let totalPrice: number | null = null;
-        let tariffLabel = 'Tarife belirtilmedi';
-
-        if (showTariffPanel.value && !tariffEntry.value.isSplitPayment && tariffEntry.value.pricePerKg) {
-            totalPrice = tariffEntry.value.pricePerKg * saleKg.value;
-            tariffLabel = `${paymentTermLabels[tariffEntry.value.paymentTerm]} - ${formatPrice(tariffEntry.value.pricePerKg)}/kg`;
-        } else if (showTariffPanel.value && tariffEntry.value.isSplitPayment && tariffEntry.value.splits.length > 0) {
-            const firstPrice = tariffEntry.value.splits[0]?.pricePerKg;
-            if (firstPrice) {
-                totalPrice = firstPrice * saleKg.value;
-            }
-            tariffLabel = 'Bölünmüş Ödeme';
-        }
-
-        const payment = await paymentsStore.createPayment({
-            harvestAllocations: [{ harvestId: harvest.id, usedAmountKg: saleKg.value }],
-            totalPrice: totalPrice ?? 0,
-            brokerFirmId: brokerFirm?.id,
-            paymentDate: harvestDate,
-            paymentStatus: 'pending',
-        });
-
-        if (payment) {
-            saleSummary.value = {
-                firmName: selectedFirm.value.name,
-                tariffLabel,
-                kg: saleKg.value,
-                fieldName: selectedField.value?.name || '',
-                totalPrice,
-                date: harvestDate,
-            };
-            saleSuccess.value = true;
-            toast.success('Yaş çay satışı başarıyla kaydedildi!');
-        } else {
-            toast.error('Satış kaydı oluşturulurken hata oluştu');
-        }
-    } catch {
-        toast.error('Bir hata oluştu, lütfen tekrar deneyin');
-    } finally {
-        isSaving.value = false;
+async function confirmAssignField() {
+    if (!pickerFieldId.value) {
+        toast.error('Lütfen bir arazi seçin');
+        return;
+    }
+    isAssigning.value = true;
+    const ok = await paymentsStore.assignField(pickerDeliveryId.value, pickerFieldId.value);
+    isAssigning.value = false;
+    if (ok) {
+        toast.success('Teslimat araziye atandı');
+        showFieldPicker.value = false;
+        // Refresh harvest-backed analysis now that a new harvest exists.
+        harvestsStore.fetchHarvests({ year: yearFilter.value });
+        loadAnalysisData();
+    } else {
+        toast.error(paymentsStore.error || 'Arazi atanırken hata oluştu');
     }
 }
 
-function resetForm() {
-    selectedFirmId.value = '';
-    saleKg.value = null;
-    saleFieldId.value = '';
-    useCustomDate.value = false;
-    saleDate.value = new Date().toISOString().split('T')[0];
-    showTariffPanel.value = false;
-    tariffEntry.value = { paymentTerm: 'cash', pricePerKg: null, isSplitPayment: false, splits: [] };
-    saleSuccess.value = false;
-    saleSummary.value = null;
-}
-
-// ─── Sales Tab Actions ───
+// ─── Filters ───
 function applyFilters() {
     const params: Record<string, unknown> = {};
     if (fieldFilter.value) params.fieldId = fieldFilter.value;
     if (yearFilter.value) params.year = yearFilter.value;
     harvestsStore.fetchHarvests(params as { fieldId?: string; year?: number });
+    paymentsStore.fetchPayments({ year: yearFilter.value });
     loadAnalysisData();
 }
 
@@ -393,28 +276,8 @@ function formatPrice(price: number) {
     }).format(price);
 }
 
-function getFirmInitials(name: string) {
-    return name.split(' ').map((word) => word[0]).join('').toUpperCase().slice(0, 2);
-}
-
-function getFirmLogo(firm: { name: string; logoUrl: string | null }) {
-    if (firm.logoUrl) return firm.logoUrl;
-    const normalized = firm.name.toLocaleLowerCase('tr-TR').replace(/\s+/g, '');
-    return firmLogoMap[normalized] || null;
-}
-
-function deleteHarvest(id: string) {
-    deleteTargetId.value = id;
-    showDeleteConfirm.value = true;
-}
-
-async function confirmDeleteHarvest() {
-    const success = await harvestsStore.deleteHarvest(deleteTargetId.value);
-    if (success) {
-        toast.success('Hasat başarıyla silindi');
-    } else {
-        toast.error('Hasat silinirken bir hata oluştu');
-    }
+function statusLabel(status: string) {
+    return status === 'received' ? 'Ödendi' : 'Bekliyor';
 }
 </script>
 
@@ -425,7 +288,7 @@ async function confirmDeleteHarvest() {
             <header class="page-header">
                 <div class="header-content">
                     <h1>Hasatlarım</h1>
-                    <p class="subtitle">Yaş çay satışlarınızı yönetin ve takip edin</p>
+                    <p class="subtitle">Çaykur teslimatlarınızı görüntüleyin, arazilerinize atayın ve ödemelerinizi takip edin</p>
                 </div>
             </header>
 
@@ -433,19 +296,12 @@ async function confirmDeleteHarvest() {
             <div class="main-tabs app-tabs">
                 <button
                     class="main-tab-btn app-tab-btn"
-                    :class="{ 'main-tab-btn--active app-tab-btn--active': activeMainTab === 'sell' }"
-                    @click="activeMainTab = 'sell'"
+                    :class="{ 'main-tab-btn--active app-tab-btn--active': activeMainTab === 'harvests' }"
+                    @click="activeMainTab = 'harvests'"
                 >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-                    Yaş Çay Sat
-                </button>
-                <button
-                    class="main-tab-btn app-tab-btn"
-                    :class="{ 'main-tab-btn--active app-tab-btn--active': activeMainTab === 'sales' }"
-                    @click="activeMainTab = 'sales'"
-                >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                    Satış Verilerim
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                    Hasat Verilerim
+                    <span v-if="unassignedCount > 0" class="tab-count">{{ unassignedCount }}</span>
                 </button>
                 <button
                     class="main-tab-btn app-tab-btn"
@@ -455,264 +311,21 @@ async function confirmDeleteHarvest() {
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
                     Arazi Verim Analizi
                 </button>
+                <button
+                    class="main-tab-btn app-tab-btn"
+                    :class="{ 'main-tab-btn--active app-tab-btn--active': activeMainTab === 'payments' }"
+                    @click="activeMainTab = 'payments'"
+                >
+                    <span class="currency-tab-icon" aria-hidden="true">₺</span>
+                    Ödemeler
+                </button>
             </div>
 
-            <!-- ═══════════════ TAB 1: Yaş Çay Sat ═══════════════ -->
-            <div v-if="activeMainTab === 'sell'" class="tab-content">
-
-                <!-- Success State -->
-                <div v-if="saleSuccess && saleSummary" class="success-state">
-                    <div class="success-icon-wrap">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                    </div>
-                    <h2>Satış Kaydedildi!</h2>
-                    <p class="success-subtitle">Yaş çay satışınız başarıyla sisteme kaydedildi.</p>
-
-                    <div class="summary-card">
-                        <div class="summary-row">
-                            <span class="summary-label">Firma</span>
-                            <span class="summary-value">{{ saleSummary.firmName }}</span>
-                        </div>
-                        <div class="summary-row">
-                            <span class="summary-label">Tarife</span>
-                            <span class="summary-value">{{ saleSummary.tariffLabel }}</span>
-                        </div>
-                        <div class="summary-row">
-                            <span class="summary-label">Miktar</span>
-                            <span class="summary-value summary-value--highlight">{{ formatKg(saleSummary.kg) }}</span>
-                        </div>
-                        <div class="summary-row">
-                            <span class="summary-label">Arazi</span>
-                            <span class="summary-value">{{ saleSummary.fieldName }}</span>
-                        </div>
-                        <div class="summary-row">
-                            <span class="summary-label">Tarih</span>
-                            <span class="summary-value">{{ formatDate(saleSummary.date) }}</span>
-                        </div>
-                        <div v-if="saleSummary.totalPrice" class="summary-row summary-row--total">
-                            <span class="summary-label">Tahmini Tutar</span>
-                            <span class="summary-value summary-value--total">{{ formatPrice(saleSummary.totalPrice) }}</span>
-                        </div>
-                    </div>
-
-                    <div class="success-actions">
-                        <button class="btn-primary" @click="resetForm">
-                            Yeni Satış Kaydet
-                        </button>
-                        <button class="btn-secondary" @click="activeMainTab = 'sales'">
-                            Satış Verilerime Git
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Single-Form Sale View -->
-                <template v-else>
-                    <div class="sale-form-card">
-                        <div class="sale-form-header">
-                            <h2>Yaş çayınızı hangi firmaya sattınız?</h2>
-                            <p>Firma, miktar ve arazi bilgilerini girin. Tarife belirtmek isteğe bağlıdır.</p>
-                        </div>
-
-                        <div class="sale-form">
-                            <!-- Firma Selection -->
-                            <div class="form-group">
-                                <label class="form-label">Firma <span class="required">*</span></label>
-                                <div v-if="firmsStore.isLoading" class="loading-inline">
-                                    <div class="spinner-sm"></div>
-                                </div>
-                                <div v-else class="firm-chips">
-                                    <button
-                                        v-for="firm in firmsStore.firms"
-                                        :key="firm.id"
-                                        type="button"
-                                        class="firm-chip"
-                                        :class="{ 'firm-chip--active': selectedFirmId === firm.id }"
-                                        @click="selectedFirmId = firm.id"
-                                    >
-                                        <span class="firm-chip-avatar" :class="{ 'firm-chip-avatar--logo': getFirmLogo(firm) }">
-                                            <img
-                                                v-if="getFirmLogo(firm)"
-                                                :src="getFirmLogo(firm) || ''"
-                                                :alt="`${firm.name} logosu`"
-                                                class="firm-chip-logo"
-                                            />
-                                            <span v-else>{{ getFirmInitials(firm.name) }}</span>
-                                        </span>
-                                        <span class="firm-chip-name">{{ firm.name }}</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Miktar -->
-                            <div class="form-group">
-                                <label class="form-label">Miktar (kg) <span class="required">*</span></label>
-                                <div class="kg-input-wrap">
-                                    <input
-                                        type="number"
-                                        v-model.number="saleKg"
-                                        min="0.1"
-                                        step="0.1"
-                                        placeholder="Örn: 150"
-                                        class="form-input form-input--lg"
-                                    />
-                                    <span class="kg-suffix">kg</span>
-                                </div>
-                            </div>
-
-                            <!-- Arazi -->
-                            <div class="form-group">
-                                <label class="form-label">Arazi <span class="required">*</span></label>
-                                <AppSelect
-                                    v-model="saleFieldId"
-                                    :options="fieldSelectOptions"
-                                    placeholder="Arazi seçiniz..."
-                                    variant="light"
-                                />
-                            </div>
-
-                            <!-- Tarih -->
-                            <div class="form-group">
-                                <AppCheckbox
-                                    v-model="useCustomDate"
-                                    label="Farklı bir tarih belirtmek istiyorum"
-                                />
-                                <p v-if="!useCustomDate" class="date-auto-info">
-                                    Bugünün tarihi kullanılacak:
-                                    <strong>{{ formatDate(new Date().toISOString().split('T')[0]) }}</strong>
-                                </p>
-                                <div v-if="useCustomDate" class="date-input-wrap">
-                                    <label class="form-label">Satış tarihi</label>
-                                    <input
-                                        type="date"
-                                        v-model="saleDate"
-                                        :max="new Date().toISOString().split('T')[0]"
-                                        class="form-input"
-                                    />
-                                </div>
-                            </div>
-
-                            <!-- Tarife Ekle Button -->
-                            <div class="tariff-panel-toggle">
-                                <button
-                                    type="button"
-                                    class="btn-tariff-toggle"
-                                    :class="{ 'btn-tariff-toggle--open': showTariffPanel }"
-                                    @click="toggleTariffPanel"
-                                >
-                                    <span v-if="!showTariffPanel">+</span>
-                                    {{ showTariffPanel ? 'Tarife Bilgisini Kaldır' : 'Tarife Ekle' }}
-                                    <span class="tariff-toggle-hint">{{ showTariffPanel ? '' : '(İsteğe bağlı)' }}</span>
-                                </button>
-                            </div>
-
-                            <!-- Inline Tariff Panel -->
-                            <Transition name="tariff-panel">
-                                <div v-if="showTariffPanel" class="tariff-panel">
-                                    <div class="tariff-panel-header">
-                                        <h4>Ödeme Bilgileri</h4>
-                                        <p>Bu satış için ödeme zamanı ve fiyat bilgisini girin.</p>
-                                    </div>
-
-                                    <!-- Split toggle -->
-                                    <div class="split-toggle-row">
-                                        <label class="split-toggle-label">
-                                            <input type="checkbox" :checked="tariffEntry.isSplitPayment" @change="toggleSplitPayment" />
-                                            <span>Bölünmüş ödeme (%50 peşin, %50 vadeli gibi)</span>
-                                        </label>
-                                    </div>
-
-                                    <!-- Simple tariff -->
-                                    <template v-if="!tariffEntry.isSplitPayment">
-                                        <div class="form-group">
-                                            <label class="form-label">Ödeme Zamanı <span class="required">*</span></label>
-                                            <div class="payment-term-options">
-                                                <button
-                                                    v-for="term in (['cash', 'weekly', 'monthly'] as PaymentTermType[])"
-                                                    :key="term"
-                                                    type="button"
-                                                    class="term-btn"
-                                                    :class="{ 'term-btn--active': tariffEntry.paymentTerm === term }"
-                                                    @click="tariffEntry.paymentTerm = term"
-                                                >
-                                                    {{ paymentTermLabels[term] }}
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div class="form-group">
-                                            <label class="form-label">Fiyat (TL/kg) <span class="required">*</span></label>
-                                            <input
-                                                type="number"
-                                                v-model.number="tariffEntry.pricePerKg"
-                                                min="0.01"
-                                                step="0.01"
-                                                placeholder="Örn: 22"
-                                                class="form-input"
-                                            />
-                                            <p v-if="tariffEntry.pricePerKg && saleKg" class="estimated-total">
-                                                Tahmini tutar: <strong>{{ formatPrice(tariffEntry.pricePerKg * saleKg) }}</strong>
-                                            </p>
-                                        </div>
-                                    </template>
-
-                                    <!-- Split payment -->
-                                    <template v-else>
-                                        <div v-for="(split, sIndex) in tariffEntry.splits" :key="sIndex" class="split-entry">
-                                            <div class="split-entry-header">
-                                                <span class="split-badge">Kısım {{ sIndex + 1 }}</span>
-                                                <button v-if="tariffEntry.splits.length > 2" type="button" class="btn-icon-sm" @click="removeSplit(sIndex)">
-                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                                </button>
-                                            </div>
-                                            <div class="form-row form-row--3">
-                                                <div class="form-group">
-                                                    <label class="form-label">Yüzde (%)</label>
-                                                    <input type="number" v-model.number="split.percentage" min="1" max="100" placeholder="50" class="form-input" />
-                                                </div>
-                                                <div class="form-group">
-                                                    <label class="form-label">Ödeme Zamanı</label>
-                                                    <select v-model="split.paymentTerm" class="form-input">
-                                                        <option value="cash">Peşin</option>
-                                                        <option value="weekly">Haftalık</option>
-                                                        <option value="monthly">Ay Sonu</option>
-                                                    </select>
-                                                </div>
-                                                <div class="form-group">
-                                                    <label class="form-label">Fiyat (TL/kg)</label>
-                                                    <input type="number" v-model.number="split.pricePerKg" min="0.01" step="0.01" placeholder="20" class="form-input" />
-                                                </div>
-                                            </div>
-                                            <div v-if="split.paymentTerm !== 'cash'" class="form-group">
-                                                <label class="form-label">Kaç Hafta/Ay Sonra?</label>
-                                                <input type="number" v-model.number="split.deferredMonths" min="1" max="24" placeholder="2" class="form-input" />
-                                            </div>
-                                        </div>
-                                        <button type="button" class="btn-add-split" @click="addSplit">+ Kısım Ekle</button>
-                                    </template>
-                                </div>
-                            </Transition>
-
-                            <!-- Submit -->
-                            <div class="form-actions">
-                                <button
-                                    class="btn-primary btn-primary--lg"
-                                    :disabled="!canSubmitSale || isSaving"
-                                    @click="completeSale"
-                                >
-                                    <span v-if="isSaving" class="btn-spinner"></span>
-                                    {{ isSaving ? 'Kaydediliyor...' : 'Satışı Kaydet' }}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </template>
-            </div>
-
-            <!-- ═══════════════ TAB 2: Satış Verilerim ═══════════════ -->
-            <div v-if="activeMainTab === 'sales'" class="tab-content">
+            <!-- ═══════════════ TAB: Hasat Verilerim (Çaykur teslimatları) ═══════════════ -->
+            <div v-if="activeMainTab === 'harvests'" class="tab-content">
                 <div class="sales-header">
                     <p class="sales-summary">
-                        {{ harvestsStore.harvestCount }} hasat, toplam {{ formatKg(harvestsStore.totalHarvestKg) }}
+                        Çaykur veritabanından gelen çay satışlarınız. Her teslimatı, çayı topladığınız araziye atayın.
                     </p>
                 </div>
 
@@ -723,92 +336,27 @@ async function confirmDeleteHarvest() {
                         placeholder="Yıl"
                         @update:model-value="applyFilters"
                     />
-                    <AppSelect
-                        v-model="fieldFilter"
-                        :options="fieldFilterOptions"
-                        placeholder="Tarla"
-                        @update:model-value="applyFilters"
-                    />
                 </div>
 
-                <div v-if="harvestsStore.isLoading" class="loading">
+                <div v-if="paymentsStore.isLoading" class="loading">
                     <div class="spinner"></div>
                 </div>
 
                 <AppEmptyState
-                    v-else-if="harvestsStore.harvests.length === 0"
+                    v-else-if="deliveries.length === 0"
                     icon="leaf"
-                    title="Henüz satış kaydı yok"
-                    description="Yaş Çay Sat sekmesinden ilk satışınızı kaydedin"
-                >
-                    <button class="btn-primary" style="margin-top: 16px;" @click="activeMainTab = 'sell'">
-                        Yaş Çay Sat
-                    </button>
-                </AppEmptyState>
+                    title="Henüz teslimat yok"
+                    description="Çaykur'a sattığınız çaylar bu alana otomatik olarak düşer."
+                />
 
-                <!-- Desktop Table -->
-                <template v-else>
-                    <div class="data-table-wrapper desktop-only">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Tarla</th>
-                                    <th>Tarih</th>
-                                    <th>Miktar</th>
-                                    <th>Satılan</th>
-                                    <th class="th-action"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="harvest in harvestsStore.harvests" :key="harvest.id">
-                                    <td>
-                                        <span class="cell-primary">{{ harvest.fieldName }}</span>
-                                    </td>
-                                    <td>{{ formatDate(harvest.harvestDate) }}</td>
-                                    <td><span class="cell-highlight">{{ formatKg(harvest.amountKg) }}</span></td>
-                                    <td>{{ harvest.soldAmountKg ? formatKg(harvest.soldAmountKg) : '-' }}</td>
-                                    <td class="td-action">
-                                        <button
-                                            class="btn-icon-delete"
-                                            @click="deleteHarvest(harvest.id)"
-                                        >
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                                        </button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Mobile Card List -->
-                    <div class="card-list mobile-only">
-                        <div v-for="harvest in harvestsStore.harvests" :key="'card-' + harvest.id" class="data-card">
-                            <div class="card-header">
-                                <span class="card-title">{{ harvest.fieldName }}</span>
-                                <span class="card-value">{{ formatDate(harvest.harvestDate) }}</span>
-                            </div>
-                            <div class="card-body">
-                                <div class="card-row">
-                                    <span class="card-label">Miktar</span>
-                                    <span class="card-value card-value--highlight">{{ formatKg(harvest.amountKg) }}</span>
-                                </div>
-                                <div class="card-row">
-                                    <span class="card-label">Satılan</span>
-                                    <span class="card-value">{{ harvest.soldAmountKg ? formatKg(harvest.soldAmountKg) : '-' }}</span>
-                                </div>
-                            </div>
-                            <div class="card-footer">
-                                <button
-                                    class="btn-icon-delete"
-                                    @click="deleteHarvest(harvest.id)"
-                                >
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                                    <span>Sil</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </template>
+                <div v-else class="delivery-grid">
+                    <DeliveryBox
+                        v-for="delivery in deliveries"
+                        :key="delivery.id"
+                        :delivery="delivery"
+                        @assign="openFieldPicker"
+                    />
+                </div>
             </div>
 
             <!-- ═══════════════ TAB 3: Arazi Verim Analizi ═══════════════ -->
@@ -842,7 +390,7 @@ async function confirmDeleteHarvest() {
                     v-else-if="analysisMonthRows.length === 0 && analysisYearRows.length === 0"
                     icon="bar-chart"
                     title="Analiz icin hasat verisi yok"
-                    description="Yaş Çay Sat sekmesinden hasat eklediğinizde verim değişimleri burada görünür."
+                    description="Hasat Verilerim sekmesinden teslimatlarınızı bir araziye atadığınızda verim değişimleri burada görünür."
                 />
 
                 <template v-else>
@@ -928,16 +476,112 @@ async function confirmDeleteHarvest() {
                 </template>
             </div>
 
-            <!-- Delete Harvest Confirm Modal -->
-            <ConfirmModal
-                v-model="showDeleteConfirm"
-                title="Hasatı Sil"
-                message="Bu hasatı silmek istediğinize emin misiniz? Bu işlem geri alınamaz."
-                confirm-text="Sil"
-                cancel-text="Vazgeç"
-                variant="danger"
-                @confirm="confirmDeleteHarvest"
-            />
+            <!-- ═══════════════ TAB: Ödemeler ═══════════════ -->
+            <div v-if="activeMainTab === 'payments'" class="tab-content">
+                <div class="sales-header">
+                    <p class="sales-summary">
+                        Toplam gelir: <strong>{{ formatPrice(paymentsStore.totalIncome) }}</strong>
+                    </p>
+                </div>
+
+                <div class="filters">
+                    <AppSelect
+                        v-model="yearFilter"
+                        :options="yearOptions"
+                        placeholder="Yıl"
+                        @update:model-value="applyFilters"
+                    />
+                    <AppSelect
+                        v-model="statusFilter"
+                        :options="statusOptions"
+                        placeholder="Durum"
+                    />
+                </div>
+
+                <div v-if="paymentsStore.isLoading" class="loading">
+                    <div class="spinner"></div>
+                </div>
+
+                <AppEmptyState
+                    v-else-if="filteredPayments.length === 0"
+                    icon="payment"
+                    title="Ödeme kaydı yok"
+                    description="Çaykur teslimatlarınızın ödemeleri burada listelenir."
+                />
+
+                <template v-else>
+                    <div class="data-table-wrapper desktop-only">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Tarih</th>
+                                    <th>Firma</th>
+                                    <th>Miktar</th>
+                                    <th>Tutar</th>
+                                    <th>Durum</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="p in filteredPayments" :key="p.id">
+                                    <td>{{ formatDate(p.paymentDate) }}</td>
+                                    <td><span class="cell-primary">{{ p.firm?.name || p.brokerFirm?.firmName || '—' }}</span></td>
+                                    <td>{{ formatKg(p.totalAmountKg) }}</td>
+                                    <td><span class="cell-highlight">{{ formatPrice(p.totalPrice) }}</span></td>
+                                    <td>
+                                        <span class="status-pill" :class="p.paymentStatus === 'received' ? 'status-pill--received' : 'status-pill--pending'">
+                                            {{ statusLabel(p.paymentStatus) }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="card-list mobile-only">
+                        <div v-for="p in filteredPayments" :key="'pay-' + p.id" class="data-card">
+                            <div class="card-header">
+                                <span class="card-title">{{ p.firm?.name || p.brokerFirm?.firmName || '—' }}</span>
+                                <span class="card-value">{{ formatDate(p.paymentDate) }}</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="card-row">
+                                    <span class="card-label">Miktar</span>
+                                    <span class="card-value">{{ formatKg(p.totalAmountKg) }}</span>
+                                </div>
+                                <div class="card-row">
+                                    <span class="card-label">Tutar</span>
+                                    <span class="card-value card-value--highlight">{{ formatPrice(p.totalPrice) }}</span>
+                                </div>
+                                <div class="card-row">
+                                    <span class="card-label">Durum</span>
+                                    <span class="card-value">{{ statusLabel(p.paymentStatus) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- ═══ Arazi ekle (land assignment) modal ═══ -->
+            <div v-if="showFieldPicker" class="picker-overlay" role="dialog" aria-modal="true" @click.self="showFieldPicker = false" @keydown.esc="showFieldPicker = false">
+                <div class="picker-card">
+                    <h2 class="picker-title">Arazi ekle</h2>
+                    <p class="picker-desc">Bu çay teslimatını hangi arazinizden topladınız?</p>
+                    <AppSelect
+                        v-model="pickerFieldId"
+                        :options="fieldPickerOptions"
+                        placeholder="Arazi seçiniz..."
+                        variant="light"
+                    />
+                    <div class="picker-actions">
+                        <button class="btn-secondary" :disabled="isAssigning" @click="showFieldPicker = false">İptal</button>
+                        <button class="btn-primary" :disabled="isAssigning || !pickerFieldId" @click="confirmAssignField">
+                            <span v-if="isAssigning" class="btn-spinner"></span>
+                            {{ isAssigning ? 'Kaydediliyor...' : 'Araziyi Ata' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </TeaBusinessLayout>
 </template>
@@ -2562,5 +2206,86 @@ select.form-input {
     .mobile-only {
         display: flex !important;
     }
+}
+
+/* ── Çaykur delivery boxes (Hasat Verilerim) ── */
+.delivery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+}
+
+.currency-tab-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: var(--radius-full);
+    background: var(--color-primary);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+/* ── Payments tab status pill ── */
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: var(--radius-full);
+    font-size: 12px;
+    font-weight: 700;
+}
+.status-pill--received { background: rgba(34, 197, 94, 0.15); color: var(--color-success); }
+.status-pill--pending { background: rgba(245, 158, 11, 0.15); color: var(--color-warning); }
+
+/* ── Arazi ekle modal ── */
+.picker-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+.picker-card {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    padding: 24px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2);
+}
+.picker-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin: 0 0 4px;
+}
+.picker-desc {
+    font-size: 13px;
+    color: var(--color-text-muted);
+    margin: 0 0 16px;
+}
+.picker-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 20px;
 }
 </style>

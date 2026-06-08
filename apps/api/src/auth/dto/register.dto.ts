@@ -77,4 +77,16 @@ export class RegisterDto {
         message: 'TC Kimlik No 11 haneli olmalıdır',
     })
     farmerIdNumber: string;
+
+    @ApiProperty({
+        example: '1234567',
+        description: 'Çaykur producer booklet number (cüzdan no)',
+    })
+    @IsString()
+    @IsNotEmpty({ message: 'Çaykur Cüzdan No gereklidir' })
+    @Matches(/^[0-9]{1,20}$/, {
+        message: 'Çaykur Cüzdan No sadece rakamlardan oluşmalıdır',
+    })
+    @MaxLength(50)
+    cuzdanNo: string;
 }

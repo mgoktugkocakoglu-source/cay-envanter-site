@@ -24,6 +24,14 @@ useFocusTrap(showDeleteModal, fieldDeleteModalRef);
 const fieldToDelete = ref<Field | null>(null);
 const isDeleting = ref(false);
 
+// Rename ("Arazimi isimlendir") modal state
+const showRenameModal = ref(false);
+const renameInputRef = ref<HTMLInputElement | null>(null);
+watch(showRenameModal, (v) => { if (v) nextTick(() => renameInputRef.value?.focus()); });
+const fieldToRename = ref<Field | null>(null);
+const renameValue = ref('');
+const isRenaming = ref(false);
+
 // View mode
 const viewMode = ref<'grid' | 'list'>('grid');
 
@@ -61,13 +69,40 @@ function navigateToField(id: string) {
     router.push(`/fields/${id}`);
 }
 
-function navigateToCreateParams() {
-    router.push('/fields/create');
+// ── Rename ("Arazimi isimlendir") ──
+function openRenameModal(field: Field, event: Event) {
+    event.stopPropagation();
+    fieldToRename.value = field;
+    renameValue.value = field.name || '';
+    showRenameModal.value = true;
 }
 
-function navigateToEdit(id: string, event: Event) {
-    event.stopPropagation();
-    router.push(`/tea/fields/${id}/edit`);
+function closeRenameModal() {
+    showRenameModal.value = false;
+    fieldToRename.value = null;
+    renameValue.value = '';
+}
+
+async function confirmRename() {
+    if (!fieldToRename.value) return;
+    const name = renameValue.value.trim();
+    if (!name) {
+        toast.error('Lütfen bir arazi adı giriniz');
+        return;
+    }
+
+    isRenaming.value = true;
+    try {
+        const updated = await fieldsStore.updateField(fieldToRename.value.id, { name });
+        if (updated) {
+            toast.success('Arazi adı kaydedildi');
+            closeRenameModal();
+        } else {
+            toast.error('Arazi adı kaydedilirken bir hata oluştu');
+        }
+    } finally {
+        isRenaming.value = false;
+    }
 }
 
 function openDeleteModal(field: Field, event: Event) {
@@ -88,10 +123,10 @@ async function confirmDelete() {
     try {
         const success = await fieldsStore.deleteField(fieldToDelete.value.id);
         if (success) {
-            toast.success('Tarla başarıyla silindi');
+            toast.success('Arazi başarıyla silindi');
             closeDeleteModal();
         } else {
-            toast.error('Tarla silinirken bir hata oluştu');
+            toast.error('Arazi silinirken bir hata oluştu');
         }
     } finally {
         isDeleting.value = false;
@@ -115,8 +150,26 @@ function formatTotalArea(area: number) {
     return area.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' m\u00B2';
 }
 
-function getFieldInitial(name: string) {
-    return name.charAt(0).toUpperCase();
+function displayName(field: Field) {
+    return field.name?.trim() || 'İsimsiz Arazi';
+}
+
+function getFieldInitial(field: Field) {
+    const n = field.name?.trim();
+    if (n) return n.charAt(0).toUpperCase();
+    return field.parcelNo ? field.parcelNo.charAt(0) : '?';
+}
+
+// "Ada 142 / Parsel 11" — the cadastral identifiers from the Çaykur/TKGM record.
+function parcelAdaLabel(field: Field) {
+    const parts: string[] = [];
+    if (field.adaNo) parts.push(`Ada ${field.adaNo}`);
+    if (field.parcelNo) parts.push(`Parsel ${field.parcelNo}`);
+    return parts.join(' / ');
+}
+
+function isUnnamed(field: Field) {
+    return !field.name?.trim();
 }
 </script>
 
@@ -126,11 +179,11 @@ function getFieldInitial(name: string) {
             <!-- Header -->
             <header class="page-header">
                 <div class="header-left">
-                    <h1>Tarlalarım</h1>
+                    <h1>Arazilerim</h1>
                     <div class="header-stats">
                         <span class="stat-chip">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                            {{ fieldsStore.fieldCount }} tarla
+                            {{ fieldsStore.fieldCount }} arazi
                         </span>
                         <span v-if="totalArea > 0" class="stat-chip">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
@@ -138,10 +191,10 @@ function getFieldInitial(name: string) {
                         </span>
                     </div>
                 </div>
-                <button class="btn-create" @click="navigateToCreateParams">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    Yeni Tarla Ekle
-                </button>
+                <span class="caykur-source-chip" title="Araziler Çaykur cüzdan numaranızdan otomatik yüklenir">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                    Çaykur cüzdanından yüklendi
+                </span>
             </header>
 
             <!-- Toolbar -->
@@ -151,7 +204,7 @@ function getFieldInitial(name: string) {
                     <input
                         v-model="searchQuery"
                         type="text"
-                        placeholder="Tarla ara..."
+                        placeholder="Arazi ara..."
                         class="search-input"
                     />
                     <button v-if="searchQuery" class="search-clear" @click="searchQuery = ''">
@@ -188,7 +241,7 @@ function getFieldInitial(name: string) {
             <!-- Loading -->
             <div v-if="fieldsStore.isLoading" class="loading-state">
                 <div class="spinner"></div>
-                <p>Tarlalar yükleniyor...</p>
+                <p>Araziler yükleniyor...</p>
             </div>
 
             <!-- Error -->
@@ -201,14 +254,9 @@ function getFieldInitial(name: string) {
             <AppEmptyState
                 v-else-if="filteredFields.length === 0"
                 icon="field"
-                title="Henüz tarla eklenmedi"
-                description="Ilk tarlanizi ekleyerek baslayin"
-            >
-                <button class="btn-create btn-create--sm" @click="navigateToCreateParams">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    Tarla Ekle
-                </button>
-            </AppEmptyState>
+                title="Henüz arazi bulunamadı"
+                description="Çaykur cüzdan numaranıza kayıtlı araziler burada otomatik olarak listelenir."
+            />
 
             <!-- Grid View -->
             <div v-else-if="viewMode === 'grid'" class="fields-grid">
@@ -224,10 +272,10 @@ function getFieldInitial(name: string) {
                     <div class="card-content">
                         <div class="card-top">
                             <div class="field-avatar">
-                                {{ getFieldInitial(field.name) }}
+                                {{ getFieldInitial(field) }}
                             </div>
                             <div class="field-title-wrap">
-                                <h3 class="field-name">{{ field.name }}</h3>
+                                <h3 class="field-name" :class="{ 'field-name--unnamed': isUnnamed(field) }">{{ displayName(field) }}</h3>
                                 <span class="field-location">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                                     {{ field.province }} / {{ field.district }}
@@ -237,6 +285,10 @@ function getFieldInitial(name: string) {
                         </div>
 
                         <div class="card-meta">
+                            <span v-if="parcelAdaLabel(field)" class="meta-item meta-item--parcel">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                                {{ parcelAdaLabel(field) }}
+                            </span>
                             <span class="meta-item">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></svg>
                                 {{ field.neighborhood }}
@@ -245,19 +297,15 @@ function getFieldInitial(name: string) {
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                                 {{ field.partnerCount }} ortak
                             </span>
-                            <span v-if="field.parcelNo" class="meta-item">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-                                {{ field.parcelNo }}
-                            </span>
                         </div>
 
                         <div class="card-actions">
                             <button
-                                class="action-btn"
-                                title="Duzenle"
-                                @click="navigateToEdit(field.id, $event)"
+                                class="btn-name"
+                                @click="openRenameModal(field, $event)"
                             >
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                {{ isUnnamed(field) ? 'Arazimi isimlendir' : 'Adı düzenle' }}
                             </button>
                             <button
                                 class="action-btn action-btn--danger"
@@ -274,10 +322,10 @@ function getFieldInitial(name: string) {
             <!-- List View -->
             <div v-else class="fields-list">
                 <div class="list-header">
-                    <span class="lh-name">Tarla Adı</span>
+                    <span class="lh-name">Arazi Adı</span>
                     <span class="lh-location">Konum</span>
                     <span class="lh-area">Alan</span>
-                    <span class="lh-partners">Ortaklar</span>
+                    <span class="lh-partners">Ada / Parsel</span>
                     <span class="lh-actions"></span>
                 </div>
                 <div
@@ -288,9 +336,9 @@ function getFieldInitial(name: string) {
                 >
                     <div class="lr-name">
                         <div class="field-avatar field-avatar--sm">
-                            {{ getFieldInitial(field.name) }}
+                            {{ getFieldInitial(field) }}
                         </div>
-                        <span>{{ field.name }}</span>
+                        <span :class="{ 'field-name--unnamed': isUnnamed(field) }">{{ displayName(field) }}</span>
                     </div>
                     <div class="lr-location">
                         <span class="lr-location-main">{{ field.province }} / {{ field.district }}</span>
@@ -300,11 +348,11 @@ function getFieldInitial(name: string) {
                         <span class="area-tag area-tag--sm">{{ formatArea(field.area, field.areaUnit) }}</span>
                     </div>
                     <div class="lr-partners">
-                        <span v-if="field.partnerCount > 1">{{ field.partnerCount }} ortak</span>
+                        <span v-if="parcelAdaLabel(field)">{{ parcelAdaLabel(field) }}</span>
                         <span v-else class="text-muted">-</span>
                     </div>
                     <div class="lr-actions">
-                        <button class="action-btn" title="Duzenle" @click="navigateToEdit(field.id, $event)">
+                        <button class="action-btn" title="Arazimi isimlendir" @click="openRenameModal(field, $event)">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </button>
                         <button class="action-btn action-btn--danger" title="Sil" @click="openDeleteModal(field, $event)">
@@ -327,13 +375,13 @@ function getFieldInitial(name: string) {
                             <div class="modal-icon-wrap">
                                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                             </div>
-                            <h2 id="field-delete-title">Tarlayı Sil</h2>
+                            <h2 id="field-delete-title">Araziyi Sil</h2>
                             <p>
-                                <strong>{{ fieldToDelete?.name }}</strong> tarlanizi silmek istediginize emin misiniz?
+                                <strong>{{ fieldToDelete ? displayName(fieldToDelete) : '' }}</strong> arazinizi silmek istediginize emin misiniz?
                             </p>
                             <div class="modal-warning">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                                Bu işlem geri alınamaz. Tarlaya ait tüm hasat kayıtları da etkilenebilir.
+                                Bu işlem geri alınamaz. Araziye ait tüm hasat kayıtları da etkilenebilir.
                             </div>
 
                             <div v-if="fieldsStore.error" class="modal-error">
@@ -347,6 +395,39 @@ function getFieldInitial(name: string) {
                                 <button class="btn-modal-danger" @click="confirmDelete" :disabled="isDeleting">
                                     <span v-if="isDeleting" class="spinner-sm"></span>
                                     {{ isDeleting ? 'Siliniyor...' : 'Evet, Sil' }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </Transition>
+            </Teleport>
+
+            <!-- Rename Modal -->
+            <Teleport to="body">
+                <Transition name="modal">
+                    <div v-if="showRenameModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="field-rename-title" @click.self="closeRenameModal" @keydown.esc="closeRenameModal">
+                        <div class="modal-card modal-card--form">
+                            <h2 id="field-rename-title">Arazimi İsimlendir</h2>
+                            <p>
+                                <strong>{{ fieldToRename ? parcelAdaLabel(fieldToRename) || fieldToRename.district : '' }}</strong>
+                                arazinize tanıyabileceğiniz bir isim verin.
+                            </p>
+                            <input
+                                ref="renameInputRef"
+                                v-model="renameValue"
+                                type="text"
+                                class="rename-input"
+                                maxlength="50"
+                                placeholder="Örn: Evin Yanı, Üst Tarla"
+                                @keydown.enter="confirmRename"
+                            />
+                            <div class="modal-actions">
+                                <button class="btn-modal-cancel" @click="closeRenameModal" :disabled="isRenaming">
+                                    İptal
+                                </button>
+                                <button class="btn-modal-primary" @click="confirmRename" :disabled="isRenaming">
+                                    <span v-if="isRenaming" class="spinner-sm"></span>
+                                    {{ isRenaming ? 'Kaydediliyor...' : 'Kaydet' }}
                                 </button>
                             </div>
                         </div>
@@ -420,6 +501,101 @@ function getFieldInitial(name: string) {
 
 .btn-create--sm {
     padding: var(--space-2) var(--space-4);
+}
+
+.caykur-source-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    border: 1px solid var(--color-primary);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    flex-shrink: 0;
+}
+
+/* Name fallback for auto-loaded, not-yet-named lands */
+.field-name--unnamed {
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+.meta-item--parcel {
+    color: var(--color-text-secondary);
+    font-weight: var(--font-weight-medium);
+}
+
+/* "Arazimi isimlendir" primary action on each card */
+.btn-name {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    height: 34px;
+    padding: 0 var(--space-3);
+    background: var(--color-primary-light);
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-md);
+    color: var(--color-primary);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.btn-name:hover {
+    background: var(--color-primary);
+    color: white;
+}
+
+.modal-card--form {
+    text-align: left;
+}
+
+.rename-input {
+    width: 100%;
+    height: var(--control-height);
+    padding: 0 var(--space-4);
+    margin-bottom: var(--space-5);
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    color: var(--color-text-primary);
+    font-size: var(--font-size-sm);
+    font-family: var(--font-family);
+}
+
+.rename-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+.btn-modal-primary {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-3) var(--space-6);
+    background: var(--color-primary);
+    border: none;
+    border-radius: var(--radius-lg);
+    color: white;
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.btn-modal-primary:hover:not(:disabled) {
+    background: var(--color-primary-hover);
+}
+
+.btn-modal-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* ── Toolbar ── */

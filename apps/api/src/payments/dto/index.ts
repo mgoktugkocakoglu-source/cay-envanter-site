@@ -13,7 +13,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PaymentStatus } from '@/payments/entities/payment.entity';
+import { PaymentStatus, PaymentSource } from '@/payments/entities/payment.entity';
 
 export class HarvestAllocationDto {
     @ApiProperty({ description: 'Harvest ID' })
@@ -83,6 +83,12 @@ export class UpdatePaymentDto {
     notes?: string;
 }
 
+export class AssignFieldDto {
+    @ApiProperty({ description: 'Field (land) to attribute this delivery to' })
+    @IsUUID()
+    fieldId: string;
+}
+
 export class PaymentQueryDto {
     @ApiPropertyOptional({ description: 'Filter by broker firm' })
     @IsOptional()
@@ -98,6 +104,11 @@ export class PaymentQueryDto {
     @IsOptional()
     @IsEnum(['received', 'pending'])
     paymentStatus?: PaymentStatus;
+
+    @ApiPropertyOptional({ description: 'Filter by source', enum: ['caykur', 'manual'] })
+    @IsOptional()
+    @IsEnum(['caykur', 'manual'])
+    source?: PaymentSource;
 
     @ApiPropertyOptional({ description: 'Sort field', enum: ['paymentDate', 'totalPrice'] })
     @IsOptional()
@@ -123,9 +134,14 @@ export interface PaymentWithDetails {
     totalPrice: number;
     pricePerKg: number;
     brokerFirm: { id: string; firmName: string } | null;
+    firm: { id: string; name: string; logoUrl: string | null; isCaykur: boolean } | null;
+    tariffLabel: string | null;
+    source: PaymentSource;
     paymentDate: Date;
     paymentStatus: PaymentStatus;
     notes: string | null;
     harvestCount: number;
+    assigned: boolean;
+    assignedField: { id: string; name: string } | null;
     createdAt: Date;
 }

@@ -17,6 +17,7 @@ import { UploadsModule } from '@/uploads/uploads.module';
 import { HealthModule } from '@/health/health.module';
 import { KnowledgeModule } from '@/knowledge/knowledge.module';
 import { PruningModule } from '@/pruning/pruning.module';
+import { SeedModule } from '@/seed/seed.module';
 
 @Module({
     imports: [
@@ -56,6 +57,9 @@ import { PruningModule } from '@/pruning/pruning.module';
                 R2_BUCKET: Joi.string().optional().allow('').default(''),
                 R2_PUBLIC_URL: Joi.string().optional().allow('').default(''),
                 R2_PREFIX: Joi.string().optional().allow('').default(''),
+                SEED_DEMO: Joi.string().valid('true', 'false').optional().default('false'),
+                SEED_DEMO_EMAIL: Joi.string().optional().allow('').default('demo@cayhesabim.com'),
+                SEED_DEMO_PASSWORD: Joi.string().optional().allow('').default('Caykur2026'),
             }),
         }),
 
@@ -90,6 +94,7 @@ import { PruningModule } from '@/pruning/pruning.module';
         HealthModule,
         KnowledgeModule,
         PruningModule,
+        SeedModule,
     ],
     providers: [
         {

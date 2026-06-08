@@ -14,6 +14,9 @@ interface User {
     province: string;
     district: string;
     avatarUrl?: string | null;
+    cuzdanNo?: string | null;
+    quotaPerDekarKg?: number | null;
+    appointmentDays?: string[] | null;
 }
 
 interface AuthTokens {

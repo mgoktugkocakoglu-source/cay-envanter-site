@@ -3,7 +3,6 @@ import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
-import teaBusinessIcon from '@/assets/images/tea-business-icon.png';
 
 const authStore = useAuthStore();
 const themeStore = useThemeStore();
@@ -15,6 +14,7 @@ const userMenuRef = ref<HTMLElement | null>(null);
 const userInitial = computed(() => authStore.user?.fullName?.charAt(0)?.toUpperCase() ?? '?');
 const userName = computed(() => authStore.user?.fullName ?? 'Kullanıcı');
 const userAvatar = computed(() => authStore.user?.avatarUrl ?? '');
+const userCuzdan = computed(() => authStore.user?.cuzdanNo ?? '');
 
 function toggleUserMenu() {
   isUserMenuOpen.value = !isUserMenuOpen.value;
@@ -75,11 +75,6 @@ onBeforeUnmount(() => {
           <img v-if="themeStore.theme === 'dark'" src="@/assets/images/logo-dark.svg" alt="Çay Hesabım" class="hub-logo-img" />
           <img v-else src="@/assets/images/logo-light.svg" alt="Çay Hesabım" class="hub-logo-img" />
         </RouterLink>
-        <div class="hub-divider-v" aria-hidden="true"></div>
-        <div class="hub-context">
-          <img class="hub-context-icon" :src="teaBusinessIcon" alt="" aria-hidden="true" />
-          <span class="hub-context-text">Çay İşleri Hesabı</span>
-        </div>
       </div>
 
       <!-- ─── CENTER: empty for now (rail handles nav) ─── -->
@@ -110,7 +105,10 @@ onBeforeUnmount(() => {
               <img v-if="userAvatar" :src="userAvatar" :alt="userName" />
               <span v-else>{{ userInitial }}</span>
             </span>
-            <span class="user-name">{{ userName }}</span>
+            <span class="user-trigger-text">
+              <span class="user-name">{{ userName }}</span>
+              <span v-if="userCuzdan" class="user-cuzdan">Cüzdan No: {{ userCuzdan }}</span>
+            </span>
             <svg class="user-caret" :class="{ 'is-open': isUserMenuOpen }" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
 
@@ -123,6 +121,7 @@ onBeforeUnmount(() => {
                 </span>
                 <div class="user-menu-meta">
                   <span class="user-menu-name">{{ userName }}</span>
+                  <span v-if="userCuzdan" class="user-menu-cuzdan">Çaykur Cüzdan No: {{ userCuzdan }}</span>
                   <span v-if="authStore.user?.email" class="user-menu-email">{{ authStore.user.email }}</span>
                 </div>
               </div>
@@ -158,7 +157,7 @@ onBeforeUnmount(() => {
         </RouterLink>
         <RouterLink to="/tea/fields" class="app-nav-item" active-class="router-link-active">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          <span>Tarlalarım</span>
+          <span>Arazilerim</span>
         </RouterLink>
         <RouterLink to="/tea/firms" class="app-nav-item" active-class="router-link-active">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -180,6 +179,10 @@ onBeforeUnmount(() => {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a5 5 0 0 0-5 5v2H6a4 4 0 0 0 0 8h1v1a4 4 0 0 0 8 0v-1h3a4 4 0 0 0 0-8h-1V7a5 5 0 0 0-5-5z"/><path d="M9 9h.01"/><path d="M15 9h.01"/><path d="M9 14h6"/></svg>
           <span>AI Agent</span>
         </RouterLink>
+        <RouterLink to="/tea/caykur" class="app-nav-item" active-class="router-link-active">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/></svg>
+          <span>Çaykur</span>
+        </RouterLink>
       </aside>
 
       <main class="hub-content">
@@ -194,7 +197,7 @@ onBeforeUnmount(() => {
       </RouterLink>
       <RouterLink to="/tea/fields" class="bottom-tab" active-class="router-link-active">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        <span>Tarlalar</span>
+        <span>Araziler</span>
       </RouterLink>
       <RouterLink to="/tea/firms" class="bottom-tab" active-class="router-link-active">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
@@ -215,6 +218,10 @@ onBeforeUnmount(() => {
       <RouterLink to="/tea/ai-agent" class="bottom-tab" active-class="router-link-active">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a5 5 0 0 0-5 5v2H6a4 4 0 0 0 0 8h1v1a4 4 0 0 0 8 0v-1h3a4 4 0 0 0 0-8h-1V7a5 5 0 0 0-5-5z"/><path d="M9 9h.01"/><path d="M15 9h.01"/><path d="M9 14h6"/></svg>
         <span>AI</span>
+      </RouterLink>
+      <RouterLink to="/tea/caykur" class="bottom-tab" active-class="router-link-active">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/></svg>
+        <span>Çaykur</span>
       </RouterLink>
     </nav>
   </div>
@@ -402,11 +409,38 @@ onBeforeUnmount(() => {
 .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .user-avatar.lg { width: 42px; height: 42px; font-size: 16px; }
 
+.user-trigger-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 0;
+}
+
 .user-name {
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text-primary);
-  max-width: 140px;
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-cuzdan {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-menu-cuzdan {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -575,7 +609,7 @@ onBeforeUnmount(() => {
 @media (max-width: 1024px) {
   .hub-context-text { display: none; }
   .hub-switch-label { display: none; }
-  .user-name { display: none; }
+  .user-trigger-text { display: none; }
   .user-menu-trigger { padding: 4px; }
 }
 
@@ -624,8 +658,8 @@ onBeforeUnmount(() => {
     bottom: max(10px, env(safe-area-inset-bottom));
     z-index: 70;
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 4px;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 3px;
     padding: 6px;
     background: color-mix(in srgb, var(--color-bg-secondary) 94%, transparent);
     border: 1px solid var(--color-border);

@@ -107,6 +107,7 @@ export interface Field {
     neighborhood: string;
     road: string | null;
     parcelNo: string | null;
+    adaNo: string | null;
     coordinates: number[][][];
     area: number;
     areaUnit: 'donum' | 'dekar' | 'm2';
@@ -191,10 +192,15 @@ export interface Payment {
     totalPrice: number;
     pricePerKg: number;
     brokerFirm: { id: string; firmName: string } | null;
+    firm?: { id: string; name: string; logoUrl: string | null; isCaykur: boolean } | null;
+    tariffLabel?: string | null;
+    source?: 'caykur' | 'manual';
     paymentDate: string;
     paymentStatus: 'received' | 'pending';
     notes: string | null;
     harvestCount?: number;
+    assigned?: boolean;
+    assignedField?: { id: string; name: string } | null;
 }
 
 export interface BrokerFirm {
@@ -306,6 +312,7 @@ export interface Firm {
     email: string | null;
     address: string | null;
     isActive: boolean;
+    isCaykur?: boolean;
     tariffs?: FirmTariff[];
     collectionPoints?: FirmCollectionPoint[];
     createdAt: string;
@@ -319,6 +326,7 @@ export interface TariffSplitDetail {
     paymentTerm: PaymentTerm;
     deferredMonths?: number;
     customPaymentDate?: string;
+    paymentMonth?: number;
     pricePerKg: number;
 }
 
@@ -330,6 +338,7 @@ export interface FirmTariff {
     effectiveDate: string;
     endDate: string | null;
     customPaymentDate: string | null;
+    paymentMonth: number | null;
     isSplitPayment: boolean;
     splitDetails: TariffSplitDetail[] | null;
     isActive: boolean;
@@ -360,9 +369,11 @@ export interface FirmWithCurrentTariffs {
     description: string | null;
     logoUrl: string | null;
     isActive: boolean;
+    isCaykur: boolean;
     currentTariffs: {
         paymentTerm: PaymentTerm;
         pricePerKg: number;
+        paymentMonth: number | null;
         effectiveDate: string;
         isSplitPayment: boolean;
         splitDetails: TariffSplitDetail[] | null;
@@ -431,6 +442,7 @@ export const api = {
         province: string;
         district: string;
         farmerIdNumber: string;
+        cuzdanNo: string;
     }) => request<{ message: string; email: string }>('/auth/register', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -606,11 +618,13 @@ export const api = {
     getHarvestRemaining: (id: string) => request<{ remainingKg: number }>(`/harvests/${id}/remaining`),
 
     // Payments endpoints
-    getPayments: (params?: { brokerFirmId?: string; year?: number; paymentStatus?: string }) => {
+    getPayments: (params?: { brokerFirmId?: string; year?: number; paymentStatus?: string; source?: string }) => {
         const query = new URLSearchParams(params as Record<string, string>).toString();
         return request<Payment[]>(`/payments${query ? `?${query}` : ''}`);
     },
     getPayment: (id: string) => request<Payment>(`/payments/${id}`),
+    assignDeliveryField: (id: string, fieldId: string) =>
+        request<Payment>(`/payments/${id}/assign-field`, { method: 'POST', body: JSON.stringify({ fieldId }) }),
     createPayment: (data: {
         harvestAllocations: { harvestId: string; usedAmountKg: number }[];
         totalPrice: number;

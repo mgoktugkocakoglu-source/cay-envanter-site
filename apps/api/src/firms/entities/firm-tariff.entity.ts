@@ -17,6 +17,9 @@ export interface TariffSplitDetail {
     paymentTerm: PaymentTerm;
     deferredMonths?: number;
     customPaymentDate?: string;
+    // Month (1-12) the payment is made, used when paymentTerm is 'monthly'.
+    // Rendered as "{MonthName} Ayı Ödeme" (e.g. "Temmuz Ayı Ödeme").
+    paymentMonth?: number;
     pricePerKg: number;
 }
 
@@ -47,6 +50,11 @@ export class FirmTariff {
 
     @Column({ type: 'date', name: 'custom_payment_date', nullable: true })
     customPaymentDate: Date | null;
+
+    // Month (1-12) the payment is made, used when paymentTerm is 'monthly'.
+    // Rendered as "{MonthName} Ayı Ödeme" (e.g. "Temmuz Ayı Ödeme").
+    @Column({ type: 'int', name: 'payment_month', nullable: true })
+    paymentMonth: number | null;
 
     @Column({ type: 'boolean', name: 'is_split_payment', default: false })
     isSplitPayment: boolean;

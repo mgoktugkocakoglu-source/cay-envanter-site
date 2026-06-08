@@ -28,6 +28,7 @@ import {
     PaymentQueryDto,
     CreateBrokerFirmDto,
     PaymentWithDetails,
+    AssignFieldDto,
 } from '@/payments/dto';
 import { Payment, BrokerFirm } from '@/payments/entities';
 
@@ -72,6 +73,18 @@ export class PaymentsController {
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<Payment> {
         return this.paymentsService.findOne(id, req.user.id);
+    }
+
+    @Post(':id/assign-field')
+    @ApiOperation({ summary: 'Attribute an auto-dropped Çaykur delivery to one of the producer\'s lands' })
+    @ApiParam({ name: 'id', description: 'Payment UUID' })
+    @ApiResponse({ status: 201, description: 'Delivery assigned to land' })
+    async assignField(
+        @Request() req: AuthenticatedRequest,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() dto: AssignFieldDto,
+    ): Promise<PaymentWithDetails> {
+        return this.paymentsService.assignField(id, req.user.id, dto.fieldId);
     }
 
     @Patch(':id')

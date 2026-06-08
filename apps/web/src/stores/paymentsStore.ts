@@ -18,7 +18,15 @@ export const usePaymentsStore = defineStore('payments', () => {
         payments.value.filter(p => p.paymentStatus === 'pending')
     );
 
-    async function fetchPayments(params?: { year?: number; paymentStatus?: string }) {
+    // Auto-dropped Çaykur deliveries split by land-assignment state.
+    const unassignedDeliveries = computed(() =>
+        payments.value.filter(p => p.assigned === false)
+    );
+    const assignedDeliveries = computed(() =>
+        payments.value.filter(p => p.assigned !== false)
+    );
+
+    async function fetchPayments(params?: { year?: number; paymentStatus?: string; source?: string }) {
         isLoading.value = true;
         error.value = null;
         try {
@@ -87,6 +95,24 @@ export const usePaymentsStore = defineStore('payments', () => {
         }
     }
 
+    async function assignField(deliveryId: string, fieldId: string): Promise<boolean> {
+        error.value = null;
+        try {
+            const response = await api.assignDeliveryField(deliveryId, fieldId);
+            if (response.data) {
+                const index = payments.value.findIndex(p => p.id === deliveryId);
+                if (index !== -1) payments.value[index] = response.data;
+                return true;
+            } else if (response.error) {
+                error.value = response.error.message;
+            }
+            return false;
+        } catch (e) {
+            error.value = 'Failed to assign field';
+            return false;
+        }
+    }
+
     async function deletePayment(id: string) {
         isLoading.value = true;
         error.value = null;
@@ -118,10 +144,13 @@ export const usePaymentsStore = defineStore('payments', () => {
         error,
         totalIncome,
         pendingPayments,
+        unassignedDeliveries,
+        assignedDeliveries,
         fetchPayments,
         fetchBrokerFirms,
         createPayment,
         createBrokerFirm,
+        assignField,
         deletePayment,
         clearError,
     };

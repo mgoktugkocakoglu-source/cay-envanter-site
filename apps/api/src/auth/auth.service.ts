@@ -23,20 +23,25 @@ interface JwtPayload {
     email: string;
 }
 
+export interface AuthUser {
+    id: string;
+    email: string;
+    fullName: string;
+    userType: string;
+    phone: string;
+    province: string;
+    district: string;
+    avatarUrl: string | null;
+    role: string;
+    cuzdanNo: string | null;
+    quotaPerDekarKg: number | null;
+    appointmentDays: string[] | null;
+}
+
 export interface AuthResponse {
     accessToken: string;
     refreshToken: string;
-    user: {
-        id: string;
-        email: string;
-        fullName: string;
-        userType: string;
-        phone: string;
-        province: string;
-        district: string;
-        avatarUrl: string | null;
-        role: string;
-    };
+    user: AuthUser;
 }
 
 @Injectable()
@@ -73,6 +78,11 @@ export class AuthService {
             throw new ConflictException('Bu telefon numarası zaten kayıtlı');
         }
 
+        const existingCuzdan = await this.usersService.findByCuzdanNo(registerDto.cuzdanNo);
+        if (existingCuzdan) {
+            throw new ConflictException('Bu Çaykur Cüzdan No zaten kayıtlı');
+        }
+
         const hashedPassword = await bcrypt.hash(registerDto.password, this.SALT_ROUNDS);
         const verificationToken = uuidv4();
         const verificationTokenExpiry = new Date();
@@ -88,6 +98,7 @@ export class AuthService {
             province: registerDto.province,
             district: registerDto.district,
             farmerIdNumber: registerDto.farmerIdNumber,
+            cuzdanNo: registerDto.cuzdanNo,
             userType: registerDto.userType,
             emailVerified: false,
             verificationToken,
@@ -194,17 +205,24 @@ export class AuthService {
 
         return {
             ...tokens,
-            user: {
-                id: user.id,
-                email: user.email,
-                fullName: user.fullName,
-                userType: user.userType,
-                role: user.role,
-                phone: user.phone,
-                province: user.province,
-                district: user.district,
-                avatarUrl: user.avatarUrl,
-            },
+            user: this.toAuthUser(user),
+        };
+    }
+
+    private toAuthUser(user: User): AuthUser {
+        return {
+            id: user.id,
+            email: user.email,
+            fullName: user.fullName,
+            userType: user.userType,
+            role: user.role,
+            phone: user.phone,
+            province: user.province,
+            district: user.district,
+            avatarUrl: user.avatarUrl,
+            cuzdanNo: user.cuzdanNo,
+            quotaPerDekarKg: user.quotaPerDekarKg,
+            appointmentDays: user.appointmentDays,
         };
     }
 
@@ -470,34 +488,14 @@ export class AuthService {
         return { message: 'Çıkış yapıldı' };
     }
 
-    async getCurrentUser(userId: string): Promise<{
-        id: string;
-        email: string;
-        fullName: string;
-        userType: string;
-        phone: string;
-        province: string;
-        district: string;
-        avatarUrl: string | null;
-        role: string;
-    } | null> {
+    async getCurrentUser(userId: string): Promise<AuthUser | null> {
         const user = await this.usersService.findById(userId);
 
         if (!user) {
             return null;
         }
 
-        return {
-            id: user.id,
-            email: user.email,
-            fullName: user.fullName,
-            userType: user.userType,
-            role: user.role,
-            phone: user.phone,
-            province: user.province,
-            district: user.district,
-            avatarUrl: user.avatarUrl,
-        };
+        return this.toAuthUser(user);
     }
 
     // Session Management Methods

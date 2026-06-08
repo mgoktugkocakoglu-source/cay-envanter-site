@@ -35,6 +35,12 @@ export class Firm {
     @Column({ type: 'boolean', default: true })
     isActive: boolean;
 
+    // Çaykur is a state buyer with a fixed price + per-dekar quota (kontenjan)
+    // instead of negotiable tariffs. This flag drives the Çaykur-specific UI
+    // (quota panel instead of tariff cards, no "Brüt" suffix, etc.).
+    @Column({ type: 'boolean', default: false })
+    isCaykur: boolean;
+
     @OneToMany(() => FirmTariff, (tariff) => tariff.firm, { cascade: true })
     tariffs: FirmTariff[];
 

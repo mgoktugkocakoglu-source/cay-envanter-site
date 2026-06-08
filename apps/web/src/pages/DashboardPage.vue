@@ -6,9 +6,15 @@ import { useFieldsStore } from '@/stores/fieldsStore';
 import { useHarvestsStore } from '@/stores/harvestsStore';
 import { usePaymentsStore } from '@/stores/paymentsStore';
 import { useWeather } from '@/composables/useWeather';
-import { api, type YearlySummary, type MonthlyData } from '@/services/api';
+import { api, type YearlySummary } from '@/services/api';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import WeatherWidget from '@/components/ui/WeatherWidget.vue';
+
+const APPOINTMENT_DAY_LABELS: Record<string, string> = {
+  monday: 'Pazartesi', tuesday: 'Salı', wednesday: 'Çarşamba', thursday: 'Perşembe',
+  friday: 'Cuma', saturday: 'Cumartesi', sunday: 'Pazar',
+};
+const DEFAULT_QUOTA_PER_DEKAR = 30;
 
 const authStore = useAuthStore();
 const fieldsStore = useFieldsStore();
@@ -18,9 +24,8 @@ const router = useRouter();
 
 const isLoading = ref(true);
 const yearlySummary = ref<YearlySummary | null>(null);
-const monthlyData = ref<MonthlyData[]>([]);
 const currentTime = ref(new Date());
-const noonPrayerTime = ref('');
+const prayerSchedule = ref<{ key: string; label: string; time: string }[]>([]);
 const prayerError = ref('');
 let clockTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -51,7 +56,7 @@ const weatherLocationName = computed(() => {
   return field.province || 'Konum';
 });
 
-const { currentWeather, hourlyForecast, alerts: weatherAlerts, isLoading: weatherLoading, error: weatherError, lastUpdated: weatherLastUpdated, fetchWeather } = useWeather(weatherLat, weatherLon);
+const { currentWeather, hourlyForecast, dailyForecast: weatherDaily, isLoading: weatherLoading, error: weatherError, lastUpdated: weatherLastUpdated, fetchWeather } = useWeather(weatherLat, weatherLon);
 
 const greetingText = computed(() => {
   const hour = new Date().getHours();
@@ -87,15 +92,33 @@ const pendingPayments = computed(() => {
   return paymentsStore.payments.filter(p => p.paymentStatus === 'pending');
 });
 
-const maxMonthlyIncome = computed(() => {
-  if (!monthlyData.value.length) return 1;
-  return Math.max(...monthlyData.value.map(m => m.income), 1);
-});
+function isCurrentMonth(dateStr: string): boolean {
+  const d = new Date(dateStr);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+}
 
-const maxMonthlyHarvest = computed(() => {
-  if (!monthlyData.value.length) return 1;
-  return Math.max(...monthlyData.value.map(m => m.harvestKg), 1);
-});
+// Bu ayki teslimatlardan hesaplanan aylık hasat (kg) ve aylık gelir (₺).
+const monthlyHarvestKg = computed(() =>
+  paymentsStore.payments
+    .filter(p => isCurrentMonth(p.paymentDate))
+    .reduce((sum, p) => sum + Number(p.totalAmountKg || 0), 0)
+);
+
+const monthlyIncome = computed(() =>
+  paymentsStore.payments
+    .filter(p => p.paymentStatus === 'received' && isCurrentMonth(p.paymentDate))
+    .reduce((sum, p) => sum + Number(p.totalPrice || 0), 0)
+);
+
+// ── Çaykur durumu ──
+const caykurQuota = computed(() => authStore.user?.quotaPerDekarKg ?? DEFAULT_QUOTA_PER_DEKAR);
+const appointmentDays = computed(() =>
+  (authStore.user?.appointmentDays ?? ['wednesday', 'saturday']).map(d => APPOINTMENT_DAY_LABELS[d] ?? d)
+);
+const weeklyCapacityKg = computed(() =>
+  Math.round(totalArea.value * caykurQuota.value * appointmentDays.value.length)
+);
 
 const formattedClock = computed(() =>
   currentTime.value.toLocaleTimeString('tr-TR', {
@@ -112,17 +135,27 @@ const formattedToday = computed(() =>
   })
 );
 
-const noonPrayerCountdown = computed(() => {
-  if (!noonPrayerTime.value) return 'Yükleniyor';
+const nextPrayer = computed(() => {
+  const now = currentTime.value;
+  for (const p of prayerSchedule.value) {
+    const [hour, minute] = p.time.split(':').map(Number);
+    const target = new Date(now);
+    target.setHours(hour, minute, 0, 0);
+    if (target.getTime() > now.getTime()) return p;
+  }
+  return null;
+});
 
-  const [hour, minute] = noonPrayerTime.value.split(':').map(Number);
+const nextPrayerCountdown = computed(() => {
+  if (prayerError.value) return '—';
+  if (!prayerSchedule.value.length) return 'Yükleniyor';
+  if (!nextPrayer.value) return 'Yarın İmsak';
+
+  const [hour, minute] = nextPrayer.value.time.split(':').map(Number);
   const target = new Date(currentTime.value);
   target.setHours(hour, minute, 0, 0);
 
-  const diffMs = target.getTime() - currentTime.value.getTime();
-  if (diffMs <= 0) return 'Öğlen ezanı geçti';
-
-  const totalMinutes = Math.ceil(diffMs / 60000);
+  const totalMinutes = Math.ceil((target.getTime() - currentTime.value.getTime()) / 60000);
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
 
@@ -133,7 +166,8 @@ const noonPrayerCountdown = computed(() => {
 
 const nextPrayerNote = computed(() => {
   if (prayerError.value) return prayerError.value;
-  return noonPrayerTime.value ? `Öğlen ezanı ${noonPrayerTime.value}` : 'Vakit bilgisi alınıyor';
+  if (!nextPrayer.value) return 'Bugünün vakitleri tamamlandı';
+  return `Sıradaki: ${nextPrayer.value.label} ${nextPrayer.value.time}`;
 });
 
 function formatPrayerDate(date: Date): string {
@@ -158,11 +192,20 @@ async function fetchPrayerTimes() {
     const response = await fetch(`https://api.aladhan.com/v1/timings/${formatPrayerDate(currentTime.value)}?${params.toString()}`);
     if (!response.ok) throw new Error('Prayer API error');
     const data = await response.json();
-    noonPrayerTime.value = cleanPrayerTime(data?.data?.timings?.Dhuhr);
-    if (!noonPrayerTime.value) throw new Error('Missing Dhuhr time');
+    const t = data?.data?.timings ?? {};
+    const schedule = [
+      { key: 'Fajr', label: 'İmsak', time: cleanPrayerTime(t.Fajr) },
+      { key: 'Sunrise', label: 'Güneş', time: cleanPrayerTime(t.Sunrise) },
+      { key: 'Dhuhr', label: 'Öğle', time: cleanPrayerTime(t.Dhuhr) },
+      { key: 'Asr', label: 'İkindi', time: cleanPrayerTime(t.Asr) },
+      { key: 'Maghrib', label: 'Akşam', time: cleanPrayerTime(t.Maghrib) },
+      { key: 'Isha', label: 'Yatsı', time: cleanPrayerTime(t.Isha) },
+    ].filter(p => p.time);
+    if (!schedule.length) throw new Error('Missing timings');
+    prayerSchedule.value = schedule;
   } catch {
-    noonPrayerTime.value = '';
-    prayerError.value = 'Öğlen vakti alınamadı';
+    prayerSchedule.value = [];
+    prayerError.value = 'Vakit bilgisi alınamadı';
   }
 }
 
@@ -206,9 +249,6 @@ async function loadDashboardData() {
       paymentsStore.fetchPayments(),
       api.getYearlySummary(currentYear).then(r => {
         if (r.data) yearlySummary.value = r.data;
-      }),
-      api.getMonthlyIncome(currentYear).then(r => {
-        if (r.data) monthlyData.value = r.data;
       }),
     ]);
     await fetchPrayerTimes();
@@ -257,27 +297,10 @@ onUnmounted(stopClock);
             </div>
           </div>
           <div class="greeting-actions">
-            <!-- Arazi Sahibi icin -->
-            <template v-if="authStore.user?.userType === 'land_owner'">
-              <RouterLink to="/tea/fields" class="action-btn action-btn--primary">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-                Arazilerim
-              </RouterLink>
-            </template>
-            <!-- Çay işçisi için -->
-            <template v-else-if="authStore.user?.userType === 'worker'">
-              <RouterLink to="/tea/fields" class="action-btn action-btn--primary">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-                Tarlalarım
-              </RouterLink>
-            </template>
-            <!-- Kendi Isleyen icin (varsayilan) -->
-            <template v-else>
-              <RouterLink to="/tea/fields/create" class="action-btn action-btn--primary">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                Tarla Ekle
-              </RouterLink>
-            </template>
+            <RouterLink to="/tea/fields" class="action-btn action-btn--primary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+              Arazilerim
+            </RouterLink>
           </div>
         </header>
 
@@ -286,7 +309,7 @@ onUnmounted(stopClock);
           <WeatherWidget
             :current="currentWeather"
             :hourly="hourlyForecast"
-            :alerts="weatherAlerts"
+            :daily="weatherDaily"
             :is-loading="weatherLoading"
             :error="weatherError"
             :last-updated="weatherLastUpdated"
@@ -305,9 +328,20 @@ onUnmounted(stopClock);
             </div>
             <p class="time-date">{{ formattedToday }}</p>
             <div class="prayer-countdown">
-              <span class="prayer-label">Öğlen Ezan Vaktine Kalan Süre</span>
-              <strong>{{ noonPrayerCountdown }}</strong>
+              <span class="prayer-label">Sonraki Ezana Kalan Süre</span>
+              <strong>{{ nextPrayerCountdown }}</strong>
               <span class="prayer-note">{{ nextPrayerNote }}</span>
+            </div>
+            <div v-if="prayerSchedule.length" class="prayer-times">
+              <div
+                v-for="p in prayerSchedule"
+                :key="p.key"
+                class="prayer-time"
+                :class="{ 'prayer-time--next': nextPrayer && nextPrayer.key === p.key }"
+              >
+                <span class="prayer-time-label">{{ p.label }}</span>
+                <span class="prayer-time-value">{{ p.time }}</span>
+              </div>
             </div>
           </div>
         </section>
@@ -320,7 +354,7 @@ onUnmounted(stopClock);
             </div>
             <div class="stat-info">
               <span class="stat-value">{{ fieldsStore.fieldCount }}</span>
-              <span class="stat-label">Tarla</span>
+              <span class="stat-label">Arazi</span>
             </div>
             <div class="stat-sub">{{ totalArea.toFixed(1) }} dekar toplam alan</div>
           </div>
@@ -330,10 +364,10 @@ onUnmounted(stopClock);
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
             </div>
             <div class="stat-info">
-              <span class="stat-value">{{ formatKg(harvestsStore.totalHarvestKg) }}</span>
-              <span class="stat-label">kg Hasat</span>
+              <span class="stat-value">{{ formatKg(monthlyHarvestKg) }}</span>
+              <span class="stat-label">Aylık Hasat (kg)</span>
             </div>
-            <div class="stat-sub">{{ harvestsStore.harvestCount }} hasat kaydi</div>
+            <div class="stat-sub">Bu ay teslim edilen yaş çay</div>
           </div>
 
           <div class="stat-card" role="link" tabindex="0" @click="router.push('/payments')" @keydown.enter="router.push('/payments')">
@@ -341,12 +375,12 @@ onUnmounted(stopClock);
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
             </div>
             <div class="stat-info">
-              <span class="stat-value">{{ formatCurrency(paymentsStore.totalIncome) }}</span>
-              <span class="stat-label">Toplam Gelir</span>
+              <span class="stat-value">{{ formatCurrency(monthlyIncome) }}</span>
+              <span class="stat-label">Aylık Gelir</span>
             </div>
             <div class="stat-sub">
               <span v-if="yearlySummary">{{ yearlySummary.averagePricePerKg.toFixed(2) }} TL/kg ort.</span>
-              <span v-else>-</span>
+              <span v-else>Bu ay alınan ödemeler</span>
             </div>
           </div>
 
@@ -364,55 +398,34 @@ onUnmounted(stopClock);
           </div>
         </section>
 
-        <!-- Charts Row -->
-        <section class="charts-row" v-if="monthlyData.length">
-          <!-- Monthly Income Chart -->
-          <div class="chart-card">
-            <div class="chart-header">
-              <h3>Aylık Gelir</h3>
-              <span class="chart-year">{{ currentYear }}</span>
+        <!-- Çaykur Durumu -->
+        <section class="caykur-status">
+          <div class="caykur-status-head">
+            <h3>Çaykur Durumu</h3>
+            <span class="caykur-status-sub">Güncel kontenjan ve randevu bilgileriniz</span>
+          </div>
+          <div class="caykur-status-grid">
+            <div class="caykur-tile">
+              <span class="caykur-tile-label">Toplam Arazi</span>
+              <span class="caykur-tile-value">{{ totalArea.toFixed(1) }}<small> dekar</small></span>
             </div>
-            <div class="bar-chart">
-              <div
-                v-for="month in monthlyData"
-                :key="month.month"
-                class="bar-col"
-              >
-                <div class="bar-tooltip">{{ formatCurrency(month.income) }}</div>
-                <div class="bar-track">
-                  <div
-                    class="bar-fill bar-fill--income"
-                    :style="{ height: (month.income / maxMonthlyIncome * 100) + '%' }"
-                  ></div>
-                </div>
-                <span class="bar-label">{{ month.monthName.slice(0, 3) }}</span>
-              </div>
+            <div class="caykur-tile">
+              <span class="caykur-tile-label">Güncel Kontenjan</span>
+              <span class="caykur-tile-value">{{ caykurQuota }}<small> kg/dekar</small></span>
+            </div>
+            <div class="caykur-tile caykur-tile--accent">
+              <span class="caykur-tile-label">Haftalık Satış Hakkı</span>
+              <span class="caykur-tile-value">{{ formatKg(weeklyCapacityKg) }}<small> kg</small></span>
+            </div>
+            <div class="caykur-tile">
+              <span class="caykur-tile-label">Randevu Günleri</span>
+              <span class="caykur-tile-value caykur-tile-value--days">{{ appointmentDays.join(', ') }}</span>
             </div>
           </div>
-
-          <!-- Monthly Harvest Chart -->
-          <div class="chart-card">
-            <div class="chart-header">
-              <h3>Aylık Hasat (kg)</h3>
-              <span class="chart-year">{{ currentYear }}</span>
-            </div>
-            <div class="bar-chart">
-              <div
-                v-for="month in monthlyData"
-                :key="month.month"
-                class="bar-col"
-              >
-                <div class="bar-tooltip">{{ formatKg(month.harvestKg) }} kg</div>
-                <div class="bar-track">
-                  <div
-                    class="bar-fill bar-fill--harvest"
-                    :style="{ height: (month.harvestKg / maxMonthlyHarvest * 100) + '%' }"
-                  ></div>
-                </div>
-                <span class="bar-label">{{ month.monthName.slice(0, 3) }}</span>
-              </div>
-            </div>
-          </div>
+          <p class="caykur-status-note">
+            {{ totalArea.toFixed(1) }} dekar × {{ caykurQuota }} kg kontenjan × {{ appointmentDays.length }} randevu günü =
+            haftalık <strong>{{ formatKg(weeklyCapacityKg) }} kg</strong> satış hakkı.
+          </p>
         </section>
 
         <!-- Quick Links -->
@@ -423,7 +436,7 @@ onUnmounted(stopClock);
           </RouterLink>
           <RouterLink to="/tea/fields" class="quick-link-card">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-            <span>Tarlalarım</span>
+            <span>Arazilerim</span>
           </RouterLink>
         </section>
       </div>
@@ -530,6 +543,137 @@ onUnmounted(stopClock);
   color: var(--color-primary);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
+}
+
+/* ── Prayer schedule (all daily times) ── */
+.prayer-times {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.prayer-time {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: var(--space-2);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.prayer-time--next {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+
+.prayer-time-label {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium);
+}
+
+.prayer-time--next .prayer-time-label {
+  color: var(--color-primary);
+}
+
+.prayer-time-value {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+/* ── Çaykur Durumu ── */
+.caykur-status {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+}
+
+.caykur-status-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.caykur-status-head h3 {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.caykur-status-sub {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.caykur-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.caykur-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.caykur-tile--accent {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+
+.caykur-tile-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium);
+}
+
+.caykur-tile-value {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  line-height: 1.1;
+}
+
+.caykur-tile--accent .caykur-tile-value {
+  color: var(--color-primary);
+}
+
+.caykur-tile-value small {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+}
+
+.caykur-tile-value--days {
+  font-size: var(--font-size-base);
+}
+
+.caykur-status-note {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin: 0;
+}
+
+.caykur-status-note strong {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-bold);
 }
 
 /* ── Greeting ── */

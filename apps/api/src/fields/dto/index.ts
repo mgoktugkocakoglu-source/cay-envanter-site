@@ -77,6 +77,12 @@ export class CreateFieldDto {
     @MaxLength(50)
     parcelNo?: string;
 
+    @ApiPropertyOptional({ description: 'Block (ada) number from cadastre' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(50)
+    adaNo?: string;
+
     @ApiProperty({ description: 'Polygon coordinates in GeoJSON format' })
     @IsArray()
     coordinates: number[][][];

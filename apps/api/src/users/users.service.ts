@@ -67,6 +67,12 @@ export class UsersService {
         });
     }
 
+    async findByCuzdanNo(cuzdanNo: string): Promise<User | null> {
+        return this.userRepository.findOne({
+            where: { cuzdanNo, deleted: false },
+        });
+    }
+
     async searchUser(query: string, type: 'tc' | 'phone'): Promise<{
         id: string;
         fullName: string;

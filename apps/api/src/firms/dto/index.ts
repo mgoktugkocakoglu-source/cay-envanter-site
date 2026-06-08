@@ -58,6 +58,11 @@ export class CreateFirmDto {
     @IsOptional()
     @IsBoolean()
     isActive?: boolean;
+
+    @ApiPropertyOptional({ description: 'Whether this firm is Çaykur (quota-based, no tariffs)', default: false })
+    @IsOptional()
+    @IsBoolean()
+    isCaykur?: boolean;
 }
 
 export class UpdateFirmDto {
@@ -101,6 +106,11 @@ export class UpdateFirmDto {
     @IsOptional()
     @IsBoolean()
     isActive?: boolean;
+
+    @ApiPropertyOptional({ description: 'Whether this firm is Çaykur (quota-based, no tariffs)' })
+    @IsOptional()
+    @IsBoolean()
+    isCaykur?: boolean;
 }
 
 export class FirmQueryDto {
@@ -140,6 +150,13 @@ export class TariffSplitDetailDto {
     @IsDateString()
     customPaymentDate?: string;
 
+    @ApiPropertyOptional({ description: 'Payment month (1-12) when paymentTerm is monthly' })
+    @IsOptional()
+    @IsNumber()
+    @Min(1)
+    @Max(12)
+    paymentMonth?: number;
+
     @ApiProperty({ description: 'Price per kg in TL for this split' })
     @IsNumber()
     @Min(0.01)
@@ -171,6 +188,13 @@ export class CreateFirmTariffDto {
     @IsOptional()
     @IsDateString()
     customPaymentDate?: string;
+
+    @ApiPropertyOptional({ description: 'Payment month (1-12), used when paymentTerm is monthly' })
+    @IsOptional()
+    @IsNumber()
+    @Min(1)
+    @Max(12)
+    paymentMonth?: number;
 
     @ApiPropertyOptional({ description: 'Whether this is a split payment', default: false })
     @IsOptional()
@@ -216,6 +240,13 @@ export class UpdateFirmTariffDto {
     @IsOptional()
     @IsDateString()
     customPaymentDate?: string;
+
+    @ApiPropertyOptional({ description: 'Payment month (1-12), used when paymentTerm is monthly' })
+    @IsOptional()
+    @IsNumber()
+    @Min(1)
+    @Max(12)
+    paymentMonth?: number;
 
     @ApiPropertyOptional({ description: 'Whether this is a split payment' })
     @IsOptional()
@@ -372,15 +403,18 @@ export interface FirmWithCurrentTariffs {
     description: string | null;
     logoUrl: string | null;
     isActive: boolean;
+    isCaykur: boolean;
     currentTariffs: {
         paymentTerm: PaymentTerm;
         pricePerKg: number;
+        paymentMonth: number | null;
         effectiveDate: Date;
         isSplitPayment: boolean;
         splitDetails: {
             percentage: number;
             paymentTerm: PaymentTerm;
             deferredMonths?: number;
+            paymentMonth?: number;
             pricePerKg: number;
         }[] | null;
     }[];

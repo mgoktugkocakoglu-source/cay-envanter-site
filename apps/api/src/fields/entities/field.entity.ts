@@ -45,6 +45,10 @@ export class Field {
     @Column({ type: 'varchar', length: 50, nullable: true })
     parcelNo: string | null;
 
+    // Cadastral block number (ada no) from TKGM, shown alongside the parcel no.
+    @Column({ type: 'varchar', length: 50, nullable: true })
+    adaNo: string | null;
+
     // Store coordinates as JSON array (GeoJSON polygon format)
     // For PostGIS, you would use: @Column('geometry', { spatialFeatureType: 'Polygon', srid: 4326 })
     @Column({ type: 'jsonb' })

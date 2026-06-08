@@ -40,6 +40,7 @@ export class FieldsService {
             neighborhood: dto.neighborhood,
             road: dto.road || null,
             parcelNo: dto.parcelNo || null,
+            adaNo: dto.adaNo || null,
             coordinates: dto.coordinates,
             area: dto.area,
             areaUnit: dto.areaUnit,

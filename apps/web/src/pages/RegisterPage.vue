@@ -42,6 +42,7 @@ const form = ref({
   password: '',
   confirmPassword: '',
   farmerIdNumber: '',
+  cuzdanNo: '',
   termsAccepted: false,
 });
 
@@ -176,6 +177,14 @@ function validateField(field: string): boolean {
       }
       break;
 
+    case 'cuzdanNo':
+      if (!form.value.cuzdanNo) {
+        errors.value[field] = 'Çaykur Cüzdan No gereklidir';
+      } else if (!/^[0-9]{1,20}$/.test(form.value.cuzdanNo)) {
+        errors.value[field] = 'Çaykur Cüzdan No sadece rakamlardan oluşmalıdır';
+      }
+      break;
+
     case 'termsAccepted':
       if (!form.value.termsAccepted) {
         errors.value[field] = 'Kullanım koşullarını kabul etmelisiniz';
@@ -187,7 +196,7 @@ function validateField(field: string): boolean {
 }
 
 function validateAll(): boolean {
-  const fields = ['userType', 'fullName', 'email', 'phone', 'province', 'district', 'password', 'confirmPassword', 'farmerIdNumber', 'termsAccepted'];
+  const fields = ['userType', 'fullName', 'email', 'phone', 'province', 'district', 'password', 'confirmPassword', 'farmerIdNumber', 'cuzdanNo', 'termsAccepted'];
   return fields.every(validateField);
 }
 
@@ -216,6 +225,7 @@ async function handleSubmit() {
     district: form.value.district,
     password: form.value.password,
     farmerIdNumber: form.value.farmerIdNumber,
+    cuzdanNo: form.value.cuzdanNo,
   });
 
   isLoading.value = false;
@@ -346,6 +356,24 @@ async function resendVerification() {
               />
               <p class="form-hint">TC kimlik numaranız, diger kullanıcılarla baglantı kurmak icin kullanılacaktır.</p>
               <p v-if="errors.farmerIdNumber" class="form-error">{{ errors.farmerIdNumber }}</p>
+            </div>
+
+            <!-- Çaykur Cüzdan No -->
+            <div class="form-group">
+              <label class="form-label" for="cuzdanNo">Çaykur Cüzdan No *</label>
+              <input
+                id="cuzdanNo"
+                v-model="form.cuzdanNo"
+                type="text"
+                inputmode="numeric"
+                class="form-input"
+                :class="{ 'has-error': errors.cuzdanNo }"
+                placeholder="Çaykur üretici cüzdan numaranız"
+                maxlength="20"
+                @blur="validateField('cuzdanNo')"
+              />
+              <p class="form-hint">Çaykur üretici cüzdan numaranız; arazileriniz ve çay satışlarınız bu numara üzerinden eşleştirilir.</p>
+              <p v-if="errors.cuzdanNo" class="form-error">{{ errors.cuzdanNo }}</p>
             </div>
 
             <!-- Full Name -->

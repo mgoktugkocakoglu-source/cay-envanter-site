@@ -51,6 +51,43 @@ export class User {
     })
     role: Role;
 
+    // ── Çaykur producer (müstahsil) profile ──
+    // Bureaucratic identifiers maintained by Çaykur. Optional: a producer can
+    // exist in the platform before Çaykur supplies them; the monitoring panel
+    // falls back to derived values (e.g. quota from licensed area) when unset.
+
+    // Çaykur licence number (ruhsat no).
+    @Column({ type: 'varchar', length: 50, nullable: true })
+    ruhsatNo: string | null;
+
+    // Producer booklet number (cüzdan no).
+    @Column({ type: 'varchar', length: 50, nullable: true })
+    cuzdanNo: string | null;
+
+    // Whether the producer holds organic certification.
+    @Column({ type: 'boolean', default: false })
+    organic: boolean;
+
+    // Affiliated Çaykur factory the producer delivers to.
+    @Column({ type: 'varchar', length: 150, nullable: true })
+    factory: string | null;
+
+    // Çaykur-set annual purchase quota (kg). When null, the panel derives it
+    // from licensed area (quotaPerDekar × dekar).
+    @Column({ type: 'int', nullable: true })
+    annualQuotaKg: number | null;
+
+    // Çaykur per-dekar purchase quota (kg/dekar) for the current period. Çaykur
+    // adjusts this periodically; the producer dashboard multiplies it by the
+    // total licensed area to show the weekly delivery allowance.
+    @Column({ type: 'int', nullable: true })
+    quotaPerDekarKg: number | null;
+
+    // Çaykur appointment (randevu) days the producer may deliver tea on, stored
+    // as lowercase English weekday keys (e.g. ['wednesday', 'saturday']).
+    @Column({ type: 'simple-array', nullable: true })
+    appointmentDays: string[] | null;
+
     @Column({ type: 'varchar', length: 500, nullable: true })
     avatarUrl: string | null;
 

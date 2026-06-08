@@ -71,6 +71,7 @@ export class FirmsService {
             email: dto.email || null,
             address: dto.address || null,
             isActive: dto.isActive ?? true,
+            isCaykur: dto.isCaykur ?? false,
         });
 
         const saved = await this.firmRepository.save(firm);
@@ -88,6 +89,7 @@ export class FirmsService {
         if (dto.email !== undefined) firm.email = dto.email;
         if (dto.address !== undefined) firm.address = dto.address;
         if (dto.isActive !== undefined) firm.isActive = dto.isActive;
+        if (dto.isCaykur !== undefined) firm.isCaykur = dto.isCaykur;
 
         await this.firmRepository.save(firm);
         this.logger.log(`Firm updated: ${id}`);
@@ -134,6 +136,7 @@ export class FirmsService {
             effectiveDate: new Date(dto.effectiveDate),
             endDate: dto.endDate ? new Date(dto.endDate) : null,
             customPaymentDate: dto.customPaymentDate ? new Date(dto.customPaymentDate) : null,
+            paymentMonth: dto.paymentMonth ?? null,
             isSplitPayment: dto.isSplitPayment ?? false,
             splitDetails: dto.splitDetails || null,
             isActive: dto.isActive ?? true,
@@ -160,6 +163,7 @@ export class FirmsService {
         if (dto.effectiveDate !== undefined) tariff.effectiveDate = new Date(dto.effectiveDate);
         if (dto.endDate !== undefined) tariff.endDate = dto.endDate ? new Date(dto.endDate) : null;
         if (dto.customPaymentDate !== undefined) tariff.customPaymentDate = dto.customPaymentDate ? new Date(dto.customPaymentDate) : null;
+        if (dto.paymentMonth !== undefined) tariff.paymentMonth = dto.paymentMonth ?? null;
         if (dto.isSplitPayment !== undefined) tariff.isSplitPayment = dto.isSplitPayment;
         if (dto.splitDetails !== undefined) tariff.splitDetails = dto.splitDetails || null;
         if (dto.isActive !== undefined) tariff.isActive = dto.isActive;
@@ -304,9 +308,11 @@ export class FirmsService {
                 description: firm.description,
                 logoUrl: firm.logoUrl,
                 isActive: firm.isActive,
+                isCaykur: firm.isCaykur,
                 currentTariffs: tariffs.map((t) => ({
                     paymentTerm: t.paymentTerm,
                     pricePerKg: t.pricePerKg,
+                    paymentMonth: t.paymentMonth,
                     effectiveDate: t.effectiveDate,
                     isSplitPayment: t.isSplitPayment,
                     splitDetails: t.splitDetails,
