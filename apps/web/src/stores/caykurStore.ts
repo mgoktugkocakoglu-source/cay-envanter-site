@@ -8,13 +8,27 @@ import {
     getProducer,
     type Producer,
 } from '@/services/caykurData';
+import {
+    PERSONAS,
+    personaForRole,
+    canAccess,
+    roleDef,
+    type CaykurRole,
+    type ModuleKey,
+    type Persona,
+} from '@/services/caykur/roles';
+import { opsSnapshot } from '@/services/caykur';
 
 /**
  * Çaykur command-center store.
  *
- * Currently sourced from the local demo dataset (caykurData). This is the
- * single seam to swap for real API aggregation endpoints later: replace the
- * `producers` initializer with a fetch and keep the computed getters intact.
+ * Sourced from the local deterministic demo dataset (services/caykur). This is
+ * the single seam to swap for real API aggregation endpoints later: replace the
+ * initializers with fetches and keep the computed getters intact.
+ *
+ * Also holds the demo *persona* — the current institutional role — which gates
+ * the panel navigation and page access (Faz 1). Swapping persona lets a pitch
+ * walk through each role's view without re-authenticating.
  */
 export const useCaykurStore = defineStore('caykur', () => {
     const producers = ref<Producer[]>(PRODUCERS);
@@ -22,10 +36,40 @@ export const useCaykurStore = defineStore('caykur', () => {
 
     const overview = computed(() => buildOverview(producers.value));
     const flagged = computed(() => flaggedProducers(producers.value));
+    const ops = computed(() => opsSnapshot());
 
     function producerById(id: string): Producer | undefined {
         return getProducer(id);
     }
 
-    return { producers, season, overview, flagged, producerById };
+    // ── Persona / role-based access (Faz 1) ──
+    const role = ref<CaykurRole>('kurum_admin');
+    const persona = computed<Persona>(() => personaForRole(role.value));
+    const personas = ref<Persona[]>(PERSONAS);
+
+    function setRole(next: CaykurRole): void {
+        role.value = next;
+    }
+
+    function can(moduleKey: ModuleKey): boolean {
+        return canAccess(role.value, moduleKey);
+    }
+
+    const currentRoleDef = computed(() => roleDef(role.value));
+
+    return {
+        producers,
+        season,
+        overview,
+        flagged,
+        ops,
+        producerById,
+        // persona / access
+        role,
+        persona,
+        personas,
+        currentRoleDef,
+        setRole,
+        can,
+    };
 });

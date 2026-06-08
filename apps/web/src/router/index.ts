@@ -136,6 +136,12 @@ const router = createRouter({
             meta: { requiresAuth: true, hub: 'tea' },
         },
         {
+            path: '/tea/caykur',
+            name: 'tea-caykur',
+            component: () => import('@/pages/MustahsilCaykurPage.vue'),
+            meta: { requiresAuth: true, hub: 'tea' },
+        },
+        {
             path: '/tea/settings',
             name: 'tea-settings',
             component: () => import('@/pages/SettingsPage.vue'),
@@ -162,24 +168,144 @@ const router = createRouter({
             meta: { requiresAuth: true, requiresAdmin: true },
         },
 
-        // ═══════ ÇAYKUR COMMAND CENTER (MÜSTAHSİL İZLEME) ═══════
+        // ═══════ ÇAYKUR KURUMSAL PANEL (ENTERPRISE) ═══════
         {
             path: '/caykur',
             name: 'caykur-overview',
             component: () => import('@/pages/caykur/CaykurOverviewPage.vue'),
-            meta: { requiresAuth: true, requiresAdmin: true },
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'overview' },
         },
         {
             path: '/caykur/producers',
             name: 'caykur-producers',
             component: () => import('@/pages/caykur/CaykurProducersPage.vue'),
-            meta: { requiresAuth: true, requiresAdmin: true },
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'producers' },
         },
         {
             path: '/caykur/producers/:id',
             name: 'caykur-producer-detail',
             component: () => import('@/pages/caykur/CaykurProducerDetailPage.vue'),
-            meta: { requiresAuth: true, requiresAdmin: true },
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'producers' },
+        },
+        {
+            path: '/caykur/parcels',
+            name: 'caykur-parcels',
+            component: () => import('@/pages/caykur/CaykurParcelsPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'parcels' },
+        },
+        {
+            path: '/caykur/parcels/:id',
+            name: 'caykur-parcel-detail',
+            component: () => import('@/pages/caykur/CaykurParcelDetailPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'parcels' },
+        },
+        {
+            path: '/caykur/deliveries',
+            name: 'caykur-deliveries',
+            component: () => import('@/pages/caykur/CaykurDeliveriesPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'deliveries' },
+        },
+        {
+            path: '/caykur/deliveries/new',
+            name: 'caykur-delivery-intake',
+            component: () => import('@/pages/caykur/CaykurDeliveryIntakePage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'deliveries' },
+        },
+        {
+            path: '/caykur/deliveries/:id',
+            name: 'caykur-delivery-detail',
+            component: () => import('@/pages/caykur/CaykurDeliveryDetailPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'deliveries' },
+        },
+        {
+            path: '/caykur/quota',
+            name: 'caykur-quota',
+            component: () => import('@/pages/caykur/CaykurQuotaPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'quota' },
+        },
+        {
+            path: '/caykur/finance',
+            name: 'caykur-finance',
+            component: () => import('@/pages/caykur/CaykurFinancePage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'finance' },
+        },
+        {
+            path: '/caykur/finance/:id',
+            name: 'caykur-cari-detail',
+            component: () => import('@/pages/caykur/CaykurCariDetailPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'finance' },
+        },
+        {
+            path: '/caykur/pruning',
+            name: 'caykur-pruning',
+            component: () => import('@/pages/caykur/CaykurPruningPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'pruning' },
+        },
+        {
+            path: '/caykur/pruning/:id',
+            name: 'caykur-pruning-detail',
+            component: () => import('@/pages/caykur/CaykurPruningDetailPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'pruning' },
+        },
+        {
+            path: '/caykur/org',
+            name: 'caykur-org',
+            component: () => import('@/pages/caykur/CaykurOrgPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'org' },
+        },
+        {
+            path: '/caykur/org/factory/:id',
+            name: 'caykur-factory-detail',
+            component: () => import('@/pages/caykur/CaykurFactoryDetailPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'org' },
+        },
+        {
+            path: '/caykur/tasks',
+            name: 'caykur-tasks',
+            component: () => import('@/pages/caykur/CaykurTasksPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'tasks' },
+        },
+        {
+            path: '/caykur/requests',
+            name: 'caykur-requests',
+            component: () => import('@/pages/caykur/CaykurRequestsPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'requests' },
+        },
+        {
+            path: '/caykur/requests/:id',
+            name: 'caykur-request-detail',
+            component: () => import('@/pages/caykur/CaykurRequestDetailPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'requests' },
+        },
+        {
+            path: '/caykur/announcements',
+            name: 'caykur-announcements',
+            component: () => import('@/pages/caykur/CaykurAnnouncementsPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'announcements' },
+        },
+        {
+            path: '/caykur/reports',
+            name: 'caykur-reports',
+            component: () => import('@/pages/caykur/CaykurReportsPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'reports' },
+        },
+        {
+            path: '/caykur/users',
+            name: 'caykur-users',
+            component: () => import('@/pages/caykur/CaykurUsersPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'users' },
+        },
+        {
+            path: '/caykur/audit',
+            name: 'caykur-audit',
+            component: () => import('@/pages/caykur/CaykurAuditPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'audit' },
+        },
+        {
+            path: '/caykur/settings',
+            name: 'caykur-settings',
+            component: () => import('@/pages/caykur/CaykurSettingsPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'settings' },
         },
 
         // ═══════ BACKWARD COMPATIBILITY REDIRECTS ═══════

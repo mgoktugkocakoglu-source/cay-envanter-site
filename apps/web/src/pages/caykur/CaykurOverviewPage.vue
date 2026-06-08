@@ -22,6 +22,11 @@ const caykur = useCaykurStore();
 
 const o = computed(() => caykur.overview);
 const flagged = computed(() => caykur.flagged);
+const ops = computed(() => caykur.ops);
+
+function go(path: string): void {
+    router.push(path);
+}
 
 const surgunRows = computed(() => {
     const s = o.value.surgun;
@@ -107,6 +112,34 @@ function openProducers(): void {
                 :value="formatNumber(flagged.length)"
                 sub="müstahsil incelenmeli"
             />
+        </section>
+
+        <!-- ── Operational snapshot (cross-module) ── -->
+        <section class="ops-strip" aria-label="Operasyon özeti">
+            <button type="button" class="ops-card" :data-on="ops.pendingDeliveries > 0" @click="go('/caykur/deliveries')">
+                <span class="ops-val">{{ formatNumber(ops.pendingDeliveries) }}</span>
+                <span class="ops-label">Onay bekleyen alım</span>
+            </button>
+            <button type="button" class="ops-card" :data-on="ops.pendingAudits > 0" @click="go('/caykur/pruning')">
+                <span class="ops-val">{{ formatNumber(ops.pendingAudits) }}</span>
+                <span class="ops-label">Denetim bekleyen budama</span>
+            </button>
+            <button type="button" class="ops-card" :data-on="ops.parcelsPendingVerification > 0" @click="go('/caykur/parcels')">
+                <span class="ops-val">{{ formatNumber(ops.parcelsPendingVerification) }}</span>
+                <span class="ops-label">Doğrulanacak parsel</span>
+            </button>
+            <button type="button" class="ops-card" :data-on="ops.paymentsAwaitingApproval > 0" @click="go('/caykur/finance')">
+                <span class="ops-val">{{ formatNumber(ops.paymentsAwaitingApproval) }}</span>
+                <span class="ops-label">Onay bekleyen ödeme</span>
+            </button>
+            <button type="button" class="ops-card" :data-on="ops.openRequests > 0" @click="go('/caykur/requests')">
+                <span class="ops-val">{{ formatNumber(ops.openRequests) }}</span>
+                <span class="ops-label">Açık talep</span>
+            </button>
+            <button type="button" class="ops-card" :data-on="ops.overdueTasks > 0" @click="go('/caykur/tasks')">
+                <span class="ops-val">{{ formatNumber(ops.overdueTasks) }}</span>
+                <span class="ops-label">Geciken görev</span>
+            </button>
         </section>
 
         <!-- ── Main grid ── -->
@@ -261,6 +294,56 @@ function openProducers(): void {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: var(--space-3);
     }
+}
+
+/* ── Operational snapshot strip ── */
+.ops-strip {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: var(--space-3);
+    margin-bottom: var(--space-6);
+}
+@media (max-width: 1100px) {
+    .ops-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+    .ops-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.ops-card {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-card-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all var(--transition-fast);
+}
+.ops-card:hover {
+    border-color: var(--color-border-strong);
+    background: var(--color-bg-primary);
+}
+.ops-card[data-on='true'] {
+    border-color: color-mix(in srgb, var(--color-warning) 40%, transparent);
+    background: color-mix(in srgb, var(--color-warning) 6%, var(--color-card-bg));
+}
+.ops-val {
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text-primary);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+.ops-card[data-on='true'] .ops-val {
+    color: var(--color-warning);
+}
+.ops-label {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
 }
 
 /* ── Main grid ── */
