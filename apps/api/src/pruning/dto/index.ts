@@ -7,14 +7,19 @@ import {
     IsBoolean,
     IsUUID,
     IsDateString,
+    IsIn,
+    IsInt,
     MaxLength,
+    Max,
     Min,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { MeasurementMethod, AccuracyLevel } from '@/pruning/entities';
+import { MeasurementMethod, AccuracyLevel, PruningTaskStatus } from '@/pruning/entities';
 
 const METHODS: MeasurementMethod[] = ['map', 'gps', 'assisted'];
 const ACCURACY_LEVELS: AccuracyLevel[] = ['high', 'medium', 'low'];
+const TASK_STATUSES: PruningTaskStatus[] = ['pending', 'in_progress', 'measured', 'completed', 'cancelled'];
 
 export class CreatePruningMeasurementDto {
     @ApiProperty({ description: 'Field (parcel) UUID the measurement belongs to' })
@@ -98,6 +103,11 @@ export class CreatePruningMeasurementDto {
     @IsOptional()
     @IsDateString()
     measuredAt?: string;
+
+    @ApiPropertyOptional({ description: 'Pruning task this capture fulfils (optional)' })
+    @IsOptional()
+    @IsUUID()
+    taskId?: string;
 }
 
 export class UpdatePruningApprovalDto {
@@ -110,4 +120,63 @@ export class UpdatePruningApprovalDto {
     @IsOptional()
     @IsBoolean()
     staffApproved?: boolean;
+
+    @ApiPropertyOptional({ description: 'Rejection reason; setting it rejects the measurement' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(1000)
+    rejectionReason?: string;
+}
+
+export class AssignPruningTaskDto {
+    @ApiProperty({ description: 'Field (parcel) UUID to measure' })
+    @IsUUID()
+    fieldId: string;
+
+    @ApiProperty({ description: 'Field officer (saha personeli) user UUID' })
+    @IsUUID()
+    assignedTo: string;
+
+    @ApiPropertyOptional({ description: 'Due date (ISO 8601)' })
+    @IsOptional()
+    @IsDateString()
+    dueDate?: string;
+
+    @ApiPropertyOptional({ description: 'Notes for the officer', maxLength: 1000 })
+    @IsOptional()
+    @IsString()
+    @MaxLength(1000)
+    notes?: string;
+}
+
+export class PruningQueryDto {
+    @ApiPropertyOptional({ default: 1, minimum: 1 })
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    page?: number = 1;
+
+    @ApiPropertyOptional({ default: 20, minimum: 1, maximum: 100 })
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(100)
+    limit?: number = 20;
+
+    @ApiPropertyOptional({ enum: TASK_STATUSES })
+    @IsOptional()
+    @IsIn(TASK_STATUSES)
+    status?: PruningTaskStatus;
+
+    @ApiPropertyOptional({ description: 'Filter by assigned officer UUID' })
+    @IsOptional()
+    @IsUUID()
+    assignedTo?: string;
+
+    @ApiPropertyOptional({ description: 'Filter by field UUID' })
+    @IsOptional()
+    @IsUUID()
+    fieldId?: string;
 }

@@ -17,6 +17,7 @@ import { UploadsModule } from '@/uploads/uploads.module';
 import { HealthModule } from '@/health/health.module';
 import { KnowledgeModule } from '@/knowledge/knowledge.module';
 import { PruningModule } from '@/pruning/pruning.module';
+import { CaykurModule } from '@/caykur/caykur.module';
 import { SeedModule } from '@/seed/seed.module';
 
 @Module({
@@ -94,6 +95,7 @@ import { SeedModule } from '@/seed/seed.module';
         HealthModule,
         KnowledgeModule,
         PruningModule,
+        CaykurModule,
         SeedModule,
     ],
     providers: [

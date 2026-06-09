@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useRouter, RouterLink } from 'vue-router';
+import { useRouter, useRoute, RouterLink } from 'vue-router';
 import { api } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
@@ -10,6 +10,7 @@ import AppCheckbox from '@/components/ui/AppCheckbox.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 
 const router = useRouter();
+const route = useRoute();
 const authStore = useAuthStore();
 const themeStore = useThemeStore();
 
@@ -83,7 +84,10 @@ async function handleSubmit() {
 
   if (result.data) {
     authStore.setAuth(result.data as { accessToken: string; refreshToken: string; user: any; });
-    router.push('/tea/dashboard');
+    // Honor a saved return URL, else route by identity (producer → tea hub,
+    // field officer → task queue, office/admin → Çaykur panel).
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : null;
+    router.push(redirect || authStore.homeRoute);
   }
 }
 

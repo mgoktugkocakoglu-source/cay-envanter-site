@@ -74,6 +74,15 @@
 }
 .ck-btn:hover {
     background: var(--color-bg-tertiary);
+    border-color: var(--color-text-muted);
+}
+.ck-btn:active {
+    transform: translateY(0.5px);
+}
+.ck-btn:focus-visible {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 .ck-btn-primary {
     background: var(--color-primary);
@@ -82,6 +91,7 @@
 }
 .ck-btn-primary:hover {
     background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
 }
 .ck-btn-sm {
     min-height: 34px;
@@ -176,6 +186,10 @@
 .ck-seg-btn:hover {
     color: var(--color-text-primary);
 }
+.ck-seg-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--color-primary-light);
+}
 .ck-seg-btn.is-active {
     background: var(--color-bg-secondary);
     color: var(--color-text-primary);
@@ -265,6 +279,11 @@
 }
 .ck-row-link:hover {
     background: var(--color-bg-primary);
+}
+.ck-row-link:focus-visible {
+    outline: none;
+    background: var(--color-primary-light);
+    box-shadow: inset 2px 0 0 var(--color-primary);
 }
 .ck-chevron-cell {
     text-align: right;
@@ -439,11 +458,9 @@
     min-width: 0;
 }
 .ck-dl-term {
-    font-size: var(--font-size-xs);
+    font-size: var(--font-size-sm);
     font-weight: var(--font-weight-semibold);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--color-text-muted);
+    color: var(--color-text-secondary);
 }
 .ck-dl-val {
     font-size: var(--font-size-base);

@@ -146,12 +146,115 @@ export interface PruningMeasurement {
     photoUrl: string | null;
     producerApproved: boolean;
     staffApproved: boolean;
+    status: PruningStatus;
+    rejectionReason: string | null;
     producerName: string | null;
     parcelNo: string | null;
     notes: string | null;
     measuredAt: string;
     createdAt: string;
     updatedAt: string;
+}
+
+export type PruningStatus =
+    | 'measured'
+    | 'producer_approved'
+    | 'staff_approved'
+    | 'completed'
+    | 'rejected';
+
+export type PruningTaskStatus =
+    | 'pending'
+    | 'in_progress'
+    | 'measured'
+    | 'completed'
+    | 'cancelled';
+
+export interface PruningTask {
+    id: string;
+    fieldId: string;
+    producerId: string;
+    assignedTo: string;
+    assignedBy: string;
+    status: PruningTaskStatus;
+    measurementId: string | null;
+    parcelNo: string | null;
+    producerName: string | null;
+    dueDate: string | null;
+    notes: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface AssignPruningTaskPayload {
+    fieldId: string;
+    assignedTo: string;
+    dueDate?: string;
+    notes?: string;
+}
+
+export interface PaginationMeta {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+}
+
+export interface Paginated<T> {
+    data: T[];
+    meta: PaginationMeta;
+}
+
+export type CaykurStaffRole =
+    | 'kurum_admin'
+    | 'fabrika_sorumlusu'
+    | 'alim_yeri_personeli'
+    | 'saha_personeli'
+    | 'denetci'
+    | 'finans';
+
+export interface CaykurStaff {
+    id: string;
+    fullName: string;
+    email: string;
+    phone: string;
+    province: string;
+    district: string;
+    caykurRole: CaykurStaffRole;
+    caykurScope: string | null;
+    title: string;
+    active: boolean;
+    createdAt: string;
+}
+
+export interface CreateCaykurStaffPayload {
+    fullName: string;
+    email: string;
+    phone: string;
+    province: string;
+    district: string;
+    caykurRole: CaykurStaffRole;
+    caykurScope?: string;
+}
+
+// Çaykur panel master dataset (müstahsil registry) — DB-backed.
+export interface CaykurPanelProducer {
+    id: string;
+    fullName: string;
+    ruhsatNo: string;
+    cuzdanNo: string;
+    region: string;
+    district: string;
+    factory: string;
+    licensedDekar: number;
+    organic: boolean;
+    seasonKg: number;
+    surgun: { s1: number; s2: number; s3: number };
+    quotaKg: number;
+    gardenM2: number;
+    prunedThisYearM2: number;
+    rotationHistory: boolean[];
+    outOfStandardPct: number;
 }
 
 export interface CreatePruningMeasurementPayload {
@@ -449,7 +552,7 @@ export const api = {
     }),
 
     login: (data: { email: string; password: string; rememberMe?: boolean }) =>
-        request<{ accessToken: string; refreshToken: string; user: { id: string; email: string; fullName: string; userType: 'land_owner' | 'worker' | 'self_farmer'; phone: string; province: string; district: string; avatarUrl: string | null } }>(
+        request<{ accessToken: string; refreshToken: string; user: { id: string; email: string; fullName: string; userType: 'land_owner' | 'worker' | 'self_farmer'; phone: string; province: string; district: string; avatarUrl: string | null; role?: string; caykurRole?: string | null; caykurScope?: string | null } }>(
             '/auth/login',
             { method: 'POST', body: JSON.stringify(data) }
         ),
@@ -592,16 +695,46 @@ export const api = {
         request<void>(`/fields/${fieldId}/partners/${partnerId}`, { method: 'DELETE' }),
 
     // Pruning measurement endpoints
-    createPruningMeasurement: (data: CreatePruningMeasurementPayload) =>
+    createPruningMeasurement: (data: CreatePruningMeasurementPayload & { taskId?: string }) =>
         request<PruningMeasurement>('/pruning', { method: 'POST', body: JSON.stringify(data) }),
     getPruningMeasurements: (fieldId: string) =>
         request<PruningMeasurement[]>(`/pruning/field/${fieldId}`),
+    getPruningMeasurement: (id: string) =>
+        request<PruningMeasurement>(`/pruning/${id}`),
     updatePruningApproval: (
         id: string,
-        data: { producerApproved?: boolean; staffApproved?: boolean },
+        data: { producerApproved?: boolean; staffApproved?: boolean; rejectionReason?: string },
     ) => request<PruningMeasurement>(`/pruning/${id}/approve`, { method: 'PATCH', body: JSON.stringify(data) }),
     deletePruningMeasurement: (id: string) =>
         request<void>(`/pruning/${id}`, { method: 'DELETE' }),
+
+    // Pruning task (saha queue / assignment) endpoints
+    getPruningTasks: (params?: { status?: PruningTaskStatus; assignedTo?: string; fieldId?: string; page?: number; limit?: number }) => {
+        const query = new URLSearchParams(params as Record<string, string>).toString();
+        return request<Paginated<PruningTask>>(`/pruning/tasks${query ? `?${query}` : ''}`);
+    },
+    getPruningTask: (id: string) => request<PruningTask>(`/pruning/tasks/${id}`),
+    assignPruningTask: (data: AssignPruningTaskPayload) =>
+        request<PruningTask>('/pruning/tasks', { method: 'POST', body: JSON.stringify(data) }),
+
+    // Çaykur staff (management onboarding) endpoints
+    getCaykurStaff: (params?: { page?: number; limit?: number; search?: string; caykurRole?: CaykurStaffRole; status?: 'active' | 'suspended' }) => {
+        const query = new URLSearchParams(params as Record<string, string>).toString();
+        return request<Paginated<CaykurStaff>>(`/caykur/staff${query ? `?${query}` : ''}`);
+    },
+    getCaykurStaffMember: (id: string) => request<CaykurStaff>(`/caykur/staff/${id}`),
+    createCaykurStaff: (data: CreateCaykurStaffPayload) =>
+        request<CaykurStaff & { tempPassword: string }>('/caykur/staff', { method: 'POST', body: JSON.stringify(data) }),
+    updateCaykurStaff: (id: string, data: Partial<CreateCaykurStaffPayload> & { active?: boolean }) =>
+        request<CaykurStaff>(`/caykur/staff/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    suspendCaykurStaff: (id: string) =>
+        request<CaykurStaff>(`/caykur/staff/${id}`, { method: 'DELETE' }),
+
+    // Çaykur panel data (DB-backed; replaces the frontend mock seam)
+    getCaykurPanelProducers: () =>
+        request<CaykurPanelProducer[]>('/caykur/producers'),
+    getCaykurPanelProducer: (id: string) =>
+        request<CaykurPanelProducer>(`/caykur/producers/${id}`),
 
     // Harvests endpoints
     getHarvests: (params?: { fieldId?: string; year?: number; status?: string }) => {

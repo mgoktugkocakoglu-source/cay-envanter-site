@@ -4,13 +4,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from '@/users/entities/user.entity';
-import { Role, UserType } from '@/auth/enums';
+import { Role, UserType, CaykurRole } from '@/auth/enums';
 import { Firm } from '@/firms/entities/firm.entity';
 import { FirmTariff, PaymentTerm } from '@/firms/entities/firm-tariff.entity';
 import { Field } from '@/fields/entities/field.entity';
 import { Payment } from '@/payments/entities/payment.entity';
 import { Harvest } from '@/harvests/entities/harvest.entity';
 import { PaymentHarvest } from '@/payments/entities/payment-harvest.entity';
+import { PruningMeasurement, PruningTask } from '@/pruning/entities';
 
 interface TariffSeed {
     paymentTerm: PaymentTerm;
@@ -32,6 +33,28 @@ interface DeliverySeed {
     status: 'received' | 'pending';
     assignTo: number | null; // index into the user's fields, or null = unassigned
 }
+
+interface StaffSeed {
+    email: string;
+    fullName: string;
+    phone: string;
+    caykurRole: CaykurRole;
+    role: Role;
+    scope: string;
+    province: string;
+    district: string;
+}
+
+// One demo account per Çaykur role so a pitch can log in as any persona.
+// Names mirror the frontend PERSONAS so the panel reads consistently.
+const STAFF_SEEDS: StaffSeed[] = [
+    { email: 'admin@caykur.gov.tr', fullName: 'Selçuk Aydın', phone: '5559900001', caykurRole: CaykurRole.KURUM_ADMIN, role: Role.ADMIN, scope: 'Genel Müdürlük', province: 'Rize', district: 'Merkez' },
+    { email: 'fabrika@caykur.gov.tr', fullName: 'Naci Hocaoğlu', phone: '5559900002', caykurRole: CaykurRole.FABRIKA_SORUMLUSU, role: Role.USER, scope: 'Çayeli Fab.', province: 'Rize', district: 'Çayeli' },
+    { email: 'alim@caykur.gov.tr', fullName: 'Erkan Kara', phone: '5559900003', caykurRole: CaykurRole.ALIM_YERI_PERSONELI, role: Role.USER, scope: 'Çayeli Merkez Alım', province: 'Rize', district: 'Çayeli' },
+    { email: 'saha@caykur.gov.tr', fullName: 'Davut Şahin', phone: '5559900004', caykurRole: CaykurRole.SAHA_PERSONELI, role: Role.USER, scope: 'Rize / Çayeli', province: 'Rize', district: 'Çayeli' },
+    { email: 'denetci@caykur.gov.tr', fullName: 'Ayla Demir', phone: '5559900005', caykurRole: CaykurRole.DENETCI, role: Role.USER, scope: 'Bölge Denetim', province: 'Rize', district: 'Merkez' },
+    { email: 'finans@caykur.gov.tr', fullName: 'Hülya Yıldız', phone: '5559900006', caykurRole: CaykurRole.FINANS, role: Role.USER, scope: 'Mali İşler', province: 'Rize', district: 'Merkez' },
+];
 
 const CAYKUR_PRICE = 33.0;
 const OFCAY_PRICE = 30.0;
@@ -93,6 +116,8 @@ export class SeedService implements OnModuleInit {
         @InjectRepository(Payment) private readonly paymentRepo: Repository<Payment>,
         @InjectRepository(Harvest) private readonly harvestRepo: Repository<Harvest>,
         @InjectRepository(PaymentHarvest) private readonly paymentHarvestRepo: Repository<PaymentHarvest>,
+        @InjectRepository(PruningMeasurement) private readonly measurementRepo: Repository<PruningMeasurement>,
+        @InjectRepository(PruningTask) private readonly taskRepo: Repository<PruningTask>,
     ) { }
 
     async onModuleInit(): Promise<void> {
@@ -108,6 +133,10 @@ export class SeedService implements OnModuleInit {
             await this.seedFirms();
             await this.seedFields(user);
             await this.seedDeliveries(user);
+            const sahaUser = await this.ensureStaff();
+            if (sahaUser) {
+                await this.seedPruningTasks(user, sahaUser);
+            }
             this.logger.log('Demo seed complete');
         } catch (err) {
             this.logger.error(`Demo seed failed: ${(err as Error).message}`);
@@ -258,6 +287,139 @@ export class SeedService implements OnModuleInit {
                 );
             }
         }
+    }
+
+    /**
+     * Creates one demo account per Çaykur role (pre-verified, shared password).
+     * Returns the saha personeli user so pruning tasks can be assigned to them.
+     */
+    private async ensureStaff(): Promise<User | null> {
+        const password = this.configService.get<string>('SEED_DEMO_PASSWORD') || 'Caykur2026';
+        let sahaUser: User | null = null;
+
+        for (const seed of STAFF_SEEDS) {
+            let user = await this.userRepo.findOne({ where: { email: seed.email, deleted: false } });
+            if (!user) {
+                user = await this.userRepo.save(
+                    this.userRepo.create({
+                        fullName: seed.fullName,
+                        email: seed.email,
+                        password: await bcrypt.hash(password, 12),
+                        phone: seed.phone,
+                        province: seed.province,
+                        district: seed.district,
+                        farmerIdNumber: null,
+                        cuzdanNo: null,
+                        userType: UserType.SELF_FARMER,
+                        role: seed.role,
+                        caykurRole: seed.caykurRole,
+                        caykurScope: seed.scope,
+                        emailVerified: true,
+                        verifiedAt: new Date(),
+                    }),
+                );
+                this.logger.log(`Demo staff created: ${seed.email} (${seed.caykurRole})`);
+            } else {
+                // Backfill the Çaykur identity on a pre-existing row without touching credentials.
+                const patch: Partial<User> = {};
+                if (!user.caykurRole) patch.caykurRole = seed.caykurRole;
+                if (!user.caykurScope) patch.caykurScope = seed.scope;
+                if (seed.role === Role.ADMIN && user.role !== Role.ADMIN) patch.role = Role.ADMIN;
+                if (Object.keys(patch).length > 0) {
+                    await this.userRepo.update(user.id, patch);
+                    user = await this.userRepo.findOne({ where: { id: user.id } });
+                }
+            }
+            if (seed.caykurRole === CaykurRole.SAHA_PERSONELI) {
+                sahaUser = user;
+            }
+        }
+
+        return sahaUser;
+    }
+
+    /**
+     * Seeds two pruning tasks on the demo producer's parcels, assigned to the
+     * saha personeli: one pending (shows the officer queue) and one already
+     * measured with a linked measurement awaiting producer + staff approval.
+     */
+    private async seedPruningTasks(producer: User, saha: User): Promise<void> {
+        const already = await this.taskRepo.count();
+        if (already > 0) {
+            return;
+        }
+
+        const fields = await this.fieldRepo.find({
+            where: { userId: producer.id, deleted: false },
+            order: { createdAt: 'ASC' },
+            take: 2,
+        });
+        if (fields.length === 0) {
+            return;
+        }
+
+        // Task 1 — pending, no measurement yet.
+        const f0 = fields[0];
+        await this.taskRepo.save(
+            this.taskRepo.create({
+                fieldId: f0.id,
+                producerId: producer.id,
+                assignedTo: saha.id,
+                assignedBy: saha.id,
+                status: 'pending',
+                measurementId: null,
+                parcelNo: f0.parcelNo ?? null,
+                producerName: producer.fullName,
+                dueDate: null,
+                notes: '1/7 budama rotasyon ölçümü',
+            }),
+        );
+
+        // Task 2 — measured, awaiting dual approval.
+        if (fields.length > 1) {
+            const f1 = fields[1];
+            const fieldAreaM2 = Number(f1.area) || 1000;
+            const prunedAreaM2 = Math.round(fieldAreaM2 * 0.14 * 100) / 100;
+            const measurement = await this.measurementRepo.save(
+                this.measurementRepo.create({
+                    fieldId: f1.id,
+                    userId: saha.id,
+                    method: 'gps',
+                    geometry: f1.coordinates?.[0] ?? [],
+                    prunedAreaM2,
+                    fieldAreaM2,
+                    ratioPercent: 14.0,
+                    accuracyLevel: 'high',
+                    fieldCheckDone: true,
+                    gpsAccuracyMeters: 2.5,
+                    photoUrl: null,
+                    producerApproved: false,
+                    staffApproved: false,
+                    status: 'measured',
+                    rejectionReason: null,
+                    producerName: producer.fullName,
+                    parcelNo: f1.parcelNo ?? null,
+                    notes: 'Saha ölçümü tamamlandı, onay bekliyor',
+                    measuredAt: new Date(),
+                }),
+            );
+            await this.taskRepo.save(
+                this.taskRepo.create({
+                    fieldId: f1.id,
+                    producerId: producer.id,
+                    assignedTo: saha.id,
+                    assignedBy: saha.id,
+                    status: 'measured',
+                    measurementId: measurement.id,
+                    parcelNo: f1.parcelNo ?? null,
+                    producerName: producer.fullName,
+                    dueDate: null,
+                    notes: '1/7 budama rotasyon ölçümü',
+                }),
+            );
+        }
+
+        this.logger.log('Demo pruning tasks seeded');
     }
 
     /** Builds a tiny closed square polygon (~120m) centred on the given point. */

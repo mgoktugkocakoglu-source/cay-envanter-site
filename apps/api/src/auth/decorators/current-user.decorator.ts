@@ -1,8 +1,11 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { Role, CaykurRole } from '@/auth/enums';
 
 export interface AuthenticatedUser {
     id: string;
     email: string;
+    role: Role;
+    caykurRole: CaykurRole | null;
 }
 
 /**
@@ -14,7 +17,10 @@ export interface AuthenticatedUser {
  * @CurrentUser('email') email: string
  */
 export const CurrentUser = createParamDecorator(
-    (data: keyof AuthenticatedUser | undefined, ctx: ExecutionContext): AuthenticatedUser | string => {
+    (
+        data: keyof AuthenticatedUser | undefined,
+        ctx: ExecutionContext,
+    ): AuthenticatedUser | AuthenticatedUser[keyof AuthenticatedUser] => {
         const request = ctx.switchToHttp().getRequest();
         const user = request.user as AuthenticatedUser;
 

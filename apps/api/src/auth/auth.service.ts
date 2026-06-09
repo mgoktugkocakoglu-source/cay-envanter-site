@@ -33,6 +33,8 @@ export interface AuthUser {
     district: string;
     avatarUrl: string | null;
     role: string;
+    caykurRole: string | null;
+    caykurScope: string | null;
     cuzdanNo: string | null;
     quotaPerDekarKg: number | null;
     appointmentDays: string[] | null;
@@ -220,6 +222,8 @@ export class AuthService {
             province: user.province,
             district: user.district,
             avatarUrl: user.avatarUrl,
+            caykurRole: user.caykurRole,
+            caykurScope: user.caykurScope,
             cuzdanNo: user.cuzdanNo,
             quotaPerDekarKg: user.quotaPerDekarKg,
             appointmentDays: user.appointmentDays,
