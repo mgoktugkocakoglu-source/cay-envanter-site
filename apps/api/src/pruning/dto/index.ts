@@ -182,6 +182,11 @@ export class PruningQueryDto {
     @IsOptional()
     @IsUUID()
     fieldId?: string;
+
+    @ApiPropertyOptional({ description: 'Free-text search (producer name / parcel no)' })
+    @IsOptional()
+    @IsString()
+    search?: string;
 }
 
 // ── Budama talepleri (pruning requests) ──

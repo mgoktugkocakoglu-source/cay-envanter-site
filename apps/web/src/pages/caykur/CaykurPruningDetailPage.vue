@@ -1,37 +1,94 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import CaykurLayout from '@/layouts/CaykurLayout.vue';
 import CaykurPanel from '@/components/caykur/CaykurPanel.vue';
 import StatusPill from '@/components/caykur/StatusPill.vue';
-import ComplianceBadge from '@/components/caykur/ComplianceBadge.vue';
+import { api, type PruningMeasurement, type PruningStatus, type PruningMethod } from '@/services/api';
 import {
-    measurementById,
-    AUDIT_STATUS_META,
-    METHOD_LABEL,
     BUDAMA_TARGET_PCT,
     formatNumber,
     formatPct,
     formatDateTime,
-    type AuditStatus,
 } from '@/services/caykur';
 
 const route = useRoute();
 const router = useRouter();
 
-const base = computed(() => measurementById(String(route.params.id)));
-const localAudit = ref<AuditStatus | null>(null);
-const m = computed(() => {
-    const x = base.value;
-    if (!x) return undefined;
-    return { ...x, auditStatus: localAudit.value ?? x.auditStatus };
-});
+type Tone = 'success' | 'warning' | 'danger' | 'info' | 'muted';
+
+const STATUS_META: Record<PruningStatus, { label: string; tone: Tone }> = {
+    measured: { label: 'Ölçüldü · onay bekliyor', tone: 'info' },
+    producer_approved: { label: 'Müstahsil onayladı', tone: 'info' },
+    staff_approved: { label: 'Personel onayladı', tone: 'success' },
+    completed: { label: 'Tamamlandı', tone: 'success' },
+    rejected: { label: 'Reddedildi', tone: 'danger' },
+};
+
+const METHOD_LABEL: Record<PruningMethod, string> = {
+    map: 'Harita çizimi',
+    gps: 'GPS / RTK',
+    assisted: 'Asistan ölçüm',
+};
+
+const loading = ref(true);
+const error = ref<string | null>(null);
+const saving = ref(false);
+const m = ref<PruningMeasurement | null>(null);
+
+async function load(): Promise<void> {
+    loading.value = true;
+    error.value = null;
+    try {
+        const res = await api.getPruningMeasurement(String(route.params.id));
+        if (res.data) m.value = res.data;
+        else {
+            error.value = res.error?.message ?? 'Ölçüm bulunamadı';
+            m.value = null;
+        }
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : 'Ölçüm bulunamadı';
+        m.value = null;
+    } finally {
+        loading.value = false;
+    }
+}
+
+onMounted(load);
 
 const ratioHeight = computed(() => Math.min(100, (m.value?.ratioPercent ?? 0) * 4)); // visual scale ×4
 const targetHeight = computed(() => Math.min(100, BUDAMA_TARGET_PCT * 4));
 
-function decide(next: AuditStatus): void {
-    localAudit.value = next;
+async function approve(): Promise<void> {
+    if (!m.value || saving.value) return;
+    saving.value = true;
+    error.value = null;
+    try {
+        const res = await api.updatePruningApproval(m.value.id, { staffApproved: true });
+        if (res.data) m.value = res.data;
+        else error.value = res.error?.message ?? 'Onay kaydedilemedi';
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : 'Onay kaydedilemedi';
+    } finally {
+        saving.value = false;
+    }
+}
+
+async function reject(): Promise<void> {
+    if (!m.value || saving.value) return;
+    const reason = window.prompt('Reddetme nedeni:')?.trim();
+    if (!reason) return;
+    saving.value = true;
+    error.value = null;
+    try {
+        const res = await api.updatePruningApproval(m.value.id, { rejectionReason: reason });
+        if (res.data) m.value = res.data;
+        else error.value = res.error?.message ?? 'İşlem kaydedilemedi';
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : 'İşlem kaydedilemedi';
+    } finally {
+        saving.value = false;
+    }
 }
 </script>
 
@@ -42,34 +99,35 @@ function decide(next: AuditStatus): void {
             Budama Denetimi
         </button>
 
-        <template v-if="m">
+        <div v-if="loading" class="ck-empty"><p class="ck-empty-title">Yükleniyor…</p></div>
+
+        <template v-else-if="m">
             <header class="ck-page-head">
                 <div>
-                    <h1 class="ck-page-title">{{ m.producerName }}</h1>
-                    <p class="ck-page-sub">Budama ölçümü · {{ m.parcelLabel }} · {{ m.region }}</p>
+                    <h1 class="ck-page-title">{{ m.producerName ?? 'Müstahsil' }}</h1>
+                    <p class="ck-page-sub">Budama ölçümü<template v-if="m.parcelNo"> · {{ m.parcelNo }}</template></p>
                 </div>
                 <div class="ck-page-actions">
-                    <ComplianceBadge :status="m.status" />
-                    <StatusPill :label="AUDIT_STATUS_META[m.auditStatus].label" :tone="AUDIT_STATUS_META[m.auditStatus].tone" />
+                    <StatusPill :label="STATUS_META[m.status].label" :tone="STATUS_META[m.status].tone" />
                 </div>
             </header>
 
-            <div v-if="m.overflowWarning || m.overlapWarning" class="warn-banner">
+            <div v-if="m.rejectionReason" class="warn-banner">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
-                {{ m.notes }}
+                {{ m.rejectionReason }}
             </div>
+            <div v-if="error" class="warn-banner">{{ error }}</div>
 
             <div class="ck-grid-2">
                 <div>
                     <CaykurPanel title="Ölçüm bilgileri">
                         <dl class="ck-dl">
                             <div class="ck-dl-item"><span class="ck-dl-term">Yöntem</span><span class="ck-dl-val">{{ METHOD_LABEL[m.method] }}</span></div>
-                            <div class="ck-dl-item"><span class="ck-dl-term">Ölçen personel</span><span class="ck-dl-val">{{ m.measuredBy }}</span></div>
                             <div class="ck-dl-item"><span class="ck-dl-term">Tarih</span><span class="ck-dl-val">{{ formatDateTime(m.measuredAt) }}</span></div>
-                            <div class="ck-dl-item"><span class="ck-dl-term">Parsel alanı</span><span class="ck-dl-val">{{ formatNumber(m.parcelAreaM2) }} m²</span></div>
+                            <div class="ck-dl-item"><span class="ck-dl-term">Parsel alanı</span><span class="ck-dl-val">{{ formatNumber(m.fieldAreaM2) }} m²</span></div>
                             <div class="ck-dl-item"><span class="ck-dl-term">Budanan alan</span><span class="ck-dl-val">{{ formatNumber(m.prunedAreaM2) }} m²</span></div>
-                            <div class="ck-dl-item"><span class="ck-dl-term">Doğruluk</span><span class="ck-dl-val">{{ m.accuracyLevel === 'high' ? 'Yüksek' : m.accuracyLevel === 'medium' ? 'Orta' : 'Düşük' }}<template v-if="m.gpsAccuracyMeters"> · ±{{ m.gpsAccuracyMeters }}m</template></span></div>
-                            <div class="ck-dl-item"><span class="ck-dl-term">Fotoğraf</span><span class="ck-dl-val">{{ formatNumber(m.photoCount) }} adet</span></div>
+                            <div class="ck-dl-item"><span class="ck-dl-term">Doğruluk</span><span class="ck-dl-val">{{ m.accuracyLevel === 'high' ? 'Yüksek' : m.accuracyLevel === 'medium' ? 'Orta' : m.accuracyLevel === 'low' ? 'Düşük' : '—' }}<template v-if="m.gpsAccuracyMeters"> · ±{{ m.gpsAccuracyMeters }}m</template></span></div>
+                            <div class="ck-dl-item"><span class="ck-dl-term">Saha kontrolü</span><span class="ck-dl-val">{{ m.fieldCheckDone ? 'Yapıldı' : 'Yapılmadı' }}</span></div>
                             <div class="ck-dl-item"><span class="ck-dl-term">1/7 hedef</span><span class="ck-dl-val">%{{ formatNumber(BUDAMA_TARGET_PCT, 1) }}</span></div>
                         </dl>
                     </CaykurPanel>
@@ -85,9 +143,9 @@ function decide(next: AuditStatus): void {
                                 <StatusPill :label="m.staffApproved ? 'Onaylandı' : 'Bekliyor'" :tone="m.staffApproved ? 'success' : 'warning'" />
                             </div>
                         </div>
-                        <div v-if="m.auditStatus === 'pending'" class="decide-actions">
-                            <button type="button" class="ck-btn" @click="decide('rejected')">Reddet</button>
-                            <button type="button" class="ck-btn ck-btn-primary" @click="decide('approved')">Denetimi onayla</button>
+                        <div v-if="m.status !== 'rejected' && !m.staffApproved" class="decide-actions">
+                            <button type="button" class="ck-btn" :disabled="saving" @click="reject">Reddet</button>
+                            <button type="button" class="ck-btn ck-btn-primary" :disabled="saving" @click="approve">Denetimi onayla</button>
                         </div>
                     </CaykurPanel>
                 </div>
@@ -106,7 +164,6 @@ function decide(next: AuditStatus): void {
                             <div class="ratio-readout">
                                 <span class="ratio-pct">{{ formatPct(m.ratioPercent, 1) }}</span>
                                 <span class="ratio-sub">parselin budanan oranı</span>
-                                <ComplianceBadge :status="m.status" />
                             </div>
                         </div>
                         <p class="viz-note">1/7 rotasyon kuralı her yıl bahçenin yaklaşık %{{ formatNumber(BUDAMA_TARGET_PCT, 1) }}'ünün budanmasını öngörür. %11–20 bandı uyumlu sayılır.</p>
@@ -116,7 +173,7 @@ function decide(next: AuditStatus): void {
         </template>
 
         <div v-else class="ck-empty">
-            <p class="ck-empty-title">Ölçüm bulunamadı</p>
+            <p class="ck-empty-title">{{ error ?? 'Ölçüm bulunamadı' }}</p>
             <button type="button" class="ck-btn" @click="router.push('/caykur/pruning')">Listeye dön</button>
         </div>
     </CaykurLayout>

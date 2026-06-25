@@ -91,6 +91,18 @@ export class PruningController {
 
     // ── Measurements (producers + staff; fine-grained authz in the service) ──
 
+    @Get('measurements')
+    @UseGuards(CaykurRolesGuard)
+    @CaykurRoles(...STAFF_VIEW_ROLES)
+    @ApiOperation({ summary: 'List all pruning measurements (panel audit view)' })
+    @ApiResponse({ status: 200, description: 'Paginated measurements' })
+    async listMeasurements(
+        @Request() req: AuthenticatedRequest,
+        @Query() query: PruningQueryDto,
+    ) {
+        return this.pruningService.listMeasurements(req.user, query);
+    }
+
     @Post()
     @ApiOperation({ summary: 'Record a pruning measurement' })
     @ApiResponse({ status: 201, description: 'Measurement recorded' })

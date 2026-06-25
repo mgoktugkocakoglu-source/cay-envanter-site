@@ -78,6 +78,27 @@ export class PruningService {
         return saved;
     }
 
+    /** Panel audit view: every measurement, staff-scoped, paginated + search. */
+    async listMeasurements(actor: PruningActor, query: PruningQueryDto): Promise<Paginated<PruningMeasurement>> {
+        if (!this.isStaff(actor)) {
+            throw new ForbiddenException('Bu listeye yalnızca Çaykur personeli erişebilir');
+        }
+        const page = query.page ?? 1;
+        const limit = query.limit ?? 50;
+
+        const qb = this.measurementRepository.createQueryBuilder('m');
+        if (query.search) {
+            qb.andWhere('(m.producerName ILIKE :q OR m.parcelNo ILIKE :q)', { q: `%${query.search}%` });
+        }
+        qb.orderBy('m.measuredAt', 'DESC')
+            .addOrderBy('m.createdAt', 'DESC')
+            .skip((page - 1) * limit)
+            .take(limit);
+
+        const [rows, total] = await qb.getManyAndCount();
+        return paginate(rows, total, page, limit);
+    }
+
     async findByField(fieldId: string, actor: PruningActor): Promise<PruningMeasurement[]> {
         await this.resolveField(fieldId, actor);
         return this.measurementRepository.find({

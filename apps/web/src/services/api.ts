@@ -752,6 +752,10 @@ export const api = {
         request<PruningMeasurement>('/pruning', { method: 'POST', body: JSON.stringify(data) }),
     getPruningMeasurements: (fieldId: string) =>
         request<PruningMeasurement[]>(`/pruning/field/${fieldId}`),
+    getPruningMeasurementsPanel: (params?: { search?: string; page?: number; limit?: number }) => {
+        const query = new URLSearchParams(params as Record<string, string>).toString();
+        return request<Paginated<PruningMeasurement>>(`/pruning/measurements${query ? `?${query}` : ''}`);
+    },
     getPruningMeasurement: (id: string) =>
         request<PruningMeasurement>(`/pruning/${id}`),
     updatePruningApproval: (
