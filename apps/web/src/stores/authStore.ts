@@ -3,6 +3,13 @@ import { ref, computed } from 'vue';
 
 export type UserType = 'land_owner' | 'worker' | 'self_farmer';
 export type UserRole = 'user' | 'admin' | 'moderator';
+export type CaykurRole =
+    | 'kurum_admin'
+    | 'fabrika_sorumlusu'
+    | 'alim_yeri_personeli'
+    | 'saha_personeli'
+    | 'denetci'
+    | 'finans';
 
 interface User {
     id: string;
@@ -14,6 +21,9 @@ interface User {
     province: string;
     district: string;
     avatarUrl?: string | null;
+    // Çaykur staff identity; null/undefined ⇒ producer (müstahsil).
+    caykurRole?: CaykurRole | null;
+    caykurScope?: string | null;
     cuzdanNo?: string | null;
     quotaPerDekarKg?: number | null;
     appointmentDays?: string[] | null;
@@ -47,6 +57,20 @@ export const useAuthStore = defineStore('auth', () => {
     const isAuthenticated = computed(() => !!accessToken.value);
     const hasRefreshToken = computed(() => !!refreshToken.value);
     const isAdmin = computed(() => user.value?.role === 'admin');
+    const caykurRole = computed<CaykurRole | null>(() => user.value?.caykurRole ?? null);
+    const isCaykurStaff = computed(() => !!user.value?.caykurRole);
+
+    // Where a given identity lands after login (and where guests/denied routes
+    // bounce to). Admin → panel; field officer → their task queue; office roles
+    // → panel; producer → tea hub.
+    const homeRoute = computed<string>(() => {
+        const u = user.value;
+        if (!u) return '/tea/dashboard';
+        if (u.role === 'admin') return '/caykur';
+        if (u.caykurRole === 'saha_personeli') return '/caykur/tasks';
+        if (u.caykurRole) return '/caykur';
+        return '/tea/dashboard';
+    });
 
     // Initialize - try to get user if we have a refresh token
     // Uses a shared promise to prevent race conditions from multiple callers
@@ -242,6 +266,9 @@ export const useAuthStore = defineStore('auth', () => {
         isAuthenticated,
         hasRefreshToken,
         isAdmin,
+        caykurRole,
+        isCaykurStaff,
+        homeRoute,
         // Actions
         initialize,
         setAuth,

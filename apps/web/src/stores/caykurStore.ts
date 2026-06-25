@@ -1,13 +1,12 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import {
-    PRODUCERS,
     SEASON_LABEL,
     buildOverview,
     flaggedProducers,
-    getProducer,
     type Producer,
 } from '@/services/caykurData';
+import { api } from '@/services/api';
 import {
     PERSONAS,
     personaForRole,
@@ -18,6 +17,7 @@ import {
     type Persona,
 } from '@/services/caykur/roles';
 import { opsSnapshot } from '@/services/caykur';
+import { useAuthStore } from '@/stores/authStore';
 
 /**
  * Çaykur command-center store.
@@ -31,24 +31,61 @@ import { opsSnapshot } from '@/services/caykur';
  * walk through each role's view without re-authenticating.
  */
 export const useCaykurStore = defineStore('caykur', () => {
-    const producers = ref<Producer[]>(PRODUCERS);
+    // Producer registry — loaded from the database (no mock data).
+    const producers = ref<Producer[]>([]);
+    const producersLoaded = ref(false);
+    const producersLoading = ref(false);
     const season = ref(SEASON_LABEL);
 
     const overview = computed(() => buildOverview(producers.value));
     const flagged = computed(() => flaggedProducers(producers.value));
     const ops = computed(() => opsSnapshot());
 
-    function producerById(id: string): Producer | undefined {
-        return getProducer(id);
+    async function loadProducers(force = false): Promise<void> {
+        if (producersLoading.value || (producersLoaded.value && !force)) {
+            return;
+        }
+        producersLoading.value = true;
+        try {
+            const res = await api.getCaykurPanelProducers();
+            if (res.data) {
+                producers.value = res.data as unknown as Producer[];
+                producersLoaded.value = true;
+            }
+        } finally {
+            producersLoading.value = false;
+        }
     }
 
-    // ── Persona / role-based access (Faz 1) ──
-    const role = ref<CaykurRole>('kurum_admin');
+    // Kick off the initial load when the store is first used (panel mount).
+    void loadProducers();
+
+    function producerById(id: string): Producer | undefined {
+        return producers.value.find((p) => p.id === id);
+    }
+
+    // ── Persona / role-based access ──
+    // The active role is the authenticated user's real caykurRole. Admins may
+    // override it to demo "what each persona sees" without re-authenticating;
+    // real staff are locked to their assigned role.
+    const auth = useAuthStore();
+    const demoOverride = ref<CaykurRole | null>(null);
+    const canSwitchPersona = computed(() => auth.user?.role === 'admin');
+
+    const role = computed<CaykurRole>(() => {
+        if (canSwitchPersona.value && demoOverride.value) {
+            return demoOverride.value;
+        }
+        return (auth.user?.caykurRole as CaykurRole | undefined) ?? 'kurum_admin';
+    });
     const persona = computed<Persona>(() => personaForRole(role.value));
     const personas = ref<Persona[]>(PERSONAS);
 
     function setRole(next: CaykurRole): void {
-        role.value = next;
+        // Only admins can switch personas (demo); ignored for real staff.
+        if (canSwitchPersona.value) {
+            demoOverride.value = next;
+        }
     }
 
     function can(moduleKey: ModuleKey): boolean {
@@ -59,6 +96,9 @@ export const useCaykurStore = defineStore('caykur', () => {
 
     return {
         producers,
+        producersLoaded,
+        producersLoading,
+        loadProducers,
         season,
         overview,
         flagged,
@@ -69,6 +109,7 @@ export const useCaykurStore = defineStore('caykur', () => {
         persona,
         personas,
         currentRoleDef,
+        canSwitchPersona,
         setRole,
         can,
     };

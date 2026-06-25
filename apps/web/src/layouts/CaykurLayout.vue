@@ -4,6 +4,7 @@ import { RouterLink, useRouter, useRoute } from 'vue-router';
 import { useCaykurStore } from '@/stores/caykurStore';
 import { usePruningRequestsStore } from '@/stores/pruningRequestsStore';
 import { useThemeStore } from '@/stores/themeStore';
+import { useAuthStore } from '@/stores/authStore';
 import { NAV_GROUPS } from '@/services/caykur/nav';
 import { ROLE_DEFS, MODULE_LABELS, type ModuleKey } from '@/services/caykur/roles';
 import { ANNOUNCEMENTS } from '@/services/caykur/comms';
@@ -14,6 +15,7 @@ const route = useRoute();
 const caykur = useCaykurStore();
 const pruningRequests = usePruningRequestsStore();
 const themeStore = useThemeStore();
+const authStore = useAuthStore();
 
 const menuOpen = ref(false);
 const bellOpen = ref(false);
@@ -26,6 +28,12 @@ const collapsed = ref(localStorage.getItem(COLLAPSE_KEY) === '1');
 function toggleSidebar(): void {
     collapsed.value = !collapsed.value;
     localStorage.setItem(COLLAPSE_KEY, collapsed.value ? '1' : '0');
+}
+
+async function logout(): Promise<void> {
+    menuOpen.value = false;
+    await authStore.logout();
+    router.push('/login');
 }
 
 /** Nav groups with items filtered to what the active role may access. */
@@ -244,22 +252,31 @@ watch(
 
                     <div v-if="menuOpen" class="ck-menu-backdrop" @click="menuOpen = false"></div>
                     <div v-if="menuOpen" class="ck-menu ck-pop-in" role="menu">
-                        <p class="ck-menu-title">Demo · rol değiştir</p>
-                        <button
-                            v-for="r in ROLE_DEFS"
-                            :key="r.id"
-                            type="button"
-                            class="ck-menu-item"
-                            :class="{ 'is-active': caykur.role === r.id }"
-                            role="menuitemradio"
-                            :aria-checked="caykur.role === r.id"
-                            @click="selectRole(r.id)"
-                        >
+                        <template v-if="caykur.canSwitchPersona">
+                            <p class="ck-menu-title">Demo · rol değiştir</p>
+                            <button
+                                v-for="r in ROLE_DEFS"
+                                :key="r.id"
+                                type="button"
+                                class="ck-menu-item"
+                                :class="{ 'is-active': caykur.role === r.id }"
+                                role="menuitemradio"
+                                :aria-checked="caykur.role === r.id"
+                                @click="selectRole(r.id)"
+                            >
+                                <span class="ck-menu-item-main">
+                                    <span class="ck-menu-item-label">{{ r.label }}</span>
+                                    <span class="ck-menu-item-desc">{{ r.description }}</span>
+                                </span>
+                                <svg v-if="caykur.role === r.id" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                            </button>
+                            <div style="height:1px;background:var(--color-border);margin:6px 0"></div>
+                        </template>
+                        <button type="button" class="ck-menu-item" role="menuitem" @click="logout">
                             <span class="ck-menu-item-main">
-                                <span class="ck-menu-item-label">{{ r.label }}</span>
-                                <span class="ck-menu-item-desc">{{ r.description }}</span>
+                                <span class="ck-menu-item-label">Çıkış yap</span>
+                                <span class="ck-menu-item-desc">{{ authStore.user?.email }}</span>
                             </span>
-                            <svg v-if="caykur.role === r.id" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                         </button>
                         <div class="ck-menu-sep" aria-hidden="true"></div>
                         <button type="button" class="ck-menu-item" role="menuitem" @click="backToApp">
@@ -272,6 +289,11 @@ watch(
                         </button>
                     </div>
                 </div>
+
+                <button v-if="authStore.isAdmin" type="button" class="ck-back" @click="backToApp">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
+                    <span>Uygulamaya dön</span>
+                </button>
             </div>
         </header>
 
@@ -628,6 +650,12 @@ watch(
 .ck-menu-item-cta:hover {
     color: var(--color-text-primary);
 }
+.ck-back:focus-visible,
+.ck-persona-btn:focus-visible {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-light);
+}
 
 /* ── Body ── */
 .ck-body {
@@ -701,6 +729,10 @@ watch(
     color: var(--color-primary);
     background: var(--color-primary-light);
     font-weight: var(--font-weight-semibold);
+}
+.ck-nav-item:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-primary-light), 0 0 0 3px var(--color-primary);
 }
 .ck-nav-item svg {
     flex-shrink: 0;

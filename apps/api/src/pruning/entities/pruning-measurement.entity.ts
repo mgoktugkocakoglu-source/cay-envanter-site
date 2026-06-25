@@ -17,6 +17,15 @@ export type MeasurementMethod = 'map' | 'gps' | 'assisted';
 // GPS / measurement confidence: high = 1-3m, medium = 3-5m, low = >5m or map estimate.
 export type AccuracyLevel = 'high' | 'medium' | 'low';
 
+// Approval lifecycle. A fresh capture is 'measured'; producer + staff approvals
+// advance it; either party may 'reject'. 'completed' = both approved.
+export type PruningStatus =
+    | 'measured'
+    | 'producer_approved'
+    | 'staff_approved'
+    | 'completed'
+    | 'rejected';
+
 @Entity('pruning_measurements')
 @Index(['fieldId', 'createdAt'])
 export class PruningMeasurement {
@@ -73,6 +82,15 @@ export class PruningMeasurement {
 
     @Column({ type: 'boolean', name: 'staff_approved', default: false })
     staffApproved: boolean;
+
+    // Approval lifecycle stage; derived from the two approval flags. Existing
+    // rows backfill to 'measured'.
+    @Column({ type: 'varchar', length: 24, default: 'measured' })
+    status: PruningStatus;
+
+    // Reason captured when a producer or staff member rejects the measurement.
+    @Column({ type: 'text', name: 'rejection_reason', nullable: true })
+    rejectionReason: string | null;
 
     // Snapshot of producer/owner and parcel identifiers for audit history.
     @Column({ type: 'varchar', length: 150, name: 'producer_name', nullable: true })

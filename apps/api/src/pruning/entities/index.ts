@@ -2,4 +2,7 @@ export { PruningMeasurement } from '@/pruning/entities/pruning-measurement.entit
 export type {
     MeasurementMethod,
     AccuracyLevel,
+    PruningStatus,
 } from '@/pruning/entities/pruning-measurement.entity';
+export { PruningTask } from '@/pruning/entities/pruning-task.entity';
+export type { PruningTaskStatus } from '@/pruning/entities/pruning-task.entity';

@@ -141,6 +141,24 @@ export class FieldsService {
         return field;
     }
 
+    /**
+     * Field lookup WITHOUT an ownership check, for privileged callers (Çaykur
+     * staff / admin) who are not the field owner. Producer-facing access must
+     * keep using findOne(); never expose this on a producer endpoint.
+     */
+    async findOneRaw(id: string): Promise<Field> {
+        const field = await this.fieldRepository.findOne({
+            where: { id, deleted: false },
+            relations: ['partners'],
+        });
+
+        if (!field) {
+            throw new NotFoundException('Field not found');
+        }
+
+        return field;
+    }
+
     async update(id: string, userId: string, dto: UpdateFieldDto): Promise<Field> {
         const field = await this.findOwnedField(id, userId);
 

@@ -132,6 +132,46 @@ export class MailService {
     });
   }
 
+  async sendStaffInviteEmail(
+    email: string,
+    fullName: string,
+    token: string,
+    roleLabel: string,
+  ): Promise<boolean> {
+    const appUrl = this.configService.get<string>('APP_URL');
+    const setupLink = `${appUrl}/reset-password?token=${token}`;
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #15803D;">Çaykur Kurumsal Platform</h2>
+        <p>Merhaba ${fullName},</p>
+        <p>Çaykur Kurumsal Platform'a <strong>${roleLabel}</strong> olarak tanımlandınız.</p>
+        <p>Hesabınızı etkinleştirmek ve şifrenizi belirlemek için aşağıdaki butona tıklayın:</p>
+        <p style="text-align: center; margin: 30px 0;">
+          <a href="${setupLink}"
+             style="background-color: #15803D; color: white; padding: 12px 30px;
+                    text-decoration: none; border-radius: 8px; display: inline-block;">
+            Şifremi Belirle
+          </a>
+        </p>
+        <p style="color: #666; font-size: 14px;">Bu link 24 saat geçerlidir.</p>
+        <p style="color: #666; font-size: 14px;">
+          Bu daveti beklemiyorsanız, bu e-postayı görmezden gelebilirsiniz.
+        </p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+        <p style="color: #999; font-size: 12px;">
+          İyi günler,<br>Çaykur Kurumsal Platform Ekibi
+        </p>
+      </div>
+    `;
+
+    return this.sendEmail({
+      to: email,
+      subject: 'Çaykur Kurumsal Platform - Hesap Daveti',
+      html,
+    });
+  }
+
   async sendPasswordChangedEmail(
     email: string,
     fullName: string,

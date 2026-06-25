@@ -6,7 +6,7 @@ import {
     UpdateDateColumn,
     Index,
 } from 'typeorm';
-import { Role, UserType } from '@/auth/enums';
+import { Role, UserType, CaykurRole } from '@/auth/enums';
 
 @Entity('users')
 export class User {
@@ -87,6 +87,17 @@ export class User {
     // as lowercase English weekday keys (e.g. ['wednesday', 'saturday']).
     @Column({ type: 'simple-array', nullable: true })
     appointmentDays: string[] | null;
+
+    // ── Çaykur staff identity ──
+    // null ⇒ this account is a producer (müstahsil). A non-null caykurRole marks
+    // the account as Çaykur institutional staff and drives panel/module access.
+    // Role.ADMIN remains orthogonal: an admin sees everything regardless.
+    @Column({ type: 'enum', enum: CaykurRole, nullable: true })
+    caykurRole: CaykurRole | null;
+
+    // Org scope label for staff, e.g. region / factory / purchase point ("Çayeli Fab.").
+    @Column({ type: 'varchar', length: 150, nullable: true })
+    caykurScope: string | null;
 
     @Column({ type: 'varchar', length: 500, nullable: true })
     avatarUrl: string | null;
