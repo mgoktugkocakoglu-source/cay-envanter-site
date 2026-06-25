@@ -15,6 +15,7 @@ export * from '@/services/caykur/deliveries';
 export * from '@/services/caykur/quota';
 export * from '@/services/caykur/finance';
 export * from '@/services/caykur/pruning';
+export * from '@/services/caykur/pruningRequests';
 export * from '@/services/caykur/comms';
 export * from '@/services/caykur/audit';
 export * from '@/services/caykur/reports';
@@ -53,12 +54,14 @@ import { deliverySummary, pendingDeliveries } from '@/services/caykur/deliveries
 import { quotaSummary } from '@/services/caykur/quota';
 import { financeSummary } from '@/services/caykur/finance';
 import { pruningSummary, pendingAudits } from '@/services/caykur/pruning';
+import { pendingPruningRequests } from '@/services/caykur/pruningRequests';
 import { REQUESTS, WORK_TASKS } from '@/services/caykur/comms';
 
 /** Cross-module operational counters for the command-center overview header. */
 export interface OpsSnapshot {
     pendingDeliveries: number;
     pendingAudits: number;
+    pendingPruningRequests: number;
     openRequests: number;
     overdueTasks: number;
     parcelsPendingVerification: number;
@@ -72,6 +75,7 @@ export function opsSnapshot(): OpsSnapshot {
     return {
         pendingDeliveries: pendingDeliveries().length,
         pendingAudits: pendingAudits().length,
+        pendingPruningRequests: pendingPruningRequests().length,
         openRequests: REQUESTS.filter((r) => r.status === 'open' || r.status === 'in_progress').length,
         overdueTasks: WORK_TASKS.filter((t) => t.status === 'overdue').length,
         parcelsPendingVerification: parcelSummary().pending,

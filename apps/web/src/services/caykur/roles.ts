@@ -17,6 +17,7 @@ export type ModuleKey =
     | 'quota'
     | 'finance'
     | 'pruning'
+    | 'pruning_requests'
     | 'org'
     | 'tasks'
     | 'requests'
@@ -58,7 +59,7 @@ export const ROLE_DEFS: RoleDef[] = [
         description: 'Bağlı fabrika ve alım yerlerinin operasyonunu yönetir.',
         access: [
             'overview', 'producers', 'parcels', 'deliveries', 'quota',
-            'pruning', 'org', 'tasks', 'requests', 'announcements', 'reports',
+            'pruning', 'pruning_requests', 'org', 'tasks', 'requests', 'announcements', 'reports',
         ],
     },
     {
@@ -73,7 +74,7 @@ export const ROLE_DEFS: RoleDef[] = [
         label: 'Saha Personeli',
         short: 'Saha',
         description: 'Parsel doğrulama ve budama ölçüm görevlerini yürütür.',
-        access: ['overview', 'producers', 'parcels', 'pruning', 'tasks'],
+        access: ['overview', 'producers', 'parcels', 'pruning', 'pruning_requests', 'tasks'],
     },
     {
         id: 'denetci',
@@ -102,6 +103,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
     quota: 'Kota Yönetimi',
     finance: 'Ödeme & Cari',
     pruning: 'Budama Denetimi',
+    pruning_requests: 'Budama Talepleri',
     org: 'Fabrika & Alım Yeri',
     tasks: 'Görevler',
     requests: 'Talepler',

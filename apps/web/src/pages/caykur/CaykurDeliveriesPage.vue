@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import CaykurPage from '@/components/caykur/CaykurPage.vue';
 import CaykurPanel from '@/components/caykur/CaykurPanel.vue';
@@ -59,6 +59,66 @@ const filtered = computed(() => {
     });
 });
 
+// ── Sorting ──
+type SortKey = 'date' | 'net' | 'fire';
+const sortKey = ref<SortKey>('date');
+const sortDir = ref<'asc' | 'desc'>('desc');
+
+function toggleSort(key: SortKey): void {
+    if (sortKey.value === key) {
+        sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortKey.value = key;
+        sortDir.value = 'desc';
+    }
+    page.value = 1;
+}
+function sortDirOf(key: SortKey): 'asc' | 'desc' | undefined {
+    return sortKey.value === key ? sortDir.value : undefined;
+}
+function ariaSortOf(key: SortKey): 'ascending' | 'descending' | undefined {
+    if (sortKey.value !== key) return undefined;
+    return sortDir.value === 'asc' ? 'ascending' : 'descending';
+}
+
+const sorted = computed(() => {
+    const arr = [...filtered.value];
+    const key = sortKey.value;
+    const factor = sortDir.value === 'asc' ? 1 : -1;
+    arr.sort((a, b) => {
+        let cmp: number;
+        if (key === 'date') cmp = a.date.localeCompare(b.date);
+        else if (key === 'net') cmp = a.netKg - b.netKg;
+        else cmp = a.firePct - b.firePct;
+        return cmp * factor;
+    });
+    return arr;
+});
+
+// ── Pagination ──
+const PAGE_SIZE = 25;
+const page = ref(1);
+watch([search, region, status, view], () => {
+    page.value = 1;
+});
+const totalPages = computed(() => Math.max(1, Math.ceil(sorted.value.length / PAGE_SIZE)));
+const paged = computed(() => sorted.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE));
+const rangeStart = computed(() => (sorted.value.length === 0 ? 0 : (page.value - 1) * PAGE_SIZE + 1));
+const rangeEnd = computed(() => Math.min(page.value * PAGE_SIZE, sorted.value.length));
+
+/** Compact page list with ellipsis gaps: 1 … 4 5 6 … 16. */
+const pageWindow = computed<Array<number | 'gap'>>(() => {
+    const total = totalPages.value;
+    const cur = page.value;
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const out: Array<number | 'gap'> = [1];
+    if (cur > 3) out.push('gap');
+    for (let i = Math.max(2, cur - 1); i <= Math.min(total - 1, cur + 1); i++) out.push(i);
+    if (cur < total - 2) out.push('gap');
+    out.push(total);
+    return out;
+});
+
 function openDelivery(id: string): void {
     router.push(`/caykur/deliveries/${id}`);
 }
@@ -103,26 +163,41 @@ function openDelivery(id: string): void {
 
             <CaykurPanel>
                 <template #head>
-                    <span class="ck-panel-meta">{{ formatNumber(filtered.length) }} fiş</span>
+                    <span class="ck-panel-meta">{{ formatNumber(sorted.length) }} fiş</span>
                 </template>
-                <div v-if="filtered.length" class="ck-table-wrap">
+                <div v-if="sorted.length" class="ck-table-wrap">
                     <table class="ck-table">
                         <thead>
                             <tr>
                                 <th>Fiş no</th>
                                 <th>Müstahsil</th>
                                 <th>Alım yeri</th>
-                                <th>Tarih</th>
+                                <th :aria-sort="ariaSortOf('date')">
+                                    <button type="button" class="ck-th-sort" :data-dir="sortDirOf('date')" @click="toggleSort('date')">
+                                        Tarih
+                                        <svg class="ck-sort-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15" /></svg>
+                                    </button>
+                                </th>
                                 <th>Sürgün</th>
-                                <th class="num">Net</th>
-                                <th class="num">Fire</th>
+                                <th class="num" :aria-sort="ariaSortOf('net')">
+                                    <button type="button" class="ck-th-sort" :data-dir="sortDirOf('net')" @click="toggleSort('net')">
+                                        Net
+                                        <svg class="ck-sort-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15" /></svg>
+                                    </button>
+                                </th>
+                                <th class="num" :aria-sort="ariaSortOf('fire')">
+                                    <button type="button" class="ck-th-sort" :data-dir="sortDirOf('fire')" @click="toggleSort('fire')">
+                                        Fire
+                                        <svg class="ck-sort-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15" /></svg>
+                                    </button>
+                                </th>
                                 <th>Kalite</th>
                                 <th>Durum</th>
                                 <th aria-label="Detay"></th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="d in filtered.slice(0, 120)" :key="d.id" class="ck-row-link" @click="openDelivery(d.id)">
+                            <tr v-for="d in paged" :key="d.id" class="ck-row-link" tabindex="0" @click="openDelivery(d.id)" @keydown.enter="openDelivery(d.id)">
                                 <td class="strong" style="font-variant-numeric: tabular-nums">{{ d.receiptNo }}</td>
                                 <td>{{ d.producerName }}</td>
                                 <td>
@@ -141,7 +216,29 @@ function openDelivery(id: string): void {
                     </table>
                 </div>
                 <div v-else class="ck-empty"><p class="ck-empty-title">Kayıt bulunamadı</p></div>
-                <p v-if="filtered.length > 120" class="more-note">İlk 120 kayıt gösteriliyor — filtrelerle daraltın.</p>
+
+                <div v-if="sorted.length && totalPages > 1" class="ck-table-foot">
+                    <span class="ck-page-info">{{ rangeStart }}–{{ rangeEnd }} / {{ formatNumber(sorted.length) }} fiş</span>
+                    <div class="ck-pager" role="group" aria-label="Sayfalama">
+                        <button type="button" class="ck-pager-btn" :disabled="page === 1" aria-label="Önceki sayfa" @click="page--">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+                        </button>
+                        <template v-for="(n, i) in pageWindow" :key="i">
+                            <span v-if="n === 'gap'" class="ck-pager-gap">…</span>
+                            <button
+                                v-else
+                                type="button"
+                                class="ck-pager-btn"
+                                :class="{ 'is-current': n === page }"
+                                :aria-current="n === page ? 'page' : undefined"
+                                @click="page = n"
+                            >{{ n }}</button>
+                        </template>
+                        <button type="button" class="ck-pager-btn" :disabled="page === totalPages" aria-label="Sonraki sayfa" @click="page++">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+                        </button>
+                    </div>
+                </div>
             </CaykurPanel>
         </template>
 
@@ -175,12 +272,3 @@ function openDelivery(id: string): void {
     </CaykurPage>
 </template>
 
-<style scoped>
-.more-note {
-    margin: 0;
-    padding: var(--space-3) var(--space-5);
-    font-size: var(--font-size-xs);
-    color: var(--color-text-muted);
-    border-top: 1px solid var(--color-border);
-}
-</style>

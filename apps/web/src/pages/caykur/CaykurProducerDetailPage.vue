@@ -65,7 +65,7 @@ function goBack(): void {
 
 <template>
     <CaykurLayout>
-        <button type="button" class="back-link" @click="goBack">
+        <button type="button" class="ck-back-link" @click="goBack">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
             Müstahsiller
         </button>
@@ -77,7 +77,7 @@ function goBack(): void {
                 <div class="detail-id">
                     <h1 class="detail-name">
                         {{ producer.fullName }}
-                        <span v-if="producer.organic" class="organic-tag">Organik</span>
+                        <span v-if="producer.organic" class="ck-tag">Organik</span>
                     </h1>
                     <p class="detail-meta">
                         {{ producer.region }} / {{ producer.district }} · {{ producer.factory }}
@@ -133,11 +133,11 @@ function goBack(): void {
             <div class="detail-grid">
                 <div class="detail-main">
                     <!-- ── Budama rotation (hero) ── -->
-                    <section class="panel rotation-panel">
-                        <div class="panel-head">
+                    <section class="ck-panel rotation-panel">
+                        <div class="ck-panel-head rotation-head">
                             <div>
-                                <h2 class="panel-title">Budama rotasyonu</h2>
-                                <p class="panel-desc">7 yıllık döngü — her yıl bahçenin 1/7'si budanır</p>
+                                <h2 class="ck-panel-title">Budama rotasyonu</h2>
+                                <p class="panel-desc">7 yıllık döngü: her yıl bahçenin 1/7'si budanır</p>
                             </div>
                             <ComplianceBadge :status="budama" />
                         </div>
@@ -184,10 +184,10 @@ function goBack(): void {
                     </section>
 
                     <!-- ── Sürgün breakdown ── -->
-                    <section class="panel">
-                        <div class="panel-head">
-                            <h2 class="panel-title">Sürgün dağılımı</h2>
-                            <span class="panel-meta">{{ formatKg(producer.seasonKg) }}</span>
+                    <section class="ck-panel">
+                        <div class="ck-panel-head">
+                            <h2 class="ck-panel-title">Sürgün dağılımı</h2>
+                            <span class="ck-panel-meta">{{ formatKg(producer.seasonKg) }}</span>
                         </div>
                         <div class="surgun-list">
                             <div v-for="row in surgunRows" :key="row.label" class="surgun-row">
@@ -202,9 +202,9 @@ function goBack(): void {
                 </div>
 
                 <!-- ── Ruhsat / identity ── -->
-                <aside class="panel info-panel">
-                    <div class="panel-head">
-                        <h2 class="panel-title">Ruhsat bilgileri</h2>
+                <aside class="ck-panel info-panel">
+                    <div class="ck-panel-head">
+                        <h2 class="ck-panel-title">Ruhsat bilgileri</h2>
                     </div>
                     <dl class="info-list">
                         <div class="info-row"><dt>Ruhsat no</dt><dd>{{ producer.ruhsatNo }}</dd></div>
@@ -221,33 +221,15 @@ function goBack(): void {
         </template>
 
         <!-- ── Not found ── -->
-        <div v-else class="empty-state">
-            <p class="empty-title">Müstahsil bulunamadı</p>
-            <button type="button" class="empty-reset" @click="goBack">Müstahsillere dön</button>
+        <div v-else class="ck-empty">
+            <p class="ck-empty-title">Müstahsil bulunamadı</p>
+            <p class="ck-empty-sub">Kayıt taşınmış veya bağlantı eski olabilir.</p>
+            <button type="button" class="ck-btn" @click="goBack">Müstahsillere dön</button>
         </div>
     </CaykurLayout>
 </template>
 
 <style scoped>
-.back-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: var(--space-5);
-    background: none;
-    border: none;
-    padding: 0;
-    color: var(--color-text-secondary);
-    font-family: inherit;
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold);
-    cursor: pointer;
-    transition: color var(--transition-fast);
-}
-.back-link:hover {
-    color: var(--color-primary);
-}
-
 /* ── Header ── */
 .detail-head {
     display: flex;
@@ -282,15 +264,6 @@ function goBack(): void {
     color: var(--color-text-primary);
     letter-spacing: -0.01em;
     margin: 0;
-}
-.organic-tag {
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-success);
-    background: color-mix(in srgb, var(--color-success) 10%, transparent);
-    border: 1px solid color-mix(in srgb, var(--color-success) 24%, transparent);
-    padding: 2px 9px;
-    border-radius: var(--radius-full);
 }
 .detail-meta {
     margin: 5px 0 0;
@@ -366,31 +339,12 @@ function goBack(): void {
     }
 }
 
-/* ── Panel ── */
-.panel {
-    background: var(--color-card-bg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-}
-.panel-head {
-    display: flex;
+/* ── Panel extras (on top of ck-panel) ── */
+.rotation-head {
     align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-3);
-    padding: var(--space-5) var(--space-5) var(--space-4);
-}
-.panel-title {
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text-primary);
-    margin: 0;
 }
 .panel-desc {
     margin: 3px 0 0;
-    font-size: var(--font-size-sm);
-    color: var(--color-text-muted);
-}
-.panel-meta {
     font-size: var(--font-size-sm);
     color: var(--color-text-muted);
 }
@@ -553,9 +507,10 @@ function goBack(): void {
     border-radius: var(--radius-full);
     overflow: hidden;
 }
+/* Volume is informational data, not success: Field Blue, not the working green. */
 .surgun-bar-fill {
     height: 100%;
-    background: var(--color-border-strong);
+    background: var(--color-secondary);
     border-radius: var(--radius-full);
 }
 .surgun-kg {
@@ -593,30 +548,6 @@ function goBack(): void {
     color: var(--color-text-primary);
     text-align: right;
     font-variant-numeric: tabular-nums;
-}
-
-/* ── Empty ── */
-.empty-state {
-    text-align: center;
-    padding: var(--space-16) var(--space-5);
-}
-.empty-title {
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text-primary);
-    margin: 0 0 var(--space-4);
-}
-.empty-reset {
-    min-height: 40px;
-    padding: 0 var(--space-4);
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-md);
-    color: var(--color-text-primary);
-    font-family: inherit;
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold);
-    cursor: pointer;
 }
 
 @media (max-width: 560px) {

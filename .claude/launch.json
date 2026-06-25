@@ -6,6 +6,13 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev:web"],
       "port": 5173
+    },
+    {
+      "name": "web-preview",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev:web", "--port", "5273", "--strictPort"],
+      "port": 5273,
+      "autoPort": false
     }
   ]
 }

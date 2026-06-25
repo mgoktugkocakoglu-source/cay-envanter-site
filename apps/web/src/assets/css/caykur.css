@@ -75,6 +75,10 @@
 .ck-btn:hover {
     background: var(--color-bg-tertiary);
 }
+.ck-btn:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
 .ck-btn-primary {
     background: var(--color-primary);
     border-color: var(--color-primary);
@@ -87,6 +91,40 @@
     min-height: 34px;
     padding: 0 var(--space-3);
     font-size: var(--font-size-sm);
+}
+/* Quiet button: toolbar/utility actions that shouldn't compete with content. */
+.ck-btn-ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--color-text-secondary);
+}
+.ck-btn-ghost:hover {
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-primary);
+}
+/* Square icon-only button (header utilities). Pair with aria-label. */
+.ck-icon-btn {
+    width: 40px;
+    min-width: 40px;
+    padding: 0;
+}
+
+/* ── Keyboard hint chip (⌘K etc.) ── */
+.ck-kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    line-height: 1;
+    color: var(--color-text-secondary);
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-sm);
 }
 
 /* ── Toolbar / filters ── */
@@ -176,6 +214,10 @@
 .ck-seg-btn:hover {
     color: var(--color-text-primary);
 }
+.ck-seg-btn:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
 .ck-seg-btn.is-active {
     background: var(--color-bg-secondary);
     color: var(--color-text-primary);
@@ -188,6 +230,83 @@
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: var(--space-4);
     margin-bottom: var(--space-6);
+}
+
+/* Stat card anatomy (CaykurStatCard) — label row, Ink value, optional delta + sub. */
+.ck-kpi {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: var(--space-4) var(--space-5);
+    background: var(--color-card-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    min-width: 0;
+}
+.ck-kpi-label {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-secondary);
+    line-height: 1.3;
+}
+.ck-kpi-value-row {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    min-width: 0;
+}
+/* The numbers carry the promise: Ink, full contrast, never muted. */
+.ck-kpi-value {
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text-primary);
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.ck-kpi-unit {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-secondary);
+}
+.ck-kpi-sub {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+}
+.ck-kpi-foot {
+    margin-top: var(--space-3);
+}
+
+/* Delta chip: season-over-season change. Direction ≠ judgement — pass tone explicitly. */
+.ck-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 7px;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.5;
+    border-radius: var(--radius-full);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.ck-delta[data-tone='success'] {
+    color: var(--color-success);
+    background: color-mix(in srgb, var(--color-success) 10%, transparent);
+}
+.ck-delta[data-tone='danger'] {
+    color: var(--color-danger);
+    background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+}
+.ck-delta[data-tone='warning'] {
+    color: var(--color-warning);
+    background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+}
+.ck-delta[data-tone='muted'] {
+    color: var(--color-text-secondary);
+    background: var(--color-bg-tertiary);
 }
 
 /* ── Panel ── */
@@ -231,9 +350,11 @@
 }
 .ck-table th {
     text-align: left;
+    font-size: var(--font-size-xs);
     font-weight: var(--font-weight-semibold);
+    letter-spacing: 0.01em;
     color: var(--color-text-secondary);
-    padding: 10px var(--space-5);
+    padding: 9px var(--space-5);
     border-top: 1px solid var(--color-border);
     border-bottom: 1px solid var(--color-border);
     background: var(--color-bg-primary);
@@ -242,11 +363,61 @@
 .ck-table th.num {
     text-align: right;
 }
+
+/* Sortable column header — a real button so it's keyboard reachable. */
+.ck-th-sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin: -2px -4px;
+    padding: 2px 4px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    cursor: pointer;
+    transition: color var(--transition-fast);
+}
+.ck-th-sort:hover {
+    color: var(--color-text-primary);
+}
+.ck-th-sort:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+.ck-th-sort .ck-sort-arrow {
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+.ck-th-sort:hover .ck-sort-arrow {
+    opacity: 0.5;
+}
+.ck-th-sort[data-dir] {
+    color: var(--color-text-primary);
+}
+.ck-th-sort[data-dir] .ck-sort-arrow {
+    opacity: 1;
+}
+.ck-th-sort[data-dir='desc'] .ck-sort-arrow {
+    transform: rotate(180deg);
+}
+th.num .ck-th-sort {
+    flex-direction: row-reverse;
+}
 .ck-table td {
     padding: 12px var(--space-5);
     border-bottom: 1px solid var(--color-border);
     color: var(--color-text-primary);
     vertical-align: middle;
+}
+/* Dense variant for side-by-side panels where width is scarce. */
+.ck-table--dense th,
+.ck-table--dense td {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
 }
 .ck-table tbody tr:last-child td {
     border-bottom: none;
@@ -265,6 +436,76 @@
 }
 .ck-row-link:hover {
     background: var(--color-bg-primary);
+}
+.ck-row-link:focus-visible {
+    outline: none;
+    box-shadow: inset var(--focus-ring);
+}
+
+/* ── Table footer / pagination ── */
+.ck-table-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    padding: var(--space-3) var(--space-5);
+    border-top: 1px solid var(--color-border);
+}
+.ck-page-info {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+}
+.ck-pager {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.ck-pager-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 var(--space-2);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    color: var(--color-text-secondary);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+.ck-pager-btn:hover:not(:disabled) {
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-primary);
+}
+.ck-pager-btn:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+.ck-pager-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.ck-pager-btn.is-current {
+    background: var(--color-bg-secondary);
+    border-color: var(--color-border-strong);
+    color: var(--color-text-primary);
+    box-shadow: var(--shadow-sm);
+}
+.ck-pager-gap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 32px;
+    color: var(--color-text-muted);
+    user-select: none;
 }
 .ck-chevron-cell {
     text-align: right;
@@ -458,4 +699,63 @@
     color: var(--color-text-primary);
     letter-spacing: -0.01em;
     margin: var(--space-6) 0 var(--space-3);
+}
+
+/* ── Breadcrumbs (shell header) ── */
+.ck-crumbs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+.ck-crumb {
+    color: var(--color-text-muted);
+    text-decoration: none;
+    font-weight: var(--font-weight-medium);
+    border-radius: var(--radius-sm);
+    transition: color var(--transition-fast);
+}
+a.ck-crumb:hover {
+    color: var(--color-text-primary);
+}
+a.ck-crumb:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+.ck-crumb.is-current {
+    color: var(--color-text-primary);
+    font-weight: var(--font-weight-semibold);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ck-crumb-sep {
+    color: var(--color-border-strong);
+    flex-shrink: 0;
+}
+
+/* ── Overlay entrances (dropdown menus, popovers, palette) ── */
+@keyframes ck-pop {
+    from {
+        opacity: 0;
+        transform: translateY(-4px) scale(0.985);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+.ck-pop-in {
+    animation: ck-pop 140ms var(--ease-out-quint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ck-pop-in {
+        animation: none;
+    }
+    .ck-th-sort .ck-sort-arrow {
+        transition: none;
+    }
 }

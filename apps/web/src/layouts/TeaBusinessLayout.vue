@@ -160,7 +160,7 @@ onBeforeUnmount(() => {
           <span>Arazilerim</span>
         </RouterLink>
         <RouterLink to="/tea/firms" class="app-nav-item" active-class="router-link-active">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M8 10h.01"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 14h.01"/><path d="M16 14h.01"/><path d="M12 14h.01"/></svg>
           <span>Firmalar</span>
         </RouterLink>
         <RouterLink to="/tea/harvests" class="app-nav-item" active-class="router-link-active">
@@ -200,7 +200,7 @@ onBeforeUnmount(() => {
         <span>Araziler</span>
       </RouterLink>
       <RouterLink to="/tea/firms" class="bottom-tab" active-class="router-link-active">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M8 10h.01"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 14h.01"/><path d="M16 14h.01"/><path d="M12 14h.01"/></svg>
         <span>Firmalar</span>
       </RouterLink>
       <RouterLink to="/tea/harvests" class="bottom-tab" active-class="router-link-active">
@@ -272,35 +272,6 @@ onBeforeUnmount(() => {
   object-fit: contain;
 }
 
-.hub-divider-v {
-  width: 1px;
-  height: 28px;
-  background: var(--color-border);
-  flex-shrink: 0;
-}
-
-.hub-context {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.hub-context-icon {
-  width: 28px;
-  height: 28px;
-  object-fit: contain;
-  flex-shrink: 0;
-}
-.hub-context-text {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  letter-spacing: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .hub-spacer {
   display: block;
 }
@@ -311,40 +282,6 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: var(--space-2);
   justify-content: flex-end;
-}
-
-.hub-switch-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 38px;
-  padding: 5px 14px 5px 7px;
-  background: linear-gradient(135deg, #fb923c 0%, #f59e0b 100%);
-  border: 1px solid rgba(251, 146, 60, 0.85);
-  border-radius: var(--radius-full);
-  color: #fff;
-  box-shadow: 0 8px 18px -10px rgba(234, 88, 12, 0.8);
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-.hub-switch-btn:hover {
-  background: linear-gradient(135deg, #f97316 0%, #f59e0b 100%);
-  border-color: rgba(249, 115, 22, 0.95);
-  box-shadow: 0 10px 22px -12px rgba(234, 88, 12, 0.95);
-}
-.hub-switch-icon {
-  display: block;
-  width: 28px;
-  height: 28px;
-  margin-left: -1px;
-  object-fit: cover;
-  object-position: center;
-  border-radius: 50%;
-  clip-path: circle(49% at 50% 50%);
-  flex-shrink: 0;
 }
 
 .icon-btn {
@@ -363,6 +300,10 @@ onBeforeUnmount(() => {
 .icon-btn:hover {
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
+}
+.icon-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 /* ── User menu ── */
@@ -390,6 +331,10 @@ onBeforeUnmount(() => {
 .user-menu-trigger[aria-expanded="true"] {
   background: var(--color-bg-primary);
   border-color: var(--color-primary);
+}
+.user-menu-trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .user-avatar {
@@ -458,11 +403,11 @@ onBeforeUnmount(() => {
   right: 0;
   min-width: 260px;
   padding: 6px;
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-  z-index: 60;
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-dropdown);
 }
 
 .user-menu-header {
@@ -520,11 +465,15 @@ onBeforeUnmount(() => {
   background: var(--color-bg-tertiary);
   color: var(--color-text-primary);
 }
+.user-menu-item:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
+}
 .user-menu-item svg { flex-shrink: 0; }
 .user-menu-item--danger { color: var(--color-text-muted); }
 .user-menu-item--danger:hover {
-  background: rgba(239, 68, 68, 0.08);
-  color: #ef4444;
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+  color: var(--color-danger);
 }
 
 /* Dropdown transition */
@@ -580,6 +529,11 @@ onBeforeUnmount(() => {
   background: var(--color-bg-tertiary);
 }
 
+.app-nav-item:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
+}
+
 .app-nav-item.router-link-active {
   color: var(--color-primary);
   background: var(--color-primary-light);
@@ -607,8 +561,6 @@ onBeforeUnmount(() => {
 
 /* ── RESPONSIVE ── */
 @media (max-width: 1024px) {
-  .hub-context-text { display: none; }
-  .hub-switch-label { display: none; }
   .user-trigger-text { display: none; }
   .user-menu-trigger { padding: 4px; }
 }
@@ -686,8 +638,24 @@ onBeforeUnmount(() => {
     color: var(--color-primary);
     background: var(--color-primary-light);
   }
+  .bottom-tab:focus-visible {
+    outline: none;
+    box-shadow: inset var(--focus-ring);
+  }
   .bottom-tab svg {
     flex-shrink: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .user-menu-enter-active,
+  .user-menu-leave-active,
+  .user-caret,
+  .app-nav-item,
+  .icon-btn,
+  .user-menu-trigger,
+  .user-menu-item {
+    transition: none;
   }
 }
 </style>

@@ -96,6 +96,14 @@
   /* Controls */
   --control-height: 44px;
 
+  /* App shell (enterprise panel) */
+  --header-height: 60px;
+  --sidebar-width: 264px;
+  --sidebar-width-collapsed: 64px;
+
+  /* Focus ring (pair with outline: none on :focus-visible) */
+  --focus-ring: 0 0 0 3px var(--color-primary-light);
+
   /* Border Radius */
   --radius-sm: 4px;
   --radius-md: 8px;
@@ -107,8 +115,11 @@
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
   --transition-slow: 350ms ease;
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* Z-Index */
+  --z-sticky: 40;
+  --z-header: 50;
   --z-dropdown: 100;
   --z-modal: 200;
   --z-toast: 300;

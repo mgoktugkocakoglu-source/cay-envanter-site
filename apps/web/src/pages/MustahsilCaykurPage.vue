@@ -4,9 +4,8 @@ import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import CaykurStatCard from '@/components/caykur/CaykurStatCard.vue';
 import StatusPill from '@/components/caykur/StatusPill.vue';
 import ComplianceMeter from '@/components/caykur/ComplianceMeter.vue';
+import { useDemoProducer } from '@/composables/useDemoProducer';
 import {
-    PRODUCERS,
-    kotaUsagePct,
     kotaTone,
     quotaForProducer,
     QUOTA_STATUS_META,
@@ -28,14 +27,9 @@ import {
     type RequestType,
 } from '@/services/caykur';
 
-// Demo "logged-in producer": pick a producer with a healthy, complete story.
-const producer = computed(() => {
-    const healthy = PRODUCERS.find((p) => {
-        const u = kotaUsagePct(p);
-        return u >= 70 && u <= 96;
-    });
-    return healthy ?? PRODUCERS[0];
-});
+// Demo "logged-in producer": shared with the producer pruning page so a request
+// created on one surface ties to the same müstahsil everywhere.
+const { producer } = useDemoProducer();
 
 type Tab = 'deliveries' | 'quota' | 'cari' | 'docs' | 'announcements' | 'requests';
 const tab = ref<Tab>('deliveries');

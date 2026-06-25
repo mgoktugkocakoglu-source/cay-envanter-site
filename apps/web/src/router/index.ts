@@ -236,6 +236,18 @@ const router = createRouter({
             meta: { requiresAuth: true, requiresAdmin: true, module: 'finance' },
         },
         {
+            path: '/caykur/pruning-requests',
+            name: 'caykur-pruning-requests',
+            component: () => import('@/pages/caykur/CaykurPruningRequestsPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'pruning_requests' },
+        },
+        {
+            path: '/caykur/pruning-requests/:id',
+            name: 'caykur-pruning-request-detail',
+            component: () => import('@/pages/caykur/CaykurPruningRequestDetailPage.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true, module: 'pruning_requests' },
+        },
+        {
             path: '/caykur/pruning',
             name: 'caykur-pruning',
             component: () => import('@/pages/caykur/CaykurPruningPage.vue'),
