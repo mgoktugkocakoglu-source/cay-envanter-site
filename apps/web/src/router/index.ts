@@ -136,10 +136,11 @@ const router = createRouter({
             meta: { requiresAuth: true, hub: 'tea' },
         },
         {
+            // Retired mock producer portal — real producer data lives across the
+            // other /tea/* pages (dashboard, harvests, payments). Redirect any
+            // stale link/bookmark.
             path: '/tea/caykur',
-            name: 'tea-caykur',
-            component: () => import('@/pages/MustahsilCaykurPage.vue'),
-            meta: { requiresAuth: true, hub: 'tea' },
+            redirect: '/tea/dashboard',
         },
         {
             path: '/tea/settings',

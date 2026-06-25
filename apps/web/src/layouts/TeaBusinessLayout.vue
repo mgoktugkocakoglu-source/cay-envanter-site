@@ -179,10 +179,6 @@ onBeforeUnmount(() => {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a5 5 0 0 0-5 5v2H6a4 4 0 0 0 0 8h1v1a4 4 0 0 0 8 0v-1h3a4 4 0 0 0 0-8h-1V7a5 5 0 0 0-5-5z"/><path d="M9 9h.01"/><path d="M15 9h.01"/><path d="M9 14h6"/></svg>
           <span>AI Agent</span>
         </RouterLink>
-        <RouterLink to="/tea/caykur" class="app-nav-item" active-class="router-link-active">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/></svg>
-          <span>Çaykur</span>
-        </RouterLink>
       </aside>
 
       <main class="hub-content">
@@ -218,10 +214,6 @@ onBeforeUnmount(() => {
       <RouterLink to="/tea/ai-agent" class="bottom-tab" active-class="router-link-active">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a5 5 0 0 0-5 5v2H6a4 4 0 0 0 0 8h1v1a4 4 0 0 0 8 0v-1h3a4 4 0 0 0 0-8h-1V7a5 5 0 0 0-5-5z"/><path d="M9 9h.01"/><path d="M15 9h.01"/><path d="M9 14h6"/></svg>
         <span>AI</span>
-      </RouterLink>
-      <RouterLink to="/tea/caykur" class="bottom-tab" active-class="router-link-active">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/></svg>
-        <span>Çaykur</span>
       </RouterLink>
     </nav>
   </div>
