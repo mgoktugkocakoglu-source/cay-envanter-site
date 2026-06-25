@@ -11,7 +11,7 @@ import { Field } from '@/fields/entities/field.entity';
 import { Payment } from '@/payments/entities/payment.entity';
 import { Harvest } from '@/harvests/entities/harvest.entity';
 import { PaymentHarvest } from '@/payments/entities/payment-harvest.entity';
-import { PruningMeasurement, PruningTask } from '@/pruning/entities';
+import { PruningMeasurement, PruningTask, PruningRequest } from '@/pruning/entities';
 
 interface TariffSeed {
     paymentTerm: PaymentTerm;
@@ -118,6 +118,7 @@ export class SeedService implements OnModuleInit {
         @InjectRepository(PaymentHarvest) private readonly paymentHarvestRepo: Repository<PaymentHarvest>,
         @InjectRepository(PruningMeasurement) private readonly measurementRepo: Repository<PruningMeasurement>,
         @InjectRepository(PruningTask) private readonly taskRepo: Repository<PruningTask>,
+        @InjectRepository(PruningRequest) private readonly pruningRequestRepo: Repository<PruningRequest>,
     ) { }
 
     async onModuleInit(): Promise<void> {
@@ -136,6 +137,7 @@ export class SeedService implements OnModuleInit {
             const sahaUser = await this.ensureStaff();
             if (sahaUser) {
                 await this.seedPruningTasks(user, sahaUser);
+                await this.seedPruningRequests(user, sahaUser);
             }
             this.logger.log('Demo seed complete');
         } catch (err) {
@@ -420,6 +422,97 @@ export class SeedService implements OnModuleInit {
         }
 
         this.logger.log('Demo pruning tasks seeded');
+    }
+
+    /**
+     * Seeds a few budama (pruning) requests for the demo producer across the
+     * lifecycle so the Kurum panel has real DB rows to act on: one pending
+     * (awaiting an appointment), one scheduled, one fully approved with a 3D
+     * measurement. The producer can add more from the app.
+     */
+    private async seedPruningRequests(producer: User, staff: User): Promise<void> {
+        const already = await this.pruningRequestRepo.count();
+        if (already > 0) {
+            return;
+        }
+
+        const fields = await this.fieldRepo.find({
+            where: { userId: producer.id, deleted: false },
+            order: { createdAt: 'ASC' },
+            take: 3,
+        });
+        const registeredAreaM2 = fields.reduce((s, f) => s + (Number(f.area) || 0), 0);
+        const f0 = fields[0];
+        const f1 = fields[1] ?? fields[0];
+
+        // 1) Pending — producer opened it, awaiting an appointment.
+        await this.pruningRequestRepo.save(
+            this.pruningRequestRepo.create({
+                producerId: producer.id,
+                producerName: producer.fullName,
+                il: producer.province,
+                ilce: f0?.district ?? producer.district,
+                ada: f0?.adaNo ?? '142',
+                parsel: f0?.parcelNo ?? '11',
+                registeredAreaM2,
+                status: 'pending',
+                measurementPoints: [],
+            }),
+        );
+
+        // 2) Scheduled — authorized person set an appointment date.
+        await this.pruningRequestRepo.save(
+            this.pruningRequestRepo.create({
+                producerId: producer.id,
+                producerName: producer.fullName,
+                il: producer.province,
+                ilce: f1?.district ?? producer.district,
+                ada: f1?.adaNo ?? '203',
+                parsel: f1?.parcelNo ?? '48',
+                registeredAreaM2,
+                status: 'scheduled',
+                appointmentDate: '2026-06-28',
+                appointedById: staff.id,
+                appointedByName: staff.fullName,
+                measurementPoints: [],
+            }),
+        );
+
+        // 3) Approved — measured on site (3D) and approved.
+        const ring = (f1?.coordinates?.[0] ?? []) as number[][];
+        const points = ring.slice(0, Math.max(0, ring.length - 1)).map(([lng, lat], i) => ({
+            lat,
+            lng,
+            altitudeMeters: Math.round((80 + i * 6) * 10) / 10,
+        }));
+        const measuredAreaM2 = Math.round((Number(f1?.area) || 1000) * 0.13);
+        await this.pruningRequestRepo.save(
+            this.pruningRequestRepo.create({
+                producerId: producer.id,
+                producerName: producer.fullName,
+                il: producer.province,
+                ilce: f1?.district ?? producer.district,
+                ada: f1?.adaNo ?? '203',
+                parsel: f1?.parcelNo ?? '48',
+                registeredAreaM2,
+                status: 'approved',
+                appointmentDate: '2026-06-12',
+                appointedById: staff.id,
+                appointedByName: staff.fullName,
+                measuredAreaM2,
+                measurementPoints: points,
+                method: 'gps',
+                accuracyLevel: 'high',
+                fixQuality: 'rtk-fixed',
+                measuredAt: new Date('2026-06-12T11:00:00'),
+                measuredById: staff.id,
+                measuredByName: staff.fullName,
+                approvedAt: new Date('2026-06-12T14:00:00'),
+                approvedByName: staff.fullName,
+            }),
+        );
+
+        this.logger.log('Demo pruning requests seeded');
     }
 
     /** Builds a tiny closed square polygon (~120m) centred on the given point. */

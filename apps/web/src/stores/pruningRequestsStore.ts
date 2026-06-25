@@ -1,141 +1,118 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import {
-    PRUNING_REQUESTS,
-    pruningRequestSummary,
+    api,
     type PruningRequest,
     type PruningRequestStatus,
-    type MeasurementPoint,
-    type PruningRequestSummary,
-} from '@/services/caykur/pruningRequests';
-import type { AccuracyLevel, MeasurementMethod } from '@/services/caykur/pruning';
+    type CreatePruningRequestPayload,
+    type SavePruningMeasurementResultPayload,
+} from '@/services/api';
 
 /**
- * Shared, reactive pruning-request store — the single source both the producer
- * surface (PruningPage "Budama Talebi") and the Kurum panel (Budama Talepleri)
- * read and write. A request the producer opens shows up live in the panel; the
- * authorized person's appointment / measurement / approval round-trips back to
- * the producer's view within the demo session.
- *
- * Seeded from the deterministic demo dataset (services/caykur/pruningRequests),
- * which is the seam to swap for real API endpoints later.
+ * Budama talepleri store — DB-backed (no mock data). Both the producer surface
+ * (PruningPage "Budama Talebi") and the Kurum panel (Budama Talepleri) read and
+ * write through the real `/pruning/requests` API; the backend scopes the list
+ * by role (producer sees own, staff sees all) and stamps the acting user.
  */
-
-export interface NewRequestInput {
-    producerId: string;
-    producerName: string;
-    il: string;
-    ilce: string;
-    region: PruningRequest['region'];
-    ada: string;
-    parsel: string;
-    registeredAreaM2: number;
-}
-
-export interface MeasurementResult {
-    measuredAreaM2: number;
-    points: MeasurementPoint[];
-    accuracyLevel: AccuracyLevel | null;
-    fixQuality: string | null;
-    method: MeasurementMethod;
-}
-
 export const usePruningRequestsStore = defineStore('pruningRequests', () => {
-    const requests = ref<PruningRequest[]>([...PRUNING_REQUESTS]);
-
-    let seq = requests.value.length;
-
-    const summary = computed<PruningRequestSummary>(() => pruningRequestSummary(requests.value));
-
-    function forProducer(producerId: string): PruningRequest[] {
-        return requests.value.filter((r) => r.producerId === producerId);
-    }
-
-    function byId(id: string): PruningRequest | undefined {
-        return requests.value.find((r) => r.id === id);
-    }
+    const requests = ref<PruningRequest[]>([]);
+    const isLoading = ref(false);
+    const error = ref<string | null>(null);
 
     function countByStatus(status: PruningRequestStatus): number {
         return requests.value.filter((r) => r.status === status).length;
     }
 
-    // ── Producer action ──
-    function createRequest(input: NewRequestInput): PruningRequest {
-        seq += 1;
-        const req: PruningRequest = {
-            id: `prq-new-${seq}`,
-            producerId: input.producerId,
-            producerName: input.producerName,
-            il: input.il,
-            ilce: input.ilce,
-            region: input.region,
-            ada: input.ada,
-            parsel: input.parsel,
-            parcelLabel: `Ada ${input.ada} / Parsel ${input.parsel}`,
-            registeredAreaM2: input.registeredAreaM2,
-            status: 'pending',
-            createdAt: new Date().toISOString(),
-            appointmentDate: null,
-            appointedBy: null,
-            measuredAreaM2: null,
-            measurementPoints: [],
-            accuracyLevel: null,
-            fixQuality: null,
-            method: null,
-            measuredAt: null,
-            measuredBy: null,
-            approvedAt: null,
-            approvedBy: null,
-            notes: '',
-        };
-        requests.value = [req, ...requests.value];
-        return req;
+    const summary = computed(() => ({
+        total: requests.value.length,
+        pending: countByStatus('pending'),
+        scheduled: countByStatus('scheduled'),
+        measured: countByStatus('measured'),
+        approved: countByStatus('approved'),
+        rejected: countByStatus('rejected'),
+    }));
+
+    function byId(id: string): PruningRequest | undefined {
+        return requests.value.find((r) => r.id === id);
     }
 
-    // ── Authorized-person (panel) actions ──
-    function setAppointment(id: string, date: string, staffName: string): void {
-        const r = byId(id);
-        if (!r) return;
-        r.appointmentDate = date;
-        r.appointedBy = staffName;
-        r.status = 'scheduled';
+    function upsert(rec: PruningRequest): void {
+        const i = requests.value.findIndex((r) => r.id === rec.id);
+        if (i === -1) requests.value = [rec, ...requests.value];
+        else requests.value[i] = rec;
     }
 
-    function saveMeasurement(id: string, result: MeasurementResult, staffName: string): void {
-        const r = byId(id);
-        if (!r) return;
-        r.measuredAreaM2 = result.measuredAreaM2;
-        r.measurementPoints = result.points;
-        r.accuracyLevel = result.accuracyLevel;
-        r.fixQuality = result.fixQuality;
-        r.method = result.method;
-        r.measuredAt = new Date().toISOString();
-        r.measuredBy = staffName;
-        r.status = 'measured';
+    async function fetchAll(params?: { status?: PruningRequestStatus; search?: string }): Promise<void> {
+        isLoading.value = true;
+        error.value = null;
+        try {
+            const res = await api.getPruningRequests({ limit: 100, ...params });
+            if (res.data) requests.value = res.data.data;
+            else if (res.error) error.value = res.error.message;
+        } catch {
+            error.value = 'Budama talepleri alınamadı';
+        } finally {
+            isLoading.value = false;
+        }
     }
 
-    function approve(id: string, staffName: string): void {
-        const r = byId(id);
-        if (!r) return;
-        r.approvedAt = new Date().toISOString();
-        r.approvedBy = staffName;
-        r.status = 'approved';
+    async function fetchOne(id: string): Promise<PruningRequest | undefined> {
+        const res = await api.getPruningRequest(id);
+        if (res.data) {
+            upsert(res.data);
+            return res.data;
+        }
+        if (res.error) error.value = res.error.message;
+        return undefined;
     }
 
-    function reject(id: string, staffName: string, reason: string): void {
-        const r = byId(id);
-        if (!r) return;
-        r.approvedBy = staffName;
-        r.notes = reason || r.notes;
-        r.status = 'rejected';
+    async function createRequest(payload: CreatePruningRequestPayload): Promise<PruningRequest | null> {
+        const res = await api.createPruningRequest(payload);
+        if (res.data) {
+            upsert(res.data);
+            return res.data;
+        }
+        error.value = res.error?.message ?? 'Talep oluşturulamadı';
+        return null;
+    }
+
+    async function setAppointment(id: string, appointmentDate: string): Promise<PruningRequest | null> {
+        const res = await api.setPruningAppointment(id, appointmentDate);
+        if (res.data) upsert(res.data);
+        else error.value = res.error?.message ?? null;
+        return res.data ?? null;
+    }
+
+    async function saveMeasurement(id: string, result: SavePruningMeasurementResultPayload): Promise<PruningRequest | null> {
+        const res = await api.savePruningRequestMeasurement(id, result);
+        if (res.data) upsert(res.data);
+        else error.value = res.error?.message ?? null;
+        return res.data ?? null;
+    }
+
+    async function approve(id: string): Promise<PruningRequest | null> {
+        const res = await api.approvePruningRequest(id);
+        if (res.data) upsert(res.data);
+        else error.value = res.error?.message ?? null;
+        return res.data ?? null;
+    }
+
+    async function reject(id: string, reason?: string): Promise<PruningRequest | null> {
+        const res = await api.rejectPruningRequest(id, reason);
+        if (res.data) upsert(res.data);
+        else error.value = res.error?.message ?? null;
+        return res.data ?? null;
     }
 
     return {
         requests,
+        isLoading,
+        error,
         summary,
-        forProducer,
-        byId,
         countByStatus,
+        byId,
+        fetchAll,
+        fetchOne,
         createRequest,
         setAppointment,
         saveMeasurement,

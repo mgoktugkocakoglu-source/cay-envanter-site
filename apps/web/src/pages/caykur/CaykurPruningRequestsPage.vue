@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import CaykurPage from '@/components/caykur/CaykurPage.vue';
 import CaykurPanel from '@/components/caykur/CaykurPanel.vue';
@@ -28,11 +28,13 @@ const filtered = computed(() => {
     const q = search.value.trim().toLocaleLowerCase('tr');
     return store.requests.filter((r) => {
         if (view.value !== 'all' && r.status !== view.value) return false;
-        if (region.value !== 'all' && r.region !== region.value) return false;
-        if (q && !`${r.producerName} ${r.parcelLabel} ${r.ilce}`.toLocaleLowerCase('tr').includes(q)) return false;
+        if (region.value !== 'all' && r.il !== region.value) return false;
+        if (q && !`${r.producerName} Ada ${r.ada} Parsel ${r.parsel} ${r.ilce}`.toLocaleLowerCase('tr').includes(q)) return false;
         return true;
     });
 });
+
+onMounted(() => store.fetchAll());
 
 const viewOptions: Array<{ value: View; label: string }> = [
     { value: 'pending', label: 'Bekleyenler' },
@@ -100,7 +102,7 @@ function openRequest(id: string): void {
                                 <span class="ck-name-sub">{{ formatNumber(r.registeredAreaM2) }} m² kayıtlı</span>
                             </td>
                             <td>{{ r.il }} · {{ r.ilce }}</td>
-                            <td>{{ r.parcelLabel }}</td>
+                            <td>Ada {{ r.ada }} / Parsel {{ r.parsel }}</td>
                             <td style="white-space:nowrap">{{ formatDate(r.createdAt) }}</td>
                             <td style="white-space:nowrap">{{ r.appointmentDate ? formatDate(r.appointmentDate) : '—' }}</td>
                             <td><StatusPill :label="PRUNING_REQUEST_STATUS_META[r.status].label" :tone="PRUNING_REQUEST_STATUS_META[r.status].tone" /></td>

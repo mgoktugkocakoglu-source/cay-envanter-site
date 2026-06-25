@@ -1,58 +1,69 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import CaykurLayout from '@/layouts/CaykurLayout.vue';
 import CaykurPanel from '@/components/caykur/CaykurPanel.vue';
 import StatusPill from '@/components/caykur/StatusPill.vue';
 import CaykurPruningMeasure from '@/components/caykur/CaykurPruningMeasure.vue';
-import { useCaykurStore } from '@/stores/caykurStore';
-import { usePruningRequestsStore, type MeasurementResult } from '@/stores/pruningRequestsStore';
-import {
-    PRUNING_REQUEST_STATUS_META,
-    parcelsForProducer,
-    formatNumber,
-    formatDate,
-    formatDateTime,
-} from '@/services/caykur';
+import { usePruningRequestsStore } from '@/stores/pruningRequestsStore';
+import { PRUNING_REQUEST_STATUS_META, formatNumber, formatDate, formatDateTime } from '@/services/caykur';
+import type { MeasurementPoint } from '@/services/api';
+import type { AccuracyLevel, MeasurementMethod } from '@/services/caykur/pruning';
 
 const route = useRoute();
 const router = useRouter();
-const caykur = useCaykurStore();
 const store = usePruningRequestsStore();
 
-const staffName = computed(() => caykur.persona.name);
-const req = computed(() => store.byId(String(route.params.id)));
-
-// Parcel outline for the measurement map (match the request's ada/parsel).
-const parcelPolygon = computed<number[][] | undefined>(() => {
-    const r = req.value;
-    if (!r) return undefined;
-    const match = parcelsForProducer(r.producerId).find((p) => p.ada === r.ada && p.parsel === r.parsel);
-    return match?.polygon;
-});
+const id = computed(() => String(route.params.id));
+const req = computed(() => store.byId(id.value));
+const busy = ref(false);
 
 // ── Appointment ──
 const appointmentInput = ref('');
-function submitAppointment(): void {
+async function submitAppointment(): Promise<void> {
     if (!req.value || !appointmentInput.value) return;
-    store.setAppointment(req.value.id, appointmentInput.value, staffName.value);
+    busy.value = true;
+    await store.setAppointment(req.value.id, appointmentInput.value);
+    busy.value = false;
 }
 
 // ── Measurement ──
 const measuring = ref(false);
-function onMeasured(result: MeasurementResult): void {
+async function onMeasured(result: {
+    measuredAreaM2: number;
+    points: MeasurementPoint[];
+    accuracyLevel: AccuracyLevel | null;
+    fixQuality: string | null;
+    method: MeasurementMethod;
+}): Promise<void> {
     if (!req.value) return;
-    store.saveMeasurement(req.value.id, result, staffName.value);
+    busy.value = true;
+    await store.saveMeasurement(req.value.id, {
+        measuredAreaM2: result.measuredAreaM2,
+        points: result.points,
+        method: result.method,
+        accuracyLevel: result.accuracyLevel ?? undefined,
+        fixQuality: result.fixQuality ?? undefined,
+    });
+    busy.value = false;
     measuring.value = false;
 }
 
 // ── Decision ──
-function approve(): void {
-    if (req.value) store.approve(req.value.id, staffName.value);
+async function approve(): Promise<void> {
+    if (!req.value) return;
+    busy.value = true;
+    await store.approve(req.value.id);
+    busy.value = false;
 }
-function reject(): void {
-    if (req.value) store.reject(req.value.id, staffName.value, 'Ölçüm uygun bulunmadı; yeniden randevu gerekli.');
+async function reject(): Promise<void> {
+    if (!req.value) return;
+    busy.value = true;
+    await store.reject(req.value.id, 'Ölçüm uygun bulunmadı; yeniden randevu gerekli.');
+    busy.value = false;
 }
+
+onMounted(() => store.fetchOne(id.value));
 </script>
 
 <template>
@@ -66,17 +77,16 @@ function reject(): void {
             <header class="ck-page-head">
                 <div>
                     <h1 class="ck-page-title">{{ req.producerName }}</h1>
-                    <p class="ck-page-sub">Budama talebi · {{ req.parcelLabel }} · {{ req.il }} / {{ req.ilce }}</p>
+                    <p class="ck-page-sub">Budama talebi · Ada {{ req.ada }} / Parsel {{ req.parsel }} · {{ req.il }} / {{ req.ilce }}</p>
                 </div>
                 <div class="ck-page-actions">
                     <StatusPill :label="PRUNING_REQUEST_STATUS_META[req.status].label" :tone="PRUNING_REQUEST_STATUS_META[req.status].tone" />
                 </div>
             </header>
 
-            <!-- Measurement in progress takes the full width -->
             <CaykurPanel v-if="measuring" title="Hassas ölçüm (3B)">
                 <div class="ck-panel-body">
-                    <CaykurPruningMeasure :parcel-polygon="parcelPolygon" @complete="onMeasured" @cancel="measuring = false" />
+                    <CaykurPruningMeasure @complete="onMeasured" @cancel="measuring = false" />
                 </div>
             </CaykurPanel>
 
@@ -86,46 +96,45 @@ function reject(): void {
                         <dl class="ck-dl">
                             <div class="ck-dl-item"><span class="ck-dl-term">Müstahsil</span><span class="ck-dl-val">{{ req.producerName }}</span></div>
                             <div class="ck-dl-item"><span class="ck-dl-term">İl / İlçe</span><span class="ck-dl-val">{{ req.il }} / {{ req.ilce }}</span></div>
-                            <div class="ck-dl-item"><span class="ck-dl-term">Ada / Parsel</span><span class="ck-dl-val">{{ req.parcelLabel }}</span></div>
+                            <div class="ck-dl-item"><span class="ck-dl-term">Ada / Parsel</span><span class="ck-dl-val">Ada {{ req.ada }} / Parsel {{ req.parsel }}</span></div>
                             <div class="ck-dl-item"><span class="ck-dl-term">Kayıtlı arazi</span><span class="ck-dl-val">{{ formatNumber(req.registeredAreaM2) }} m²</span></div>
                             <div class="ck-dl-item"><span class="ck-dl-term">Talep tarihi</span><span class="ck-dl-val">{{ formatDateTime(req.createdAt) }}</span></div>
-                            <div v-if="req.appointmentDate" class="ck-dl-item"><span class="ck-dl-term">Randevu tarihi</span><span class="ck-dl-val">{{ formatDate(req.appointmentDate) }}<template v-if="req.appointedBy"> · {{ req.appointedBy }}</template></span></div>
+                            <div v-if="req.appointmentDate" class="ck-dl-item"><span class="ck-dl-term">Randevu tarihi</span><span class="ck-dl-val">{{ formatDate(req.appointmentDate) }}<template v-if="req.appointedByName"> · {{ req.appointedByName }}</template></span></div>
                         </dl>
                     </CaykurPanel>
 
-                    <!-- Action card driven by status -->
                     <CaykurPanel title="İşlem">
                         <div class="ck-panel-body action-body">
                             <template v-if="req.status === 'pending'">
                                 <p class="action-hint">Talebi değerlendirin ve ölçüm için bir randevu tarihi belirleyin.</p>
                                 <div class="appt-row">
                                     <input v-model="appointmentInput" type="date" class="ck-search-input" style="padding-left:12px" />
-                                    <button type="button" class="ck-btn ck-btn-primary" :disabled="!appointmentInput" @click="submitAppointment">Randevu ver</button>
+                                    <button type="button" class="ck-btn ck-btn-primary" :disabled="!appointmentInput || busy" @click="submitAppointment">Randevu ver</button>
                                 </div>
                             </template>
 
                             <template v-else-if="req.status === 'scheduled'">
-                                <p class="action-hint">Randevu tarihi: <strong>{{ formatDate(req.appointmentDate as string) }}</strong>. Sahada hassas sensörlerle ölçümü yapın.</p>
-                                <button type="button" class="ck-btn ck-btn-primary" @click="measuring = true">Ölçümü başlat</button>
+                                <p class="action-hint">Randevu tarihi: <strong>{{ req.appointmentDate ? formatDate(req.appointmentDate) : '—' }}</strong>. Sahada hassas sensörlerle ölçümü yapın.</p>
+                                <button type="button" class="ck-btn ck-btn-primary" :disabled="busy" @click="measuring = true">Ölçümü başlat</button>
                             </template>
 
                             <template v-else-if="req.status === 'measured'">
                                 <p class="action-hint">Ölçüm tamamlandı. Kayıt için onaylayın ya da reddedin.</p>
                                 <div class="decide-row">
-                                    <button type="button" class="ck-btn" @click="reject">Reddet</button>
-                                    <button type="button" class="ck-btn ck-btn-primary" @click="approve">Onayla</button>
+                                    <button type="button" class="ck-btn" :disabled="busy" @click="reject">Reddet</button>
+                                    <button type="button" class="ck-btn ck-btn-primary" :disabled="busy" @click="approve">Onayla</button>
                                 </div>
-                                <button type="button" class="ck-btn ck-btn-sm remeasure" @click="measuring = true">Yeniden ölç</button>
+                                <button type="button" class="ck-btn ck-btn-sm remeasure" :disabled="busy" @click="measuring = true">Yeniden ölç</button>
                             </template>
 
                             <template v-else-if="req.status === 'approved'">
-                                <p class="action-done">✓ Talep onaylandı ve kayıt tamamlandı.<template v-if="req.approvedBy"> ({{ req.approvedBy }})</template></p>
+                                <p class="action-done">✓ Talep onaylandı ve kayıt tamamlandı.<template v-if="req.approvedByName"> ({{ req.approvedByName }})</template></p>
                             </template>
 
                             <template v-else>
                                 <p class="action-rejected">Talep reddedildi.</p>
                                 <p v-if="req.notes" class="action-hint">{{ req.notes }}</p>
-                                <button type="button" class="ck-btn ck-btn-sm" @click="measuring = true">Yeniden ölç</button>
+                                <button type="button" class="ck-btn ck-btn-sm" :disabled="busy" @click="measuring = true">Yeniden ölç</button>
                             </template>
                         </div>
                     </CaykurPanel>
@@ -142,7 +151,7 @@ function reject(): void {
                                 <div class="ck-dl-item"><span class="ck-dl-term">Yöntem</span><span class="ck-dl-val">{{ req.method === 'gps' ? 'RTK / GPS' : req.method === 'map' ? 'Harita' : '—' }}</span></div>
                                 <div class="ck-dl-item"><span class="ck-dl-term">Doğruluk</span><span class="ck-dl-val">{{ req.accuracyLevel === 'high' ? 'Yüksek (RTK)' : req.accuracyLevel === 'medium' ? 'Orta' : 'Düşük' }}</span></div>
                                 <div class="ck-dl-item"><span class="ck-dl-term">Köşe sayısı</span><span class="ck-dl-val">{{ formatNumber(req.measurementPoints.length) }}</span></div>
-                                <div class="ck-dl-item"><span class="ck-dl-term">Ölçen</span><span class="ck-dl-val">{{ req.measuredBy ?? '—' }}</span></div>
+                                <div class="ck-dl-item"><span class="ck-dl-term">Ölçen</span><span class="ck-dl-val">{{ req.measuredByName ?? '—' }}</span></div>
                                 <div v-if="req.measuredAt" class="ck-dl-item"><span class="ck-dl-term">Ölçüm tarihi</span><span class="ck-dl-val">{{ formatDateTime(req.measuredAt) }}</span></div>
                             </dl>
 

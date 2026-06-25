@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 248 116" role="img" aria-label="Çaykur">
+  <!-- tea leaves + sprout -->
+  <g>
+    <path d="M124 8c15 1 25 9 27 24-15 1-25-8-27-24z" fill="#62A92C"/>
+    <path d="M124 8c-15 1-25 9-27 24 15 1 25-8 27-24z" fill="#4F9A1E"/>
+    <path d="M124 10c3 9 2 18-3 25-4-8-2-17 3-25z" fill="#3C8A16"/>
+    <circle cx="124" cy="9" r="4.5" fill="#E2001A"/>
+  </g>
+  <!-- badge -->
+  <rect x="4" y="32" width="240" height="76" rx="38" fill="#E2001A"/>
+  <rect x="12" y="40" width="224" height="60" rx="30" fill="none" stroke="#ffffff" stroke-width="2.6"/>
+  <text x="124" y="83" text-anchor="middle"
+        font-family="'Arial Black','Helvetica Neue',Arial,sans-serif"
+        font-size="42" font-weight="900" letter-spacing="2" fill="#ffffff">ÇAYKUR</text>
+</svg>

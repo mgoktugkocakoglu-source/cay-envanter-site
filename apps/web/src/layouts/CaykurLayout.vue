@@ -9,6 +9,7 @@ import { NAV_GROUPS } from '@/services/caykur/nav';
 import { ROLE_DEFS, MODULE_LABELS, type ModuleKey } from '@/services/caykur/roles';
 import { ANNOUNCEMENTS } from '@/services/caykur/comms';
 import CaykurCommandPalette from '@/components/caykur/CaykurCommandPalette.vue';
+import caykurLogo from '@/assets/caykur-logo.svg';
 
 const router = useRouter();
 const route = useRoute();
@@ -116,7 +117,11 @@ function onGlobalKeydown(e: KeyboardEvent): void {
     }
 }
 
-onMounted(() => window.addEventListener('keydown', onGlobalKeydown));
+onMounted(() => {
+    window.addEventListener('keydown', onGlobalKeydown);
+    // Populate the Budama Talepleri badge from the DB.
+    pruningRequests.fetchAll();
+});
 onUnmounted(() => window.removeEventListener('keydown', onGlobalKeydown));
 
 // Redirect away from a module the current persona can't access (Faz 1 gating).
@@ -146,15 +151,9 @@ watch(
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="9" y1="3" x2="9" y2="21" /></svg>
                 </button>
 
-                <RouterLink to="/caykur" class="ck-brand">
-                    <span class="ck-mark" aria-hidden="true">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
-                            <path d="M2 21c0-3 1.85-5.36 5.08-6" />
-                        </svg>
-                    </span>
+                <RouterLink to="/caykur" class="ck-brand" aria-label="Çaykur Kurumsal Müstahsil Platformu">
+                    <img :src="caykurLogo" alt="Çaykur" class="ck-logo" />
                     <span class="ck-brand-text">
-                        <span class="ck-brand-name">Çaykur</span>
                         <span class="ck-brand-sub">Kurumsal Müstahsil Platformu</span>
                     </span>
                 </RouterLink>
@@ -342,6 +341,15 @@ watch(
 .caykur-shell {
     min-height: 100vh;
     background: var(--color-bg-primary);
+    /* Çaykur corporate identity — scoped to the Kurum panel only, so the
+       producer app keeps its working-green system. Cascades to every ck-*
+       primitive (nav, buttons, badges, focus rings, KPIs) via custom props. */
+    --color-primary: #e2001a;
+    --color-primary-hover: #c30016;
+    --color-primary-dark: #a8000f;
+    --color-primary-light: rgba(226, 0, 26, 0.10);
+    --color-secondary: #4f9a1e;
+    --focus-ring: 0 0 0 3px rgba(226, 0, 26, 0.28);
 }
 
 /* ── Header ── */
@@ -381,15 +389,10 @@ watch(
     box-shadow: var(--focus-ring);
 }
 
-.ck-mark {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: var(--radius-md);
-    background: var(--color-secondary);
-    color: #fff;
+.ck-logo {
+    height: 30px;
+    width: auto;
+    display: block;
     flex-shrink: 0;
 }
 

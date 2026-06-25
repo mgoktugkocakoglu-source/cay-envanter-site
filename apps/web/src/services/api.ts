@@ -193,6 +193,59 @@ export interface AssignPruningTaskPayload {
     notes?: string;
 }
 
+// ── Budama talepleri (pruning requests) ──
+export type PruningRequestStatus = 'pending' | 'scheduled' | 'measured' | 'approved' | 'rejected';
+
+export interface MeasurementPoint {
+    lat: number;
+    lng: number;
+    altitudeMeters: number;
+}
+
+export interface PruningRequest {
+    id: string;
+    producerId: string;
+    producerName: string;
+    il: string;
+    ilce: string;
+    ada: string;
+    parsel: string;
+    registeredAreaM2: number;
+    status: PruningRequestStatus;
+    appointmentDate: string | null;
+    appointedById: string | null;
+    appointedByName: string | null;
+    measuredAreaM2: number | null;
+    measurementPoints: MeasurementPoint[];
+    accuracyLevel: PruningAccuracyLevel | null;
+    fixQuality: string | null;
+    method: PruningMethod | null;
+    measuredAt: string | null;
+    measuredById: string | null;
+    measuredByName: string | null;
+    approvedAt: string | null;
+    approvedByName: string | null;
+    notes: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreatePruningRequestPayload {
+    il: string;
+    ilce: string;
+    ada: string;
+    parsel: string;
+    registeredAreaM2?: number;
+}
+
+export interface SavePruningMeasurementResultPayload {
+    measuredAreaM2: number;
+    points: MeasurementPoint[];
+    method: PruningMethod;
+    accuracyLevel?: PruningAccuracyLevel;
+    fixQuality?: string;
+}
+
 export interface PaginationMeta {
     page: number;
     limit: number;
@@ -716,6 +769,23 @@ export const api = {
     getPruningTask: (id: string) => request<PruningTask>(`/pruning/tasks/${id}`),
     assignPruningTask: (data: AssignPruningTaskPayload) =>
         request<PruningTask>('/pruning/tasks', { method: 'POST', body: JSON.stringify(data) }),
+
+    // Budama talepleri (pruning requests) — producer ↔ Çaykur panel, DB-backed
+    getPruningRequests: (params?: { status?: PruningRequestStatus; search?: string; page?: number; limit?: number }) => {
+        const query = new URLSearchParams(params as Record<string, string>).toString();
+        return request<Paginated<PruningRequest>>(`/pruning/requests${query ? `?${query}` : ''}`);
+    },
+    getPruningRequest: (id: string) => request<PruningRequest>(`/pruning/requests/${id}`),
+    createPruningRequest: (data: CreatePruningRequestPayload) =>
+        request<PruningRequest>('/pruning/requests', { method: 'POST', body: JSON.stringify(data) }),
+    setPruningAppointment: (id: string, appointmentDate: string) =>
+        request<PruningRequest>(`/pruning/requests/${id}/appointment`, { method: 'PATCH', body: JSON.stringify({ appointmentDate }) }),
+    savePruningRequestMeasurement: (id: string, data: SavePruningMeasurementResultPayload) =>
+        request<PruningRequest>(`/pruning/requests/${id}/measurement`, { method: 'PATCH', body: JSON.stringify(data) }),
+    approvePruningRequest: (id: string) =>
+        request<PruningRequest>(`/pruning/requests/${id}/approve`, { method: 'PATCH', body: JSON.stringify({}) }),
+    rejectPruningRequest: (id: string, reason?: string) =>
+        request<PruningRequest>(`/pruning/requests/${id}/reject`, { method: 'PATCH', body: JSON.stringify({ reason }) }),
 
     // Çaykur staff (management onboarding) endpoints
     getCaykurStaff: (params?: { page?: number; limit?: number; search?: string; caykurRole?: CaykurStaffRole; status?: 'active' | 'suspended' }) => {

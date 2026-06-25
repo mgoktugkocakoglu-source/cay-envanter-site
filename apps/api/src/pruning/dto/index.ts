@@ -1,5 +1,6 @@
 import {
     IsString,
+    IsNotEmpty,
     IsNumber,
     IsOptional,
     IsArray,
@@ -12,14 +13,16 @@ import {
     MaxLength,
     Max,
     Min,
+    ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { MeasurementMethod, AccuracyLevel, PruningTaskStatus } from '@/pruning/entities';
+import { MeasurementMethod, AccuracyLevel, PruningTaskStatus, PruningRequestStatus } from '@/pruning/entities';
 
 const METHODS: MeasurementMethod[] = ['map', 'gps', 'assisted'];
 const ACCURACY_LEVELS: AccuracyLevel[] = ['high', 'medium', 'low'];
 const TASK_STATUSES: PruningTaskStatus[] = ['pending', 'in_progress', 'measured', 'completed', 'cancelled'];
+const REQUEST_STATUSES: PruningRequestStatus[] = ['pending', 'scheduled', 'measured', 'approved', 'rejected'];
 
 export class CreatePruningMeasurementDto {
     @ApiProperty({ description: 'Field (parcel) UUID the measurement belongs to' })
@@ -179,4 +182,122 @@ export class PruningQueryDto {
     @IsOptional()
     @IsUUID()
     fieldId?: string;
+}
+
+// ── Budama talepleri (pruning requests) ──
+
+export class MeasurementPointDto {
+    @ApiProperty({ description: 'Latitude (decimal degrees)' })
+    @IsNumber()
+    lat: number;
+
+    @ApiProperty({ description: 'Longitude (decimal degrees)' })
+    @IsNumber()
+    lng: number;
+
+    @ApiProperty({ description: 'Altitude in meters' })
+    @IsNumber()
+    altitudeMeters: number;
+}
+
+export class CreatePruningRequestDto {
+    @ApiProperty({ description: 'İl (province)' })
+    @IsString()
+    @IsNotEmpty()
+    @MaxLength(100)
+    il: string;
+
+    @ApiProperty({ description: 'İlçe (district)' })
+    @IsString()
+    @IsNotEmpty()
+    @MaxLength(100)
+    ilce: string;
+
+    @ApiProperty({ description: 'Ada number' })
+    @IsString()
+    @IsNotEmpty()
+    @MaxLength(50)
+    ada: string;
+
+    @ApiProperty({ description: 'Parsel number' })
+    @IsString()
+    @IsNotEmpty()
+    @MaxLength(50)
+    parsel: string;
+
+    @ApiPropertyOptional({ description: 'Total registered land area in m² (snapshot)', default: 0 })
+    @IsOptional()
+    @IsNumber()
+    @Min(0)
+    registeredAreaM2?: number;
+}
+
+export class SetPruningAppointmentDto {
+    @ApiProperty({ description: 'Appointment date (ISO 8601, YYYY-MM-DD)' })
+    @IsDateString()
+    appointmentDate: string;
+}
+
+export class SavePruningMeasurementResultDto {
+    @ApiProperty({ description: 'Measured pruned area in m² (auto-calculated)' })
+    @IsNumber()
+    @Min(0)
+    measuredAreaM2: number;
+
+    @ApiProperty({ description: '3D measurement vertices (lat/lng/altitude)', type: [MeasurementPointDto] })
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => MeasurementPointDto)
+    points: MeasurementPointDto[];
+
+    @ApiProperty({ description: 'Measurement method', enum: METHODS })
+    @IsEnum(METHODS)
+    method: MeasurementMethod;
+
+    @ApiPropertyOptional({ description: 'Accuracy level', enum: ACCURACY_LEVELS })
+    @IsOptional()
+    @IsEnum(ACCURACY_LEVELS)
+    accuracyLevel?: AccuracyLevel;
+
+    @ApiPropertyOptional({ description: 'GPS/RTK fix quality label' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(16)
+    fixQuality?: string;
+}
+
+export class RejectPruningRequestDto {
+    @ApiPropertyOptional({ description: 'Rejection reason', maxLength: 1000 })
+    @IsOptional()
+    @IsString()
+    @MaxLength(1000)
+    reason?: string;
+}
+
+export class PruningRequestQueryDto {
+    @ApiPropertyOptional({ default: 1, minimum: 1 })
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    page?: number = 1;
+
+    @ApiPropertyOptional({ default: 50, minimum: 1, maximum: 100 })
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(100)
+    limit?: number = 50;
+
+    @ApiPropertyOptional({ enum: REQUEST_STATUSES })
+    @IsOptional()
+    @IsIn(REQUEST_STATUSES)
+    status?: PruningRequestStatus;
+
+    @ApiPropertyOptional({ description: 'Free-text search (producer name, parcel, ilçe)' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(120)
+    search?: string;
 }

@@ -1,31 +1,35 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import CaykurStatCard from '@/components/caykur/CaykurStatCard.vue';
 import StatusPill from '@/components/caykur/StatusPill.vue';
-import { useDemoProducer } from '@/composables/useDemoProducer';
+import { useAuthStore } from '@/stores/authStore';
+import { useFieldsStore } from '@/stores/fieldsStore';
 import { usePruningRequestsStore } from '@/stores/pruningRequestsStore';
-import {
-    parcelsForProducer,
-    BUDAMA_TARGET_PCT,
-    PRUNING_REQUEST_STATUS_META,
-    formatNumber,
-    formatDate,
-} from '@/services/caykur';
+import { PRUNING_REQUEST_STATUS_META } from '@/services/caykur';
+import type { Field } from '@/services/api';
 
-const { producer } = useDemoProducer();
+const auth = useAuthStore();
+const fieldsStore = useFieldsStore();
 const store = usePruningRequestsStore();
 
 type Tab = 'request' | 'record';
 const tab = ref<Tab>('request');
 
-// ── Producer context ──
-const registeredAreaM2 = computed(() =>
-    parcelsForProducer(producer.value.id).reduce((s, p) => s + p.areaM2, 0) || producer.value.gardenM2,
-);
-const pruneTargetM2 = computed(() => Math.round((registeredAreaM2.value * BUDAMA_TARGET_PCT) / 100));
+const user = computed(() => auth.user);
 
-const myRequests = computed(() => store.forProducer(producer.value.id));
+// ── Producer context (real data) ──
+function fieldToM2(f: Field): number {
+    const a = Number(f.area) || 0;
+    return f.areaUnit === 'm2' ? a : a * 1000;
+}
+const registeredAreaM2 = computed(() =>
+    Math.round(fieldsStore.fields.reduce((s, f) => s + fieldToM2(f), 0)),
+);
+// 1/7 rotation rule.
+const pruneTargetM2 = computed(() => Math.round(registeredAreaM2.value / 7));
+
+const myRequests = computed(() => store.requests);
 const records = computed(() =>
     myRequests.value.filter((r) => r.measuredAreaM2 !== null && (r.status === 'measured' || r.status === 'approved')),
 );
@@ -34,37 +38,51 @@ const measuredTotalM2 = computed(() => records.value.reduce((s, r) => s + (r.mea
 // ── New request form ──
 const form = ref({ il: '', ilce: '', ada: '', parsel: '' });
 const formError = ref('');
+const submitting = ref(false);
 
 function resetForm(): void {
-    form.value = { il: producer.value.region, ilce: producer.value.district, ada: '', parsel: '' };
+    form.value = { il: user.value?.province ?? '', ilce: user.value?.district ?? '', ada: '', parsel: '' };
     formError.value = '';
 }
-resetForm();
 
-function submit(): void {
+async function submit(): Promise<void> {
     const { il, ilce, ada, parsel } = form.value;
     if (!il.trim() || !ilce.trim() || !ada.trim() || !parsel.trim()) {
         formError.value = 'İl, ilçe, ada ve parsel alanları zorunludur.';
         return;
     }
-    store.createRequest({
-        producerId: producer.value.id,
-        producerName: producer.value.fullName,
+    submitting.value = true;
+    const created = await store.createRequest({
         il: il.trim(),
         ilce: ilce.trim(),
-        region: producer.value.region,
         ada: ada.trim(),
         parsel: parsel.trim(),
         registeredAreaM2: registeredAreaM2.value,
     });
-    resetForm();
-    tab.value = 'request';
+    submitting.value = false;
+    if (created) resetForm();
+    else formError.value = store.error ?? 'Talep oluşturulamadı.';
 }
 
 const tabs: Array<{ id: Tab; label: string }> = [
     { id: 'request', label: 'Budama Talebi' },
     { id: 'record', label: 'Budama Kaydı' },
 ];
+
+function formatNumber(n: number): string {
+    return n.toLocaleString('tr-TR', { maximumFractionDigits: 0 });
+}
+function formatDate(iso: string | null): string {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+onMounted(() => {
+    resetForm();
+    fieldsStore.fetchFields();
+    store.fetchAll();
+});
 </script>
 
 <template>
@@ -73,7 +91,7 @@ const tabs: Array<{ id: Tab; label: string }> = [
             <header class="pp-head">
                 <div>
                     <h1 class="pp-title">Budama</h1>
-                    <p class="pp-sub">{{ producer.fullName }} · Ruhsat {{ producer.ruhsatNo }} · {{ producer.factory }}</p>
+                    <p class="pp-sub">{{ user?.fullName }}<template v-if="user?.district"> · {{ user.district }} / {{ user.province }}</template></p>
                 </div>
             </header>
 
@@ -97,7 +115,7 @@ const tabs: Array<{ id: Tab; label: string }> = [
                         </div>
                         <p v-if="formError" class="pp-error">{{ formError }}</p>
                         <div class="pp-form-actions">
-                            <button type="button" class="ck-btn ck-btn-primary" @click="submit">Talep oluştur</button>
+                            <button type="button" class="ck-btn ck-btn-primary" :disabled="submitting" @click="submit">{{ submitting ? 'Gönderiliyor…' : 'Talep oluştur' }}</button>
                         </div>
                     </div>
                 </section>
@@ -112,10 +130,10 @@ const tabs: Array<{ id: Tab; label: string }> = [
                             <thead><tr><th>Ada / Parsel</th><th>İl / İlçe</th><th>Talep tarihi</th><th>Randevu</th><th>Durum</th></tr></thead>
                             <tbody>
                                 <tr v-for="r in myRequests" :key="r.id">
-                                    <td class="strong">{{ r.parcelLabel }}</td>
+                                    <td class="strong">Ada {{ r.ada }} / Parsel {{ r.parsel }}</td>
                                     <td>{{ r.il }} · {{ r.ilce }}</td>
                                     <td style="white-space:nowrap">{{ formatDate(r.createdAt) }}</td>
-                                    <td style="white-space:nowrap">{{ r.appointmentDate ? formatDate(r.appointmentDate) : '—' }}</td>
+                                    <td style="white-space:nowrap">{{ formatDate(r.appointmentDate) }}</td>
                                     <td><StatusPill :label="PRUNING_REQUEST_STATUS_META[r.status].label" :tone="PRUNING_REQUEST_STATUS_META[r.status].tone" /></td>
                                 </tr>
                             </tbody>
@@ -129,7 +147,7 @@ const tabs: Array<{ id: Tab; label: string }> = [
             <template v-else>
                 <section class="ck-kpi-grid">
                     <CaykurStatCard label="Toplam kayıtlı arazi" :value="formatNumber(registeredAreaM2)" unit="m²" sub="ruhsatlı bahçeniz" />
-                    <CaykurStatCard label="Budanacak miktar" :value="formatNumber(pruneTargetM2)" unit="m²" :sub="`1/7 hedef · %${formatNumber(BUDAMA_TARGET_PCT, 1)}`" />
+                    <CaykurStatCard label="Budanacak miktar" :value="formatNumber(pruneTargetM2)" unit="m²" sub="1/7 hedef · %14,3" />
                     <CaykurStatCard label="Ölçülen / onaylanan" :value="formatNumber(measuredTotalM2)" unit="m²" :sub="`${formatNumber(records.length)} kayıt`" />
                 </section>
 
@@ -143,7 +161,7 @@ const tabs: Array<{ id: Tab; label: string }> = [
                             <thead><tr><th>Ada / Parsel</th><th class="num">Ölçülen alan</th><th>Konum (enlem, boylam, yükseklik)</th><th>Yöntem</th><th>Durum</th><th>Tarih</th></tr></thead>
                             <tbody>
                                 <tr v-for="r in records" :key="r.id">
-                                    <td class="strong">{{ r.parcelLabel }}</td>
+                                    <td class="strong">Ada {{ r.ada }} / Parsel {{ r.parsel }}</td>
                                     <td class="num ck-money">{{ formatNumber(r.measuredAreaM2 ?? 0) }} m²</td>
                                     <td>
                                         <template v-if="r.measurementPoints.length">
@@ -154,7 +172,7 @@ const tabs: Array<{ id: Tab; label: string }> = [
                                     </td>
                                     <td>{{ r.method === 'gps' ? 'RTK / GPS' : r.method === 'map' ? 'Harita' : '—' }}</td>
                                     <td><StatusPill :label="PRUNING_REQUEST_STATUS_META[r.status].label" :tone="PRUNING_REQUEST_STATUS_META[r.status].tone" /></td>
-                                    <td style="white-space:nowrap">{{ r.measuredAt ? formatDate(r.measuredAt) : '—' }}</td>
+                                    <td style="white-space:nowrap">{{ formatDate(r.measuredAt) }}</td>
                                 </tr>
                             </tbody>
                         </table>
