@@ -653,6 +653,31 @@ watch(
 .ck-menu-item-cta:hover {
     color: var(--color-text-primary);
 }
+.ck-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-primary);
+    color: var(--color-text-secondary);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+.ck-back:hover {
+    background: var(--color-bg-secondary);
+    border-color: var(--color-border-strong);
+    color: var(--color-text-primary);
+}
+.ck-back svg {
+    flex-shrink: 0;
+}
 .ck-back:focus-visible,
 .ck-persona-btn:focus-visible {
     outline: none;

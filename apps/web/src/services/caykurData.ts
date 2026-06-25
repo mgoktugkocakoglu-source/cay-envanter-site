@@ -181,8 +181,8 @@ function buildProducer(i: number): Producer {
 /** The demo producer registry (deterministic, stable across reloads). */
 export const PRODUCERS: Producer[] = Array.from({ length: 44 }, (_, i) => buildProducer(i));
 
-/** Current campaign/season label shown in the panel header. */
-export const SEASON_LABEL = '2025 Sezonu';
+/** Current campaign/season label shown in the panel header — dynamic per year. */
+export const SEASON_LABEL = `${new Date().getFullYear()} Sezonu`;
 
 // ─────────────────────────────────────────────────────────────────────────
 // Derived metrics (pure — mirror the backend aggregation contract)
