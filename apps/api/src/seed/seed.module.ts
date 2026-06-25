@@ -7,7 +7,7 @@ import { FirmTariff } from '@/firms/entities/firm-tariff.entity';
 import { Field } from '@/fields/entities/field.entity';
 import { Payment, PaymentHarvest } from '@/payments/entities';
 import { Harvest } from '@/harvests/entities';
-import { PruningMeasurement, PruningTask } from '@/pruning/entities';
+import { PruningMeasurement, PruningTask, PruningRequest } from '@/pruning/entities';
 
 /**
  * Demo seeder. Gated behind SEED_DEMO=true so it never runs in production.
@@ -26,6 +26,7 @@ import { PruningMeasurement, PruningTask } from '@/pruning/entities';
             Harvest,
             PruningMeasurement,
             PruningTask,
+            PruningRequest,
         ]),
     ],
     providers: [SeedService],
