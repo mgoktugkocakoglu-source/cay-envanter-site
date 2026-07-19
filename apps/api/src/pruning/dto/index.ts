@@ -235,6 +235,11 @@ export class CreatePruningRequestDto {
     @IsNumber()
     @Min(0)
     registeredAreaM2?: number;
+
+    @ApiPropertyOptional({ description: 'Cadastral parcel outline as [lng, lat] pairs' })
+    @IsOptional()
+    @IsArray()
+    parcelGeometry?: number[][];
 }
 
 export class SetPruningAppointmentDto {

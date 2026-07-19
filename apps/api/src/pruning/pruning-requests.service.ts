@@ -54,6 +54,7 @@ export class PruningRequestsService {
             ada: dto.ada,
             parsel: dto.parsel,
             registeredAreaM2: dto.registeredAreaM2 ?? 0,
+            parcelGeometry: dto.parcelGeometry ?? null,
             status: 'pending',
             measurementPoints: [],
         });

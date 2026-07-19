@@ -61,6 +61,10 @@ export class PruningRequest {
     @Column({ type: 'double precision', name: 'registered_area_m2', default: 0 })
     registeredAreaM2: number;
 
+    /** Cadastral parcel outline as a [lng, lat] ring (TKGM-style), if known. */
+    @Column({ type: 'jsonb', name: 'parcel_geometry', nullable: true })
+    parcelGeometry: number[][] | null;
+
     @Column({ type: 'varchar', length: 16, default: 'pending' })
     status: PruningRequestStatus;
 

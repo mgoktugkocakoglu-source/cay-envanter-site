@@ -86,7 +86,7 @@ onMounted(() => store.fetchOne(id.value));
 
             <CaykurPanel v-if="measuring" title="Hassas ölçüm (3B)">
                 <div class="ck-panel-body">
-                    <CaykurPruningMeasure @complete="onMeasured" @cancel="measuring = false" />
+                    <CaykurPruningMeasure :parcel-polygon="req.parcelGeometry ?? undefined" @complete="onMeasured" @cancel="measuring = false" />
                 </div>
             </CaykurPanel>
 

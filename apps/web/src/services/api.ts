@@ -211,6 +211,8 @@ export interface PruningRequest {
     ada: string;
     parsel: string;
     registeredAreaM2: number;
+    /** Cadastral parcel outline as a [lng, lat] ring, if known. */
+    parcelGeometry: number[][] | null;
     status: PruningRequestStatus;
     appointmentDate: string | null;
     appointedById: string | null;
@@ -236,6 +238,7 @@ export interface CreatePruningRequestPayload {
     ada: string;
     parsel: string;
     registeredAreaM2?: number;
+    parcelGeometry?: number[][];
 }
 
 export interface SavePruningMeasurementResultPayload {

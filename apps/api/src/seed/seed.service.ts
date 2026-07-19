@@ -45,6 +45,17 @@ interface StaffSeed {
     district: string;
 }
 
+// TKGM Ergazi Imar 15270/2 (Ankara / Yenimahalle) — closed [lng, lat] ring
+// used by the laser+IMU drag-placement test request.
+const ANKARA_TEST_PARCEL_RING: number[][] = [
+    [32.7141, 39.96719],
+    [32.71418, 39.96683],
+    [32.71437, 39.96673],
+    [32.71506, 39.96683],
+    [32.71495, 39.9673],
+    [32.7141, 39.96719],
+];
+
 // One demo account per Çaykur role so a pitch can log in as any persona.
 // Names mirror the frontend PERSONAS so the panel reads consistently.
 const STAFF_SEEDS: StaffSeed[] = [
@@ -509,6 +520,26 @@ export class SeedService implements OnModuleInit {
                 measuredByName: staff.fullName,
                 approvedAt: new Date('2026-06-12T14:00:00'),
                 approvedByName: staff.fullName,
+            }),
+        );
+
+        // 4) Scheduled with a cadastral outline — laser+IMU drag-placement test
+        //    parcel (TKGM Ergazi Imar 15270/2, Ankara / Yenimahalle).
+        await this.pruningRequestRepo.save(
+            this.pruningRequestRepo.create({
+                producerId: producer.id,
+                producerName: producer.fullName,
+                il: 'Ankara',
+                ilce: 'Yenimahalle',
+                ada: '15270',
+                parsel: '2',
+                registeredAreaM2: 3905,
+                parcelGeometry: ANKARA_TEST_PARCEL_RING,
+                status: 'scheduled',
+                appointmentDate: '2026-07-20',
+                appointedById: staff.id,
+                appointedByName: staff.fullName,
+                measurementPoints: [],
             }),
         );
 
