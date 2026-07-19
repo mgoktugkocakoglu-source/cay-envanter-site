@@ -203,7 +203,7 @@ export class PruningService {
         const qb = this.taskRepository.createQueryBuilder('task');
 
         // Field officers see only their own queue; managers / auditors / admin see all.
-        if (actor.caykurRole === CaykurRole.SAHA_PERSONELI) {
+        if (actor.role !== Role.ADMIN && actor.caykurRole === CaykurRole.SAHA_PERSONELI) {
             qb.andWhere('task.assignedTo = :uid', { uid: actor.id });
         }
         if (query.status) {
@@ -229,7 +229,11 @@ export class PruningService {
         if (!task) {
             throw new NotFoundException('Görev bulunamadı');
         }
-        if (actor.caykurRole === CaykurRole.SAHA_PERSONELI && task.assignedTo !== actor.id) {
+        if (
+            actor.role !== Role.ADMIN &&
+            actor.caykurRole === CaykurRole.SAHA_PERSONELI &&
+            task.assignedTo !== actor.id
+        ) {
             throw new ForbiddenException('Bu görev size atanmamış');
         }
         return task;
@@ -271,7 +275,7 @@ export class PruningService {
     }
 
     private isReadOnly(actor: PruningActor): boolean {
-        return actor.caykurRole === CaykurRole.DENETCI;
+        return actor.role !== Role.ADMIN && actor.caykurRole === CaykurRole.DENETCI;
     }
 
     private isStaffApprover(actor: PruningActor): boolean {

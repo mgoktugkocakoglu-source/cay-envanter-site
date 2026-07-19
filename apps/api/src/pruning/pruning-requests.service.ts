@@ -15,7 +15,7 @@ import {
     RejectPruningRequestDto,
     PruningRequestQueryDto,
 } from '@/pruning/dto';
-import { Role, CaykurRole } from '@/auth/enums';
+import { Role, CaykurRole, UserType } from '@/auth/enums';
 import { Paginated, paginate } from '@/common/dto/paginated.dto';
 import { PruningActor } from '@/pruning/pruning.service';
 
@@ -23,6 +23,7 @@ import { PruningActor } from '@/pruning/pruning.service';
  * Budama talepleri workflow service. Producers open requests; Çaykur authorized
  * staff set an appointment, capture the 3D measurement, and approve/reject —
  * all persisted in Postgres (single source of truth for both surfaces).
+ * Platform admins (Role.ADMIN) bypass every restriction and can perform any action.
  */
 @Injectable()
 export class PruningRequestsService {
@@ -36,10 +37,15 @@ export class PruningRequestsService {
     ) {}
 
     async create(actor: PruningActor, dto: CreatePruningRequestDto): Promise<PruningRequest> {
-        if (this.isStaff(actor)) {
+        const user = await this.userRepository.findOne({ where: { id: actor.id } });
+
+        // Producer account types may open a request; platform admin is always exempt.
+        if (
+            !this.isAdmin(actor) &&
+            (this.isStaff(actor) || !user || !this.isProducerUserType(user.userType))
+        ) {
             throw new ForbiddenException('Budama talebini yalnızca üretici oluşturabilir');
         }
-        const user = await this.userRepository.findOne({ where: { id: actor.id } });
         const request = this.requestRepository.create({
             producerId: actor.id,
             producerName: user?.fullName ?? 'Müstahsil',
@@ -170,6 +176,15 @@ export class PruningRequestsService {
 
     private isStaff(actor: PruningActor): boolean {
         return actor.role === Role.ADMIN || actor.caykurRole != null;
+    }
+
+    /** Platform admin — god mode, bypasses every pruning-request restriction. */
+    private isAdmin(actor: PruningActor): boolean {
+        return actor.role === Role.ADMIN;
+    }
+
+    private isProducerUserType(userType: UserType): boolean {
+        return userType === UserType.LAND_OWNER || userType === UserType.SELF_FARMER;
     }
 
     private isProducer(actor: PruningActor): boolean {
