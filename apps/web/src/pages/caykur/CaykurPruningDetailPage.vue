@@ -29,6 +29,7 @@ const METHOD_LABEL: Record<PruningMethod, string> = {
     map: 'Harita çizimi',
     gps: 'GPS / RTK',
     assisted: 'Asistan ölçüm',
+    imu: 'Lazer + IMU',
 };
 
 const loading = ref(true);

@@ -128,7 +128,7 @@ export interface FieldPartner {
     invitationStatus: 'pending' | 'accepted' | 'rejected';
 }
 
-export type PruningMethod = 'map' | 'gps' | 'assisted';
+export type PruningMethod = 'map' | 'gps' | 'assisted' | 'imu';
 export type PruningAccuracyLevel = 'high' | 'medium' | 'low';
 
 export interface PruningMeasurement {

@@ -18,7 +18,7 @@ import {
 import { parcelsForProducer } from '@/services/caykur/parcels';
 import { intBetween, noise, round, timestampDaysAgo } from '@/services/caykur/rng';
 
-export type MeasurementMethod = 'map' | 'gps' | 'assisted';
+export type MeasurementMethod = 'map' | 'gps' | 'assisted' | 'imu';
 export type AccuracyLevel = 'high' | 'medium' | 'low';
 export type AuditStatus = 'pending' | 'approved' | 'rejected';
 
@@ -53,6 +53,7 @@ export const METHOD_LABEL: Record<MeasurementMethod, string> = {
     map: 'Harita ile',
     gps: 'GPS ile',
     assisted: 'Yardımlı',
+    imu: 'Lazer + IMU',
 };
 
 const FIELD_OFFICERS = ['Davut Şahin', 'Yılmaz Çelik', 'İbrahim Kaya', 'Mustafa Yılmaz', 'Hasan Demir', 'Ali Arslan'];

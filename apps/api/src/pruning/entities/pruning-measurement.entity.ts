@@ -12,7 +12,7 @@ import { User } from '@/users/entities/user.entity';
 import { Field } from '@/fields/entities/field.entity';
 
 // How the pruned area was captured (mirrors the three field situations in the spec).
-export type MeasurementMethod = 'map' | 'gps' | 'assisted';
+export type MeasurementMethod = 'map' | 'gps' | 'assisted' | 'imu';
 
 // GPS / measurement confidence: high = 1-3m, medium = 3-5m, low = >5m or map estimate.
 export type AccuracyLevel = 'high' | 'medium' | 'low';

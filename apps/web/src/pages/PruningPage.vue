@@ -170,7 +170,7 @@ onMounted(() => {
                                         </template>
                                         <template v-else>—</template>
                                     </td>
-                                    <td>{{ r.method === 'gps' ? 'RTK / GPS' : r.method === 'map' ? 'Harita' : '—' }}</td>
+                                    <td>{{ r.method === 'gps' ? 'RTK / GPS' : r.method === 'map' ? 'Harita' : r.method === 'imu' ? 'Lazer + IMU' : '—' }}</td>
                                     <td><StatusPill :label="PRUNING_REQUEST_STATUS_META[r.status].label" :tone="PRUNING_REQUEST_STATUS_META[r.status].tone" /></td>
                                     <td style="white-space:nowrap">{{ formatDate(r.measuredAt) }}</td>
                                 </tr>

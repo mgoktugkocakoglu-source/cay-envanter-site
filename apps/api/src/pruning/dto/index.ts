@@ -19,7 +19,7 @@ import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MeasurementMethod, AccuracyLevel, PruningTaskStatus, PruningRequestStatus } from '@/pruning/entities';
 
-const METHODS: MeasurementMethod[] = ['map', 'gps', 'assisted'];
+const METHODS: MeasurementMethod[] = ['map', 'gps', 'assisted', 'imu'];
 const ACCURACY_LEVELS: AccuracyLevel[] = ['high', 'medium', 'low'];
 const TASK_STATUSES: PruningTaskStatus[] = ['pending', 'in_progress', 'measured', 'completed', 'cancelled'];
 const REQUEST_STATUSES: PruningRequestStatus[] = ['pending', 'scheduled', 'measured', 'approved', 'rejected'];
