@@ -59,14 +59,15 @@ interface SensorCorner {
     pitch: number;
 }
 
+const DEVICE_DISPLAY_NAME = 'CayHesabim';
 const imu = useImuSensor();
-const imuUrl = ref(imu.url.value);
-const showImuSettings = ref(false);
 const corners = ref<SensorCorner[]>([]);
 const distanceInput = ref('');
 const calibrationMessage = ref('');
 /** Map anchor chosen when the operator presses "Bitir"; null until then. */
 const placedAnchor = ref<LatLngPoint | null>(null);
+/** The placed sensor ring may be dragged into position on the map. */
+const draggablePlacement = computed(() => mode.value === 'sensor' && placedAnchor.value !== null);
 
 const imuActive = computed(() => imu.connected.value || imu.connecting.value);
 const imuTone = computed(() => {
@@ -82,8 +83,9 @@ const imuStatusLabel = computed(() => {
 });
 const imuStatusSub = computed(() => {
     const reading = imu.reading.value;
-    if (!imu.connected.value || !reading) return `ESP32 hotspot · ${imu.url.value}`;
-    return `${reading.still ? 'Sabit' : 'Hareketli'} · ${reading.calibrated ? 'kalibre edildi' : 'kalibrasyon önerilir'}`;
+    if (!imu.connected.value || !reading) return `Bluetooth cihazı: ${DEVICE_DISPLAY_NAME}`;
+    const name = imu.deviceLabel.value || DEVICE_DISPLAY_NAME;
+    return `${name} · ${reading.still ? 'sabit' : 'hareketli'} · ${reading.calibrated ? 'kalibre edildi' : 'kalibrasyon önerilir'}`;
 });
 
 const parsedDistance = computed(() => {
@@ -203,7 +205,9 @@ function redraw(): void {
             weight: 2,
             fillColor: '#15803D',
             fillOpacity: 0.22,
+            className: draggablePlacement.value ? 'ck-drag-poly' : undefined,
         }).addTo(map);
+        if (draggablePlacement.value) bindPolygonDrag();
     }
     latlngs.forEach((ll, i) => {
         L.circleMarker(ll, {
@@ -219,6 +223,90 @@ function redraw(): void {
 }
 
 watch(points, redraw, { deep: true });
+// Re-render the ring when drag eligibility flips (tab switch, finish, clear).
+watch(draggablePlacement, redraw);
+
+// ── Polygon drag (Pointer Events → same code path for mouse and touch) ──
+interface PolygonDragState {
+    pointerId: number;
+    last: L.LatLng;
+    totalLat: number;
+    totalLng: number;
+    moved: boolean;
+}
+let polygonDrag: PolygonDragState | null = null;
+
+function bindPolygonDrag(): void {
+    // The SVG renderer backs L.Polygon with an SVGPathElement.
+    const el = (polygon?.getElement() ?? null) as SVGPathElement | null;
+    if (!el) return;
+    el.addEventListener('pointerdown', onPolygonPointerDown);
+    el.addEventListener('pointermove', onPolygonPointerMove);
+    el.addEventListener('pointerup', onPolygonPointerUp);
+    el.addEventListener('pointercancel', onPolygonPointerUp);
+}
+
+function pointerLatLng(event: PointerEvent): L.LatLng | null {
+    if (!map || !mapContainer.value) return null;
+    const rect = mapContainer.value.getBoundingClientRect();
+    return map.containerPointToLatLng(
+        L.point(event.clientX - rect.left, event.clientY - rect.top),
+    );
+}
+
+function onPolygonPointerDown(event: PointerEvent): void {
+    if (!draggablePlacement.value || !map || !polygon) return;
+    const at = pointerLatLng(event);
+    if (!at) return;
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+        (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
+    } catch {
+        // Capture is a nicety (keeps fast drags attached); dragging still works without it.
+    }
+    map.dragging.disable();
+    polygonDrag = { pointerId: event.pointerId, last: at, totalLat: 0, totalLng: 0, moved: false };
+}
+
+function onPolygonPointerMove(event: PointerEvent): void {
+    if (!polygonDrag || event.pointerId !== polygonDrag.pointerId || !polygon) return;
+    const at = pointerLatLng(event);
+    if (!at) return;
+    event.preventDefault();
+    const dLat = at.lat - polygonDrag.last.lat;
+    const dLng = at.lng - polygonDrag.last.lng;
+    if (dLat === 0 && dLng === 0) return;
+    polygonDrag.last = at;
+    polygonDrag.totalLat += dLat;
+    polygonDrag.totalLng += dLng;
+    polygonDrag.moved = true;
+    // Shift the visuals directly while dragging; reactivity would recreate the
+    // dragged element mid-gesture. The move commits on pointer release.
+    const ring = (polygon.getLatLngs() as L.LatLng[][])[0].map((ll) =>
+        L.latLng(ll.lat + dLat, ll.lng + dLng),
+    );
+    polygon.setLatLngs([ring]);
+    vertexLayer?.eachLayer((layer) => {
+        const marker = layer as L.CircleMarker;
+        const ll = marker.getLatLng();
+        marker.setLatLng([ll.lat + dLat, ll.lng + dLng]);
+    });
+}
+
+function onPolygonPointerUp(event: PointerEvent): void {
+    if (!polygonDrag || event.pointerId !== polygonDrag.pointerId) return;
+    const { totalLat, totalLng, moved } = polygonDrag;
+    polygonDrag = null;
+    map?.dragging.enable();
+    if (moved && placedAnchor.value) {
+        placedAnchor.value = {
+            lat: placedAnchor.value.lat + totalLat,
+            lng: placedAnchor.value.lng + totalLng,
+        };
+        syncSensorPlacement();
+    }
+}
 
 // ── Actions ──
 function toggleReceiver(): void {
@@ -253,13 +341,7 @@ function yawDeltaFromPrev(index: number): number {
 
 function toggleImu(): void {
     if (imuActive.value) imu.disconnect();
-    else imu.connect();
-}
-
-function applyImuUrl(): void {
-    imu.setUrl(imuUrl.value);
-    imu.reconnect();
-    showImuSettings.value = false;
+    else void imu.connect(); // stays inside the click gesture — Web Bluetooth requires it
 }
 
 async function runCalibration(): Promise<void> {
@@ -411,14 +493,10 @@ onUnmounted(() => {
 
                 <section v-else-if="mode === 'sensor'" class="ms-panel">
                     <header class="ms-head">
-                        <span class="ms-title">ESP32 Sensör (Lazer + IMU)</span>
-                        <button type="button" class="ck-btn ck-btn-sm" @click="showImuSettings = !showImuSettings">Ayar</button>
+                        <span class="ms-title">ESP32 Sensör (Bluetooth)</span>
                     </header>
 
-                    <div v-if="showImuSettings" class="ms-settings">
-                        <input v-model="imuUrl" type="text" class="ck-search-input" placeholder="http://192.168.4.1" style="padding-left:12px" />
-                        <button type="button" class="ck-btn ck-btn-sm ck-btn-primary" @click="applyImuUrl">Uygula</button>
-                    </div>
+                    <p v-if="!imu.supported" class="ms-error">Bu tarayıcı Bluetooth desteklemiyor. Android telefonda Chrome (veya Edge / Samsung Internet) ile açın.</p>
 
                     <div class="ms-fix">
                         <span class="ms-dot" :data-tone="imuTone"></span>
@@ -426,7 +504,7 @@ onUnmounted(() => {
                             <span class="ms-fix-label">{{ imuStatusLabel }}</span>
                             <span class="ms-fix-sub">{{ imuStatusSub }}</span>
                         </div>
-                        <button type="button" class="ck-btn ck-btn-sm" @click="toggleImu">{{ imuActive ? 'Durdur' : 'Sensöre bağlan' }}</button>
+                        <button type="button" class="ck-btn ck-btn-sm" :disabled="!imu.supported" @click="toggleImu">{{ imuActive ? 'Durdur' : 'Sensöre bağlan' }}</button>
                     </div>
 
                     <dl class="ms-coords">
@@ -480,7 +558,7 @@ onUnmounted(() => {
                     <button type="button" class="ck-btn ck-btn-primary" :disabled="corners.length < 3" @click="finishSensorMeasurement">
                         {{ placedAnchor ? 'Poligonu haritada güncelle' : 'Bitir · poligonu haritaya yerleştir' }}
                     </button>
-                    <p v-if="placedAnchor" class="ms-hint">Poligon harita merkezine yerleştirildi; konum ve kuzey yönü temsilidir, şekil ve alan lazer+IMU ölçümlerinden gelir.</p>
+                    <p v-if="placedAnchor" class="ms-hint">Poligon haritaya yerleştirildi. <b>Sürükleyerek</b> (bilgisayarda fare, telefonda parmakla) parselin üzerine taşıyın; sarı kesikli çizgi tapu parselidir. Şekil ve alan lazer+IMU ölçümlerinden gelir — yerleşim bitince <b>Ölçümü kaydet</b>'e basın.</p>
                 </section>
 
                 <section v-else class="ms-panel">
@@ -607,4 +685,6 @@ onUnmounted(() => {
 
 <style>
 .ck-vtx-label { background: transparent; border: none; box-shadow: none; color: #fff; font-weight: 700; font-size: 11px; }
+.ck-drag-poly { cursor: grab; touch-action: none; }
+.ck-drag-poly:active { cursor: grabbing; }
 </style>
