@@ -13,7 +13,9 @@ import { FieldsModule } from '@/fields/fields.module';
         TypeOrmModule.forFeature([PruningMeasurement, PruningTask, PruningRequest, User]),
         FieldsModule,
     ],
-    controllers: [PruningController, PruningRequestsController],
+    // PruningRequestsController must register first: PruningController's
+    // GET :id would otherwise capture /pruning/requests as a UUID param.
+    controllers: [PruningRequestsController, PruningController],
     providers: [PruningService, PruningRequestsService],
     exports: [PruningService, PruningRequestsService],
 })
