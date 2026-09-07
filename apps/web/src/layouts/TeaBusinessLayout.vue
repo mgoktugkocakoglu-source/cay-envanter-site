@@ -171,10 +171,6 @@ onBeforeUnmount(() => {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14l6-6"/><path d="M8 18l6-6"/><path d="M14 6l4-4"/><path d="M16 8l4-4"/><path d="M4 20l16-16"/></svg>
           <span>Budama</span>
         </RouterLink>
-        <RouterLink to="/tea/payments" class="app-nav-item" active-class="router-link-active">
-          <span class="currency-nav-icon" aria-hidden="true">₺</span>
-          <span>Ödemeler</span>
-        </RouterLink>
         <RouterLink to="/tea/ai-agent" class="app-nav-item" active-class="router-link-active">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a5 5 0 0 0-5 5v2H6a4 4 0 0 0 0 8h1v1a4 4 0 0 0 8 0v-1h3a4 4 0 0 0 0-8h-1V7a5 5 0 0 0-5-5z"/><path d="M9 9h.01"/><path d="M15 9h.01"/><path d="M9 14h6"/></svg>
           <span>AI Agent</span>
@@ -206,10 +202,6 @@ onBeforeUnmount(() => {
       <RouterLink to="/tea/pruning" class="bottom-tab" active-class="router-link-active">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14l6-6"/><path d="M8 18l6-6"/><path d="M14 6l4-4"/><path d="M16 8l4-4"/><path d="M4 20l16-16"/></svg>
         <span>Budama</span>
-      </RouterLink>
-      <RouterLink to="/tea/payments" class="bottom-tab" active-class="router-link-active">
-        <span class="currency-nav-icon" aria-hidden="true">₺</span>
-        <span>Ödemeler</span>
       </RouterLink>
       <RouterLink to="/tea/ai-agent" class="bottom-tab" active-class="router-link-active">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a5 5 0 0 0-5 5v2H6a4 4 0 0 0 0 8h1v1a4 4 0 0 0 8 0v-1h3a4 4 0 0 0 0-8h-1V7a5 5 0 0 0-5-5z"/><path d="M9 9h.01"/><path d="M15 9h.01"/><path d="M9 14h6"/></svg>

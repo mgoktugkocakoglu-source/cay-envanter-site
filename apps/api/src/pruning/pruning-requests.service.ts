@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PruningRequest } from '@/pruning/entities';
 import { User } from '@/users/entities/user.entity';
+import { Field } from '@/fields/entities';
 import {
     CreatePruningRequestDto,
     SetPruningAppointmentDto,
@@ -34,6 +35,8 @@ export class PruningRequestsService {
         private readonly requestRepository: Repository<PruningRequest>,
         @InjectRepository(User)
         private readonly userRepository: Repository<User>,
+        @InjectRepository(Field)
+        private readonly fieldRepository: Repository<Field>,
     ) {}
 
     async create(actor: PruningActor, dto: CreatePruningRequestDto): Promise<PruningRequest> {
@@ -46,6 +49,20 @@ export class PruningRequestsService {
         ) {
             throw new ForbiddenException('Budama talebini yalnızca üretici oluşturabilir');
         }
+        // When the producer has this ada/parsel registered as a field, its
+        // outline and area back the request so the measure map can show them.
+        let parcelGeometry = dto.parcelGeometry ?? null;
+        let registeredAreaM2 = dto.registeredAreaM2 ?? 0;
+        if (!parcelGeometry || !registeredAreaM2) {
+            const field = await this.fieldRepository.findOne({
+                where: { userId: actor.id, adaNo: dto.ada, parcelNo: dto.parsel, deleted: false },
+            });
+            if (field) {
+                if (!parcelGeometry) parcelGeometry = field.coordinates?.[0] ?? null;
+                if (!registeredAreaM2) registeredAreaM2 = this.fieldAreaM2(field);
+            }
+        }
+
         const request = this.requestRepository.create({
             producerId: actor.id,
             producerName: user?.fullName ?? 'Müstahsil',
@@ -53,14 +70,20 @@ export class PruningRequestsService {
             ilce: dto.ilce,
             ada: dto.ada,
             parsel: dto.parsel,
-            registeredAreaM2: dto.registeredAreaM2 ?? 0,
-            parcelGeometry: dto.parcelGeometry ?? null,
+            registeredAreaM2,
+            parcelGeometry,
             status: 'pending',
             measurementPoints: [],
         });
         const saved = await this.requestRepository.save(request);
         this.logger.log(`Pruning request created: ${saved.id} by producer ${actor.id}`);
         return saved;
+    }
+
+    /** Field area normalized to m² (dekar/dönüm rows store 1 unit = 1000 m²). */
+    private fieldAreaM2(field: Field): number {
+        const area = Number(field.area) || 0;
+        return field.areaUnit === 'm2' ? area : area * 1000;
     }
 
     async list(actor: PruningActor, query: PruningRequestQueryDto): Promise<Paginated<PruningRequest>> {

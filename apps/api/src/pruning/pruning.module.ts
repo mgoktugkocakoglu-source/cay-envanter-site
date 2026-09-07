@@ -6,11 +6,12 @@ import { PruningRequestsController } from '@/pruning/pruning-requests.controller
 import { PruningRequestsService } from '@/pruning/pruning-requests.service';
 import { PruningMeasurement, PruningTask, PruningRequest } from '@/pruning/entities';
 import { User } from '@/users/entities/user.entity';
+import { Field } from '@/fields/entities';
 import { FieldsModule } from '@/fields/fields.module';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([PruningMeasurement, PruningTask, PruningRequest, User]),
+        TypeOrmModule.forFeature([PruningMeasurement, PruningTask, PruningRequest, User, Field]),
         FieldsModule,
     ],
     // PruningRequestsController must register first: PruningController's

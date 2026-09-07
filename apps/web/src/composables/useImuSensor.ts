@@ -1,11 +1,13 @@
 import { ref, onUnmounted } from 'vue';
+import { Capacitor } from '@capacitor/core';
+import { BleClient, textToDataView, type BleDevice } from '@capacitor-community/bluetooth-le';
 
-const DEVICE_NAME_PREFIX = 'CayHesabim';
-const NUS_SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
-/** ESP → site stream (notify). */
-const NUS_TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
-/** Site → ESP commands (write). */
-const NUS_RX = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+const DEVICE_NAME_PREFIX = 'CAYH';
+const DEVICE_FALLBACK_LABEL = 'CAYH_V3';
+/** Custom IMU service on the ESP32 (NUS was dropped; see hardware notes). */
+const IMU_SERVICE = '12345678-1234-5678-1234-56789abcdef0';
+/** Single READ | WRITE | NOTIFY characteristic: streams data, accepts commands. */
+const IMU_DATA = '12345678-1234-5678-1234-56789abcdef1';
 
 const RECONNECT_ATTEMPTS = 3;
 const CALIBRATE_TIMEOUT_MS = 15_000;
@@ -14,6 +16,7 @@ const STALE_MS = 3_000;
 export interface ImuReading {
     yaw: number;
     pitch: number;
+    roll: number;
     still: boolean;
     calibrated: boolean;
 }
@@ -24,19 +27,24 @@ interface CalibrationResult {
 }
 
 /**
- * Live orientation feed from the laser-mounted ESP32 IMU box over Web
- * Bluetooth (Nordic UART Service, device name "CayHesabim"). The device
- * notifies newline-terminated text lines: `D,<yaw>,<pitch>,<still>,<sensorOK>`
- * at 10 Hz plus `S,<STATUS>` lines (HELLO/CAL_START/CAL_OK/…). Commands are
- * written to the RX characteristic (`CAL`, `ZERO`, `INFO`), one at a time.
+ * Live orientation feed from the laser-mounted ESP32 IMU box ("CAYH_V3") over
+ * Bluetooth LE. Uses @capacitor-community/bluetooth-le, so the same code runs
+ * natively inside the Capacitor Android/iOS app (the WebView has no Web
+ * Bluetooth) and falls back to Web Bluetooth in desktop/Android Chrome.
  *
- * Constraints inherited from Web Bluetooth: HTTPS (or localhost) only,
- * `connect()` must run inside a user gesture, and Android Chrome/Edge/Samsung
- * Internet are the supported browsers (no Firefox, no iOS Safari). While
- * connected a screen Wake Lock is held so Android does not drop the link.
+ * Protocol: the device notifies newline-terminated text lines at 10 Hz —
+ * `D,<yaw>,<pitch>,<roll>,<still>,<sensorOk>,<calibrated>` — plus `S,<STATUS>`
+ * lines (INFO/CAL_START/CAL_OK/CAL_FAIL/…). Commands (`INFO`, `CAL`, `ZERO`)
+ * are written to the same characteristic, one at a time, `\n`-terminated.
+ * The firmware drops connections that do not subscribe within 20 s, so
+ * notifications are enabled immediately after connecting.
+ *
+ * While connected a screen Wake Lock is held so Android does not drop the link
+ * when the display would sleep.
  */
 export function useImuSensor() {
-    const supported = typeof navigator !== 'undefined' && !!navigator.bluetooth;
+    const supported =
+        Capacitor.isNativePlatform() || (typeof navigator !== 'undefined' && !!navigator.bluetooth);
     const connected = ref(false);
     const connecting = ref(false);
     const calibrating = ref(false);
@@ -44,8 +52,8 @@ export function useImuSensor() {
     const reading = ref<ImuReading | null>(null);
     const deviceLabel = ref('');
 
-    let device: BluetoothDevice | null = null;
-    let rxChar: BluetoothRemoteGATTCharacteristic | null = null;
+    let device: BleDevice | null = null;
+    let bleReady = false;
     let lineBuffer = '';
     let manualClose = false;
     let calibrated = false;
@@ -87,15 +95,8 @@ export function useImuSensor() {
     }
 
     function handleStatus(status: string): void {
-        if (status.startsWith('HELLO')) {
-            const id = status.split(',')[1];
-            const name = device?.name ?? DEVICE_NAME_PREFIX;
-            deviceLabel.value = id ? `${name} · ${id}` : name;
-            void send('INFO').catch(() => undefined);
-            return;
-        }
         if (status.startsWith('INFO')) {
-            // S,INFO,0x68,cal=1
+            // S,INFO,imu=1,cal=0
             calibrated = status.includes('cal=1');
             if (reading.value) reading.value = { ...reading.value, calibrated };
             return;
@@ -125,19 +126,22 @@ export function useImuSensor() {
 
     function handleLine(line: string): void {
         if (line.startsWith('D,')) {
-            const parts = line.split(','); // [D, yaw, pitch, still, sensorOK]
+            const parts = line.split(','); // [D, yaw, pitch, roll, still, sensorOk, calibrated]
+            if (parts.length < 7) return;
             lastDataAt = Date.now();
-            if (parts[4] === '0') {
+            if (parts[5] === '0') {
                 reading.value = null;
                 error.value =
                     'ESP bağlı ancak IMU sensörü yanıt vermiyor. Sensör kablolarını kontrol edin.';
                 return;
             }
             error.value = '';
+            calibrated = parts[6] === '1' || calibrated;
             reading.value = {
                 yaw: Number(parts[1]),
                 pitch: Number(parts[2]),
-                still: parts[3] === '1',
+                roll: Number(parts[3]),
+                still: parts[4] === '1',
                 calibrated,
             };
             return;
@@ -146,10 +150,8 @@ export function useImuSensor() {
     }
 
     // BLE notifications arrive in arbitrary chunks; reassemble into lines.
-    function onNotify(event: Event): void {
-        const data = (event.target as BluetoothRemoteGATTCharacteristic).value;
-        if (!data) return;
-        lineBuffer += new TextDecoder().decode(data);
+    function onNotifyValue(value: DataView): void {
+        lineBuffer += new TextDecoder().decode(value);
         let newline = lineBuffer.indexOf('\n');
         while (newline !== -1) {
             const line = lineBuffer.slice(0, newline).trim();
@@ -179,15 +181,19 @@ export function useImuSensor() {
         }
     }
 
+    async function ensureInitialized(): Promise<void> {
+        if (bleReady) return;
+        await BleClient.initialize({ androidNeverForLocation: true });
+        bleReady = true;
+    }
+
     async function subscribe(): Promise<void> {
-        if (!device?.gatt) throw new Error('BLE device unavailable');
-        const server = await device.gatt.connect();
-        const service = await server.getPrimaryService(NUS_SERVICE);
-        const tx = await service.getCharacteristic(NUS_TX);
-        rxChar = await service.getCharacteristic(NUS_RX);
+        if (!device) throw new Error('BLE device unavailable');
+        await BleClient.connect(device.deviceId, () => onDisconnected());
         lineBuffer = '';
-        await tx.startNotifications();
-        tx.addEventListener('characteristicvaluechanged', onNotify);
+        // Subscribe right away: the firmware kicks silent connections after 20 s.
+        await BleClient.startNotifications(device.deviceId, IMU_SERVICE, IMU_DATA, onNotifyValue);
+        await send('INFO').catch(() => undefined);
     }
 
     async function reconnectLoop(): Promise<void> {
@@ -216,7 +222,6 @@ export function useImuSensor() {
     function onDisconnected(): void {
         connected.value = false;
         reading.value = null;
-        rxChar = null;
         stopStaleWatch();
         releaseWakeLock();
         if (!manualClose) void reconnectLoop();
@@ -233,28 +238,36 @@ export function useImuSensor() {
         connecting.value = true;
         error.value = '';
         try {
+            await ensureInitialized();
             if (!device) {
-                // Opens Chrome's device chooser; later reconnects reuse the grant.
-                device = await navigator.bluetooth.requestDevice({
-                    filters: [{ namePrefix: DEVICE_NAME_PREFIX }],
-                    optionalServices: [NUS_SERVICE],
+                // Native: plugin scan dialog. Web: Chrome device chooser.
+                device = await BleClient.requestDevice({
+                    namePrefix: DEVICE_NAME_PREFIX,
+                    optionalServices: [IMU_SERVICE],
                 });
-                device.addEventListener('gattserverdisconnected', onDisconnected);
             }
             await subscribe();
             connected.value = true;
             connecting.value = false;
-            if (!deviceLabel.value) deviceLabel.value = device.name ?? DEVICE_NAME_PREFIX;
+            deviceLabel.value = device.name ?? DEVICE_FALLBACK_LABEL;
             startStaleWatch();
             void requestWakeLock();
         } catch (err) {
             connecting.value = false;
-            if (err instanceof DOMException && err.name === 'NotFoundError') {
+            const message = err instanceof Error ? err.message : String(err);
+            const cancelled =
+                (err instanceof DOMException && err.name === 'NotFoundError') ||
+                /cancel/i.test(message);
+            if (cancelled) {
+                device = null;
                 error.value =
-                    "Cihaz seçilmedi. Listede göremiyorsanız ESP'nin açık ve başka bir telefona bağlı olmadığından emin olun.";
+                    "Cihaz seçilmedi. Listede göremiyorsanız cihazın açık ve başka bir telefona bağlı olmadığından emin olun (cihaz adı: CAYH_V3).";
+            } else if (/disabled|turned off|not enabled/i.test(message)) {
+                error.value = 'Bluetooth kapalı. Telefonun Bluetooth ayarını açıp tekrar deneyin.';
             } else {
+                device = null;
                 error.value =
-                    'Bağlantı kurulamadı. Telefonda Bluetooth (ve gerekiyorsa Konum) servisinin açık olduğundan emin olun.';
+                    'Bağlantı kurulamadı. Bluetooth izinlerini onayladığınızdan ve cihazın menzilde olduğundan emin olun.';
             }
         }
     }
@@ -264,8 +277,11 @@ export function useImuSensor() {
         settleCalibration({ ok: false, message: 'Bağlantı kapatıldı.' });
         stopStaleWatch();
         releaseWakeLock();
-        if (device?.gatt?.connected) device.gatt.disconnect();
-        rxChar = null;
+        const id = device?.deviceId;
+        if (id) {
+            void BleClient.stopNotifications(id, IMU_SERVICE, IMU_DATA).catch(() => undefined);
+            void BleClient.disconnect(id).catch(() => undefined);
+        }
         connected.value = false;
         connecting.value = false;
         reading.value = null;
@@ -274,13 +290,13 @@ export function useImuSensor() {
 
     // ── Commands (one at a time; CAL answers via S,CAL_* lines) ──
     async function send(command: string): Promise<void> {
-        if (!rxChar) throw new Error('BLE not connected');
-        await rxChar.writeValue(new TextEncoder().encode(`${command}\n`));
+        if (!device) throw new Error('BLE not connected');
+        await BleClient.write(device.deviceId, IMU_SERVICE, IMU_DATA, textToDataView(`${command}\n`));
     }
 
     /** Trigger the on-device gyro re-reference (device must stay still, ~2 s). */
     async function calibrate(): Promise<CalibrationResult> {
-        if (!connected.value || !rxChar) return { ok: false, message: 'Önce sensöre bağlanın.' };
+        if (!connected.value || !device) return { ok: false, message: 'Önce sensöre bağlanın.' };
         if (calibrating.value) return { ok: false, message: 'Kalibrasyon zaten sürüyor.' };
         calibrating.value = true;
         try {

@@ -19,6 +19,7 @@
         "generate:assets": "node scripts/generate-assets.mjs"
     },
     "dependencies": {
+        "@capacitor-community/bluetooth-le": "^8.2.0",
         "@capacitor/android": "^8.3.1",
         "@capacitor/app": "^8.1.0",
         "@capacitor/core": "^8.3.1",

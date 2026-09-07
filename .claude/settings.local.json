@@ -57,7 +57,28 @@
       "Bash(docker exec *)",
       "Bash(cat .claude/launch.json)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5173/)",
-      "Bash(curl -s -X POST __TRACKED_VAR__/auth/register -H 'Content-Type: application/json' -d '{ *)"
+      "Bash(curl -s -X POST __TRACKED_VAR__/auth/register -H 'Content-Type: application/json' -d '{ *)",
+      "PowerShell(gh run list --limit 3)",
+      "PowerShell(gh run watch 29646248676 --exit-status --interval 30)",
+      "PowerShell(gh run view 29646248676 --log-failed 2>$null)",
+      "PowerShell(gh run view 28188945237 --log-failed 2>$null)",
+      "PowerShell(gh secret list)",
+      "PowerShell(Get-Content \"$env:USERPROFILE\\\\.ssh\\\\cayhesabim_deploy\" -Raw | gh secret set SSH_PRIVATE_KEY; if \\($?\\) { gh secret list | Select-String SSH })",
+      "Bash(where.exe plink *)",
+      "Bash(echo \"exit: $?\")",
+      "PowerShell([Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null; Set-PSRepository -Name PSGallery -InstallationPolicy Trusted; Install-Module -Name Posh-SSH -Scope CurrentUser -Force -AllowClobber; \\(Get-Module -ListAvailable Posh-SSH\\).Version)",
+      "Bash(ssh -i *)",
+      "PowerShell(Set-Content -Path \"$env:TEMP\\\\cayhesabim_server_deploy.pub\" -Value \"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJHApqlThmkFHGj5V6lUiB/nKldGAAaWlhePp5F+tGHu cayhesabim-prod-server-readonly\" -Encoding ascii; gh repo deploy-key add \"$env:TEMP\\\\cayhesabim_server_deploy.pub\" --title \"prod-server-45.74.158.190 \\(read-only\\)\"; gh repo deploy-key list)",
+      "Bash(cat)",
+      "Bash(scp -q -i ~/.ssh/cayhesabim_deploy /tmp/origin.pem /tmp/origin-key.pem root@45.74.158.190:cayhesabim/cloudflare/)",
+      "Bash(rm /tmp/origin.pem /tmp/origin-key.pem)",
+      "Bash(ssh-keygen -y -f ~/.ssh/cayhesabim_deploy)",
+      "Bash(gh secret *)",
+      "PowerShell(gh run view 29646248676)",
+      "Bash(scp -q -i ~/.ssh/cayhesabim_deploy /c/Users/Huseyin/cayhesabim-backups/local-cayhesabim-20260718-1724.dump root@45.74.158.190:/root/backups/)",
+      "PowerShell(pnpm build:api)",
+      "PowerShell(pnpm install)",
+      "PowerShell(pnpm build:web)"
     ]
   }
 }

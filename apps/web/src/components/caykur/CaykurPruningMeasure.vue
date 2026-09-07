@@ -59,7 +59,7 @@ interface SensorCorner {
     pitch: number;
 }
 
-const DEVICE_DISPLAY_NAME = 'CayHesabim';
+const DEVICE_DISPLAY_NAME = 'CAYH_V3';
 const imu = useImuSensor();
 const corners = ref<SensorCorner[]>([]);
 const distanceInput = ref('');
@@ -496,7 +496,7 @@ onUnmounted(() => {
                         <span class="ms-title">ESP32 Sensör (Bluetooth)</span>
                     </header>
 
-                    <p v-if="!imu.supported" class="ms-error">Bu tarayıcı Bluetooth desteklemiyor. Android telefonda Chrome (veya Edge / Samsung Internet) ile açın.</p>
+                    <p v-if="!imu.supported" class="ms-error">Bu tarayıcı Bluetooth desteklemiyor. Çay Hesabım mobil uygulamasını veya Android'de Chrome'u kullanın.</p>
 
                     <div class="ms-fix">
                         <span class="ms-dot" :data-tone="imuTone"></span>
