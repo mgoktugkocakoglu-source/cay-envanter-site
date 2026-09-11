@@ -159,10 +159,6 @@ onBeforeUnmount(() => {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           <span>Arazilerim</span>
         </RouterLink>
-        <RouterLink to="/tea/firms" class="app-nav-item" active-class="router-link-active">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M8 10h.01"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 14h.01"/><path d="M16 14h.01"/><path d="M12 14h.01"/></svg>
-          <span>Firmalar</span>
-        </RouterLink>
         <RouterLink to="/tea/harvests" class="app-nav-item" active-class="router-link-active">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
           <span>Hasatlarım</span>
@@ -190,10 +186,6 @@ onBeforeUnmount(() => {
       <RouterLink to="/tea/fields" class="bottom-tab" active-class="router-link-active">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         <span>Araziler</span>
-      </RouterLink>
-      <RouterLink to="/tea/firms" class="bottom-tab" active-class="router-link-active">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M8 10h.01"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 14h.01"/><path d="M16 14h.01"/><path d="M12 14h.01"/></svg>
-        <span>Firmalar</span>
       </RouterLink>
       <RouterLink to="/tea/harvests" class="bottom-tab" active-class="router-link-active">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
@@ -594,8 +586,9 @@ onBeforeUnmount(() => {
     bottom: max(10px, env(safe-area-inset-bottom));
     z-index: 70;
     display: grid;
-    grid-template-columns: repeat(8, 1fr);
-    gap: 3px;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 4px;
     padding: 6px;
     background: color-mix(in srgb, var(--color-bg-secondary) 94%, transparent);
     border: 1px solid var(--color-border);
@@ -610,13 +603,20 @@ onBeforeUnmount(() => {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: 4px;
+    padding: 0 4px;
     border-radius: 16px;
     color: var(--color-text-muted);
     text-decoration: none;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: var(--font-weight-semibold);
     line-height: 1.1;
+  }
+  .bottom-tab span {
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .bottom-tab.router-link-active {
     color: var(--color-primary);

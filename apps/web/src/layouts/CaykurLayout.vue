@@ -7,7 +7,6 @@ import { useThemeStore } from '@/stores/themeStore';
 import { useAuthStore } from '@/stores/authStore';
 import { NAV_GROUPS } from '@/services/caykur/nav';
 import { ROLE_DEFS, MODULE_LABELS, type ModuleKey } from '@/services/caykur/roles';
-import { ANNOUNCEMENTS } from '@/services/caykur/comms';
 import CaykurCommandPalette from '@/components/caykur/CaykurCommandPalette.vue';
 import caykurLogo from '@/assets/caykur-logo.svg';
 
@@ -19,7 +18,6 @@ const themeStore = useThemeStore();
 const authStore = useAuthStore();
 
 const menuOpen = ref(false);
-const bellOpen = ref(false);
 const paletteOpen = ref(false);
 
 // ── Sidebar collapse (desktop) ──
@@ -46,14 +44,11 @@ const visibleGroups = computed(() =>
 
 /** Open work counts surfaced as quiet badges next to their module. */
 const navBadges = computed<Partial<Record<ModuleKey, number>>>(() => ({
-    deliveries: caykur.ops.pendingDeliveries,
-    pruning: caykur.ops.pendingAudits,
     pruning_requests: pruningRequests.countByStatus('pending'),
-    parcels: caykur.ops.parcelsPendingVerification,
-    finance: caykur.ops.paymentsAwaitingApproval,
-    requests: caykur.ops.openRequests,
-    tasks: caykur.ops.overdueTasks,
 }));
+
+/** First module the active role may open; where denied navigations land. */
+const fallbackRoute = computed(() => visibleGroups.value[0]?.items[0]?.to ?? '/tea/dashboard');
 
 // ── Breadcrumbs ──
 interface Crumb {
@@ -77,25 +72,6 @@ const crumbs = computed<Crumb[]>(() => {
     }
     return list;
 });
-
-// ── Notifications (announcements feed) ──
-const notifications = computed(() =>
-    [...ANNOUNCEMENTS]
-        .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.publishedAt.localeCompare(a.publishedAt))
-        .slice(0, 5),
-);
-
-const dateFormatter = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short' });
-
-function formatShortDate(iso: string): string {
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? iso : dateFormatter.format(d);
-}
-
-function openAnnouncements(): void {
-    bellOpen.value = false;
-    router.push('/caykur/announcements');
-}
 
 // ── Header actions ──
 const isMac = navigator.platform.toUpperCase().includes('MAC');
@@ -130,7 +106,7 @@ watch(
     ([moduleKey]) => {
         const key = moduleKey as ModuleKey | undefined;
         if (key && !caykur.can(key)) {
-            router.replace('/caykur');
+            router.replace(fallbackRoute.value);
         }
     },
     { immediate: true },
@@ -189,48 +165,6 @@ watch(
                     <svg v-if="themeStore.theme === 'dark'" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></svg>
                     <svg v-else width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
                 </button>
-
-                <div v-if="caykur.can('announcements')" class="ck-bell">
-                    <button
-                        type="button"
-                        class="ck-btn ck-btn-ghost ck-icon-btn"
-                        aria-label="Duyurular"
-                        :aria-expanded="bellOpen"
-                        aria-haspopup="true"
-                        @click="bellOpen = !bellOpen"
-                    >
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>
-                        <span v-if="notifications.length" class="ck-bell-dot" aria-hidden="true"></span>
-                    </button>
-
-                    <div v-if="bellOpen" class="ck-menu-backdrop" @click="bellOpen = false"></div>
-                    <div v-if="bellOpen" class="ck-menu ck-bell-menu ck-pop-in" role="menu" aria-label="Son duyurular">
-                        <p class="ck-menu-title">Son duyurular</p>
-                        <button
-                            v-for="n in notifications"
-                            :key="n.id"
-                            type="button"
-                            class="ck-menu-item ck-bell-item"
-                            role="menuitem"
-                            @click="openAnnouncements"
-                        >
-                            <span class="ck-menu-item-main">
-                                <span class="ck-menu-item-label ck-bell-title">
-                                    {{ n.title }}
-                                </span>
-                                <span class="ck-menu-item-desc">
-                                    {{ formatShortDate(n.publishedAt) }} · {{ n.audienceLabel }}
-                                </span>
-                            </span>
-                            <span v-if="n.pinned" class="ck-pill no-dot ck-bell-pin" data-tone="info">Sabit</span>
-                        </button>
-                        <div class="ck-menu-sep" aria-hidden="true"></div>
-                        <button type="button" class="ck-menu-item ck-menu-item-cta" role="menuitem" @click="openAnnouncements">
-                            <span class="ck-menu-item-label">Tüm duyuruları aç</span>
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
-                        </button>
-                    </div>
-                </div>
 
                 <!-- Persona / role switcher (demo) -->
                 <div class="ck-persona">
@@ -474,41 +408,6 @@ watch(
     border-radius: var(--radius-full);
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
-}
-
-/* ── Bell ── */
-.ck-bell {
-    position: relative;
-}
-.ck-bell .ck-icon-btn {
-    position: relative;
-}
-.ck-bell-dot {
-    position: absolute;
-    top: 9px;
-    right: 9px;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--color-danger);
-    box-shadow: 0 0 0 2px var(--color-bg-secondary);
-}
-.ck-bell-menu {
-    width: 360px;
-}
-.ck-bell-item {
-    align-items: flex-start;
-}
-.ck-bell-title {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 250px;
-}
-.ck-bell-pin {
-    flex-shrink: 0;
-    margin-top: 2px;
 }
 
 /* ── Persona switcher ── */

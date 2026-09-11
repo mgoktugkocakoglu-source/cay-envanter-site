@@ -61,7 +61,6 @@ const themeStore = useThemeStore();
             <span>🌿 Tarla Yönetimi</span>
             <span>📊 Hasat Takibi</span>
             <span>💰 Ödeme Kontrolü</span>
-            <span>🏭 Firma Bilgileri</span>
           </div>
         </div>
         

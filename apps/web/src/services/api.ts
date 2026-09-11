@@ -293,6 +293,83 @@ export interface CreateCaykurStaffPayload {
     caykurScope?: string;
 }
 
+// Çaykur panel field (parcel) registry — every producer's fields, DB-backed.
+export type CaykurFieldOwnership = 'all' | 'shared' | 'partnered' | 'single';
+export type CaykurFieldSortKey = 'createdAt' | 'name' | 'area' | 'province' | 'owner' | 'parcel';
+
+export interface CaykurFieldPerson {
+    name: string;
+    role: 'owner' | 'partner';
+    userId: string | null;
+    phone: string | null;
+    sharePercentage: number | null;
+    invitationStatus: 'pending' | 'accepted' | 'rejected' | null;
+}
+
+export interface CaykurFieldSharedRegistrant {
+    fieldId: string;
+    fieldName: string;
+    userId: string;
+    fullName: string;
+}
+
+export interface CaykurFieldRow {
+    id: string;
+    name: string;
+    province: string;
+    district: string;
+    neighborhood: string;
+    road: string | null;
+    adaNo: string | null;
+    parcelNo: string | null;
+    area: number;
+    areaUnit: 'donum' | 'dekar' | 'm2';
+    areaDekar: number;
+    partnerCount: number;
+    notes: string | null;
+    hasGeometry: boolean;
+    owner: {
+        id: string;
+        fullName: string;
+        phone: string | null;
+        ruhsatNo: string | null;
+        cuzdanNo: string | null;
+    };
+    people: CaykurFieldPerson[];
+    /** Another user registered the same province + ada + parcel (hisseli). */
+    shared: boolean;
+    sharedWith: CaykurFieldSharedRegistrant[];
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CaykurFieldsOverview {
+    total: number;
+    shared: number;
+    withPartners: number;
+    totalAreaDekar: number;
+    provinces: Array<{ province: string; count: number }>;
+    districts: Array<{ province: string; district: string; count: number }>;
+}
+
+export interface CaykurFieldsQuery {
+    page?: number;
+    limit?: number;
+    search?: string;
+    province?: string;
+    district?: string;
+    neighborhood?: string;
+    adaNo?: string;
+    parcelNo?: string;
+    ownership?: CaykurFieldOwnership;
+    minAreaDekar?: number;
+    maxAreaDekar?: number;
+    createdFrom?: string;
+    createdTo?: string;
+    sortBy?: CaykurFieldSortKey;
+    sortOrder?: 'ASC' | 'DESC';
+}
+
 // Çaykur panel master dataset (müstahsil registry) — DB-backed.
 export interface CaykurPanelProducer {
     id: string;
@@ -812,6 +889,16 @@ export const api = {
         request<CaykurPanelProducer[]>('/caykur/producers'),
     getCaykurPanelProducer: (id: string) =>
         request<CaykurPanelProducer>(`/caykur/producers/${id}`),
+
+    // Çaykur panel field registry (every producer, DB-backed)
+    getCaykurFields: (params?: CaykurFieldsQuery) => {
+        const entries = Object.entries(params ?? {}).filter(
+            ([, v]) => v !== undefined && v !== null && v !== '',
+        ) as Array<[string, string | number]>;
+        const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        return request<Paginated<CaykurFieldRow>>(`/caykur/fields${query ? `?${query}` : ''}`);
+    },
+    getCaykurFieldsOverview: () => request<CaykurFieldsOverview>('/caykur/fields/overview'),
 
     // Harvests endpoints
     getHarvests: (params?: { fieldId?: string; year?: number; status?: string }) => {

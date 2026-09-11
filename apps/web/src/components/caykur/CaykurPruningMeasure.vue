@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import { useRtkReceiver } from '@/composables/useRtkReceiver';
 import { useImuSensor } from '@/composables/useImuSensor';
-import { fixQualityLabel, fixQualityTone } from '@/utils/nmea';
+import { hasGoogleMapsKey, loadGoogleMaps } from '@/services/googleMaps';
 import {
     localPolygonAreaM2,
     normalizeDeltaDeg,
@@ -27,30 +24,180 @@ const emit = defineEmits<{
         measuredAreaM2: number;
         points: MeasurementPoint[];
         accuracyLevel: AccuracyLevel | null;
-        fixQuality: string | null;
         method: MeasurementMethod;
     }): void;
     (e: 'cancel'): void;
 }>();
 
-type Mode = 'gps' | 'sensor' | 'map';
-const mode = ref<Mode>('gps');
+type Mode = 'map' | 'sensor';
+const mode = ref<Mode>('map');
+/** Ring of the polygon currently shown for the active mode. */
 const points = ref<MeasurementPoint[]>([]);
 
-// ── RTK receiver ──
-const rtk = useRtkReceiver();
-const receiverUrl = ref(rtk.url.value);
-const showSettings = ref(false);
+// ── Google Map (kept out of reactivity) ──
+const mapContainer = ref<HTMLDivElement | null>(null);
+const keyMissing = !hasGoogleMapsKey();
+const mapReady = ref(false);
+const mapError = ref('');
 
-const fixLabel = computed(() => fixQualityLabel(rtk.fixQuality.value));
-const fixTone = computed(() => fixQualityTone(rtk.fixQuality.value));
-const accuracyText = computed(() => {
-    const m = rtk.accuracyMeters.value;
-    if (m === null) return 'Konum bekleniyor…';
-    if (m < 1) return `±${(m * 100).toLocaleString('tr-TR', { maximumFractionDigits: 1 })} cm`;
-    return `±${m.toLocaleString('tr-TR', { maximumFractionDigits: 1 })} m`;
-});
-const hasLiveFix = computed(() => rtk.position.value !== null && rtk.fixQuality.value !== 'none');
+let map: google.maps.Map | null = null;
+let mapClickListener: google.maps.MapsEventListener | null = null;
+/**
+ * "Harita ile": vertices are added by tapping the map; Google's native
+ * editable/draggable polygon handles vertex moves, midpoint inserts and drags.
+ * (The Drawing Library was removed from the Maps JavaScript API in 2026.)
+ */
+let drawnPolygon: google.maps.Polygon | null = null;
+let drawnListeners: google.maps.MapsEventListener[] = [];
+/** True while map taps append vertices; false once the operator finishes the ring. */
+const drawing = ref(true);
+/** "Lazer + IMU": projected ring, draggable as a whole to sit on the parcel. */
+let sensorPolygon: google.maps.Polygon | null = null;
+let parcelOutline: google.maps.Polygon | null = null;
+
+const DEFAULT_CENTER: google.maps.LatLngLiteral = { lat: 41.02, lng: 40.52 }; // Rize
+const POLYGON_STYLE: google.maps.PolygonOptions = {
+    strokeColor: '#15803D',
+    strokeOpacity: 1,
+    strokeWeight: 2,
+    fillColor: '#15803D',
+    fillOpacity: 0.22,
+    geodesic: false,
+};
+
+function parcelLatLngs(): google.maps.LatLngLiteral[] {
+    return (props.parcelPolygon ?? [])
+        .filter((pair) => Array.isArray(pair) && pair.length >= 2)
+        .map(([lng, lat]) => ({ lat, lng }));
+}
+
+async function initMap(): Promise<void> {
+    if (!mapContainer.value || map) return;
+    if (keyMissing) return;
+    try {
+        const libs = await loadGoogleMaps();
+        if (!mapContainer.value) return; // unmounted while loading
+        const ring = parcelLatLngs();
+
+        map = new libs.maps.Map(mapContainer.value, {
+            center: ring[0] ?? DEFAULT_CENTER,
+            zoom: ring.length ? 18 : 13,
+            mapTypeId: 'hybrid',
+            tilt: 0,
+            mapTypeControl: true,
+            mapTypeControlOptions: { mapTypeIds: ['hybrid', 'satellite', 'roadmap'] },
+            streetViewControl: false,
+            rotateControl: false,
+            fullscreenControl: true,
+            clickableIcons: false,
+            gestureHandling: 'greedy',
+        });
+
+        if (ring.length >= 3) {
+            parcelOutline = new libs.maps.Polygon({
+                map,
+                paths: ring,
+                strokeColor: '#facc15',
+                strokeOpacity: 1,
+                strokeWeight: 2,
+                fillOpacity: 0,
+                clickable: false,
+            });
+            fitTo(ring);
+        }
+
+        mapClickListener = map.addListener('click', onMapClick);
+
+        mapReady.value = true;
+        applyMode();
+    } catch (err) {
+        mapError.value = err instanceof Error ? err.message : 'Harita yüklenemedi.';
+    }
+}
+
+function fitTo(ring: google.maps.LatLngLiteral[]): void {
+    if (!map || !ring.length) return;
+    const bounds = new google.maps.LatLngBounds();
+    ring.forEach((ll) => bounds.extend(ll));
+    map.fitBounds(bounds, 48);
+}
+
+/** Show the overlay of the active mode; park the other one off-map. */
+function applyMode(): void {
+    if (!map) return;
+    if (mode.value === 'map') {
+        sensorPolygon?.setMap(null);
+        drawnPolygon?.setMap(map);
+        syncPointsFromDrawn();
+    } else {
+        drawnPolygon?.setMap(null);
+        sensorPolygon?.setMap(map);
+        syncSensorPlacement();
+    }
+    syncMapInteraction();
+}
+watch(mode, applyMode);
+watch(drawing, syncMapInteraction);
+
+/** Double-click zoom fights with rapid vertex taps, so it is off while drawing. */
+function syncMapInteraction(): void {
+    const active = mode.value === 'map' && drawing.value;
+    map?.setOptions({ disableDoubleClickZoom: active, draggableCursor: active ? 'crosshair' : undefined });
+}
+
+// ── "Harita ile": tap to add vertices, Google handles editing ──
+function onMapClick(e: google.maps.MapMouseEvent): void {
+    if (mode.value !== 'map' || !drawing.value || !e.latLng || !map) return;
+    if (!drawnPolygon) {
+        createDrawnPolygon(e.latLng);
+        return;
+    }
+    drawnPolygon.getPath().push(e.latLng);
+}
+
+/** A polygon built with an empty `paths` has no ring at all, so seed it with the first vertex. */
+function createDrawnPolygon(first: google.maps.LatLng): void {
+    if (!map) return;
+    removeDrawnPolygon();
+    const polygon = new google.maps.Polygon({ ...POLYGON_STYLE, map, paths: [[first]], editable: true, draggable: true });
+    drawnPolygon = polygon;
+    const path = polygon.getPath();
+    drawnListeners = [
+        path.addListener('set_at', syncPointsFromDrawn),
+        path.addListener('insert_at', syncPointsFromDrawn),
+        path.addListener('remove_at', syncPointsFromDrawn),
+        polygon.addListener('dragend', syncPointsFromDrawn),
+        // Right-click (long-press on touch) a vertex to delete it.
+        polygon.addListener('contextmenu', (ev: google.maps.PolyMouseEvent) => {
+            if (ev.vertex !== undefined && path.getLength() > 3) path.removeAt(ev.vertex);
+        }),
+    ];
+    syncPointsFromDrawn();
+}
+
+function removeDrawnPolygon(): void {
+    drawnListeners.forEach((l) => l.remove());
+    drawnListeners = [];
+    drawnPolygon?.setMap(null);
+    drawnPolygon = null;
+}
+
+function syncPointsFromDrawn(): void {
+    if (mode.value !== 'map') return;
+    points.value = drawnPolygon
+        ? drawnPolygon.getPath().getArray().map((ll) => ({ lat: ll.lat(), lng: ll.lng(), altitudeMeters: 0 }))
+        : [];
+}
+
+function restartDrawing(): void {
+    removeDrawnPolygon();
+    points.value = [];
+    drawing.value = true;
+}
+
+function finishDrawing(): void {
+    if (points.value.length >= 3) drawing.value = false;
+}
 
 // ── ESP32 laser + IMU sensor (radial survey from a tripod station) ──
 interface SensorCorner {
@@ -66,8 +213,6 @@ const distanceInput = ref('');
 const calibrationMessage = ref('');
 /** Map anchor chosen when the operator presses "Bitir"; null until then. */
 const placedAnchor = ref<LatLngPoint | null>(null);
-/** The placed sensor ring may be dragged into position on the map. */
-const draggablePlacement = computed(() => mode.value === 'sensor' && placedAnchor.value !== null);
 
 const imuActive = computed(() => imu.connected.value || imu.connecting.value);
 const imuTone = computed(() => {
@@ -133,204 +278,6 @@ const sketch = computed(() => {
     };
 });
 
-const areaM2 = computed(() => polygonAreaM2(points.value as LatLngPoint[]));
-const canSave = computed(() => points.value.length >= 3);
-const canUndo = computed(() => (mode.value === 'sensor' ? corners.value.length > 0 : points.value.length > 0));
-
-function accuracyLevelFromFix(): AccuracyLevel | null {
-    const q = rtk.fixQuality.value;
-    if (q === 'rtk-fixed' || q === 'rtk-float') return 'high';
-    if (q === 'dgps') return 'medium';
-    if (q === 'gps' || q === 'estimated') return 'low';
-    return null;
-}
-
-// ── Leaflet (kept out of reactivity) ──
-const mapContainer = ref<HTMLDivElement | null>(null);
-let map: L.Map | null = null;
-let polygon: L.Polygon | null = null;
-let vertexLayer: L.LayerGroup | null = null;
-let parcelOutline: L.Polygon | null = null;
-
-const DEFAULT_CENTER: [number, number] = [41.02, 40.52]; // Rize
-
-function parcelLatLngs(): [number, number][] {
-    return (props.parcelPolygon ?? [])
-        .filter((pair) => Array.isArray(pair) && pair.length >= 2)
-        .map(([lng, lat]) => [lat, lng] as [number, number]);
-}
-
-function initMap(): void {
-    if (!mapContainer.value || map) return;
-    const ring = parcelLatLngs();
-    map = L.map(mapContainer.value, { zoomControl: true, maxZoom: 20 }).setView(
-        ring[0] ?? DEFAULT_CENTER,
-        ring.length ? 17 : 13,
-    );
-    L.tileLayer(
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        { maxZoom: 20, attribution: 'Esri' },
-    ).addTo(map);
-
-    vertexLayer = L.layerGroup().addTo(map);
-
-    if (ring.length >= 3) {
-        parcelOutline = L.polygon(ring, {
-            color: '#facc15',
-            weight: 2,
-            dashArray: '6 4',
-            fill: false,
-        }).addTo(map);
-        map.fitBounds(parcelOutline.getBounds().pad(0.4));
-    }
-
-    map.on('click', (e: L.LeafletMouseEvent) => {
-        if (mode.value !== 'map') return;
-        points.value.push({ lat: e.latlng.lat, lng: e.latlng.lng, altitudeMeters: 0 });
-    });
-}
-
-function redraw(): void {
-    if (!map || !vertexLayer) return;
-    vertexLayer.clearLayers();
-    const latlngs = points.value.map((p) => [p.lat, p.lng] as [number, number]);
-
-    if (polygon) {
-        map.removeLayer(polygon);
-        polygon = null;
-    }
-    if (latlngs.length >= 3) {
-        polygon = L.polygon(latlngs, {
-            color: '#15803D',
-            weight: 2,
-            fillColor: '#15803D',
-            fillOpacity: 0.22,
-            className: draggablePlacement.value ? 'ck-drag-poly' : undefined,
-        }).addTo(map);
-        if (draggablePlacement.value) bindPolygonDrag();
-    }
-    latlngs.forEach((ll, i) => {
-        L.circleMarker(ll, {
-            radius: 6,
-            color: '#15803D',
-            weight: 2,
-            fillColor: '#ffffff',
-            fillOpacity: 1,
-        })
-            .bindTooltip(String(i + 1), { permanent: true, direction: 'center', className: 'ck-vtx-label' })
-            .addTo(vertexLayer!);
-    });
-}
-
-watch(points, redraw, { deep: true });
-// Re-render the ring when drag eligibility flips (tab switch, finish, clear).
-watch(draggablePlacement, redraw);
-
-// ── Polygon drag (Pointer Events → same code path for mouse and touch) ──
-interface PolygonDragState {
-    pointerId: number;
-    last: L.LatLng;
-    totalLat: number;
-    totalLng: number;
-    moved: boolean;
-}
-let polygonDrag: PolygonDragState | null = null;
-
-function bindPolygonDrag(): void {
-    // The SVG renderer backs L.Polygon with an SVGPathElement.
-    const el = (polygon?.getElement() ?? null) as SVGPathElement | null;
-    if (!el) return;
-    el.addEventListener('pointerdown', onPolygonPointerDown);
-    el.addEventListener('pointermove', onPolygonPointerMove);
-    el.addEventListener('pointerup', onPolygonPointerUp);
-    el.addEventListener('pointercancel', onPolygonPointerUp);
-}
-
-function pointerLatLng(event: PointerEvent): L.LatLng | null {
-    if (!map || !mapContainer.value) return null;
-    const rect = mapContainer.value.getBoundingClientRect();
-    return map.containerPointToLatLng(
-        L.point(event.clientX - rect.left, event.clientY - rect.top),
-    );
-}
-
-function onPolygonPointerDown(event: PointerEvent): void {
-    if (!draggablePlacement.value || !map || !polygon) return;
-    const at = pointerLatLng(event);
-    if (!at) return;
-    event.preventDefault();
-    event.stopPropagation();
-    try {
-        (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
-    } catch {
-        // Capture is a nicety (keeps fast drags attached); dragging still works without it.
-    }
-    map.dragging.disable();
-    polygonDrag = { pointerId: event.pointerId, last: at, totalLat: 0, totalLng: 0, moved: false };
-}
-
-function onPolygonPointerMove(event: PointerEvent): void {
-    if (!polygonDrag || event.pointerId !== polygonDrag.pointerId || !polygon) return;
-    const at = pointerLatLng(event);
-    if (!at) return;
-    event.preventDefault();
-    const dLat = at.lat - polygonDrag.last.lat;
-    const dLng = at.lng - polygonDrag.last.lng;
-    if (dLat === 0 && dLng === 0) return;
-    polygonDrag.last = at;
-    polygonDrag.totalLat += dLat;
-    polygonDrag.totalLng += dLng;
-    polygonDrag.moved = true;
-    // Shift the visuals directly while dragging; reactivity would recreate the
-    // dragged element mid-gesture. The move commits on pointer release.
-    const ring = (polygon.getLatLngs() as L.LatLng[][])[0].map((ll) =>
-        L.latLng(ll.lat + dLat, ll.lng + dLng),
-    );
-    polygon.setLatLngs([ring]);
-    vertexLayer?.eachLayer((layer) => {
-        const marker = layer as L.CircleMarker;
-        const ll = marker.getLatLng();
-        marker.setLatLng([ll.lat + dLat, ll.lng + dLng]);
-    });
-}
-
-function onPolygonPointerUp(event: PointerEvent): void {
-    if (!polygonDrag || event.pointerId !== polygonDrag.pointerId) return;
-    const { totalLat, totalLng, moved } = polygonDrag;
-    polygonDrag = null;
-    map?.dragging.enable();
-    if (moved && placedAnchor.value) {
-        placedAnchor.value = {
-            lat: placedAnchor.value.lat + totalLat,
-            lng: placedAnchor.value.lng + totalLng,
-        };
-        syncSensorPlacement();
-    }
-}
-
-// ── Actions ──
-function toggleReceiver(): void {
-    if (rtk.connected.value || rtk.connecting.value) rtk.disconnect();
-    else rtk.connect();
-}
-
-function applyReceiverUrl(): void {
-    rtk.setUrl(receiverUrl.value);
-    rtk.reconnect();
-    showSettings.value = false;
-}
-
-function addLivePoint(): void {
-    const pos = rtk.position.value;
-    if (!pos) return;
-    points.value.push({
-        lat: pos.lat,
-        lng: pos.lng,
-        altitudeMeters: rtk.altitudeMeters.value ?? 0,
-    });
-}
-
-// ── Sensor actions ──
 function cornerLabel(index: number): string {
     return index < 26 ? String.fromCharCode(65 + index) : String(index + 1);
 }
@@ -377,9 +324,10 @@ function removeCorner(index: number): void {
  * orientation are representative while shape/area come from the laser+IMU.
  */
 function syncSensorPlacement(): void {
-    if (!placedAnchor.value) return;
-    if (corners.value.length < 3) {
+    if (mode.value !== 'sensor') return;
+    if (!placedAnchor.value || corners.value.length < 3) {
         points.value = [];
+        renderSensorPolygon();
         return;
     }
     const local = localCorners.value;
@@ -389,21 +337,65 @@ function syncSensorPlacement(): void {
         ...offsetLatLng(placedAnchor.value as LatLngPoint, p.x - midX, p.y - midY),
         altitudeMeters: Math.round(p.z * 100) / 100,
     }));
+    renderSensorPolygon();
+}
+
+function renderSensorPolygon(): void {
+    if (!map) return;
+    const path = points.value.map((p) => ({ lat: p.lat, lng: p.lng }));
+    if (path.length < 3) {
+        sensorPolygon?.setMap(null);
+        sensorPolygon = null;
+        return;
+    }
+    if (!sensorPolygon) {
+        sensorPolygon = new google.maps.Polygon({ ...POLYGON_STYLE, paths: path, draggable: true, editable: false });
+        sensorPolygon.addListener('dragend', onSensorDragEnd);
+    } else {
+        sensorPolygon.setPath(path);
+    }
+    sensorPolygon.setMap(map);
+}
+
+/** The ring was dragged as a whole: its new centroid becomes the anchor. */
+function onSensorDragEnd(): void {
+    if (!sensorPolygon) return;
+    const ring = sensorPolygon.getPath().getArray();
+    if (!ring.length) return;
+    placedAnchor.value = {
+        lat: ring.reduce((s, ll) => s + ll.lat(), 0) / ring.length,
+        lng: ring.reduce((s, ll) => s + ll.lng(), 0) / ring.length,
+    };
+    syncSensorPlacement();
 }
 
 function finishSensorMeasurement(): void {
     if (corners.value.length < 3) return;
     if (!placedAnchor.value && map) {
         const center = map.getCenter();
-        placedAnchor.value = { lat: center.lat, lng: center.lng };
+        if (center) placedAnchor.value = { lat: center.lat(), lng: center.lng() };
     }
     syncSensorPlacement();
-    if (map && points.value.length >= 3) {
-        map.fitBounds(
-            L.latLngBounds(points.value.map((p) => [p.lat, p.lng] as [number, number])).pad(0.4),
-        );
-    }
+    if (points.value.length >= 3) fitTo(points.value.map((p) => ({ lat: p.lat, lng: p.lng })));
 }
+
+// ── Shared readout & actions ──
+function ringAreaM2(ring: MeasurementPoint[]): number {
+    if (ring.length < 3) return 0;
+    if (typeof google !== 'undefined' && google.maps?.geometry?.spherical) {
+        return google.maps.geometry.spherical.computeArea(ring.map((p) => ({ lat: p.lat, lng: p.lng })));
+    }
+    return polygonAreaM2(ring as LatLngPoint[]);
+}
+
+const areaM2 = computed(() => ringAreaM2(points.value));
+const perimeterM = computed(() => {
+    if (points.value.length < 3 || typeof google === 'undefined' || !google.maps?.geometry?.spherical) return 0;
+    const path = points.value.map((p) => ({ lat: p.lat, lng: p.lng }));
+    return google.maps.geometry.spherical.computeLength([...path, path[0]]);
+});
+const canSave = computed(() => points.value.length >= 3);
+const canUndo = computed(() => (mode.value === 'sensor' ? corners.value.length > 0 : points.value.length > 0));
 
 function undo(): void {
     if (mode.value === 'sensor') {
@@ -411,15 +403,20 @@ function undo(): void {
         syncSensorPlacement();
         return;
     }
-    points.value.pop();
+    if (!drawnPolygon) return;
+    const path = drawnPolygon.getPath();
+    if (path.getLength() > 3) path.removeAt(path.getLength() - 1);
+    else restartDrawing();
 }
 
 function clearAll(): void {
     if (mode.value === 'sensor') {
         corners.value = [];
         placedAnchor.value = null;
+        syncSensorPlacement();
+        return;
     }
-    points.value = [];
+    restartDrawing();
 }
 
 function save(): void {
@@ -427,71 +424,79 @@ function save(): void {
     emit('complete', {
         measuredAreaM2: Math.round(areaM2.value),
         points: [...points.value],
-        accuracyLevel: mode.value === 'gps' ? accuracyLevelFromFix() : 'medium',
-        fixQuality: mode.value === 'gps' ? rtk.fixQuality.value : null,
-        method: mode.value === 'gps' ? 'gps' : mode.value === 'sensor' ? 'imu' : 'map',
+        accuracyLevel: 'medium',
+        method: mode.value === 'sensor' ? 'imu' : 'map',
     });
 }
 
-onMounted(initMap);
+function formatMeters(value: number): string {
+    return value.toLocaleString('tr-TR', { maximumFractionDigits: 0 });
+}
+
+onMounted(() => {
+    void initMap();
+});
 onUnmounted(() => {
-    if (map) {
-        map.remove();
-        map = null;
-    }
+    removeDrawnPolygon();
+    sensorPolygon?.setMap(null);
+    parcelOutline?.setMap(null);
+    mapClickListener?.remove();
+    if (map) google.maps.event.clearInstanceListeners(map);
+    map = null;
 });
 </script>
 
 <template>
     <div class="measure">
         <div class="measure-modes ck-seg" role="group" aria-label="Ölçüm yöntemi">
-            <button type="button" class="ck-seg-btn" :class="{ 'is-active': mode === 'gps' }" @click="mode = 'gps'">RTK Alıcı</button>
-            <button type="button" class="ck-seg-btn" :class="{ 'is-active': mode === 'sensor' }" @click="mode = 'sensor'">Lazer + IMU</button>
             <button type="button" class="ck-seg-btn" :class="{ 'is-active': mode === 'map' }" @click="mode = 'map'">Harita ile</button>
+            <button type="button" class="ck-seg-btn" :class="{ 'is-active': mode === 'sensor' }" @click="mode = 'sensor'">Lazer + IMU</button>
         </div>
 
         <div class="measure-grid">
             <div class="measure-map">
                 <div ref="mapContainer" class="measure-canvas"></div>
-                <div class="measure-readout">
-                    <span class="ro-area">{{ areaM2 ? Math.round(areaM2).toLocaleString('tr-TR') : '0' }} m²</span>
-                    <span class="ro-sub">{{ points.length }} köşe · otomatik hesaplanan alan</span>
+                <div v-if="keyMissing || mapError || !mapReady" class="measure-placeholder" role="status">
+                    <template v-if="keyMissing">
+                        <b>Google Haritalar anahtarı tanımlı değil.</b>
+                        <span><code>VITE_GOOGLE_MAPS_API_KEY</code> değişkenini ayarlayıp uygulamayı yeniden derleyin.</span>
+                    </template>
+                    <template v-else-if="mapError">
+                        <b>Harita yüklenemedi.</b>
+                        <span>{{ mapError }}</span>
+                    </template>
+                    <span v-else>Google uydu görüntüsü yükleniyor…</span>
+                </div>
+                <div v-else class="measure-readout">
+                    <span class="ro-area">{{ formatMeters(areaM2) }} m²</span>
+                    <span class="ro-sub">{{ points.length }} köşe<template v-if="perimeterM"> · çevre {{ formatMeters(perimeterM) }} m</template></span>
                 </div>
             </div>
 
             <aside class="measure-side">
-                <section v-if="mode === 'gps'" class="ms-panel">
+                <section v-if="mode === 'map'" class="ms-panel">
                     <header class="ms-head">
-                        <span class="ms-title">RTK Alıcı (3B sensör)</span>
-                        <button type="button" class="ck-btn ck-btn-sm" @click="showSettings = !showSettings">Ayar</button>
+                        <span class="ms-title">Google uydu görüntüsünde çiz</span>
+                        <button v-if="drawing" type="button" class="ck-btn ck-btn-sm ck-btn-primary" :disabled="points.length < 3" @click="finishDrawing">Çizimi bitir</button>
+                        <button v-else type="button" class="ck-btn ck-btn-sm" @click="restartDrawing">Yeni çizim</button>
                     </header>
 
-                    <div v-if="showSettings" class="ms-settings">
-                        <input v-model="receiverUrl" type="text" class="ck-search-input" placeholder="ws://caygps.local:81" style="padding-left:12px" />
-                        <button type="button" class="ck-btn ck-btn-sm ck-btn-primary" @click="applyReceiverUrl">Bağlan</button>
-                    </div>
-
-                    <div class="ms-fix">
-                        <span class="ms-dot" :data-tone="fixTone"></span>
-                        <div class="ms-fix-main">
-                            <span class="ms-fix-label">{{ rtk.connected.value ? fixLabel : rtk.connecting.value ? 'Bağlanıyor…' : 'Bağlı değil' }}</span>
-                            <span class="ms-fix-sub">{{ accuracyText }}<template v-if="rtk.satellites.value"> · {{ rtk.satellites.value }} uydu</template></span>
-                        </div>
-                        <button type="button" class="ck-btn ck-btn-sm" @click="toggleReceiver">{{ rtk.connected.value || rtk.connecting.value ? 'Durdur' : 'Başlat' }}</button>
-                    </div>
+                    <ol class="ms-steps">
+                        <li>Budanan alanın köşelerine sırayla dokunun; her dokunuş bir köşe ekler.</li>
+                        <li>Tüm köşeler işaretlenince <b>Çizimi bitir</b>'e basın.</li>
+                        <li>Köşeleri sürükleyerek düzeltin; kenar ortasındaki açık noktalar yeni köşe ekler. Bir köşeyi silmek için üzerine sağ tıklayın (telefonda basılı tutun). Alanı bütün olarak da sürükleyebilirsiniz.</li>
+                    </ol>
 
                     <dl class="ms-coords">
-                        <div><span>Enlem</span><b>{{ rtk.position.value ? rtk.position.value.lat.toFixed(7) : '—' }}</b></div>
-                        <div><span>Boylam</span><b>{{ rtk.position.value ? rtk.position.value.lng.toFixed(7) : '—' }}</b></div>
-                        <div><span>Yükseklik</span><b>{{ rtk.altitudeMeters.value !== null ? `${rtk.altitudeMeters.value.toFixed(1)} m` : '—' }}</b></div>
+                        <div><span>Köşe</span><b>{{ points.length }}</b></div>
+                        <div><span>Alan</span><b>{{ formatMeters(areaM2) }} m²</b></div>
+                        <div><span>Çevre</span><b>{{ perimeterM ? `${formatMeters(perimeterM)} m` : '—' }}</b></div>
                     </dl>
 
-                    <p v-if="rtk.error.value" class="ms-error">{{ rtk.error.value }}</p>
-
-                    <button type="button" class="ck-btn ck-btn-primary ms-add" :disabled="!hasLiveFix" @click="addLivePoint">Konumu ekle (köşe)</button>
+                    <p class="ms-hint">Alan ve çevre Google'ın küresel geometri hesabıyla otomatik bulunur. Sarı çizgi tapu parselinin sınırıdır.</p>
                 </section>
 
-                <section v-else-if="mode === 'sensor'" class="ms-panel">
+                <section v-else class="ms-panel">
                     <header class="ms-head">
                         <span class="ms-title">ESP32 Sensör (Bluetooth)</span>
                     </header>
@@ -555,15 +560,10 @@ onUnmounted(() => {
                         <p class="ms-hint">Ön izleme alanı: <b>{{ sensorAreaM2 ? Math.round(sensorAreaM2).toLocaleString('tr-TR') : '0' }} m²</b> · yeşil nokta = tripod istasyonu</p>
                     </template>
 
-                    <button type="button" class="ck-btn ck-btn-primary" :disabled="corners.length < 3" @click="finishSensorMeasurement">
+                    <button type="button" class="ck-btn ck-btn-primary" :disabled="corners.length < 3 || !mapReady" @click="finishSensorMeasurement">
                         {{ placedAnchor ? 'Poligonu haritada güncelle' : 'Bitir · poligonu haritaya yerleştir' }}
                     </button>
-                    <p v-if="placedAnchor" class="ms-hint">Poligon haritaya yerleştirildi. <b>Sürükleyerek</b> (bilgisayarda fare, telefonda parmakla) parselin üzerine taşıyın; sarı kesikli çizgi tapu parselidir. Şekil ve alan lazer+IMU ölçümlerinden gelir — yerleşim bitince <b>Ölçümü kaydet</b>'e basın.</p>
-                </section>
-
-                <section v-else class="ms-panel">
-                    <header class="ms-head"><span class="ms-title">Harita ile köşe ekle</span></header>
-                    <p class="ms-hint">Budanan alanın köşelerini haritaya dokunarak işaretleyin. RTK alıcı yoksa kullanın.</p>
+                    <p v-if="placedAnchor" class="ms-hint">Poligon haritaya yerleştirildi. <b>Sürükleyerek</b> (bilgisayarda fare, telefonda parmakla) parselin üzerine taşıyın; sarı çizgi tapu parselidir. Şekil ve alan lazer+IMU ölçümlerinden gelir — yerleşim bitince <b>Ölçümü kaydet</b>'e basın.</p>
                 </section>
 
                 <div class="ms-actions">
@@ -595,14 +595,27 @@ onUnmounted(() => {
     overflow: hidden;
     background: var(--color-bg-primary);
 }
+.measure-placeholder {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    padding: var(--space-4); text-align: center;
+    border-radius: var(--radius-md);
+    background: var(--color-subtle-bg);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    pointer-events: none;
+}
+.measure-placeholder b { color: var(--color-text-primary); }
+.measure-placeholder code { font-size: var(--font-size-xs); }
 .measure-readout {
-    position: absolute; left: 12px; bottom: 12px; z-index: 500;
+    position: absolute; left: 12px; bottom: 28px; z-index: 5;
     background: var(--color-card-bg);
     border: 1px solid var(--color-border-strong);
     border-radius: var(--radius-md);
     padding: 8px 12px;
     display: flex; flex-direction: column;
     box-shadow: var(--shadow-md);
+    pointer-events: none;
 }
 .ro-area { font-size: var(--font-size-lg); font-weight: var(--font-weight-bold); color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
 .ro-sub { font-size: var(--font-size-xs); color: var(--color-text-muted); }
@@ -617,8 +630,12 @@ onUnmounted(() => {
 }
 .ms-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .ms-title { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); }
-.ms-settings { display: flex; gap: var(--space-2); }
-.ms-settings .ck-search-input { flex: 1; }
+
+.ms-steps {
+    margin: 0; padding-left: 18px;
+    display: flex; flex-direction: column; gap: 4px;
+    font-size: var(--font-size-xs); color: var(--color-text-secondary); line-height: 1.5;
+}
 
 .ms-fix { display: flex; align-items: center; gap: var(--space-2); }
 .ms-fix-main { display: flex; flex-direction: column; flex: 1; }
@@ -636,7 +653,6 @@ onUnmounted(() => {
 .ms-coords b { font-size: var(--font-size-xs); color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
 
 .ms-error { margin: 0; font-size: var(--font-size-xs); color: var(--color-danger); }
-.ms-add { width: 100%; }
 .ms-hint { margin: 0; font-size: var(--font-size-xs); color: var(--color-text-muted); line-height: 1.5; }
 .ms-actions { display: flex; gap: var(--space-2); }
 .ms-actions .ck-btn { flex: 1; }
@@ -681,10 +697,4 @@ onUnmounted(() => {
 .sk-node { fill: #fff; stroke: #15803d; stroke-width: 2; }
 .sk-label { fill: var(--color-text-secondary); font-size: 10px; font-weight: 600; }
 .sk-station { fill: var(--color-success); }
-</style>
-
-<style>
-.ck-vtx-label { background: transparent; border: none; box-shadow: none; color: #fff; font-weight: 700; font-size: 11px; }
-.ck-drag-poly { cursor: grab; touch-action: none; }
-.ck-drag-poly:active { cursor: grabbing; }
 </style>

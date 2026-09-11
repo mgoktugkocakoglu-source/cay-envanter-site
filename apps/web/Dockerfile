@@ -23,6 +23,7 @@ COPY tsconfig.base.json ./
 
 # Build arguments for environment variables
 ARG VITE_API_URL=/api
+ARG VITE_GOOGLE_MAPS_API_KEY=
 
 # Build
 WORKDIR /app/apps/web

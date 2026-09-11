@@ -7,9 +7,7 @@ import type { ModuleKey } from '@/services/caykur/roles';
 import { useFocusTrap } from '@/composables/useFocusTrap';
 
 /**
- * Panel-wide command palette (⌘K): jump to a module, find a producer by name /
- * ruhsat / cüzdan number, or run a frequent action. Pure client-side over the
- * seeded dataset; swap the producer source together with the caykur store seam.
+ * Panel-wide command palette (⌘K): jump to a module or run a frequent action.
  */
 
 const open = defineModel<boolean>('open', { required: true });
@@ -31,10 +29,7 @@ interface PaletteGroup {
 }
 
 const ICONS = {
-    producer:
-        '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
     back: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
-    plus: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>',
 };
 
 const query = ref('');
@@ -69,9 +64,6 @@ interface ActionDef {
 }
 
 const ACTION_DEFS: ActionDef[] = [
-    { label: 'Yaş çay alımı kaydet', to: '/caykur/deliveries/new', module: 'deliveries', iconSvg: ICONS.plus },
-    { label: 'Yeni görev oluştur', to: '/caykur/tasks', module: 'tasks', iconSvg: ICONS.plus },
-    { label: 'Duyuru yayınla', to: '/caykur/announcements', module: 'announcements', iconSvg: ICONS.plus },
     { label: 'Üretici uygulamasına dön', to: '/tea/dashboard', module: null, iconSvg: ICONS.back },
 ];
 
@@ -85,26 +77,6 @@ const actionItems = computed<PaletteItem[]>(() =>
     })),
 );
 
-const producerItems = computed<PaletteItem[]>(() => {
-    const q = norm(query.value.trim());
-    if (q.length < 2) return [];
-    return caykur.producers
-        .filter(
-            (p) =>
-                norm(p.fullName).includes(q) ||
-                p.ruhsatNo.includes(q) ||
-                p.cuzdanNo.includes(q),
-        )
-        .slice(0, 8)
-        .map((p) => ({
-            id: `producer:${p.id}`,
-            label: p.fullName,
-            meta: `${p.region} · ${p.ruhsatNo}`,
-            iconSvg: ICONS.producer,
-            to: `/caykur/producers/${p.id}`,
-        }));
-});
-
 const groups = computed<PaletteGroup[]>(() => {
     const q = norm(query.value.trim());
     const byQuery = (items: PaletteItem[]) =>
@@ -112,7 +84,6 @@ const groups = computed<PaletteGroup[]>(() => {
 
     return [
         { title: 'Sayfalar', items: byQuery(navItems.value) },
-        { title: 'Müstahsiller', items: producerItems.value },
         { title: 'İşlemler', items: byQuery(actionItems.value) },
     ].filter((g) => g.items.length > 0);
 });
@@ -198,7 +169,7 @@ function flatIndexOf(item: PaletteItem): number {
                         v-model="query"
                         type="text"
                         class="palette-input"
-                        placeholder="Sayfa, müstahsil veya işlem ara…"
+                        placeholder="Sayfa veya işlem ara…"
                         role="combobox"
                         aria-expanded="true"
                         aria-controls="ck-palette-list"
@@ -234,7 +205,7 @@ function flatIndexOf(item: PaletteItem): number {
                     <div v-if="flatItems.length === 0" class="palette-empty">
                         <p class="palette-empty-title">Sonuç bulunamadı</p>
                         <p class="palette-empty-sub">
-                            "{{ query }}" için sayfa, müstahsil veya işlem eşleşmedi.
+                            "{{ query }}" için sayfa veya işlem eşleşmedi.
                         </p>
                     </div>
                 </div>

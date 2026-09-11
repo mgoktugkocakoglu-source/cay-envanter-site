@@ -33,7 +33,6 @@ async function onMeasured(result: {
     measuredAreaM2: number;
     points: MeasurementPoint[];
     accuracyLevel: AccuracyLevel | null;
-    fixQuality: string | null;
     method: MeasurementMethod;
 }): Promise<void> {
     if (!req.value) return;
@@ -43,7 +42,6 @@ async function onMeasured(result: {
         points: result.points,
         method: result.method,
         accuracyLevel: result.accuracyLevel ?? undefined,
-        fixQuality: result.fixQuality ?? undefined,
     });
     busy.value = false;
     measuring.value = false;
@@ -148,8 +146,8 @@ onMounted(() => store.fetchOne(id.value));
                                 <span class="result-sub">otomatik hesaplanan budama alanı</span>
                             </div>
                             <dl class="ck-dl" style="padding-left:0;padding-right:0">
-                                <div class="ck-dl-item"><span class="ck-dl-term">Yöntem</span><span class="ck-dl-val">{{ req.method === 'gps' ? 'RTK / GPS' : req.method === 'map' ? 'Harita' : req.method === 'imu' ? 'Lazer + IMU' : '—' }}</span></div>
-                                <div class="ck-dl-item"><span class="ck-dl-term">Doğruluk</span><span class="ck-dl-val">{{ req.accuracyLevel === 'high' ? 'Yüksek (RTK)' : req.accuracyLevel === 'medium' ? 'Orta' : 'Düşük' }}</span></div>
+                                <div class="ck-dl-item"><span class="ck-dl-term">Yöntem</span><span class="ck-dl-val">{{ req.method === 'gps' ? 'GPS' : req.method === 'map' ? 'Harita' : req.method === 'imu' ? 'Lazer + IMU' : '—' }}</span></div>
+                                <div class="ck-dl-item"><span class="ck-dl-term">Doğruluk</span><span class="ck-dl-val">{{ req.accuracyLevel === 'high' ? 'Yüksek' : req.accuracyLevel === 'medium' ? 'Orta' : 'Düşük' }}</span></div>
                                 <div class="ck-dl-item"><span class="ck-dl-term">Köşe sayısı</span><span class="ck-dl-val">{{ formatNumber(req.measurementPoints.length) }}</span></div>
                                 <div class="ck-dl-item"><span class="ck-dl-term">Ölçen</span><span class="ck-dl-val">{{ req.measuredByName ?? '—' }}</span></div>
                                 <div v-if="req.measuredAt" class="ck-dl-item"><span class="ck-dl-term">Ölçüm tarihi</span><span class="ck-dl-val">{{ formatDateTime(req.measuredAt) }}</span></div>

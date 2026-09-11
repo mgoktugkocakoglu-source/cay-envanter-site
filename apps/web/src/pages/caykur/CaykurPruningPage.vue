@@ -28,7 +28,7 @@ const STATUS_META: Record<PruningStatus, { label: string; tone: Tone }> = {
 
 const METHOD_LABEL: Record<PruningMethod, string> = {
     map: 'Harita çizimi',
-    gps: 'GPS / RTK',
+    gps: 'GPS',
     assisted: 'Asistan ölçüm',
     imu: 'Lazer + IMU',
 };

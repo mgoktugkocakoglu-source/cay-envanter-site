@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
+import { canAccess } from '@/services/caykur/roles';
 
 export type UserType = 'land_owner' | 'worker' | 'self_farmer';
 export type UserRole = 'user' | 'admin' | 'moderator';
@@ -61,14 +62,16 @@ export const useAuthStore = defineStore('auth', () => {
     const isCaykurStaff = computed(() => !!user.value?.caykurRole);
 
     // Where a given identity lands after login (and where guests/denied routes
-    // bounce to). Admin → panel; field officer → their task queue; office roles
-    // → panel; producer → tea hub.
+    // bounce to). Admin → panel; staff → the first pruning module their role
+    // may open; staff with no panel module and producers → tea hub.
     const homeRoute = computed<string>(() => {
         const u = user.value;
         if (!u) return '/tea/dashboard';
         if (u.role === 'admin') return '/caykur';
-        if (u.caykurRole === 'saha_personeli') return '/caykur/tasks';
-        if (u.caykurRole) return '/caykur';
+        if (u.caykurRole) {
+            if (canAccess(u.caykurRole, 'pruning_requests')) return '/caykur/pruning-requests';
+            if (canAccess(u.caykurRole, 'pruning')) return '/caykur/pruning';
+        }
         return '/tea/dashboard';
     });
 

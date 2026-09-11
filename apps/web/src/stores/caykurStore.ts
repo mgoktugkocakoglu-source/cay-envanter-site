@@ -16,7 +16,6 @@ import {
     type ModuleKey,
     type Persona,
 } from '@/services/caykur/roles';
-import { opsSnapshot } from '@/services/caykur';
 import { useAuthStore } from '@/stores/authStore';
 
 /**
@@ -39,7 +38,6 @@ export const useCaykurStore = defineStore('caykur', () => {
 
     const overview = computed(() => buildOverview(producers.value));
     const flagged = computed(() => flaggedProducers(producers.value));
-    const ops = computed(() => opsSnapshot());
 
     async function loadProducers(force = false): Promise<void> {
         if (producersLoading.value || (producersLoaded.value && !force)) {
@@ -102,7 +100,6 @@ export const useCaykurStore = defineStore('caykur', () => {
         season,
         overview,
         flagged,
-        ops,
         producerById,
         // persona / access
         role,

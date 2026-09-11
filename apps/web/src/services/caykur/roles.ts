@@ -9,23 +9,7 @@
  */
 
 /** Every navigable area of the Kurum panel — the unit of access control. */
-export type ModuleKey =
-    | 'overview'
-    | 'producers'
-    | 'parcels'
-    | 'deliveries'
-    | 'quota'
-    | 'finance'
-    | 'pruning'
-    | 'pruning_requests'
-    | 'org'
-    | 'tasks'
-    | 'requests'
-    | 'announcements'
-    | 'reports'
-    | 'users'
-    | 'audit'
-    | 'settings';
+export type ModuleKey = 'fields' | 'pruning' | 'pruning_requests';
 
 export type CaykurRole =
     | 'kurum_admin'
@@ -57,61 +41,42 @@ export const ROLE_DEFS: RoleDef[] = [
         label: 'Fabrika Sorumlusu',
         short: 'Fabrika',
         description: 'Bağlı fabrika ve alım yerlerinin operasyonunu yönetir.',
-        access: [
-            'overview', 'producers', 'parcels', 'deliveries', 'quota',
-            'pruning', 'pruning_requests', 'org', 'tasks', 'requests', 'announcements', 'reports',
-        ],
+        access: ['fields', 'pruning', 'pruning_requests'],
     },
     {
         id: 'alim_yeri_personeli',
         label: 'Alım Yeri Personeli',
         short: 'Alım yeri',
         description: 'Günlük yaş çay alımını kaydeder, kota durumunu izler.',
-        access: ['overview', 'producers', 'deliveries', 'quota', 'tasks'],
+        access: ['fields'],
     },
     {
         id: 'saha_personeli',
         label: 'Saha Personeli',
         short: 'Saha',
         description: 'Parsel doğrulama ve budama ölçüm görevlerini yürütür.',
-        access: ['overview', 'producers', 'parcels', 'pruning', 'pruning_requests', 'tasks'],
+        access: ['fields', 'pruning', 'pruning_requests'],
     },
     {
         id: 'denetci',
         label: 'Denetçi',
         short: 'Denetçi',
         description: 'Uygunluk, ödeme ve işlem kayıtlarını denetler (salt-izleme).',
-        access: [
-            'overview', 'producers', 'parcels', 'deliveries', 'quota',
-            'finance', 'pruning', 'reports', 'audit',
-        ],
+        access: ['fields', 'pruning'],
     },
     {
         id: 'finans',
         label: 'Finans Personeli',
         short: 'Finans',
         description: 'Hakediş, kesinti, avans ve ödeme onay akışını yönetir.',
-        access: ['overview', 'producers', 'finance', 'quota', 'reports', 'requests'],
+        access: ['fields'],
     },
 ];
 
 export const MODULE_LABELS: Record<ModuleKey, string> = {
-    overview: 'Genel Bakış',
-    producers: 'Müstahsiller',
-    parcels: 'Parseller',
-    deliveries: 'Yaş Çay Alımı',
-    quota: 'Kota Yönetimi',
-    finance: 'Ödeme & Cari',
+    fields: 'Araziler',
     pruning: 'Budama Denetimi',
     pruning_requests: 'Budama Talepleri',
-    org: 'Fabrika & Alım Yeri',
-    tasks: 'Görevler',
-    requests: 'Talepler',
-    announcements: 'Duyurular',
-    reports: 'Raporlar',
-    users: 'Kullanıcılar & Roller',
-    audit: 'İşlem Geçmişi',
-    settings: 'Sistem Ayarları',
 };
 
 export const ALL_MODULES: ModuleKey[] = Object.keys(MODULE_LABELS) as ModuleKey[];
@@ -134,7 +99,7 @@ export function canAccess(role: CaykurRole, moduleKey: ModuleKey): boolean {
 
 /**
  * Demo personas for the in-panel role switcher. Each maps to a real seeded
- * staff member (see org.ts) so scoping reads as authentic.
+ * staff member (see the seeded staff registry) so scoping reads as authentic.
  */
 export interface Persona {
     role: CaykurRole;

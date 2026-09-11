@@ -257,9 +257,6 @@ onMounted(() => {
                     </span>
                     <span class="date-cell">{{ formatDate(firm.createdAt) }}</span>
                     <div class="actions-cell">
-                        <RouterLink class="btn-secondary" :to="`/tea/firms/${firm.id}`">
-                            Detay
-                        </RouterLink>
                         <button class="btn-secondary" type="button" @click="openEditForm(firm)">
                             Duzenle
                         </button>

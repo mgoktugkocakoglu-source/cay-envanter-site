@@ -33,7 +33,6 @@ function closeMobileMenu() {
       <nav class="app-nav" :class="{ 'is-open': isMobileMenuOpen }">
         <RouterLink to="/dashboard" class="nav-link" @click="closeMobileMenu" exact-active-class="router-link-active">Ana Sayfa</RouterLink>
         <RouterLink to="/fields" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Tarlalarım</RouterLink>
-        <RouterLink to="/firms" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Firmalar</RouterLink>
         <RouterLink to="/harvests" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Hasatlarım</RouterLink>
         <RouterLink to="/community" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">Topluluk</RouterLink>
         <RouterLink to="/job-listings" class="nav-link" @click="closeMobileMenu" active-class="router-link-active">İş/İşçi Bul</RouterLink>

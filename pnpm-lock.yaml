@@ -168,6 +168,9 @@ importers:
       '@capacitor/status-bar':
         specifier: ^8.0.2
         version: 8.0.2(@capacitor/core@8.3.1)
+      '@googlemaps/js-api-loader':
+        specifier: ^2.1.1
+        version: 2.1.1
       '@tiptap/core':
         specifier: ^3.19.0
         version: 3.19.0(@tiptap/pm@3.19.0)
@@ -208,6 +211,9 @@ importers:
       '@capacitor/cli':
         specifier: ^8.3.1
         version: 8.3.1
+      '@types/google.maps':
+        specifier: ^3.66.2
+        version: 3.66.2
       '@types/leaflet':
         specifier: ^1.9.21
         version: 1.9.21
@@ -1297,6 +1303,12 @@ packages:
   /@floating-ui/utils@0.2.10:
     resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
     requiresBuild: true
+    dev: false
+
+  /@googlemaps/js-api-loader@2.1.1:
+    resolution: {integrity: sha512-yUpAwksbHrlZIWD49JmveNSfBG4oAK0AwMknfSaPMnP5N7UT8oFRVCqwjGb1XQovi//7KLbPQKZpbofiLGzpDw==}
+    dependencies:
+      '@types/google.maps': 3.66.2
     dev: false
 
   /@hapi/hoek@9.3.0:
@@ -3018,6 +3030,9 @@ packages:
   /@types/geojson@7946.0.16:
     resolution: {integrity: sha512-6C8nqWur3j98U6+lXDfTUWIfgvZU+EumvpHKcYjujKH7woYyLj2sUmff0tRhrqM7BohUw7Pz3ZB1jj2gW9Fvmg==}
     dev: true
+
+  /@types/google.maps@3.66.2:
+    resolution: {integrity: sha512-Lg/U5iLj90fQV3jQJo6hmGYsNAecXH3J+3LkKb4AupYyyI3UFx7y4hINz1pYILX0DEWNN1FeCAXLUEjBBeV9XA==}
 
   /@types/http-errors@2.0.5:
     resolution: {integrity: sha512-r8Tayk8HJnX0FztbZN7oVqGccWgw98T/0neJphO91KkmOzug1KkofZURD4UaD5uH8AqcFLfdPErnBod0u71/qg==}

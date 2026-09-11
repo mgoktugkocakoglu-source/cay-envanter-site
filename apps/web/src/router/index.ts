@@ -100,18 +100,6 @@ const router = createRouter({
             meta: { requiresAuth: true, hub: 'tea' },
         },
         {
-            path: '/tea/firms',
-            name: 'tea-firms',
-            component: () => import('@/pages/FirmsPage.vue'),
-            meta: { requiresAuth: true, hub: 'tea' },
-        },
-        {
-            path: '/tea/firms/:id',
-            name: 'tea-firm-detail',
-            component: () => import('@/pages/FirmDetailPage.vue'),
-            meta: { requiresAuth: true, hub: 'tea' },
-        },
-        {
             path: '/tea/harvests',
             name: 'tea-harvests',
             component: () => import('@/pages/HarvestsPage.vue'),
@@ -170,71 +158,14 @@ const router = createRouter({
         },
 
         // ═══════ ÇAYKUR KURUMSAL PANEL (ENTERPRISE) ═══════
+        // Only the pruning operations remain in the panel; the root lands on
+        // the pruning request queue.
+        { path: '/caykur', redirect: '/caykur/pruning-requests' },
         {
-            path: '/caykur',
-            name: 'caykur-overview',
-            component: () => import('@/pages/caykur/CaykurOverviewPage.vue'),
-            meta: { requiresAuth: true, module: 'overview' },
-        },
-        {
-            path: '/caykur/producers',
-            name: 'caykur-producers',
-            component: () => import('@/pages/caykur/CaykurProducersPage.vue'),
-            meta: { requiresAuth: true, module: 'producers' },
-        },
-        {
-            path: '/caykur/producers/:id',
-            name: 'caykur-producer-detail',
-            component: () => import('@/pages/caykur/CaykurProducerDetailPage.vue'),
-            meta: { requiresAuth: true, module: 'producers' },
-        },
-        {
-            path: '/caykur/parcels',
-            name: 'caykur-parcels',
-            component: () => import('@/pages/caykur/CaykurParcelsPage.vue'),
-            meta: { requiresAuth: true, module: 'parcels' },
-        },
-        {
-            path: '/caykur/parcels/:id',
-            name: 'caykur-parcel-detail',
-            component: () => import('@/pages/caykur/CaykurParcelDetailPage.vue'),
-            meta: { requiresAuth: true, module: 'parcels' },
-        },
-        {
-            path: '/caykur/deliveries',
-            name: 'caykur-deliveries',
-            component: () => import('@/pages/caykur/CaykurDeliveriesPage.vue'),
-            meta: { requiresAuth: true, module: 'deliveries' },
-        },
-        {
-            path: '/caykur/deliveries/new',
-            name: 'caykur-delivery-intake',
-            component: () => import('@/pages/caykur/CaykurDeliveryIntakePage.vue'),
-            meta: { requiresAuth: true, module: 'deliveries' },
-        },
-        {
-            path: '/caykur/deliveries/:id',
-            name: 'caykur-delivery-detail',
-            component: () => import('@/pages/caykur/CaykurDeliveryDetailPage.vue'),
-            meta: { requiresAuth: true, module: 'deliveries' },
-        },
-        {
-            path: '/caykur/quota',
-            name: 'caykur-quota',
-            component: () => import('@/pages/caykur/CaykurQuotaPage.vue'),
-            meta: { requiresAuth: true, module: 'quota' },
-        },
-        {
-            path: '/caykur/finance',
-            name: 'caykur-finance',
-            component: () => import('@/pages/caykur/CaykurFinancePage.vue'),
-            meta: { requiresAuth: true, module: 'finance' },
-        },
-        {
-            path: '/caykur/finance/:id',
-            name: 'caykur-cari-detail',
-            component: () => import('@/pages/caykur/CaykurCariDetailPage.vue'),
-            meta: { requiresAuth: true, module: 'finance' },
+            path: '/caykur/fields',
+            name: 'caykur-fields',
+            component: () => import('@/pages/caykur/CaykurFieldsPage.vue'),
+            meta: { requiresAuth: true, module: 'fields' },
         },
         {
             path: '/caykur/pruning-requests',
@@ -260,66 +191,8 @@ const router = createRouter({
             component: () => import('@/pages/caykur/CaykurPruningDetailPage.vue'),
             meta: { requiresAuth: true, module: 'pruning' },
         },
-        {
-            path: '/caykur/org',
-            name: 'caykur-org',
-            component: () => import('@/pages/caykur/CaykurOrgPage.vue'),
-            meta: { requiresAuth: true, module: 'org' },
-        },
-        {
-            path: '/caykur/org/factory/:id',
-            name: 'caykur-factory-detail',
-            component: () => import('@/pages/caykur/CaykurFactoryDetailPage.vue'),
-            meta: { requiresAuth: true, module: 'org' },
-        },
-        {
-            path: '/caykur/tasks',
-            name: 'caykur-tasks',
-            component: () => import('@/pages/caykur/CaykurTasksPage.vue'),
-            meta: { requiresAuth: true, module: 'tasks' },
-        },
-        {
-            path: '/caykur/requests',
-            name: 'caykur-requests',
-            component: () => import('@/pages/caykur/CaykurRequestsPage.vue'),
-            meta: { requiresAuth: true, module: 'requests' },
-        },
-        {
-            path: '/caykur/requests/:id',
-            name: 'caykur-request-detail',
-            component: () => import('@/pages/caykur/CaykurRequestDetailPage.vue'),
-            meta: { requiresAuth: true, module: 'requests' },
-        },
-        {
-            path: '/caykur/announcements',
-            name: 'caykur-announcements',
-            component: () => import('@/pages/caykur/CaykurAnnouncementsPage.vue'),
-            meta: { requiresAuth: true, module: 'announcements' },
-        },
-        {
-            path: '/caykur/reports',
-            name: 'caykur-reports',
-            component: () => import('@/pages/caykur/CaykurReportsPage.vue'),
-            meta: { requiresAuth: true, module: 'reports' },
-        },
-        {
-            path: '/caykur/users',
-            name: 'caykur-users',
-            component: () => import('@/pages/caykur/CaykurUsersPage.vue'),
-            meta: { requiresAuth: true, module: 'users' },
-        },
-        {
-            path: '/caykur/audit',
-            name: 'caykur-audit',
-            component: () => import('@/pages/caykur/CaykurAuditPage.vue'),
-            meta: { requiresAuth: true, module: 'audit' },
-        },
-        {
-            path: '/caykur/settings',
-            name: 'caykur-settings',
-            component: () => import('@/pages/caykur/CaykurSettingsPage.vue'),
-            meta: { requiresAuth: true, module: 'settings' },
-        },
+        // Retired panel screens — send stale links to the queue.
+        { path: '/caykur/:pathMatch(.*)*', redirect: '/caykur/pruning-requests' },
 
         // ═══════ BACKWARD COMPATIBILITY REDIRECTS ═══════
         { path: '/dashboard', redirect: '/tea/dashboard' },
@@ -327,8 +200,8 @@ const router = createRouter({
         { path: '/fields/create', redirect: '/tea/fields/create' },
         { path: '/fields/:id/edit', redirect: to => `/tea/fields/${to.params.id}/edit` },
         { path: '/fields/:id', redirect: to => `/tea/fields/${to.params.id}` },
-        { path: '/firms', redirect: '/tea/firms' },
-        { path: '/firms/:id', redirect: to => `/tea/firms/${to.params.id}` },
+        { path: '/firms/:id?', redirect: '/tea/dashboard' },
+        { path: '/tea/firms/:id?', redirect: '/tea/dashboard' },
         { path: '/harvests', redirect: '/tea/harvests' },
         { path: '/pruning', redirect: '/tea/pruning' },
         { path: '/payments', redirect: '/tea/payments' },

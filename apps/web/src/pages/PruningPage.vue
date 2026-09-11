@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { RouterLink } from 'vue-router';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import CaykurStatCard from '@/components/caykur/CaykurStatCard.vue';
 import StatusPill from '@/components/caykur/StatusPill.vue';
@@ -35,29 +36,46 @@ const records = computed(() =>
 );
 const measuredTotalM2 = computed(() => records.value.reduce((s, r) => s + (r.measuredAreaM2 ?? 0), 0));
 
-// ── New request form ──
-const form = ref({ il: '', ilce: '', ada: '', parsel: '' });
+// ── New request form: the producer picks one of their registered fields;
+// il/ilçe + ada/parsel are derived from it (never typed by hand).
+const selectedFieldId = ref('');
 const formError = ref('');
 const submitting = ref(false);
 
+function hasCadastralInfo(f: Field): boolean {
+    return !!f.adaNo?.trim() && !!f.parcelNo?.trim();
+}
+const selectableFields = computed(() => fieldsStore.fields);
+const selectedField = computed(() => fieldsStore.fields.find((f) => f.id === selectedFieldId.value) ?? null);
+
+function fieldOptionLabel(f: Field): string {
+    const parcel = hasCadastralInfo(f) ? `Ada ${f.adaNo} / Parsel ${f.parcelNo}` : 'Ada/parsel eksik';
+    return `${f.name} · ${parcel}`;
+}
+
 function resetForm(): void {
-    form.value = { il: user.value?.province ?? '', ilce: user.value?.district ?? '', ada: '', parsel: '' };
+    selectedFieldId.value = '';
     formError.value = '';
 }
 
 async function submit(): Promise<void> {
-    const { il, ilce, ada, parsel } = form.value;
-    if (!il.trim() || !ilce.trim() || !ada.trim() || !parsel.trim()) {
-        formError.value = 'İl, ilçe, ada ve parsel alanları zorunludur.';
+    const field = selectedField.value;
+    if (!field) {
+        formError.value = 'Lütfen bir tarla seçin.';
+        return;
+    }
+    if (!hasCadastralInfo(field)) {
+        formError.value = 'Seçilen tarlanın ada/parsel bilgisi eksik. Önce tarla kaydını düzenleyin.';
         return;
     }
     submitting.value = true;
     const created = await store.createRequest({
-        il: il.trim(),
-        ilce: ilce.trim(),
-        ada: ada.trim(),
-        parsel: parsel.trim(),
-        registeredAreaM2: registeredAreaM2.value,
+        il: field.province.trim(),
+        ilce: field.district.trim(),
+        ada: (field.adaNo ?? '').trim(),
+        parsel: (field.parcelNo ?? '').trim(),
+        registeredAreaM2: Math.round(fieldToM2(field)),
+        parcelGeometry: field.coordinates?.[0] ?? undefined,
     });
     submitting.value = false;
     if (created) resetForm();
@@ -106,12 +124,28 @@ onMounted(() => {
                         <h2 class="ck-panel-title">Yeni budama talebi</h2>
                     </div>
                     <div class="ck-panel-body">
-                        <p class="pp-flow">Budadığınız araziyi kaydettirmek için il/ilçe ve ada/parsel bilgisini girin. Çaykur yetkili personeli talebinizi değerlendirip bir <strong>randevu tarihi</strong> belirler; randevuda budanan çay hassas sensörlerle ölçülüp kaydedilir.</p>
-                        <div class="pp-form">
-                            <label class="pp-field"><span>İl</span><input v-model="form.il" type="text" class="pp-input" placeholder="İl" /></label>
-                            <label class="pp-field"><span>İlçe</span><input v-model="form.ilce" type="text" class="pp-input" placeholder="İlçe" /></label>
-                            <label class="pp-field"><span>Ada no</span><input v-model="form.ada" type="text" class="pp-input" placeholder="Ada" inputmode="numeric" /></label>
-                            <label class="pp-field"><span>Parsel no</span><input v-model="form.parsel" type="text" class="pp-input" placeholder="Parsel" inputmode="numeric" /></label>
+                        <p class="pp-flow">Budadığınız tarlayı kayıtlı tarlalarınız arasından seçin; il/ilçe ve ada/parsel bilgisi tarla kaydından alınır. Çaykur yetkili personeli talebinizi değerlendirip bir <strong>randevu tarihi</strong> belirler; randevuda budanan çay hassas sensörlerle ölçülüp kaydedilir.</p>
+                        <div v-if="fieldsStore.isLoading && !selectableFields.length" class="pp-hint">Tarlalar yükleniyor…</div>
+                        <div v-else-if="!selectableFields.length" class="pp-hint">
+                            Henüz kayıtlı tarlanız yok. Talep açmak için önce <RouterLink to="/tea/fields/create" class="pp-link">tarla ekleyin</RouterLink>.
+                        </div>
+                        <div v-else class="pp-form">
+                            <label class="pp-field pp-field-full">
+                                <span>Tarla</span>
+                                <select v-model="selectedFieldId" class="pp-input">
+                                    <option value="" disabled>Tarla seçin</option>
+                                    <option v-for="f in selectableFields" :key="f.id" :value="f.id" :disabled="!hasCadastralInfo(f)">{{ fieldOptionLabel(f) }}</option>
+                                </select>
+                            </label>
+                            <template v-if="selectedField">
+                                <div class="pp-field"><span>İl / İlçe</span><p class="pp-readonly">{{ selectedField.province }} / {{ selectedField.district }}</p></div>
+                                <div class="pp-field"><span>Ada / Parsel</span><p class="pp-readonly">Ada {{ selectedField.adaNo }} / Parsel {{ selectedField.parcelNo }}</p></div>
+                                <div class="pp-field"><span>Mahalle</span><p class="pp-readonly">{{ selectedField.neighborhood || '—' }}</p></div>
+                                <div class="pp-field"><span>Alan</span><p class="pp-readonly">{{ formatNumber(fieldToM2(selectedField)) }} m²</p></div>
+                            </template>
+                            <p v-if="selectableFields.some((f) => !hasCadastralInfo(f))" class="pp-hint pp-field-full">
+                                Ada/parsel bilgisi eksik tarlalar seçilemez. <RouterLink to="/tea/fields" class="pp-link">Tarla kaydını düzenleyin</RouterLink>.
+                            </p>
                         </div>
                         <p v-if="formError" class="pp-error">{{ formError }}</p>
                         <div class="pp-form-actions">
@@ -170,7 +204,7 @@ onMounted(() => {
                                         </template>
                                         <template v-else>—</template>
                                     </td>
-                                    <td>{{ r.method === 'gps' ? 'RTK / GPS' : r.method === 'map' ? 'Harita' : r.method === 'imu' ? 'Lazer + IMU' : '—' }}</td>
+                                    <td>{{ r.method === 'gps' ? 'GPS' : r.method === 'map' ? 'Harita' : r.method === 'imu' ? 'Lazer + IMU' : '—' }}</td>
                                     <td><StatusPill :label="PRUNING_REQUEST_STATUS_META[r.status].label" :tone="PRUNING_REQUEST_STATUS_META[r.status].tone" /></td>
                                     <td style="white-space:nowrap">{{ formatDate(r.measuredAt) }}</td>
                                 </tr>
@@ -208,6 +242,16 @@ onMounted(() => {
     font-size: var(--font-size-sm);
 }
 .pp-input:focus { outline: none; border-color: var(--color-primary); }
+select.pp-input { cursor: pointer; }
+.pp-field-full { grid-column: 1 / -1; }
+.pp-readonly {
+    margin: 0; min-height: 44px; display: flex; align-items: center; padding: 0 14px;
+    border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    background: var(--color-bg-secondary); color: var(--color-text-primary);
+    font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold);
+}
+.pp-hint { margin: 0; font-size: var(--font-size-xs); color: var(--color-text-muted); line-height: 1.5; }
+.pp-link { color: var(--color-primary); font-weight: var(--font-weight-semibold); text-decoration: underline; }
 .pp-error { margin: var(--space-3) 0 0; font-size: var(--font-size-xs); color: var(--color-danger); }
 .pp-form-actions { margin-top: var(--space-4); display: flex; justify-content: flex-end; }
 .pp-pts { color: var(--color-text-muted); font-size: var(--font-size-xs); margin-left: 6px; }
