@@ -230,6 +230,24 @@ export interface PruningRequest {
     notes: string | null;
     createdAt: string;
     updatedAt: string;
+    /**
+     * Every registered owner of the same il + ada + parsel (the requester
+     * included). More than one entry ⇒ hisseli parcel: the panel warns and a
+     * ruhsatlandırma measurement per owner is expected.
+     */
+    coOwners: PruningCoOwner[];
+}
+
+/** A user holding an active field registration on the request's parcel. */
+export interface PruningCoOwner {
+    userId: string;
+    fullName: string;
+    cuzdanNo: string | null;
+    ruhsatNo: string | null;
+    phone: string | null;
+    fieldId: string;
+    fieldName: string;
+    areaM2: number;
 }
 
 export interface CreatePruningRequestPayload {
@@ -247,6 +265,58 @@ export interface SavePruningMeasurementResultPayload {
     method: PruningMethod;
     accuracyLevel?: PruningAccuracyLevel;
     fixQuality?: string;
+}
+
+// ── Ruhsatlandırma (licensing) — one owner's slice on a hisseli parcel ──
+export type LicensingMeasurementStatus = 'pending_approval' | 'approved' | 'rejected';
+export type LicensingApprovalStatus = 'pending' | 'approved' | 'rejected';
+
+export interface LicensingApproval {
+    id: string;
+    measurementId: string;
+    approverId: string;
+    approverName: string;
+    status: LicensingApprovalStatus;
+    decidedAt: string | null;
+    reason: string | null;
+    emailSent: boolean;
+    createdAt: string;
+    updatedAt: string;
+    /** Present on the producer's approval list (joined server-side). */
+    measurement?: LicensingMeasurement;
+}
+
+export interface LicensingMeasurement {
+    id: string;
+    pruningRequestId: string;
+    il: string;
+    ilce: string;
+    ada: string;
+    parsel: string;
+    ownerId: string;
+    ownerName: string;
+    ownerCuzdanNo: string | null;
+    measuredAreaM2: number;
+    measurementPoints: MeasurementPoint[];
+    method: PruningMethod;
+    accuracyLevel: PruningAccuracyLevel | null;
+    fixQuality: string | null;
+    measuredById: string;
+    measuredByName: string;
+    measuredAt: string;
+    status: LicensingMeasurementStatus;
+    resolvedAt: string | null;
+    notes: string | null;
+    /** Present on staff reads (one row per co-owner asked to confirm). */
+    approvals?: LicensingApproval[];
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateLicensingMeasurementPayload extends SavePruningMeasurementResultPayload {
+    pruningRequestId: string;
+    ownerId: string;
+    notes?: string;
 }
 
 export interface PaginationMeta {
@@ -870,6 +940,22 @@ export const api = {
         request<PruningRequest>(`/pruning/requests/${id}/approve`, { method: 'PATCH', body: JSON.stringify({}) }),
     rejectPruningRequest: (id: string, reason?: string) =>
         request<PruningRequest>(`/pruning/requests/${id}/reject`, { method: 'PATCH', body: JSON.stringify({ reason }) }),
+
+    // Ruhsatlandırma (licensing) — staff capture + co-owner approvals
+    createLicensingMeasurement: (data: CreateLicensingMeasurementPayload) =>
+        request<LicensingMeasurement>('/licensing', { method: 'POST', body: JSON.stringify(data) }),
+    getLicensingMeasurements: (params?: { pruningRequestId?: string; status?: LicensingMeasurementStatus; page?: number; limit?: number }) => {
+        const query = new URLSearchParams(params as Record<string, string>).toString();
+        return request<Paginated<LicensingMeasurement>>(`/licensing${query ? `?${query}` : ''}`);
+    },
+    getLicensingMeasurement: (id: string) => request<LicensingMeasurement>(`/licensing/${id}`),
+    getMyLicensingApprovals: (params?: { status?: LicensingApprovalStatus; page?: number; limit?: number }) => {
+        const query = new URLSearchParams(params as Record<string, string>).toString();
+        return request<Paginated<LicensingApproval>>(`/licensing/approvals${query ? `?${query}` : ''}`);
+    },
+    getPendingLicensingApprovalCount: () => request<{ count: number }>('/licensing/approvals/pending-count'),
+    decideLicensingApproval: (id: string, decision: 'approved' | 'rejected', reason?: string) =>
+        request<LicensingApproval>(`/licensing/approvals/${id}/decision`, { method: 'PATCH', body: JSON.stringify({ decision, reason }) }),
 
     // Çaykur staff (management onboarding) endpoints
     getCaykurStaff: (params?: { page?: number; limit?: number; search?: string; caykurRole?: CaykurStaffRole; status?: 'active' | 'suspended' }) => {

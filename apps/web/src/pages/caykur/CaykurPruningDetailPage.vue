@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { AlertTriangle, SearchX } from '@lucide/vue';
 import CaykurLayout from '@/layouts/CaykurLayout.vue';
-import CaykurPanel from '@/components/caykur/CaykurPanel.vue';
-import StatusPill from '@/components/caykur/StatusPill.vue';
+import { EmptyState, LoadingState, PageContainer, PageHeader, Spinner } from '@/components/shared';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { toneVariant, type Tone } from '@/components/caykur/tone';
 import { api, type PruningMeasurement, type PruningStatus, type PruningMethod } from '@/services/api';
 import {
     BUDAMA_TARGET_PCT,
@@ -14,8 +19,6 @@ import {
 
 const route = useRoute();
 const router = useRouter();
-
-type Tone = 'success' | 'warning' | 'danger' | 'info' | 'muted';
 
 const STATUS_META: Record<PruningStatus, { label: string; tone: Tone }> = {
     measured: { label: 'Ölçüldü · onay bekliyor', tone: 'info' },
@@ -30,6 +33,12 @@ const METHOD_LABEL: Record<PruningMethod, string> = {
     gps: 'GPS',
     assisted: 'Asistan ölçüm',
     imu: 'Lazer + IMU',
+};
+
+const ACCURACY_LABEL: Record<NonNullable<PruningMeasurement['accuracyLevel']>, string> = {
+    high: 'Yüksek',
+    medium: 'Orta',
+    low: 'Düşük',
 };
 
 const loading = ref(true);
@@ -59,6 +68,21 @@ onMounted(load);
 
 const ratioHeight = computed(() => Math.min(100, (m.value?.ratioPercent ?? 0) * 4)); // visual scale ×4
 const targetHeight = computed(() => Math.min(100, BUDAMA_TARGET_PCT * 4));
+
+const infoRows = computed<Array<{ term: string; value: string }>>(() => {
+    const cur = m.value;
+    if (!cur) return [];
+    const accuracy = cur.accuracyLevel ? ACCURACY_LABEL[cur.accuracyLevel] : '—';
+    return [
+        { term: 'Yöntem', value: METHOD_LABEL[cur.method] },
+        { term: 'Tarih', value: formatDateTime(cur.measuredAt) },
+        { term: 'Parsel alanı', value: `${formatNumber(cur.fieldAreaM2)} m²` },
+        { term: 'Budanan alan', value: `${formatNumber(cur.prunedAreaM2)} m²` },
+        { term: 'Doğruluk', value: cur.gpsAccuracyMeters ? `${accuracy} · ±${cur.gpsAccuracyMeters}m` : accuracy },
+        { term: 'Saha kontrolü', value: cur.fieldCheckDone ? 'Yapıldı' : 'Yapılmadı' },
+        { term: '1/7 hedef', value: `%${formatNumber(BUDAMA_TARGET_PCT, 1)}` },
+    ];
+});
 
 async function approve(): Promise<void> {
     if (!m.value || saving.value) return;
@@ -95,181 +119,106 @@ async function reject(): Promise<void> {
 
 <template>
     <CaykurLayout>
-        <button type="button" class="ck-back-link" @click="router.push('/caykur/pruning')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
-            Budama Denetimi
-        </button>
+        <PageContainer>
+            <LoadingState v-if="loading" text="Ölçüm yükleniyor…" />
 
-        <div v-if="loading" class="ck-empty"><p class="ck-empty-title">Yükleniyor…</p></div>
+            <template v-else-if="m">
+                <PageHeader
+                    :title="m.producerName ?? 'Müstahsil'"
+                    :description="m.parcelNo ? `Budama ölçümü · ${m.parcelNo}` : 'Budama ölçümü'"
+                    back-to="/caykur/pruning"
+                    back-label="Budama Denetimi"
+                >
+                    <template #badge>
+                        <Badge :variant="toneVariant(STATUS_META[m.status].tone)">{{ STATUS_META[m.status].label }}</Badge>
+                    </template>
+                </PageHeader>
 
-        <template v-else-if="m">
-            <header class="ck-page-head">
-                <div>
-                    <h1 class="ck-page-title">{{ m.producerName ?? 'Müstahsil' }}</h1>
-                    <p class="ck-page-sub">Budama ölçümü<template v-if="m.parcelNo"> · {{ m.parcelNo }}</template></p>
-                </div>
-                <div class="ck-page-actions">
-                    <StatusPill :label="STATUS_META[m.status].label" :tone="STATUS_META[m.status].tone" />
-                </div>
-            </header>
+                <Alert v-if="m.rejectionReason" variant="warning">
+                    <AlertTriangle aria-hidden="true" />
+                    <AlertDescription>{{ m.rejectionReason }}</AlertDescription>
+                </Alert>
+                <Alert v-if="error" variant="destructive">
+                    <AlertDescription>{{ error }}</AlertDescription>
+                </Alert>
 
-            <div v-if="m.rejectionReason" class="warn-banner">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
-                {{ m.rejectionReason }}
-            </div>
-            <div v-if="error" class="warn-banner">{{ error }}</div>
+                <div class="grid gap-6 lg:grid-cols-2">
+                    <div class="flex flex-col gap-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Ölçüm bilgileri</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                                    <div v-for="row in infoRows" :key="row.term">
+                                        <dt class="text-muted-foreground">{{ row.term }}</dt>
+                                        <dd class="font-medium text-foreground tabular-nums">{{ row.value }}</dd>
+                                    </div>
+                                </dl>
+                            </CardContent>
+                        </Card>
 
-            <div class="ck-grid-2">
-                <div>
-                    <CaykurPanel title="Ölçüm bilgileri">
-                        <dl class="ck-dl">
-                            <div class="ck-dl-item"><span class="ck-dl-term">Yöntem</span><span class="ck-dl-val">{{ METHOD_LABEL[m.method] }}</span></div>
-                            <div class="ck-dl-item"><span class="ck-dl-term">Tarih</span><span class="ck-dl-val">{{ formatDateTime(m.measuredAt) }}</span></div>
-                            <div class="ck-dl-item"><span class="ck-dl-term">Parsel alanı</span><span class="ck-dl-val">{{ formatNumber(m.fieldAreaM2) }} m²</span></div>
-                            <div class="ck-dl-item"><span class="ck-dl-term">Budanan alan</span><span class="ck-dl-val">{{ formatNumber(m.prunedAreaM2) }} m²</span></div>
-                            <div class="ck-dl-item"><span class="ck-dl-term">Doğruluk</span><span class="ck-dl-val">{{ m.accuracyLevel === 'high' ? 'Yüksek' : m.accuracyLevel === 'medium' ? 'Orta' : m.accuracyLevel === 'low' ? 'Düşük' : '—' }}<template v-if="m.gpsAccuracyMeters"> · ±{{ m.gpsAccuracyMeters }}m</template></span></div>
-                            <div class="ck-dl-item"><span class="ck-dl-term">Saha kontrolü</span><span class="ck-dl-val">{{ m.fieldCheckDone ? 'Yapıldı' : 'Yapılmadı' }}</span></div>
-                            <div class="ck-dl-item"><span class="ck-dl-term">1/7 hedef</span><span class="ck-dl-val">%{{ formatNumber(BUDAMA_TARGET_PCT, 1) }}</span></div>
-                        </dl>
-                    </CaykurPanel>
-
-                    <CaykurPanel title="Onay durumu">
-                        <div class="ck-panel-body approvals">
-                            <div class="appr">
-                                <span class="appr-label">Üretici onayı</span>
-                                <StatusPill :label="m.producerApproved ? 'Onaylandı' : 'Bekliyor'" :tone="m.producerApproved ? 'success' : 'warning'" />
-                            </div>
-                            <div class="appr">
-                                <span class="appr-label">Personel onayı</span>
-                                <StatusPill :label="m.staffApproved ? 'Onaylandı' : 'Bekliyor'" :tone="m.staffApproved ? 'success' : 'warning'" />
-                            </div>
-                        </div>
-                        <div v-if="m.status !== 'rejected' && !m.staffApproved" class="decide-actions">
-                            <button type="button" class="ck-btn" :disabled="saving" @click="reject">Reddet</button>
-                            <button type="button" class="ck-btn ck-btn-primary" :disabled="saving" @click="approve">Denetimi onayla</button>
-                        </div>
-                    </CaykurPanel>
-                </div>
-
-                <CaykurPanel title="Budama oranı (1/7 kuralı)">
-                    <div class="ck-panel-body">
-                        <div class="ratio-viz">
-                            <div class="parcel-box">
-                                <div class="pruned-fill" :style="{ height: `${ratioHeight}%` }">
-                                    <span class="pruned-label">budanan</span>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Onay durumu</CardTitle>
+                            </CardHeader>
+                            <CardContent class="flex flex-col gap-3">
+                                <div class="flex items-center justify-between gap-3">
+                                    <span class="text-sm font-medium text-muted-foreground">Üretici onayı</span>
+                                    <Badge :variant="m.producerApproved ? 'success' : 'warning'">{{ m.producerApproved ? 'Onaylandı' : 'Bekliyor' }}</Badge>
                                 </div>
-                                <div class="target-line" :style="{ bottom: `${targetHeight}%` }">
-                                    <span class="target-label">hedef %{{ formatNumber(BUDAMA_TARGET_PCT, 1) }}</span>
+                                <div class="flex items-center justify-between gap-3">
+                                    <span class="text-sm font-medium text-muted-foreground">Personel onayı</span>
+                                    <Badge :variant="m.staffApproved ? 'success' : 'warning'">{{ m.staffApproved ? 'Onaylandı' : 'Bekliyor' }}</Badge>
                                 </div>
-                            </div>
-                            <div class="ratio-readout">
-                                <span class="ratio-pct">{{ formatPct(m.ratioPercent, 1) }}</span>
-                                <span class="ratio-sub">parselin budanan oranı</span>
-                            </div>
-                        </div>
-                        <p class="viz-note">1/7 rotasyon kuralı her yıl bahçenin yaklaşık %{{ formatNumber(BUDAMA_TARGET_PCT, 1) }}'ünün budanmasını öngörür. %11–20 bandı uyumlu sayılır.</p>
+                            </CardContent>
+                            <CardFooter v-if="m.status !== 'rejected' && !m.staffApproved" class="gap-2">
+                                <Button variant="outline" class="h-11 flex-1 md:h-9" :disabled="saving" @click="reject">Reddet</Button>
+                                <Button class="h-11 flex-1 md:h-9" :disabled="saving" @click="approve">
+                                    <Spinner v-if="saving" />
+                                    Denetimi onayla
+                                </Button>
+                            </CardFooter>
+                        </Card>
                     </div>
-                </CaykurPanel>
-            </div>
-        </template>
 
-        <div v-else class="ck-empty">
-            <p class="ck-empty-title">{{ error ?? 'Ölçüm bulunamadı' }}</p>
-            <button type="button" class="ck-btn" @click="router.push('/caykur/pruning')">Listeye dön</button>
-        </div>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Budama oranı (1/7 kuralı)</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="flex items-stretch gap-6">
+                                <div
+                                    class="relative h-56 w-32 shrink-0 overflow-hidden rounded-md border bg-muted/40"
+                                    role="img"
+                                    :aria-label="`Parselin ${formatPct(m.ratioPercent, 1)} kadarı budanmış; hedef %${formatNumber(BUDAMA_TARGET_PCT, 1)}`"
+                                >
+                                    <div
+                                        class="absolute inset-x-0 bottom-0 flex items-start justify-center border-t-2 border-primary bg-primary/25 pt-1"
+                                        :style="{ height: `${ratioHeight}%` }"
+                                    >
+                                        <span class="text-xs font-semibold text-primary">budanan</span>
+                                    </div>
+                                    <div class="absolute inset-x-0 h-0 border-t-2 border-dashed border-muted-foreground" :style="{ bottom: `${targetHeight}%` }">
+                                        <span class="absolute -top-4 right-1 bg-card px-0.5 text-[10px] text-muted-foreground">hedef %{{ formatNumber(BUDAMA_TARGET_PCT, 1) }}</span>
+                                    </div>
+                                </div>
+                                <div class="flex flex-col justify-center gap-1.5">
+                                    <span class="text-4xl leading-none font-bold text-foreground tabular-nums">{{ formatPct(m.ratioPercent, 1) }}</span>
+                                    <span class="text-sm text-muted-foreground">parselin budanan oranı</span>
+                                </div>
+                            </div>
+                            <p class="mt-4 text-xs leading-relaxed text-muted-foreground">
+                                1/7 rotasyon kuralı her yıl bahçenin yaklaşık %{{ formatNumber(BUDAMA_TARGET_PCT, 1) }}'ünün budanmasını öngörür. %11–20 bandı uyumlu sayılır.
+                            </p>
+                        </CardContent>
+                    </Card>
+                </div>
+            </template>
+
+            <EmptyState v-else :icon="SearchX" :title="error ?? 'Ölçüm bulunamadı'">
+                <Button variant="outline" class="h-11 md:h-9" @click="router.push('/caykur/pruning')">Listeye dön</Button>
+            </EmptyState>
+        </PageContainer>
     </CaykurLayout>
 </template>
-
-<style scoped>
-.warn-banner {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-3) var(--space-4);
-    margin-bottom: var(--space-4);
-    background: color-mix(in srgb, var(--color-warning) 10%, transparent);
-    border: 1px solid color-mix(in srgb, var(--color-warning) 28%, transparent);
-    border-radius: var(--radius-md);
-    color: var(--color-warning);
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold);
-}
-.approvals { display: flex; flex-direction: column; gap: var(--space-3); }
-.appr { display: flex; align-items: center; justify-content: space-between; }
-.appr-label { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); color: var(--color-text-secondary); }
-.decide-actions { display: flex; gap: var(--space-2); padding: 0 var(--space-5) var(--space-5); }
-.decide-actions .ck-btn { flex: 1; }
-
-.ratio-viz {
-    display: flex;
-    align-items: stretch;
-    gap: var(--space-5);
-}
-.parcel-box {
-    position: relative;
-    width: 130px;
-    height: 220px;
-    background: var(--color-bg-primary);
-    border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    flex-shrink: 0;
-}
-.pruned-fill {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: color-mix(in srgb, var(--color-primary) 26%, transparent);
-    border-top: 2px solid var(--color-primary);
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding-top: 4px;
-}
-.pruned-label {
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-primary);
-}
-.target-line {
-    position: absolute;
-    left: 0;
-    right: 0;
-    height: 0;
-    border-top: 2px dashed var(--color-text-secondary);
-}
-.target-label {
-    position: absolute;
-    right: 4px;
-    top: -16px;
-    font-size: 10px;
-    color: var(--color-text-secondary);
-    background: var(--color-card-bg);
-    padding: 0 3px;
-}
-.ratio-readout {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    justify-content: center;
-}
-.ratio-pct {
-    font-size: var(--font-size-4xl);
-    font-weight: var(--font-weight-bold);
-    color: var(--color-text-primary);
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-}
-.ratio-sub {
-    font-size: var(--font-size-sm);
-    color: var(--color-text-muted);
-    margin-bottom: 4px;
-}
-.viz-note {
-    margin: var(--space-4) 0 0;
-    font-size: var(--font-size-xs);
-    color: var(--color-text-muted);
-    line-height: 1.5;
-}
-</style>

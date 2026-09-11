@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { RouterLink } from 'vue-router';
+import { MailCheck } from '@lucide/vue';
 import { api } from '@/services/api';
+import AuthLayout from '@/layouts/AuthLayout.vue';
+import { Spinner } from '@/components/shared';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 const email = ref('');
 const isLoading = ref(false);
@@ -9,115 +15,94 @@ const isSuccess = ref(false);
 const error = ref('');
 
 async function handleSubmit() {
-  if (!email.value) {
-    error.value = 'Email adresi gereklidir';
-    return;
-  }
-  
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
-    error.value = 'Geçerli bir email adresi giriniz';
-    return;
-  }
-  
-  error.value = '';
-  isLoading.value = true;
-  
-  const result = await api.forgotPassword(email.value);
-  
-  isLoading.value = false;
-  
-  if (result.error) {
-    error.value = result.error.message;
-    return;
-  }
-  
-  isSuccess.value = true;
+    if (!email.value) {
+        error.value = 'Email adresi gereklidir';
+        return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
+        error.value = 'Geçerli bir email adresi giriniz';
+        return;
+    }
+
+    error.value = '';
+    isLoading.value = true;
+
+    const result = await api.forgotPassword(email.value);
+
+    isLoading.value = false;
+
+    if (result.error) {
+        error.value = result.error.message;
+        return;
+    }
+
+    isSuccess.value = true;
 }
 </script>
 
 <template>
-  <div class="auth-page">
-    <header class="auth-header">
-      <RouterLink to="/" class="auth-logo">
-        <span class="auth-logo-icon">🍃</span>
-        <span>Çay Platformu</span>
-      </RouterLink>
-      <RouterLink to="/login" class="btn btn-secondary">
-        Giriş Sayfasına Dön
-      </RouterLink>
-    </header>
-    
-    <main class="auth-container">
-      <div class="auth-card card card-elevated">
-        <!-- Success State -->
-        <template v-if="isSuccess">
-          <div class="success-state">
-            <div class="status-icon">✉️</div>
-            <h1 class="auth-title">Email Gönderildi</h1>
-            <p class="auth-subtitle">
-              Eğer <strong>{{ email }}</strong> adresi kayıtlı ise, şifre sıfırlama linki gönderildi.
+    <!-- Success state -->
+    <AuthLayout v-if="isSuccess" title="Email Gönderildi" align="center">
+        <template #cta>
+            <Button as-child variant="outline" class="h-11 md:h-9">
+                <RouterLink to="/login">Giriş Sayfasına Dön</RouterLink>
+            </Button>
+        </template>
+        <template #icon>
+            <span class="mb-2 flex size-14 items-center justify-center rounded-full bg-success/10 text-success" aria-hidden="true">
+                <MailCheck class="size-7" />
+            </span>
+        </template>
+
+        <div class="space-y-4 text-sm">
+            <p class="text-foreground">
+                Eğer <strong>{{ email }}</strong> adresi kayıtlı ise, şifre sıfırlama linki gönderildi.
             </p>
-            <p class="hint-text">Lütfen email kutunuzu kontrol edin.</p>
-            <p class="hint-text">Link 1 saat geçerlidir.</p>
-            <RouterLink to="/login" class="btn btn-primary btn-lg btn-block">
-              Giriş Sayfasına Dön
-            </RouterLink>
-          </div>
-        </template>
-        
-        <!-- Form -->
-        <template v-else>
-          <h1 class="auth-title">Şifre Sıfırlama</h1>
-          <p class="auth-subtitle">Kayıtlı email adresinizi girin, size şifre sıfırlama linki gönderelim.</p>
-          
-          <form @submit.prevent="handleSubmit" novalidate>
-            <div class="form-group">
-              <label class="form-label" for="email">Email Adresi</label>
-              <input
-                id="email"
-                v-model="email"
-                type="email"
-                class="form-input"
-                :class="{ 'has-error': error }"
-                placeholder="ahmet@example.com"
-                autocomplete="email"
-              />
-              <p v-if="error" class="form-error">{{ error }}</p>
+            <div class="space-y-1 text-muted-foreground">
+                <p>Lütfen email kutunuzu kontrol edin.</p>
+                <p>Link 1 saat geçerlidir.</p>
             </div>
-            
-            <button type="submit" class="btn btn-primary btn-lg btn-block" :disabled="isLoading">
-              <span v-if="isLoading" class="spinner"></span>
-              {{ isLoading ? 'Gönderiliyor...' : 'Sıfırlama Linki Gönder' }}
-            </button>
-          </form>
-          
-          <p class="auth-footer">
-            Şifrenizi hatırladınız mı?
-            <RouterLink to="/login">Giriş Yapın</RouterLink>
-          </p>
+            <Button as-child class="h-11 w-full">
+                <RouterLink to="/login">Giriş Sayfasına Dön</RouterLink>
+            </Button>
+        </div>
+    </AuthLayout>
+
+    <!-- Request form -->
+    <AuthLayout v-else title="Şifre Sıfırlama" description="Kayıtlı email adresinizi girin, size şifre sıfırlama linki gönderelim.">
+        <template #cta>
+            <Button as-child variant="outline" class="h-11 md:h-9">
+                <RouterLink to="/login">Giriş Sayfasına Dön</RouterLink>
+            </Button>
         </template>
-      </div>
-    </main>
-  </div>
+
+        <form class="space-y-5" novalidate @submit.prevent="handleSubmit">
+            <div class="space-y-2">
+                <Label for="forgot-email">Email Adresi</Label>
+                <Input
+                    id="forgot-email"
+                    v-model="email"
+                    type="email"
+                    placeholder="ahmet@example.com"
+                    autocomplete="email"
+                    class="h-11 md:h-9"
+                    :aria-invalid="!!error"
+                />
+                <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
+            </div>
+
+            <Button type="submit" class="h-11 w-full" :disabled="isLoading">
+                <Spinner v-if="isLoading" />
+                {{ isLoading ? 'Gönderiliyor...' : 'Sıfırlama Linki Gönder' }}
+            </Button>
+        </form>
+
+        <template #footer>
+            <p>
+                Şifrenizi hatırladınız mı?
+                <RouterLink to="/login" class="font-medium text-primary underline-offset-4 hover:underline">Giriş Yapın</RouterLink>
+            </p>
+        </template>
+    </AuthLayout>
 </template>
-
-<style scoped>
-.success-state {
-  text-align: center;
-}
-
-.status-icon {
-  font-size: 64px;
-  margin-bottom: var(--space-4);
-}
-
-.hint-text {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  margin-bottom: var(--space-2);
-}
-
-.btn-block {
-  margin-top: var(--space-6);
-}
-</style>

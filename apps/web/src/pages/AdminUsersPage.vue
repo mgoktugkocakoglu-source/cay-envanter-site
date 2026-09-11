@@ -1,16 +1,35 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, watch, nextTick } from 'vue';
-import { useFocusTrap } from '@/composables/useFocusTrap';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { Ban, CheckCircle2, Eye, MoreHorizontal, ShieldCheck, UserRound, Users } from '@lucide/vue';
 import { useAuthStore } from '@/stores/authStore';
+import { useToast } from '@/composables/useToast';
 import { api, type AdminUser } from '@/services/api';
-import AppLayout from '@/layouts/AppLayout.vue';
-import AppSelect from '@/components/ui/AppSelect.vue';
-import AppEmptyState from '@/components/ui/AppEmptyState.vue';
-import ConfirmModal from '@/components/ui/ConfirmModal.vue';
+import AdminLayout from '@/layouts/AdminLayout.vue';
+import { ConfirmDialog, EmptyState, ListToolbar, LoadingState, PageContainer, PageHeader, SearchInput, StatCard } from '@/components/shared';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge, type BadgeVariants } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+
+type UserRole = AdminUser['role'];
+type RoleFilter = 'all' | UserRole;
+type StatusFilter = 'all' | 'active' | 'banned';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const toast = useToast();
 
 // State
 const users = ref<AdminUser[]>([]);
@@ -18,32 +37,34 @@ const users = ref<AdminUser[]>([]);
 const loading = ref(false);
 const errorMessage = ref<string | null>(null);
 const searchQuery = ref('');
-const filterRole = ref<'all' | 'user' | 'moderator' | 'admin'>('all');
-const filterStatus = ref<'all' | 'active' | 'banned'>('all');
+const filterRole = ref<RoleFilter>('all');
+const filterStatus = ref<StatusFilter>('all');
 const selectedUser = ref<AdminUser | null>(null);
 const showUserModal = ref(false);
-const userModalRef = ref<HTMLElement | null>(null);
-watch(showUserModal, (v) => { if (v) nextTick(() => userModalRef.value?.focus()); });
-useFocusTrap(showUserModal, userModalRef);
 const showBanConfirm = ref(false);
 const showRoleConfirm = ref(false);
 const banTargetUser = ref<AdminUser | null>(null);
 const roleTargetUser = ref<AdminUser | null>(null);
-const roleTargetRole = ref<'user' | 'moderator' | 'admin' | ''>('');
+const roleTargetRole = ref<UserRole | ''>('');
 const actionLoading = ref(false);
 
-// Options for AppSelect
-const roleFilterOptions = [
+const roleFilterOptions: { value: RoleFilter; label: string }[] = [
     { value: 'all', label: 'Tüm Roller' },
     { value: 'user', label: 'Kullanıcı' },
     { value: 'moderator', label: 'Moderatör' },
-    { value: 'admin', label: 'Admin' }
+    { value: 'admin', label: 'Admin' },
 ];
 
-const statusFilterOptions = [
+const statusFilterOptions: { value: StatusFilter; label: string }[] = [
     { value: 'all', label: 'Tüm Durumlar' },
     { value: 'active', label: 'Aktif' },
-    { value: 'banned', label: 'Yasaklı' }
+    { value: 'banned', label: 'Yasaklı' },
+];
+
+const roleOptions: { value: UserRole; label: string }[] = [
+    { value: 'user', label: 'Kullanıcı' },
+    { value: 'moderator', label: 'Moderatör' },
+    { value: 'admin', label: 'Admin' },
 ];
 
 onMounted(() => {
@@ -79,6 +100,17 @@ async function fetchUsers() {
 }
 
 const filteredUsers = computed(() => users.value);
+const hasActiveFilters = computed(() => searchQuery.value !== '' || filterRole.value !== 'all' || filterStatus.value !== 'all');
+
+const staffCount = computed(() => users.value.filter((u) => u.role === 'admin' || u.role === 'moderator').length);
+const bannedCount = computed(() => users.value.filter((u) => u.isBanned).length);
+const activeCount = computed(() => users.value.filter((u) => u.isActive && !u.isBanned).length);
+
+function clearFilters() {
+    searchQuery.value = '';
+    filterRole.value = 'all';
+    filterStatus.value = 'all';
+}
 
 function openUserModal(user: AdminUser) {
     selectedUser.value = user;
@@ -103,15 +135,18 @@ async function confirmBan() {
     actionLoading.value = false;
     if (error) {
         errorMessage.value = error.message;
+        toast.error(error.message);
     } else if (data) {
-        const idx = users.value.findIndex(u => u.id === data.id);
+        const idx = users.value.findIndex((u) => u.id === data.id);
         if (idx !== -1) users.value[idx] = data;
         if (selectedUser.value?.id === data.id) selectedUser.value = data;
+        toast.success(data.isBanned ? 'Kullanıcı yasaklandı' : 'Yasak kaldırıldı');
     }
     banTargetUser.value = null;
+    showBanConfirm.value = false;
 }
 
-function changeRole(user: AdminUser, newRole: 'user' | 'moderator' | 'admin') {
+function changeRole(user: AdminUser, newRole: UserRole) {
     roleTargetUser.value = user;
     roleTargetRole.value = newRole;
     showRoleConfirm.value = true;
@@ -126,13 +161,16 @@ async function confirmChangeRole() {
     actionLoading.value = false;
     if (error) {
         errorMessage.value = error.message;
+        toast.error(error.message);
     } else if (data) {
-        const idx = users.value.findIndex(u => u.id === data.id);
+        const idx = users.value.findIndex((u) => u.id === data.id);
         if (idx !== -1) users.value[idx] = data;
         if (selectedUser.value?.id === data.id) selectedUser.value = data;
+        toast.success(`Rol ${getRoleLabel(data.role)} olarak güncellendi`);
     }
     roleTargetUser.value = null;
     roleTargetRole.value = '';
+    showRoleConfirm.value = false;
 }
 
 function getRoleLabel(role: string) {
@@ -144,13 +182,27 @@ function getRoleLabel(role: string) {
     return labels[role] || role;
 }
 
-function getRoleBadgeClass(role: string) {
-    const classes: Record<string, string> = {
-        user: 'role-user',
-        moderator: 'role-mod',
-        admin: 'role-admin',
+function getRoleBadgeVariant(role: string): BadgeVariants['variant'] {
+    const variants: Record<string, BadgeVariants['variant']> = {
+        user: 'muted',
+        moderator: 'info',
+        admin: 'warning',
     };
-    return classes[role] || 'role-user';
+    return variants[role] ?? 'muted';
+}
+
+function getStatusLabel(user: AdminUser) {
+    if (user.isBanned) return 'Yasaklı';
+    return user.isActive ? 'Aktif' : 'Pasif';
+}
+
+function getStatusBadgeVariant(user: AdminUser): BadgeVariants['variant'] {
+    if (user.isBanned) return 'danger';
+    return user.isActive ? 'success' : 'muted';
+}
+
+function getInitial(user: AdminUser) {
+    return user.fullName.charAt(0).toUpperCase();
 }
 
 function formatDate(dateString: string) {
@@ -163,720 +215,213 @@ function formatDate(dateString: string) {
 </script>
 
 <template>
-    <AppLayout>
-        <div class="admin-users-page">
-            <!-- Header -->
-            <div class="page-header">
-                <div>
-                    <div class="breadcrumb">
-                        <router-link to="/admin" class="breadcrumb-link">Admin Panel</router-link>
-                        <span class="breadcrumb-separator">/</span>
-                        <span class="breadcrumb-current">Kullanıcılar</span>
+    <AdminLayout>
+        <PageContainer size="wide">
+            <PageHeader title="Kullanıcı Yönetimi" description="Platform kullanıcılarını görüntüleyin, rollerini ve erişimlerini yönetin." back-to="/admin" back-label="Admin Panel">
+                <template #meta>
+                    <Badge variant="secondary">{{ users.length }} kullanıcı</Badge>
+                    <Badge v-if="hasActiveFilters" variant="outline">Filtrelenmiş</Badge>
+                </template>
+            </PageHeader>
+
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <StatCard label="Toplam Kullanıcı" :value="users.length" :icon="Users" />
+                <StatCard label="Aktif" :value="activeCount" :icon="CheckCircle2" />
+                <StatCard label="Yönetici / Moderatör" :value="staffCount" :icon="ShieldCheck" />
+                <StatCard label="Yasaklı" :value="bannedCount" :icon="Ban" />
+            </div>
+
+            <ListToolbar>
+                <SearchInput v-model="searchQuery" placeholder="Kullanıcı ara..." aria-label="Kullanıcı ara" />
+                <template #filters>
+                    <Select v-model="filterRole">
+                        <SelectTrigger class="w-40" aria-label="Rol filtresi">
+                            <SelectValue placeholder="Rol filtresi" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem v-for="option in roleFilterOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Select v-model="filterStatus">
+                        <SelectTrigger class="w-40" aria-label="Durum filtresi">
+                            <SelectValue placeholder="Durum filtresi" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem v-for="option in statusFilterOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </template>
+            </ListToolbar>
+
+            <Alert v-if="errorMessage" variant="destructive">
+                <AlertDescription>{{ errorMessage }}</AlertDescription>
+            </Alert>
+
+            <LoadingState v-if="loading" text="Kullanıcılar yükleniyor..." />
+
+            <EmptyState
+                v-else-if="filteredUsers.length === 0"
+                :icon="Users"
+                title="Kullanıcı bulunamadı"
+                :description="hasActiveFilters ? 'Arama veya filtreleri değiştirerek tekrar deneyin.' : 'Henüz kayıtlı kullanıcı yok.'"
+            >
+                <Button v-if="hasActiveFilters" variant="outline" class="h-11 md:h-9" @click="clearFilters">Filtreleri temizle</Button>
+            </EmptyState>
+
+            <div v-else class="overflow-hidden rounded-lg border bg-card">
+                <Table>
+                    <TableHeader>
+                        <TableRow class="hover:bg-transparent">
+                            <TableHead class="pl-4">Kullanıcı</TableHead>
+                            <TableHead class="hidden md:table-cell">Rol</TableHead>
+                            <TableHead class="hidden md:table-cell">Durum</TableHead>
+                            <TableHead class="hidden lg:table-cell">Kayıt Tarihi</TableHead>
+                            <TableHead class="pr-4 text-right"><span class="sr-only">İşlemler</span></TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        <TableRow v-for="user in filteredUsers" :key="user.id">
+                            <TableCell class="pl-4">
+                                <div class="flex items-center gap-3">
+                                    <Avatar class="size-9 rounded-md">
+                                        <AvatarFallback class="rounded-md bg-primary/10 text-sm font-bold text-primary">{{ getInitial(user) }}</AvatarFallback>
+                                    </Avatar>
+                                    <div class="min-w-0">
+                                        <p class="truncate text-sm font-medium text-foreground">{{ user.fullName }}</p>
+                                        <p class="truncate text-xs text-muted-foreground">{{ user.email }}</p>
+                                        <div class="mt-1 flex flex-wrap gap-1 md:hidden">
+                                            <Badge :variant="getRoleBadgeVariant(user.role)">{{ getRoleLabel(user.role) }}</Badge>
+                                            <Badge :variant="getStatusBadgeVariant(user)">{{ getStatusLabel(user) }}</Badge>
+                                        </div>
+                                    </div>
+                                </div>
+                            </TableCell>
+                            <TableCell class="hidden md:table-cell">
+                                <Badge :variant="getRoleBadgeVariant(user.role)">{{ getRoleLabel(user.role) }}</Badge>
+                            </TableCell>
+                            <TableCell class="hidden md:table-cell">
+                                <Badge :variant="getStatusBadgeVariant(user)">{{ getStatusLabel(user) }}</Badge>
+                            </TableCell>
+                            <TableCell class="hidden text-muted-foreground lg:table-cell">{{ formatDate(user.createdAt) }}</TableCell>
+                            <TableCell class="pr-4 text-right">
+                                <div class="flex justify-end gap-1">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        class="hidden size-9 md:inline-flex"
+                                        :aria-label="`${user.fullName} detayını gör`"
+                                        @click="openUserModal(user)"
+                                    >
+                                        <Eye aria-hidden="true" />
+                                    </Button>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger as-child>
+                                            <Button variant="ghost" size="icon" class="size-11 md:size-9" :aria-label="`${user.fullName} için işlemler`">
+                                                <MoreHorizontal aria-hidden="true" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" class="w-48">
+                                            <DropdownMenuItem class="min-h-11 md:min-h-9" @select="openUserModal(user)">
+                                                <Eye aria-hidden="true" />
+                                                Detay
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                class="min-h-11 md:min-h-9"
+                                                :variant="user.isBanned ? 'default' : 'destructive'"
+                                                @select="toggleBan(user)"
+                                            >
+                                                <component :is="user.isBanned ? CheckCircle2 : Ban" aria-hidden="true" />
+                                                {{ user.isBanned ? 'Yasağı Kaldır' : 'Yasakla' }}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuLabel>Rol Değiştir</DropdownMenuLabel>
+                                            <DropdownMenuItem
+                                                v-for="option in roleOptions"
+                                                :key="option.value"
+                                                class="min-h-11 md:min-h-9"
+                                                :disabled="user.role === option.value"
+                                                @select="changeRole(user, option.value)"
+                                            >
+                                                <UserRound aria-hidden="true" />
+                                                {{ option.label }}
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            </TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
+            </div>
+        </PageContainer>
+
+        <!-- User detail dialog -->
+        <Dialog v-model:open="showUserModal">
+            <DialogContent v-if="selectedUser">
+                <DialogHeader>
+                    <DialogTitle>Kullanıcı Detayı</DialogTitle>
+                    <DialogDescription>Hesap bilgileri ve durumu</DialogDescription>
+                </DialogHeader>
+
+                <div class="flex items-center gap-4">
+                    <Avatar class="size-14 rounded-lg">
+                        <AvatarFallback class="rounded-lg bg-primary/10 text-xl font-bold text-primary">{{ getInitial(selectedUser) }}</AvatarFallback>
+                    </Avatar>
+                    <div class="min-w-0 space-y-1">
+                        <h3 class="truncate text-base font-semibold text-foreground">{{ selectedUser.fullName }}</h3>
+                        <p class="truncate text-sm text-muted-foreground">{{ selectedUser.email }}</p>
+                        <Badge :variant="getRoleBadgeVariant(selectedUser.role)">{{ getRoleLabel(selectedUser.role) }}</Badge>
                     </div>
-                    <h1>👥 Kullanıcı Yönetimi</h1>
-                </div>
-            </div>
-
-            <!-- Filters -->
-            <div class="filters-bar">
-                <div class="search-box">
-                    <span class="search-icon">🔍</span>
-                    <input
-                        v-model="searchQuery"
-                        type="text"
-                        placeholder="Kullanıcı ara..."
-                        class="search-input"
-                    />
-                </div>
-                <AppSelect
-                    v-model="filterRole"
-                    :options="roleFilterOptions"
-                    placeholder="Rol filtresi"
-                />
-                <AppSelect
-                    v-model="filterStatus"
-                    :options="statusFilterOptions"
-                    placeholder="Durum filtresi"
-                />
-            </div>
-
-            <!-- Error -->
-            <div v-if="errorMessage" class="error-banner">
-                {{ errorMessage }}
-            </div>
-
-            <!-- Loading -->
-            <div v-if="loading" class="loading-state">
-                <div class="spinner"></div>
-                <p>Kullanıcılar yükleniyor...</p>
-            </div>
-
-            <!-- Users Table -->
-            <div v-else class="users-table">
-                <div class="table-header">
-                    <span class="col-user">Kullanıcı</span>
-                    <span class="col-role">Rol</span>
-                    <span class="col-status">Durum</span>
-                    <span class="col-date">Kayıt Tarihi</span>
-                    <span class="col-actions">İşlemler</span>
                 </div>
 
-                <div
-                    v-for="user in filteredUsers"
-                    :key="user.id"
-                    class="table-row"
-                >
-                    <div class="col-user">
-                        <div class="user-avatar">{{ user.fullName.charAt(0) }}</div>
-                        <div class="user-info">
-                            <span class="user-name">{{ user.fullName }}</span>
-                            <span class="user-email">{{ user.email }}</span>
-                        </div>
+                <dl class="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <dt class="text-xs text-muted-foreground uppercase">Kayıt Tarihi</dt>
+                        <dd class="font-medium text-foreground">{{ formatDate(selectedUser.createdAt) }}</dd>
                     </div>
-                    <span class="col-role">
-                        <span :class="['role-badge', getRoleBadgeClass(user.role)]">
-                            {{ getRoleLabel(user.role) }}
-                        </span>
-                    </span>
-                    <span class="col-status">
-                        <span v-if="user.isBanned" class="status-banned">🚫 Yasaklı</span>
-                        <span v-else-if="user.isActive" class="status-active">✓ Aktif</span>
-                        <span v-else class="status-inactive">○ Pasif</span>
-                    </span>
-                    <span class="col-date">{{ formatDate(user.createdAt) }}</span>
-                    <span class="col-actions">
-                        <button class="action-btn view" title="Detay" @click="openUserModal(user)">👁️</button>
-                        <button
-                            :class="['action-btn', user.isBanned ? 'unban' : 'ban']"
-                            :title="user.isBanned ? 'Yasağı Kaldır' : 'Yasakla'"
-                            @click="toggleBan(user)"
-                        >
-                            {{ user.isBanned ? '✓' : '🚫' }}
-                        </button>
-                        <div class="role-dropdown">
-                            <button class="action-btn role" title="Rol Değiştir">👤</button>
-                            <div class="dropdown-menu">
-                                <button @click="changeRole(user, 'user')">Kullanıcı</button>
-                                <button @click="changeRole(user, 'moderator')">Moderatör</button>
-                                <button @click="changeRole(user, 'admin')">Admin</button>
-                            </div>
-                        </div>
-                    </span>
-                </div>
+                    <div>
+                        <dt class="text-xs text-muted-foreground uppercase">Durum</dt>
+                        <dd>
+                            <Badge :variant="getStatusBadgeVariant(selectedUser)">{{ getStatusLabel(selectedUser) }}</Badge>
+                        </dd>
+                    </div>
+                </dl>
 
-                <!-- Empty State -->
-                <AppEmptyState
-                    v-if="filteredUsers.length === 0"
-                    icon="users"
-                    title="Kullanıcı bulunamadı"
-                />
-            </div>
+                <DialogFooter>
+                    <Button variant="outline" class="h-11 md:h-9" @click="closeUserModal">Kapat</Button>
+                    <Button
+                        :variant="selectedUser.isBanned ? 'default' : 'destructive'"
+                        class="h-11 md:h-9"
+                        @click="toggleBan(selectedUser); closeUserModal();"
+                    >
+                        {{ selectedUser.isBanned ? 'Yasağı Kaldır' : 'Kullanıcıyı Yasakla' }}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
 
-            <!-- User Detail Modal -->
-            <div v-if="showUserModal && selectedUser" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="user-modal-title" @click.self="closeUserModal" @keydown.esc="closeUserModal">
-                <div class="modal" ref="userModalRef" tabindex="-1">
-                    <div class="modal-header">
-                        <h2 id="user-modal-title">Kullanıcı Detayı</h2>
-                        <button class="close-btn" aria-label="Kapat" @click="closeUserModal">✕</button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="user-profile">
-                            <div class="profile-avatar">{{ selectedUser.fullName.charAt(0) }}</div>
-                            <div class="profile-info">
-                                <h3>{{ selectedUser.fullName }}</h3>
-                                <p>{{ selectedUser.email }}</p>
-                                <span :class="['role-badge', getRoleBadgeClass(selectedUser.role)]">
-                                    {{ getRoleLabel(selectedUser.role) }}
-                                </span>
-                            </div>
-                        </div>
-                        <div class="detail-grid">
-                            <div class="detail-item">
-                                <span class="detail-label">Kayıt Tarihi</span>
-                                <span class="detail-value">{{ formatDate(selectedUser.createdAt) }}</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Durum</span>
-                                <span class="detail-value">
-                                    {{ selectedUser.isBanned ? 'Yasaklı' : (selectedUser.isActive ? 'Aktif' : 'Pasif') }}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button
-                            :class="['btn', selectedUser.isBanned ? 'btn-success' : 'btn-danger']"
-                            @click="toggleBan(selectedUser); closeUserModal();"
-                        >
-                            {{ selectedUser.isBanned ? 'Yasağı Kaldır' : 'Kullanıcıyı Yasakla' }}
-                        </button>
-                        <button class="btn btn-secondary" @click="closeUserModal">Kapat</button>
-                    </div>
-                </div>
-            </div>
-        <!-- Ban/Unban Confirm Modal -->
-        <ConfirmModal
-            v-model="showBanConfirm"
+        <!-- Ban/Unban confirm -->
+        <ConfirmDialog
+            v-model:open="showBanConfirm"
             :title="banTargetUser?.isBanned ? 'Yasağı Kaldır' : 'Kullanıcıyı Yasakla'"
-            :message="`${banTargetUser?.fullName || ''} kullanicisini ${banTargetUser?.isBanned ? 'yasagini kaldirmak' : 'yasaklamak'} istediginize emin misiniz?`"
+            :description="`${banTargetUser?.fullName || ''} kullanıcısının ${banTargetUser?.isBanned ? 'yasağını kaldırmak' : 'yasaklanmasını'} istediğinize emin misiniz?`"
             :confirm-text="banTargetUser?.isBanned ? 'Yasağı Kaldır' : 'Yasakla'"
-            cancel-text="Vazgec"
-            :variant="banTargetUser?.isBanned ? 'info' : 'danger'"
+            cancel-text="Vazgeç"
+            :variant="banTargetUser?.isBanned ? 'primary' : 'danger'"
+            :loading="actionLoading"
             @confirm="confirmBan"
         />
 
-        <!-- Change Role Confirm Modal -->
-        <ConfirmModal
-            v-model="showRoleConfirm"
+        <!-- Change role confirm -->
+        <ConfirmDialog
+            v-model:open="showRoleConfirm"
             title="Rol Değiştir"
-            :message="`${roleTargetUser?.fullName || ''} kullanicisinin rolunu ${getRoleLabel(roleTargetRole)} olarak degistirmek istediginize emin misiniz?`"
+            :description="`${roleTargetUser?.fullName || ''} kullanıcısının rolünü ${getRoleLabel(roleTargetRole)} olarak değiştirmek istediğinize emin misiniz?`"
             confirm-text="Değiştir"
-            cancel-text="Vazgec"
-            variant="warning"
+            cancel-text="Vazgeç"
+            variant="primary"
+            :loading="actionLoading"
             @confirm="confirmChangeRole"
         />
-        </div>
-    </AppLayout>
+    </AdminLayout>
 </template>
-
-<style scoped>
-.admin-users-page {
-    padding: 24px;
-    max-width: 1400px;
-    margin: 0 auto;
-}
-
-/* Header */
-.page-header {
-    margin-bottom: 24px;
-}
-
-.breadcrumb {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-    font-size: 14px;
-}
-
-.breadcrumb-link {
-    color: var(--color-primary);
-    text-decoration: none;
-}
-
-.breadcrumb-link:hover {
-    color: var(--color-primary-hover);
-}
-
-.breadcrumb-separator {
-    color: var(--color-text-muted);
-}
-
-.breadcrumb-current {
-    color: var(--color-text-secondary);
-}
-
-.page-header h1 {
-    margin: 0;
-    font-size: 28px;
-    font-weight: 700;
-    color: #ffffff;
-}
-
-/* Filters */
-.filters-bar {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
-}
-
-.search-box {
-    flex: 1;
-    min-width: 250px;
-    position: relative;
-}
-
-.search-icon {
-    position: absolute;
-    left: 14px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 16px;
-}
-
-.search-input {
-    width: 100%;
-    height: var(--control-height);
-    padding: 0 12px 0 44px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-    color: #ffffff;
-    font-size: 14px;
-}
-
-.search-input:focus {
-    outline: none;
-    border-color: var(--color-primary);
-}
-
-.search-input::placeholder {
-    color: var(--color-text-muted);
-}
-
-.filter-select {
-    height: var(--control-height);
-    padding: 0 16px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-    color: #ffffff;
-    font-size: 14px;
-    cursor: pointer;
-    min-width: 150px;
-}
-
-.filter-select:focus {
-    outline: none;
-    border-color: var(--color-primary);
-}
-
-.filter-select option {
-    background: var(--color-bg-secondary);
-}
-
-/* Error */
-.error-banner {
-    padding: 12px 16px;
-    margin-bottom: 16px;
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    border-radius: 8px;
-    color: var(--color-danger);
-    font-size: 14px;
-}
-
-/* Loading */
-.loading-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 60px;
-}
-
-.spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid rgba(255, 255, 255, 0.1);
-    border-top-color: var(--color-primary);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
-.loading-state p {
-    margin-top: 16px;
-    color: var(--color-text-secondary);
-}
-
-/* Users Table */
-.users-table {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    overflow: hidden;
-}
-
-.table-header,
-.table-row {
-    display: grid;
-    grid-template-columns: 2fr 120px 100px 120px 120px;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 20px;
-}
-
-.table-header {
-    background: rgba(0, 0, 0, 0.2);
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--color-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.table-row {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.table-row:last-child {
-    border-bottom: none;
-}
-
-.table-row:hover {
-    background: rgba(255, 255, 255, 0.02);
-}
-
-/* User Column */
-.col-user {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.user-avatar {
-    width: 40px;
-    height: 40px;
-    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 16px;
-    color: white;
-}
-
-.user-info {
-    display: flex;
-    flex-direction: column;
-}
-
-.user-name {
-    font-weight: 600;
-    color: #ffffff;
-    font-size: 14px;
-}
-
-.user-email {
-    font-size: 12px;
-    color: var(--color-text-muted);
-}
-
-/* Role Badge */
-.role-badge {
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 500;
-}
-
-.role-user {
-    background: rgba(148, 163, 184, 0.2);
-    color: var(--color-text-secondary);
-}
-
-.role-mod {
-    background: rgba(59, 130, 246, 0.2);
-    color: var(--color-info);
-}
-
-.role-admin {
-    background: rgba(168, 85, 247, 0.2);
-    color: #a855f7;
-}
-
-/* Status */
-.status-active {
-    color: var(--color-primary);
-    font-size: 13px;
-}
-
-.status-inactive {
-    color: var(--color-text-muted);
-    font-size: 13px;
-}
-
-.status-banned {
-    color: var(--color-danger);
-    font-size: 13px;
-}
-
-/* Date */
-.col-date {
-    font-size: 13px;
-    color: var(--color-text-secondary);
-}
-
-/* Actions */
-.col-actions {
-    display: flex;
-    gap: 8px;
-}
-
-.action-btn {
-    width: 32px;
-    height: 32px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.action-btn.view {
-    background: rgba(59, 130, 246, 0.2);
-}
-
-.action-btn.ban {
-    background: rgba(239, 68, 68, 0.2);
-}
-
-.action-btn.unban {
-    background: rgba(16, 185, 129, 0.2);
-}
-
-.action-btn.role {
-    background: rgba(168, 85, 247, 0.2);
-}
-
-.action-btn:hover {
-    transform: scale(1.1);
-}
-
-/* Role Dropdown */
-.role-dropdown {
-    position: relative;
-}
-
-.dropdown-menu {
-    position: absolute;
-    top: 100%;
-    right: 0;
-    background: var(--color-bg-secondary);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 4px;
-    display: none;
-    z-index: 100;
-    min-width: 120px;
-}
-
-.role-dropdown:hover .dropdown-menu {
-    display: block;
-}
-
-.dropdown-menu button {
-    display: block;
-    width: 100%;
-    padding: 8px 12px;
-    background: none;
-    border: none;
-    color: var(--color-text-primary);
-    font-size: 13px;
-    text-align: left;
-    cursor: pointer;
-    border-radius: 4px;
-}
-
-.dropdown-menu button:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
-
-/* Empty State */
-.empty-state {
-    padding: 60px;
-    text-align: center;
-}
-
-.empty-icon {
-    font-size: 48px;
-    display: block;
-    margin-bottom: 12px;
-}
-
-.empty-state p {
-    margin: 0;
-    color: var(--color-text-muted);
-}
-
-/* Modal */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    padding: 20px;
-}
-
-.modal {
-    background: var(--color-bg-secondary);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    width: 100%;
-    max-width: 500px;
-}
-
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px 24px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.modal-header h2 {
-    margin: 0;
-    font-size: 18px;
-    color: #ffffff;
-}
-
-.close-btn {
-    background: none;
-    border: none;
-    color: var(--color-text-muted);
-    font-size: 20px;
-    cursor: pointer;
-}
-
-.close-btn:hover {
-    color: #ffffff;
-}
-
-.modal-body {
-    padding: 24px;
-}
-
-.user-profile {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 24px;
-}
-
-.profile-avatar {
-    width: 64px;
-    height: 64px;
-    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 24px;
-    color: white;
-}
-
-.profile-info h3 {
-    margin: 0;
-    font-size: 18px;
-    color: #ffffff;
-}
-
-.profile-info p {
-    margin: 4px 0 8px;
-    font-size: 14px;
-    color: var(--color-text-muted);
-}
-
-.detail-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
-}
-
-.detail-item {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.detail-label {
-    font-size: 12px;
-    color: var(--color-text-muted);
-    text-transform: uppercase;
-}
-
-.detail-value {
-    font-size: 15px;
-    color: var(--color-text-primary);
-    font-weight: 500;
-}
-
-.modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-    padding: 16px 24px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.btn {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.btn-secondary {
-    background: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
-}
-
-.btn-danger {
-    background: rgba(239, 68, 68, 0.2);
-    color: var(--color-danger);
-}
-
-.btn-success {
-    background: rgba(16, 185, 129, 0.2);
-    color: var(--color-primary);
-}
-
-.btn:hover {
-    transform: translateY(-2px);
-}
-
-/* Responsive */
-@media (max-width: 1024px) {
-    .table-header,
-    .table-row {
-        grid-template-columns: 1.5fr 100px 80px 100px;
-    }
-
-    .col-date {
-        display: none;
-    }
-}
-
-@media (max-width: 768px) {
-    .admin-users-page {
-        padding: 16px;
-    }
-
-    .filters-bar {
-        flex-direction: column;
-    }
-
-    .filter-select {
-        width: 100%;
-    }
-
-    .table-header,
-    .table-row {
-        grid-template-columns: 1fr 100px;
-    }
-
-    .col-role,
-    .col-status,
-    .col-date {
-        display: none;
-    }
-}
-</style>

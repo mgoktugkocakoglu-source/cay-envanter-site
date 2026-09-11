@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import CaykurPage from '@/components/caykur/CaykurPage.vue';
-import CaykurPanel from '@/components/caykur/CaykurPanel.vue';
-import CaykurStatCard from '@/components/caykur/CaykurStatCard.vue';
-import StatusPill from '@/components/caykur/StatusPill.vue';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, Filter, MapPinned, User } from '@lucide/vue';
+import CaykurLayout from '@/layouts/CaykurLayout.vue';
+import { EmptyState, ListToolbar, LoadingState, PageContainer, PageHeader, SearchInput, StatCard } from '@/components/shared';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
     api,
     type CaykurFieldRow,
@@ -60,6 +67,25 @@ const ownershipOptions: Array<{ value: CaykurFieldOwnership; label: string; hint
 ];
 
 const pageSizeOptions = [10, 20, 50, 100];
+
+/** Select components cannot carry an empty-string value, so "all" stands in for it. */
+const ALL = 'all';
+const provinceSelect = computed({
+    get: () => province.value || ALL,
+    set: (v: string) => { province.value = v === ALL ? '' : v; },
+});
+const districtSelect = computed({
+    get: () => district.value || ALL,
+    set: (v: string) => { district.value = v === ALL ? '' : v; },
+});
+const limitSelect = computed({
+    get: () => String(limit.value),
+    set: (v: string) => { limit.value = Number(v); },
+});
+
+function onOwnershipChange(v: unknown): void {
+    if (typeof v === 'string' && ownershipOptions.some((o) => o.value === v)) ownership.value = v as CaykurFieldOwnership;
+}
 
 const districtOptions = computed(() => {
     const list = overview.value?.districts ?? [];
@@ -218,6 +244,15 @@ onBeforeUnmount(() => {
 });
 
 // ── Sorting ──
+const SORT_COLUMNS: Array<{ key: CaykurFieldSortKey; label: string; class?: string }> = [
+    { key: 'name', label: 'Arazi' },
+    { key: 'province', label: 'Konum', class: 'hidden md:table-cell' },
+    { key: 'parcel', label: 'Ada / Parsel' },
+    { key: 'owner', label: 'Kişiler', class: 'hidden lg:table-cell' },
+    { key: 'area', label: 'Alan', class: 'text-right' },
+    { key: 'createdAt', label: 'Kayıt', class: 'hidden md:table-cell' },
+];
+
 function toggleSort(key: CaykurFieldSortKey): void {
     if (sortBy.value === key) {
         sortOrder.value = sortOrder.value === 'ASC' ? 'DESC' : 'ASC';
@@ -279,6 +314,14 @@ function personTitle(p: CaykurFieldPerson): string {
     return bits.join(' · ');
 }
 
+function personBadgeClass(p: CaykurFieldPerson): string {
+    const bits: string[] = ['max-w-full'];
+    if (p.role === 'owner') bits.push('font-semibold');
+    if (p.invitationStatus === 'pending') bits.push('border-dashed text-muted-foreground');
+    if (p.invitationStatus === 'rejected') bits.push('text-muted-foreground line-through');
+    return bits.join(' ');
+}
+
 const INVITE_LABEL: Record<NonNullable<CaykurFieldPerson['invitationStatus']>, string> = {
     pending: 'Davet bekliyor',
     accepted: 'Kabul etti',
@@ -287,488 +330,282 @@ const INVITE_LABEL: Record<NonNullable<CaykurFieldPerson['invitationStatus']>, s
 </script>
 
 <template>
-    <CaykurPage
-        title="Araziler"
-        :sub="overview ? `${formatNumber(overview.total)} arazi · ${formatDekar(overview.totalAreaDekar)} toplam alan · ${overview.provinces.length} il` : 'Tüm müstahsillerin kayıtlı arazileri'"
-    >
-        <section class="ck-kpi-grid">
-            <CaykurStatCard
-                label="Toplam arazi"
-                :value="overview ? formatNumber(overview.total) : '—'"
-                :sub="overview ? `${formatDekar(overview.totalAreaDekar)} kayıtlı alan` : ' '"
+    <CaykurLayout>
+        <PageContainer size="wide">
+            <PageHeader
+                title="Araziler"
+                :description="overview ? `${formatNumber(overview.total)} arazi · ${formatDekar(overview.totalAreaDekar)} toplam alan · ${overview.provinces.length} il` : 'Tüm müstahsillerin kayıtlı arazileri'"
             />
-            <CaykurStatCard
-                label="Hisseli arazi"
-                :value="overview ? formatNumber(overview.shared) : '—'"
-                sub="aynı ada/parsel birden fazla kişide"
-            />
-            <CaykurStatCard
-                label="Ortaklı arazi"
-                :value="overview ? formatNumber(overview.withPartners) : '—'"
-                sub="sahibi ortak beyan etmiş"
-            />
-            <CaykurStatCard
-                label="İl / ilçe"
-                :value="overview ? `${overview.provinces.length} / ${overview.districts.length}` : '—'"
-                sub="kayıt bulunan bölge"
-            />
-        </section>
 
-        <div class="ck-seg fields-quick" role="group" aria-label="Hızlı filtre">
-            <button
-                v-for="opt in ownershipOptions"
-                :key="opt.value"
-                type="button"
-                class="ck-seg-btn"
-                :class="{ 'is-active': ownership === opt.value }"
-                :title="opt.hint"
-                :aria-pressed="ownership === opt.value"
-                @click="ownership = opt.value"
-            >
-                {{ opt.label }}
-                <span v-if="opt.value === 'shared' && overview" class="fields-seg-count">{{ formatNumber(overview.shared) }}</span>
-            </button>
-        </div>
+            <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Özet">
+                <StatCard
+                    label="Toplam arazi"
+                    :value="overview ? formatNumber(overview.total) : '—'"
+                    :hint="overview ? `${formatDekar(overview.totalAreaDekar)} kayıtlı alan` : ' '"
+                />
+                <StatCard label="Hisseli arazi" :value="overview ? formatNumber(overview.shared) : '—'" hint="aynı ada/parsel birden fazla kişide" />
+                <StatCard label="Ortaklı arazi" :value="overview ? formatNumber(overview.withPartners) : '—'" hint="sahibi ortak beyan etmiş" />
+                <StatCard
+                    label="İl / ilçe"
+                    :value="overview ? `${overview.provinces.length} / ${overview.districts.length}` : '—'"
+                    hint="kayıt bulunan bölge"
+                />
+            </section>
 
-        <div class="ck-toolbar">
-            <div class="ck-search-wrap">
-                <svg class="ck-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-                <input v-model="search" type="search" class="ck-search-input" placeholder="Arazi, müstahsil, ortak, mahalle, ada veya parsel ara…" aria-label="Arazi ara" />
-            </div>
-            <select v-model="province" class="ck-select" aria-label="İl filtresi">
-                <option value="">Tüm iller</option>
-                <option v-for="p in overview?.provinces ?? []" :key="p.province" :value="p.province">{{ p.province }} ({{ p.count }})</option>
-            </select>
-            <select v-model="district" class="ck-select" aria-label="İlçe filtresi">
-                <option value="">Tüm ilçeler</option>
-                <option v-for="d in districtOptions" :key="`${d.province}/${d.district}`" :value="d.district">
-                    {{ d.district }}<template v-if="!province"> · {{ d.province }}</template> ({{ d.count }})
-                </option>
-            </select>
-            <input v-model="adaNo" type="text" inputmode="numeric" class="ck-search-input fields-input-narrow" placeholder="Ada" aria-label="Ada no" />
-            <input v-model="parcelNo" type="text" inputmode="numeric" class="ck-search-input fields-input-narrow" placeholder="Parsel" aria-label="Parsel no" />
-            <button type="button" class="ck-btn ck-btn-ghost" :aria-expanded="moreOpen" @click="moreOpen = !moreOpen">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
-                Diğer filtreler<span v-if="advancedCount" class="fields-seg-count">{{ advancedCount }}</span>
-            </button>
-            <button v-if="hasActiveFilters" type="button" class="ck-btn ck-btn-ghost" @click="resetFilters">Temizle</button>
-        </div>
+            <ToggleGroup :model-value="ownership" type="single" aria-label="Hızlı filtre" class="h-11 md:h-9" @update:model-value="onOwnershipChange">
+                <ToggleGroupItem v-for="opt in ownershipOptions" :key="opt.value" :value="opt.value" :title="opt.hint" class="h-full px-3">
+                    {{ opt.label }}
+                    <Badge v-if="opt.value === 'shared' && overview" variant="muted" class="tabular-nums">{{ formatNumber(overview.shared) }}</Badge>
+                </ToggleGroupItem>
+            </ToggleGroup>
 
-        <div v-if="moreOpen" class="fields-advanced">
-            <label class="fields-field">
-                <span class="fields-label">Mahalle / köy</span>
-                <input v-model="neighborhood" type="text" class="ck-search-input fields-input-plain" placeholder="Mahalle adı" />
-            </label>
-            <label class="fields-field">
-                <span class="fields-label">En az alan (da)</span>
-                <input v-model="minArea" type="number" min="0" step="0.1" class="ck-search-input fields-input-plain" placeholder="0" />
-            </label>
-            <label class="fields-field">
-                <span class="fields-label">En çok alan (da)</span>
-                <input v-model="maxArea" type="number" min="0" step="0.1" class="ck-search-input fields-input-plain" placeholder="∞" />
-            </label>
-            <label class="fields-field">
-                <span class="fields-label">Kayıt tarihi (başlangıç)</span>
-                <input v-model="createdFrom" type="date" class="ck-search-input fields-input-plain" />
-            </label>
-            <label class="fields-field">
-                <span class="fields-label">Kayıt tarihi (bitiş)</span>
-                <input v-model="createdTo" type="date" class="ck-search-input fields-input-plain" />
-            </label>
-        </div>
+            <ListToolbar>
+                <SearchInput v-model="search" placeholder="Arazi, müstahsil, ortak, mahalle, ada veya parsel ara…" aria-label="Arazi ara" />
+                <template #filters>
+                    <Select v-model="provinceSelect">
+                        <SelectTrigger class="w-40" aria-label="İl filtresi">
+                            <SelectValue placeholder="Tüm iller" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem :value="ALL">Tüm iller</SelectItem>
+                            <SelectItem v-for="p in overview?.provinces ?? []" :key="p.province" :value="p.province">{{ p.province }} ({{ p.count }})</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Select v-model="districtSelect">
+                        <SelectTrigger class="w-44" aria-label="İlçe filtresi">
+                            <SelectValue placeholder="Tüm ilçeler" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem :value="ALL">Tüm ilçeler</SelectItem>
+                            <SelectItem v-for="d in districtOptions" :key="`${d.province}/${d.district}`" :value="d.district">
+                                {{ d.district }}<template v-if="!province"> · {{ d.province }}</template> ({{ d.count }})
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Input v-model="adaNo" type="text" inputmode="numeric" placeholder="Ada" aria-label="Ada no" class="h-11 w-24 md:h-9" />
+                    <Input v-model="parcelNo" type="text" inputmode="numeric" placeholder="Parsel" aria-label="Parsel no" class="h-11 w-24 md:h-9" />
+                    <Button variant="outline" class="h-11 md:h-9" :aria-expanded="moreOpen" @click="moreOpen = !moreOpen">
+                        <Filter aria-hidden="true" />
+                        Diğer filtreler
+                        <Badge v-if="advancedCount" variant="muted" class="tabular-nums">{{ advancedCount }}</Badge>
+                    </Button>
+                    <Button v-if="hasActiveFilters" variant="ghost" class="h-11 md:h-9" @click="resetFilters">Temizle</Button>
+                </template>
+            </ListToolbar>
 
-        <CaykurPanel>
-            <template #head>
-                <span class="ck-panel-meta" aria-live="polite">
-                    <template v-if="isLoading && rows.length === 0">Yükleniyor…</template>
-                    <template v-else>{{ formatNumber(total) }} arazi</template>
-                </span>
-                <label class="fields-pagesize">
-                    <span class="fields-label">Sayfa başına</span>
-                    <select v-model.number="limit" class="ck-select fields-pagesize-select" aria-label="Sayfa başına kayıt">
-                        <option v-for="n in pageSizeOptions" :key="n" :value="n">{{ n }}</option>
-                    </select>
-                </label>
-            </template>
+            <Card v-if="moreOpen" class="py-4">
+                <CardContent class="grid gap-4 px-4 sm:grid-cols-2 lg:grid-cols-5">
+                    <div class="space-y-2">
+                        <Label for="fields-neighborhood">Mahalle / köy</Label>
+                        <Input id="fields-neighborhood" v-model="neighborhood" type="text" placeholder="Mahalle adı" class="h-11 md:h-9" />
+                    </div>
+                    <div class="space-y-2">
+                        <Label for="fields-min-area">En az alan (da)</Label>
+                        <Input id="fields-min-area" v-model="minArea" type="number" min="0" step="0.1" placeholder="0" class="h-11 md:h-9" />
+                    </div>
+                    <div class="space-y-2">
+                        <Label for="fields-max-area">En çok alan (da)</Label>
+                        <Input id="fields-max-area" v-model="maxArea" type="number" min="0" step="0.1" placeholder="∞" class="h-11 md:h-9" />
+                    </div>
+                    <div class="space-y-2">
+                        <Label for="fields-created-from">Kayıt tarihi (başlangıç)</Label>
+                        <Input id="fields-created-from" v-model="createdFrom" type="date" class="h-11 md:h-9" />
+                    </div>
+                    <div class="space-y-2">
+                        <Label for="fields-created-to">Kayıt tarihi (bitiş)</Label>
+                        <Input id="fields-created-to" v-model="createdTo" type="date" class="h-11 md:h-9" />
+                    </div>
+                </CardContent>
+            </Card>
 
-            <div v-if="error" class="ck-empty">
-                <p class="ck-empty-title">Araziler yüklenemedi</p>
-                <p class="ck-empty-sub">{{ error }}</p>
-                <button type="button" class="ck-btn" @click="load">Tekrar dene</button>
-            </div>
+            <Card class="gap-0 py-0">
+                <CardHeader class="border-b py-4">
+                    <CardTitle>Arazi kayıtları</CardTitle>
+                    <CardDescription aria-live="polite">
+                        <template v-if="isLoading && rows.length === 0">Yükleniyor…</template>
+                        <template v-else>{{ formatNumber(total) }} arazi</template>
+                    </CardDescription>
+                    <CardAction class="flex items-center gap-2">
+                        <Label for="fields-page-size" class="text-xs text-muted-foreground">Sayfa başına</Label>
+                        <Select v-model="limitSelect">
+                            <SelectTrigger id="fields-page-size" size="sm" class="w-20" aria-label="Sayfa başına kayıt">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="n in pageSizeOptions" :key="n" :value="String(n)">{{ n }}</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </CardAction>
+                </CardHeader>
 
-            <div v-else-if="rows.length" class="ck-table-wrap" :aria-busy="isLoading">
-                <table class="ck-table fields-table">
-                    <thead>
-                        <tr>
-                            <th :aria-sort="ariaSortOf('name')">
-                                <button type="button" class="ck-th-sort" :data-dir="sortDirOf('name')" @click="toggleSort('name')">
-                                    Arazi
-                                    <svg class="ck-sort-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15" /></svg>
-                                </button>
-                            </th>
-                            <th :aria-sort="ariaSortOf('province')">
-                                <button type="button" class="ck-th-sort" :data-dir="sortDirOf('province')" @click="toggleSort('province')">
-                                    Konum
-                                    <svg class="ck-sort-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15" /></svg>
-                                </button>
-                            </th>
-                            <th :aria-sort="ariaSortOf('parcel')">
-                                <button type="button" class="ck-th-sort" :data-dir="sortDirOf('parcel')" @click="toggleSort('parcel')">
-                                    Ada / Parsel
-                                    <svg class="ck-sort-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15" /></svg>
-                                </button>
-                            </th>
-                            <th :aria-sort="ariaSortOf('owner')">
-                                <button type="button" class="ck-th-sort" :data-dir="sortDirOf('owner')" @click="toggleSort('owner')">
-                                    Kişiler
-                                    <svg class="ck-sort-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15" /></svg>
-                                </button>
-                            </th>
-                            <th class="num" :aria-sort="ariaSortOf('area')">
-                                <button type="button" class="ck-th-sort" :data-dir="sortDirOf('area')" @click="toggleSort('area')">
-                                    Alan
-                                    <svg class="ck-sort-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15" /></svg>
-                                </button>
-                            </th>
-                            <th :aria-sort="ariaSortOf('createdAt')">
-                                <button type="button" class="ck-th-sort" :data-dir="sortDirOf('createdAt')" @click="toggleSort('createdAt')">
-                                    Kayıt
-                                    <svg class="ck-sort-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15" /></svg>
-                                </button>
-                            </th>
-                            <th aria-label="Detay"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <template v-for="r in rows" :key="r.id">
-                            <tr
-                                class="ck-row-link"
-                                :class="{ 'is-expanded': expandedId === r.id }"
-                                tabindex="0"
-                                :aria-expanded="expandedId === r.id"
-                                @click="toggleRow(r.id)"
-                                @keydown="onRowKey($event, r.id)"
-                            >
-                                <td>
-                                    <span class="strong" style="display:block">{{ r.name || 'İsimsiz arazi' }}</span>
-                                    <span class="ck-name-sub">{{ r.neighborhood }}<template v-if="r.road"> · {{ r.road }}</template></span>
-                                </td>
-                                <td>
-                                    <span style="display:block">{{ r.province }}</span>
-                                    <span class="ck-name-sub">{{ r.district }}</span>
-                                </td>
-                                <td style="white-space:nowrap">
-                                    <span style="display:block">{{ parcelLabel(r) }}</span>
-                                    <StatusPill
-                                        v-if="r.shared"
-                                        :label="`Hisseli · ${r.sharedWith.length + 1} kayıt`"
-                                        tone="warning"
-                                    />
-                                </td>
-                                <td>
-                                    <div class="fields-tags">
-                                        <span
-                                            v-for="(p, i) in r.people"
-                                            :key="`${r.id}-p-${i}`"
-                                            class="fields-tag"
-                                            :data-role="p.role"
-                                            :data-invite="p.invitationStatus ?? undefined"
-                                            :title="personTitle(p)"
-                                        >
-                                            <svg v-if="p.role === 'owner'" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-                                            {{ p.name }}
-                                            <span v-if="p.sharePercentage !== null && p.sharePercentage > 0" class="fields-tag-meta">%{{ formatNumber(p.sharePercentage, 0) }}</span>
-                                        </span>
-                                        <span
-                                            v-for="s in r.sharedWith"
-                                            :key="`${r.id}-s-${s.fieldId}`"
-                                            class="fields-tag"
-                                            data-role="registrant"
-                                            :title="`Aynı ada/parseli ayrıca kaydetmiş: ${s.fieldName || 'isimsiz arazi'}`"
-                                        >
-                                            {{ s.fullName }}
-                                            <span class="fields-tag-meta">ayrı kayıt</span>
-                                        </span>
-                                    </div>
-                                </td>
-                                <td class="num">
-                                    <span class="ck-money">{{ formatDekar(r.areaDekar) }}</span>
-                                    <span v-if="r.areaUnit === 'm2'" class="ck-name-sub" style="display:block">{{ areaOriginal(r) }}</span>
-                                </td>
-                                <td style="white-space:nowrap">{{ formatDate(r.createdAt) }}</td>
-                                <td class="ck-chevron-cell">
-                                    <svg class="fields-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>
-                                </td>
-                            </tr>
-                            <tr v-if="expandedId === r.id" class="fields-detail-row">
-                                <td colspan="7">
-                                    <div class="fields-detail">
-                                        <div class="fields-detail-col">
-                                            <h3 class="fields-detail-title">Kişiler</h3>
-                                            <ul class="fields-people">
-                                                <li v-for="(p, i) in r.people" :key="`${r.id}-d-${i}`">
-                                                    <span class="strong">{{ p.name }}</span>
-                                                    <span class="ck-name-sub">
-                                                        {{ p.role === 'owner' ? 'Kayıt sahibi' : 'Ortak' }}
-                                                        <template v-if="p.phone"> · {{ p.phone }}</template>
-                                                        <template v-if="p.sharePercentage !== null && p.sharePercentage > 0"> · %{{ formatNumber(p.sharePercentage, 0) }} hisse</template>
-                                                        <template v-if="p.invitationStatus"> · {{ INVITE_LABEL[p.invitationStatus] }}</template>
-                                                    </span>
-                                                </li>
-                                            </ul>
-                                            <template v-if="r.sharedWith.length">
-                                                <h3 class="fields-detail-title" style="margin-top: var(--space-4)">Aynı ada/parseli kaydeden diğer kişiler</h3>
-                                                <ul class="fields-people">
-                                                    <li v-for="s in r.sharedWith" :key="`${r.id}-ds-${s.fieldId}`">
-                                                        <span class="strong">{{ s.fullName }}</span>
-                                                        <span class="ck-name-sub">Arazi adı: {{ s.fieldName || 'isimsiz' }}</span>
-                                                    </li>
-                                                </ul>
-                                            </template>
-                                        </div>
-                                        <dl class="ck-dl fields-detail-col">
-                                            <div class="ck-dl-item"><dt class="ck-dl-term">Kayıt sahibi telefon</dt><dd class="ck-dl-val">{{ r.owner.phone ?? '—' }}</dd></div>
-                                            <div class="ck-dl-item"><dt class="ck-dl-term">Ruhsat / cüzdan no</dt><dd class="ck-dl-val">{{ r.owner.ruhsatNo ?? '—' }} / {{ r.owner.cuzdanNo ?? '—' }}</dd></div>
-                                            <div class="ck-dl-item"><dt class="ck-dl-term">Beyan edilen alan</dt><dd class="ck-dl-val">{{ areaOriginal(r) }}</dd></div>
-                                            <div class="ck-dl-item"><dt class="ck-dl-term">Sınır çizimi</dt><dd class="ck-dl-val">{{ r.hasGeometry ? 'Var' : 'Yok' }}</dd></div>
-                                            <div class="ck-dl-item"><dt class="ck-dl-term">Son güncelleme</dt><dd class="ck-dl-val">{{ formatDate(r.updatedAt) }}</dd></div>
-                                            <div v-if="r.notes" class="ck-dl-item"><dt class="ck-dl-term">Not</dt><dd class="ck-dl-val">{{ r.notes }}</dd></div>
-                                        </dl>
-                                    </div>
-                                </td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
-            </div>
+                <CardContent class="px-0">
+                    <EmptyState v-if="error" title="Araziler yüklenemedi" :description="error" class="rounded-none border-0">
+                        <Button variant="outline" class="h-11 md:h-9" @click="load">Tekrar dene</Button>
+                    </EmptyState>
 
-            <div v-else-if="isLoading" class="ck-empty">
-                <p class="ck-empty-sub">Araziler yükleniyor…</p>
-            </div>
+                    <div v-else-if="rows.length" class="overflow-x-auto" :aria-busy="isLoading">
+                        <Table>
+                            <TableHeader>
+                                <TableRow class="hover:bg-transparent">
+                                    <TableHead
+                                        v-for="col in SORT_COLUMNS"
+                                        :key="col.key"
+                                        :class="[col.class, col.key === 'name' && 'pl-2']"
+                                        :aria-sort="ariaSortOf(col.key)"
+                                    >
+                                        <Button variant="ghost" size="sm" class="-ml-2 h-8 gap-1 px-2" @click="toggleSort(col.key)">
+                                            {{ col.label }}
+                                            <ArrowUp v-if="sortDirOf(col.key) === 'asc'" class="size-3.5" aria-hidden="true" />
+                                            <ArrowDown v-else-if="sortDirOf(col.key) === 'desc'" class="size-3.5" aria-hidden="true" />
+                                            <ChevronsUpDown v-else class="size-3.5 text-muted-foreground" aria-hidden="true" />
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead class="w-10 pr-4"><span class="sr-only">Detay</span></TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <template v-for="r in rows" :key="r.id">
+                                    <TableRow
+                                        class="cursor-pointer align-top"
+                                        :class="expandedId === r.id && 'border-b-0 bg-muted/50'"
+                                        tabindex="0"
+                                        :aria-expanded="expandedId === r.id"
+                                        @click="toggleRow(r.id)"
+                                        @keydown="onRowKey($event, r.id)"
+                                    >
+                                        <TableCell class="pl-4">
+                                            <span class="block font-medium text-foreground">{{ r.name || 'İsimsiz arazi' }}</span>
+                                            <span class="block text-xs text-muted-foreground">{{ r.neighborhood }}<template v-if="r.road"> · {{ r.road }}</template></span>
+                                            <span class="block text-xs text-muted-foreground md:hidden">{{ r.province }} / {{ r.district }}</span>
+                                        </TableCell>
+                                        <TableCell class="hidden md:table-cell">
+                                            <span class="block text-foreground">{{ r.province }}</span>
+                                            <span class="block text-xs text-muted-foreground">{{ r.district }}</span>
+                                        </TableCell>
+                                        <TableCell class="whitespace-nowrap">
+                                            <span class="block text-foreground">{{ parcelLabel(r) }}</span>
+                                            <Badge v-if="r.shared" variant="warning" class="mt-1">Hisseli · {{ r.sharedWith.length + 1 }} kayıt</Badge>
+                                        </TableCell>
+                                        <TableCell class="hidden lg:table-cell">
+                                            <div class="flex max-w-105 flex-wrap gap-1.5">
+                                                <Badge
+                                                    v-for="(p, i) in r.people"
+                                                    :key="`${r.id}-p-${i}`"
+                                                    :variant="p.role === 'partner' ? 'secondary' : 'outline'"
+                                                    :class="personBadgeClass(p)"
+                                                    :title="personTitle(p)"
+                                                >
+                                                    <User v-if="p.role === 'owner'" aria-hidden="true" />
+                                                    <span class="truncate">{{ p.name }}</span>
+                                                    <span v-if="p.sharePercentage !== null && p.sharePercentage > 0" class="font-normal text-muted-foreground">%{{ formatNumber(p.sharePercentage, 0) }}</span>
+                                                </Badge>
+                                                <Badge
+                                                    v-for="s in r.sharedWith"
+                                                    :key="`${r.id}-s-${s.fieldId}`"
+                                                    variant="warning"
+                                                    class="max-w-full"
+                                                    :title="`Aynı ada/parseli ayrıca kaydetmiş: ${s.fieldName || 'isimsiz arazi'}`"
+                                                >
+                                                    <span class="truncate">{{ s.fullName }}</span>
+                                                    <span class="font-normal opacity-85">ayrı kayıt</span>
+                                                </Badge>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell class="text-right">
+                                            <span class="block font-semibold text-foreground tabular-nums">{{ formatDekar(r.areaDekar) }}</span>
+                                            <span v-if="r.areaUnit === 'm2'" class="block text-xs text-muted-foreground tabular-nums">{{ areaOriginal(r) }}</span>
+                                        </TableCell>
+                                        <TableCell class="hidden whitespace-nowrap text-muted-foreground md:table-cell">{{ formatDate(r.createdAt) }}</TableCell>
+                                        <TableCell class="pr-4 text-right">
+                                            <ChevronDown
+                                                class="size-4 text-muted-foreground transition-transform motion-reduce:transition-none"
+                                                :class="expandedId === r.id && 'rotate-180'"
+                                                aria-hidden="true"
+                                            />
+                                        </TableCell>
+                                    </TableRow>
+                                    <TableRow v-if="expandedId === r.id" class="hover:bg-transparent">
+                                        <TableCell :colspan="SORT_COLUMNS.length + 1" class="px-4 pt-0 pb-4">
+                                            <div class="grid gap-6 md:grid-cols-2">
+                                                <div class="space-y-4">
+                                                    <div>
+                                                        <h3 class="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Kişiler</h3>
+                                                        <ul class="flex flex-col gap-2">
+                                                            <li v-for="(p, i) in r.people" :key="`${r.id}-d-${i}`" class="flex flex-col">
+                                                                <span class="font-medium text-foreground">{{ p.name }}</span>
+                                                                <span class="text-xs text-muted-foreground">
+                                                                    {{ p.role === 'owner' ? 'Kayıt sahibi' : 'Ortak' }}
+                                                                    <template v-if="p.phone"> · {{ p.phone }}</template>
+                                                                    <template v-if="p.sharePercentage !== null && p.sharePercentage > 0"> · %{{ formatNumber(p.sharePercentage, 0) }} hisse</template>
+                                                                    <template v-if="p.invitationStatus"> · {{ INVITE_LABEL[p.invitationStatus] }}</template>
+                                                                </span>
+                                                            </li>
+                                                        </ul>
+                                                    </div>
+                                                    <div v-if="r.sharedWith.length">
+                                                        <h3 class="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Aynı ada/parseli kaydeden diğer kişiler</h3>
+                                                        <ul class="flex flex-col gap-2">
+                                                            <li v-for="s in r.sharedWith" :key="`${r.id}-ds-${s.fieldId}`" class="flex flex-col">
+                                                                <span class="font-medium text-foreground">{{ s.fullName }}</span>
+                                                                <span class="text-xs text-muted-foreground">Arazi adı: {{ s.fieldName || 'isimsiz' }}</span>
+                                                            </li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                                <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                                                    <div><dt class="text-muted-foreground">Kayıt sahibi telefon</dt><dd class="text-foreground">{{ r.owner.phone ?? '—' }}</dd></div>
+                                                    <div><dt class="text-muted-foreground">Ruhsat / cüzdan no</dt><dd class="text-foreground">{{ r.owner.ruhsatNo ?? '—' }} / {{ r.owner.cuzdanNo ?? '—' }}</dd></div>
+                                                    <div><dt class="text-muted-foreground">Beyan edilen alan</dt><dd class="font-semibold text-foreground tabular-nums">{{ areaOriginal(r) }}</dd></div>
+                                                    <div><dt class="text-muted-foreground">Sınır çizimi</dt><dd class="text-foreground">{{ r.hasGeometry ? 'Var' : 'Yok' }}</dd></div>
+                                                    <div><dt class="text-muted-foreground">Son güncelleme</dt><dd class="text-foreground">{{ formatDate(r.updatedAt) }}</dd></div>
+                                                    <div v-if="r.notes" class="col-span-2"><dt class="text-muted-foreground">Not</dt><dd class="whitespace-pre-line text-foreground">{{ r.notes }}</dd></div>
+                                                </dl>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                </template>
+                            </TableBody>
+                        </Table>
+                    </div>
 
-            <div v-else class="ck-empty">
-                <p class="ck-empty-title">{{ hasActiveFilters ? 'Eşleşen arazi yok' : 'Kayıtlı arazi yok' }}</p>
-                <p class="ck-empty-sub">{{ hasActiveFilters ? 'Arama ve filtreleri değiştirmeyi deneyin.' : 'Müstahsiller arazi ekledikçe burada listelenir.' }}</p>
-                <button v-if="hasActiveFilters" type="button" class="ck-btn" @click="resetFilters">Filtreleri temizle</button>
-            </div>
+                    <LoadingState v-else-if="isLoading" text="Araziler yükleniyor…" />
 
-            <div v-if="rows.length > 0" class="ck-table-foot">
-                <span class="ck-page-info">{{ rangeStart }}–{{ rangeEnd }} / {{ formatNumber(total) }} kayıt</span>
-                <div v-if="totalPages > 1" class="ck-pager" role="group" aria-label="Sayfalama">
-                    <button type="button" class="ck-pager-btn" :disabled="page === 1" aria-label="Önceki sayfa" @click="page--">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
-                    </button>
-                    <template v-for="(n, i) in pageNumbers" :key="`${n}-${i}`">
-                        <span v-if="n === '…'" class="ck-pager-gap" aria-hidden="true">…</span>
-                        <button
-                            v-else
-                            type="button"
-                            class="ck-pager-btn"
-                            :class="{ 'is-current': n === page }"
-                            :aria-current="n === page ? 'page' : undefined"
-                            @click="page = n"
-                        >
-                            {{ n }}
-                        </button>
-                    </template>
-                    <button type="button" class="ck-pager-btn" :disabled="page === totalPages" aria-label="Sonraki sayfa" @click="page++">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
-                    </button>
-                </div>
-            </div>
-        </CaykurPanel>
-    </CaykurPage>
+                    <EmptyState
+                        v-else
+                        :icon="MapPinned"
+                        :title="hasActiveFilters ? 'Eşleşen arazi yok' : 'Kayıtlı arazi yok'"
+                        :description="hasActiveFilters ? 'Arama ve filtreleri değiştirmeyi deneyin.' : 'Müstahsiller arazi ekledikçe burada listelenir.'"
+                        class="rounded-none border-0"
+                    >
+                        <Button v-if="hasActiveFilters" variant="outline" class="h-11 md:h-9" @click="resetFilters">Filtreleri temizle</Button>
+                    </EmptyState>
+
+                    <div v-if="rows.length > 0" class="flex flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <span class="text-xs text-muted-foreground tabular-nums">{{ rangeStart }}–{{ rangeEnd }} / {{ formatNumber(total) }} kayıt</span>
+                        <nav v-if="totalPages > 1" class="flex flex-wrap items-center gap-1" aria-label="Sayfalama">
+                            <Button variant="outline" size="icon" class="size-11 md:size-9" :disabled="page === 1" aria-label="Önceki sayfa" @click="page--">
+                                <ChevronLeft aria-hidden="true" />
+                            </Button>
+                            <template v-for="(n, i) in pageNumbers" :key="`${n}-${i}`">
+                                <span v-if="n === '…'" class="px-1 text-muted-foreground" aria-hidden="true">…</span>
+                                <Button
+                                    v-else
+                                    :variant="n === page ? 'default' : 'outline'"
+                                    size="icon"
+                                    class="size-11 tabular-nums md:size-9"
+                                    :aria-current="n === page ? 'page' : undefined"
+                                    @click="page = n"
+                                >
+                                    {{ n }}
+                                </Button>
+                            </template>
+                            <Button variant="outline" size="icon" class="size-11 md:size-9" :disabled="page === totalPages" aria-label="Sonraki sayfa" @click="page++">
+                                <ChevronRight aria-hidden="true" />
+                            </Button>
+                        </nav>
+                    </div>
+                </CardContent>
+            </Card>
+        </PageContainer>
+    </CaykurLayout>
 </template>
-
-<style scoped>
-.fields-quick {
-    margin-bottom: var(--space-4);
-}
-
-.fields-seg-count {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 20px;
-    height: 20px;
-    margin-left: 6px;
-    padding: 0 6px;
-    font-size: var(--font-size-xs);
-    font-variant-numeric: tabular-nums;
-    border-radius: var(--radius-full);
-    background: var(--color-bg-tertiary);
-    border: 1px solid var(--color-border);
-    color: var(--color-text-secondary);
-}
-
-.fields-input-narrow {
-    width: 96px;
-    padding-left: var(--space-4);
-}
-
-.fields-input-plain {
-    padding-left: var(--space-4);
-}
-
-.fields-advanced {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: var(--space-3);
-    padding: var(--space-4);
-    margin-bottom: var(--space-5);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: var(--color-bg-secondary);
-}
-
-.fields-field {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.fields-label {
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text-secondary);
-}
-
-.fields-pagesize {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin-left: auto;
-}
-
-.fields-pagesize-select {
-    height: 36px;
-    padding: 0 var(--space-3);
-}
-
-.fields-table td {
-    vertical-align: top;
-}
-
-/* ── People tags ── */
-.fields-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    max-width: 420px;
-}
-
-.fields-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    max-width: 100%;
-    padding: 3px 9px;
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.4;
-    color: var(--color-text-primary);
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border-strong, var(--color-border));
-    border-radius: var(--radius-full);
-    white-space: nowrap;
-}
-
-.fields-tag[data-role='owner'] {
-    font-weight: var(--font-weight-semibold);
-}
-
-.fields-tag[data-role='partner'] {
-    background: var(--color-bg-tertiary);
-}
-
-.fields-tag[data-invite='pending'] {
-    border-style: dashed;
-    color: var(--color-text-secondary);
-}
-
-.fields-tag[data-invite='rejected'] {
-    text-decoration: line-through;
-    color: var(--color-text-muted);
-}
-
-.fields-tag[data-role='registrant'] {
-    color: var(--color-warning);
-    background: color-mix(in srgb, var(--color-warning) 10%, transparent);
-    border-color: color-mix(in srgb, var(--color-warning) 30%, transparent);
-}
-
-.fields-tag-meta {
-    font-weight: var(--font-weight-regular, 400);
-    color: var(--color-text-muted);
-}
-
-.fields-tag[data-role='registrant'] .fields-tag-meta {
-    color: inherit;
-    opacity: 0.85;
-}
-
-/* ── Expandable detail row ── */
-.fields-chevron {
-    transition: transform var(--transition-fast);
-}
-
-.ck-row-link.is-expanded .fields-chevron {
-    transform: rotate(180deg);
-}
-
-.ck-row-link.is-expanded td {
-    border-bottom-color: transparent;
-}
-
-.fields-detail-row td {
-    padding-top: 0;
-    background: var(--color-bg-primary);
-}
-
-.fields-detail {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: var(--space-5);
-    padding: var(--space-3) 0 var(--space-2);
-}
-
-.fields-detail-title {
-    margin: 0 0 var(--space-2);
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-semibold);
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-    color: var(--color-text-secondary);
-}
-
-.fields-people {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-}
-
-.fields-people li {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .fields-chevron {
-        transition: none;
-    }
-}
-
-@media (max-width: 720px) {
-    .fields-input-narrow {
-        width: 80px;
-    }
-    .fields-tags {
-        max-width: 280px;
-    }
-}
-</style>

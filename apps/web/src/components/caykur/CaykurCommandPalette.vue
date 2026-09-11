@@ -1,10 +1,15 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch, type Component } from 'vue';
 import { useRouter } from 'vue-router';
+import { ArrowLeft, Search, SearchX } from '@lucide/vue';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/shared';
 import { useCaykurStore } from '@/stores/caykurStore';
 import { NAV_GROUPS } from '@/services/caykur/nav';
 import type { ModuleKey } from '@/services/caykur/roles';
-import { useFocusTrap } from '@/composables/useFocusTrap';
 
 /**
  * Panel-wide command palette (⌘K): jump to a module or run a frequent action.
@@ -19,7 +24,7 @@ interface PaletteItem {
     id: string;
     label: string;
     meta?: string;
-    iconSvg: string;
+    icon: Component;
     to: string;
 }
 
@@ -28,31 +33,24 @@ interface PaletteGroup {
     items: PaletteItem[];
 }
 
-const ICONS = {
-    back: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
-};
-
 const query = ref('');
 const activeIndex = ref(0);
-const panelRef = ref<HTMLElement | null>(null);
-const inputRef = ref<HTMLInputElement | null>(null);
+const inputRef = ref<InstanceType<typeof Input> | null>(null);
 const listRef = ref<HTMLElement | null>(null);
-
-useFocusTrap(open, panelRef);
 
 function norm(value: string): string {
     return value.toLocaleLowerCase('tr');
 }
 
 const navItems = computed<PaletteItem[]>(() =>
-    NAV_GROUPS.flatMap((g) => g.items)
-        .filter((it) => caykur.can(it.module))
-        .map((it) => ({
-            id: `page:${it.to}`,
-            label: it.label,
+    NAV_GROUPS.flatMap((group) => group.items)
+        .filter((item) => caykur.can(item.module))
+        .map((item) => ({
+            id: `page:${item.to}`,
+            label: item.label,
             meta: 'Sayfa',
-            iconSvg: it.iconSvg,
-            to: it.to,
+            icon: item.icon,
+            to: item.to,
         })),
 );
 
@@ -60,51 +58,56 @@ interface ActionDef {
     label: string;
     to: string;
     module: ModuleKey | null;
-    iconSvg: string;
+    icon: Component;
 }
 
 const ACTION_DEFS: ActionDef[] = [
-    { label: 'Üretici uygulamasına dön', to: '/tea/dashboard', module: null, iconSvg: ICONS.back },
+    { label: 'Üretici uygulamasına dön', to: '/tea/dashboard', module: null, icon: ArrowLeft },
 ];
 
 const actionItems = computed<PaletteItem[]>(() =>
-    ACTION_DEFS.filter((a) => a.module === null || caykur.can(a.module)).map((a) => ({
-        id: `action:${a.to}:${a.label}`,
-        label: a.label,
+    ACTION_DEFS.filter((action) => action.module === null || caykur.can(action.module)).map((action) => ({
+        id: `action:${action.to}:${action.label}`,
+        label: action.label,
         meta: 'İşlem',
-        iconSvg: a.iconSvg,
-        to: a.to,
+        icon: action.icon,
+        to: action.to,
     })),
 );
 
 const groups = computed<PaletteGroup[]>(() => {
     const q = norm(query.value.trim());
     const byQuery = (items: PaletteItem[]) =>
-        q ? items.filter((it) => norm(it.label).includes(q)) : items;
+        q ? items.filter((item) => norm(item.label).includes(q)) : items;
 
     return [
         { title: 'Sayfalar', items: byQuery(navItems.value) },
         { title: 'İşlemler', items: byQuery(actionItems.value) },
-    ].filter((g) => g.items.length > 0);
+    ].filter((group) => group.items.length > 0);
 });
 
-const flatItems = computed<PaletteItem[]>(() => groups.value.flatMap((g) => g.items));
+const flatItems = computed<PaletteItem[]>(() => groups.value.flatMap((group) => group.items));
 
 watch(query, () => {
     activeIndex.value = 0;
 });
 
 watch(open, async (isOpen) => {
-    if (isOpen) {
-        query.value = '';
-        activeIndex.value = 0;
-        document.body.style.overflow = 'hidden';
-        await nextTick();
-        inputRef.value?.focus();
-    } else {
-        document.body.style.overflow = '';
-    }
+    if (!isOpen) return;
+    query.value = '';
+    activeIndex.value = 0;
+    await nextTick();
+    focusInput();
 });
+
+function focusInput(): void {
+    const el = inputRef.value?.$el as HTMLInputElement | undefined;
+    el?.focus();
+}
+
+function onQueryInput(value: string | number): void {
+    query.value = String(value);
+}
 
 function close(): void {
     open.value = false;
@@ -121,11 +124,12 @@ function move(step: number): void {
     activeIndex.value = (activeIndex.value + step + count) % count;
     nextTick(() => {
         listRef.value
-            ?.querySelector(`#ck-palette-opt-${activeIndex.value}`)
+            ?.querySelector(`#caykur-palette-opt-${activeIndex.value}`)
             ?.scrollIntoView({ block: 'nearest' });
     });
 }
 
+/** Arrow / Enter handling; Escape is owned by the Dialog itself. */
 function onKeydown(e: KeyboardEvent): void {
     if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -139,9 +143,6 @@ function onKeydown(e: KeyboardEvent): void {
             e.preventDefault();
             go(item);
         }
-    } else if (e.key === 'Escape') {
-        e.preventDefault();
-        close();
     }
 }
 
@@ -152,231 +153,100 @@ function flatIndexOf(item: PaletteItem): number {
 </script>
 
 <template>
-    <Teleport to="body">
-        <div v-if="open" class="palette-root" @keydown="onKeydown">
-            <div class="palette-backdrop" aria-hidden="true" @click="close"></div>
-            <div
-                ref="panelRef"
-                class="palette-panel ck-pop-in"
-                role="dialog"
-                aria-modal="true"
-                aria-label="Komut paleti"
-            >
-                <div class="palette-input-row">
-                    <svg class="palette-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-                    <input
-                        ref="inputRef"
-                        v-model="query"
-                        type="text"
-                        class="palette-input"
-                        placeholder="Sayfa veya işlem ara…"
-                        role="combobox"
-                        aria-expanded="true"
-                        aria-controls="ck-palette-list"
-                        :aria-activedescendant="flatItems.length ? `ck-palette-opt-${activeIndex}` : undefined"
-                        autocomplete="off"
-                        spellcheck="false"
-                    />
-                    <button type="button" class="ck-kbd palette-esc" @click="close">esc</button>
-                </div>
+    <Dialog v-model:open="open">
+        <DialogContent
+            class="top-[14vh] translate-y-0 gap-0 overflow-hidden p-0 sm:max-w-lg"
+            :show-close-button="false"
+            aria-label="Komut paleti"
+            @keydown="onKeydown"
+            @open-auto-focus.prevent="focusInput"
+        >
+            <DialogTitle class="sr-only">Komut paleti</DialogTitle>
+            <DialogDescription class="sr-only">Sayfa veya işlem arayın, ok tuşlarıyla gezinin.</DialogDescription>
 
-                <div id="ck-palette-list" ref="listRef" class="palette-list" role="listbox" aria-label="Sonuçlar">
-                    <template v-for="group in groups" :key="group.title">
-                        <p class="palette-group-title" role="presentation">{{ group.title }}</p>
-                        <button
-                            v-for="item in group.items"
-                            :id="`ck-palette-opt-${flatIndexOf(item)}`"
-                            :key="item.id"
-                            type="button"
-                            class="palette-item"
-                            role="option"
-                            :aria-selected="flatIndexOf(item) === activeIndex"
-                            :class="{ 'is-active': flatIndexOf(item) === activeIndex }"
-                            tabindex="-1"
-                            @mousemove="activeIndex = flatIndexOf(item)"
-                            @click="go(item)"
-                        >
-                            <svg class="palette-item-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" v-html="item.iconSvg" />
-                            <span class="palette-item-label">{{ item.label }}</span>
-                            <span v-if="item.meta" class="palette-item-meta">{{ item.meta }}</span>
-                        </button>
-                    </template>
-
-                    <div v-if="flatItems.length === 0" class="palette-empty">
-                        <p class="palette-empty-title">Sonuç bulunamadı</p>
-                        <p class="palette-empty-sub">
-                            "{{ query }}" için sayfa veya işlem eşleşmedi.
-                        </p>
-                    </div>
-                </div>
-
-                <div class="palette-foot" aria-hidden="true">
-                    <span class="palette-hint"><span class="ck-kbd">↑</span><span class="ck-kbd">↓</span> gezin</span>
-                    <span class="palette-hint"><span class="ck-kbd">↵</span> aç</span>
-                    <span class="palette-hint"><span class="ck-kbd">esc</span> kapat</span>
-                </div>
+            <div class="flex items-center gap-2 border-b px-3">
+                <Search class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <Input
+                    ref="inputRef"
+                    :model-value="query"
+                    type="text"
+                    placeholder="Sayfa veya işlem ara…"
+                    role="combobox"
+                    aria-expanded="true"
+                    aria-controls="caykur-palette-list"
+                    :aria-activedescendant="flatItems.length ? `caykur-palette-opt-${activeIndex}` : undefined"
+                    autocomplete="off"
+                    spellcheck="false"
+                    class="h-12 border-0 bg-transparent px-0 text-base shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
+                    @update:model-value="onQueryInput"
+                />
+                <Button
+                    variant="ghost"
+                    size="xs"
+                    class="h-6 shrink-0 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground"
+                    aria-label="Kapat"
+                    @click="close"
+                >
+                    esc
+                </Button>
             </div>
-        </div>
-    </Teleport>
+
+            <div
+                id="caykur-palette-list"
+                ref="listRef"
+                class="max-h-[min(24rem,60vh)] overflow-y-auto overscroll-contain p-2"
+                role="listbox"
+                aria-label="Sonuçlar"
+            >
+                <template v-for="group in groups" :key="group.title">
+                    <div class="px-2 pb-1 pt-2" role="presentation">
+                        <Badge variant="muted">{{ group.title }}</Badge>
+                    </div>
+                    <Button
+                        v-for="item in group.items"
+                        :id="`caykur-palette-opt-${flatIndexOf(item)}`"
+                        :key="item.id"
+                        variant="ghost"
+                        role="option"
+                        :aria-selected="flatIndexOf(item) === activeIndex"
+                        :data-active="flatIndexOf(item) === activeIndex"
+                        tabindex="-1"
+                        class="h-11 w-full justify-start gap-3 px-3 font-medium data-[active=true]:bg-accent data-[active=true]:text-accent-foreground md:h-10"
+                        @mousemove="activeIndex = flatIndexOf(item)"
+                        @click="go(item)"
+                    >
+                        <component :is="item.icon" class="text-muted-foreground" aria-hidden="true" />
+                        <span class="flex-1 truncate text-left">{{ item.label }}</span>
+                        <span v-if="item.meta" class="shrink-0 text-xs font-normal text-muted-foreground">
+                            {{ item.meta }}
+                        </span>
+                    </Button>
+                </template>
+
+                <EmptyState
+                    v-if="flatItems.length === 0"
+                    title="Sonuç bulunamadı"
+                    :description="`&quot;${query}&quot; için sayfa veya işlem eşleşmedi.`"
+                    :icon="SearchX"
+                    class="min-h-0 border-0 bg-transparent py-8"
+                />
+            </div>
+
+            <div class="flex items-center gap-4 border-t bg-muted/40 px-4 py-2 text-xs text-muted-foreground" aria-hidden="true">
+                <span class="inline-flex items-center gap-1">
+                    <kbd class="rounded border bg-muted px-1 font-mono text-[10px]">↑</kbd>
+                    <kbd class="rounded border bg-muted px-1 font-mono text-[10px]">↓</kbd>
+                    gezin
+                </span>
+                <span class="inline-flex items-center gap-1">
+                    <kbd class="rounded border bg-muted px-1 font-mono text-[10px]">↵</kbd>
+                    aç
+                </span>
+                <span class="inline-flex items-center gap-1">
+                    <kbd class="rounded border bg-muted px-1 font-mono text-[10px]">esc</kbd>
+                    kapat
+                </span>
+            </div>
+        </DialogContent>
+    </Dialog>
 </template>
-
-<style scoped>
-.palette-root {
-    position: fixed;
-    inset: 0;
-    z-index: var(--z-modal);
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding: 14vh var(--space-4) var(--space-4);
-}
-
-.palette-backdrop {
-    position: absolute;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.4);
-}
-
-.palette-panel {
-    position: relative;
-    width: min(580px, 100%);
-    display: flex;
-    flex-direction: column;
-    max-height: min(460px, 70vh);
-    background: var(--color-bg-elevated);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-xl);
-    overflow: hidden;
-}
-
-.palette-input-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    padding: 0 var(--space-4);
-    border-bottom: 1px solid var(--color-border);
-    flex-shrink: 0;
-}
-
-.palette-search-icon {
-    color: var(--color-text-muted);
-    flex-shrink: 0;
-}
-
-.palette-input {
-    flex: 1;
-    height: 52px;
-    border: none;
-    outline: none;
-    background: transparent;
-    color: var(--color-text-primary);
-    font-family: var(--font-family);
-    font-size: var(--font-size-base);
-    min-width: 0;
-}
-
-.palette-input::placeholder {
-    color: var(--color-text-muted);
-}
-
-.palette-esc {
-    cursor: pointer;
-    flex-shrink: 0;
-}
-
-.palette-list {
-    overflow-y: auto;
-    padding: var(--space-2);
-    overscroll-behavior: contain;
-}
-
-.palette-group-title {
-    margin: var(--space-2) var(--space-3) 4px;
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text-muted);
-}
-
-.palette-item {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    width: 100%;
-    min-height: 42px;
-    padding: 0 var(--space-3);
-    background: transparent;
-    border: none;
-    border-radius: var(--radius-md);
-    color: var(--color-text-primary);
-    font-family: inherit;
-    font-size: var(--font-size-sm);
-    text-align: left;
-    cursor: pointer;
-}
-
-.palette-item.is-active {
-    background: var(--color-bg-tertiary);
-}
-
-.palette-item-icon {
-    color: var(--color-text-muted);
-    flex-shrink: 0;
-}
-
-.palette-item.is-active .palette-item-icon {
-    color: var(--color-text-secondary);
-}
-
-.palette-item-label {
-    flex: 1;
-    font-weight: var(--font-weight-medium);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.palette-item-meta {
-    font-size: var(--font-size-xs);
-    color: var(--color-text-muted);
-    flex-shrink: 0;
-    font-variant-numeric: tabular-nums;
-}
-
-.palette-empty {
-    padding: var(--space-8) var(--space-5);
-    text-align: center;
-}
-
-.palette-empty-title {
-    margin: 0 0 4px;
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text-primary);
-}
-
-.palette-empty-sub {
-    margin: 0;
-    font-size: var(--font-size-sm);
-    color: var(--color-text-muted);
-    overflow-wrap: anywhere;
-}
-
-.palette-foot {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
-    padding: var(--space-2) var(--space-4);
-    border-top: 1px solid var(--color-border);
-    background: var(--color-bg-primary);
-    flex-shrink: 0;
-}
-
-.palette-hint {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: var(--font-size-xs);
-    color: var(--color-text-muted);
-}
-</style>

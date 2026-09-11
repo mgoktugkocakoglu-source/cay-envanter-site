@@ -3,7 +3,8 @@ import { onMounted } from 'vue';
 import { RouterView } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
-import AppToast from '@/components/ui/AppToast.vue';
+import AppToaster from '@/components/shared/AppToaster.vue';
+import GlobalConfirmDialog from '@/components/shared/GlobalConfirmDialog.vue';
 
 const authStore = useAuthStore();
 const themeStore = useThemeStore();
@@ -18,6 +19,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <RouterView />
-  <AppToast />
+    <RouterView />
+    <AppToaster />
+    <GlobalConfirmDialog />
 </template>

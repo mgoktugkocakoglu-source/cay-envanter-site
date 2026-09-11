@@ -131,6 +131,12 @@ const router = createRouter({
             redirect: '/tea/dashboard',
         },
         {
+            path: '/tea/notifications',
+            name: 'tea-notifications',
+            component: () => import('@/pages/NotificationsPage.vue'),
+            meta: { requiresAuth: true, hub: 'tea' },
+        },
+        {
             path: '/tea/settings',
             name: 'tea-settings',
             component: () => import('@/pages/SettingsPage.vue'),
@@ -207,6 +213,7 @@ const router = createRouter({
         { path: '/payments', redirect: '/tea/payments' },
         { path: '/ai-agent', redirect: '/tea/ai-agent' },
         { path: '/settings', redirect: '/tea/settings' },
+        { path: '/notifications', redirect: '/tea/notifications' },
 
         // ═══════ 404 CATCH-ALL ═══════
         {
@@ -216,6 +223,15 @@ const router = createRouter({
         },
     ],
 });
+
+// DEV-ONLY visual preview of authenticated pages with mocked stores.
+if (import.meta.env.DEV) {
+    router.addRoute({
+        path: '/dev/preview/:page',
+        name: 'dev-preview',
+        component: () => import('@/pages/dev/DevPreviewPage.vue'),
+    });
+}
 
 // Apply auth guard globally
 router.beforeEach(authGuard);

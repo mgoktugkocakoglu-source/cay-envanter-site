@@ -21,7 +21,7 @@ import { JwtAuthGuard, CaykurRolesGuard } from '@/auth/guards';
 import { CaykurRoles } from '@/auth/decorators';
 import { CaykurRole } from '@/auth/enums';
 import { PruningActor } from '@/pruning/pruning.service';
-import { PruningRequestsService } from '@/pruning/pruning-requests.service';
+import { PruningRequestsService, PruningRequestView } from '@/pruning/pruning-requests.service';
 import {
     CreatePruningRequestDto,
     SetPruningAppointmentDto,
@@ -29,7 +29,6 @@ import {
     RejectPruningRequestDto,
     PruningRequestQueryDto,
 } from '@/pruning/dto';
-import { PruningRequest } from '@/pruning/entities';
 
 interface AuthenticatedRequest {
     user: PruningActor;
@@ -55,7 +54,7 @@ export class PruningRequestsController {
     async create(
         @Request() req: AuthenticatedRequest,
         @Body() dto: CreatePruningRequestDto,
-    ): Promise<PruningRequest> {
+    ): Promise<PruningRequestView> {
         return this.service.create(req.user, dto);
     }
 
@@ -76,7 +75,7 @@ export class PruningRequestsController {
     async findOne(
         @Request() req: AuthenticatedRequest,
         @Param('id', ParseUUIDPipe) id: string,
-    ): Promise<PruningRequest> {
+    ): Promise<PruningRequestView> {
         return this.service.findOne(id, req.user);
     }
 
@@ -89,7 +88,7 @@ export class PruningRequestsController {
         @Request() req: AuthenticatedRequest,
         @Param('id', ParseUUIDPipe) id: string,
         @Body() dto: SetPruningAppointmentDto,
-    ): Promise<PruningRequest> {
+    ): Promise<PruningRequestView> {
         return this.service.setAppointment(id, req.user, dto);
     }
 
@@ -102,7 +101,7 @@ export class PruningRequestsController {
         @Request() req: AuthenticatedRequest,
         @Param('id', ParseUUIDPipe) id: string,
         @Body() dto: SavePruningMeasurementResultDto,
-    ): Promise<PruningRequest> {
+    ): Promise<PruningRequestView> {
         return this.service.saveMeasurement(id, req.user, dto);
     }
 
@@ -114,7 +113,7 @@ export class PruningRequestsController {
     async approve(
         @Request() req: AuthenticatedRequest,
         @Param('id', ParseUUIDPipe) id: string,
-    ): Promise<PruningRequest> {
+    ): Promise<PruningRequestView> {
         return this.service.approve(id, req.user);
     }
 
@@ -127,7 +126,7 @@ export class PruningRequestsController {
         @Request() req: AuthenticatedRequest,
         @Param('id', ParseUUIDPipe) id: string,
         @Body() dto: RejectPruningRequestDto,
-    ): Promise<PruningRequest> {
+    ): Promise<PruningRequestView> {
         return this.service.reject(id, req.user, dto);
     }
 }

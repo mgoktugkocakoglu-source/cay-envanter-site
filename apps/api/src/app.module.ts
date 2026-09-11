@@ -18,6 +18,7 @@ import { HealthModule } from '@/health/health.module';
 import { KnowledgeModule } from '@/knowledge/knowledge.module';
 import { PruningModule } from '@/pruning/pruning.module';
 import { CaykurModule } from '@/caykur/caykur.module';
+import { LicensingModule } from '@/licensing/licensing.module';
 import { SeedModule } from '@/seed/seed.module';
 
 @Module({
@@ -96,6 +97,7 @@ import { SeedModule } from '@/seed/seed.module';
         KnowledgeModule,
         PruningModule,
         CaykurModule,
+        LicensingModule,
         SeedModule,
     ],
     providers: [

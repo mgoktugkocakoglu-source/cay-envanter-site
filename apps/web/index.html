@@ -48,7 +48,11 @@
   <script>
     (function () {
       var t = localStorage.getItem('cayhesabim-theme');
-      if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+      if (t === 'light' || t === 'dark') {
+        document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.classList.toggle('dark', t === 'dark');
+        document.documentElement.style.colorScheme = t;
+      }
     })();
   </script>
   <div id="app"></div>

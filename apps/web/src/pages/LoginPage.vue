@@ -1,24 +1,26 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter, useRoute, RouterLink } from 'vue-router';
+import { Eye, EyeOff, TriangleAlert } from '@lucide/vue';
 import { api } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
-import { useThemeStore } from '@/stores/themeStore';
-import AppInput from '@/components/ui/AppInput.vue';
-import AppPasswordInput from '@/components/ui/AppPasswordInput.vue';
-import AppCheckbox from '@/components/ui/AppCheckbox.vue';
-import AppButton from '@/components/ui/AppButton.vue';
+import AuthLayout from '@/layouts/AuthLayout.vue';
+import { Spinner } from '@/components/shared';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
-const themeStore = useThemeStore();
 
 // Form data
 const form = ref({
-  email: '',
-  password: '',
-  rememberMe: false,
+    email: '',
+    password: '',
+    rememberMe: false,
 });
 
 // Form state
@@ -27,68 +29,69 @@ const isLoading = ref(false);
 const serverError = ref('');
 const needsVerification = ref(false);
 const verificationEmail = ref('');
+const showPassword = ref(false);
 
 // Validation
 function validateField(field: string): boolean {
-  errors.value[field] = '';
+    errors.value[field] = '';
 
-  switch (field) {
-    case 'email':
-      if (!form.value.email) {
-        errors.value[field] = 'Email adresi gereklidir';
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.value.email)) {
-        errors.value[field] = 'Geçerli bir email adresi giriniz';
-      }
-      break;
+    switch (field) {
+        case 'email':
+            if (!form.value.email) {
+                errors.value[field] = 'Email adresi gereklidir';
+            } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.value.email)) {
+                errors.value[field] = 'Geçerli bir email adresi giriniz';
+            }
+            break;
 
-    case 'password':
-      if (!form.value.password) {
-        errors.value[field] = 'Şifre gereklidir';
-      }
-      break;
-  }
+        case 'password':
+            if (!form.value.password) {
+                errors.value[field] = 'Şifre gereklidir';
+            }
+            break;
+    }
 
-  return !errors.value[field];
+    return !errors.value[field];
 }
 
 function validateAll(): boolean {
-  return ['email', 'password'].every(validateField);
+    return ['email', 'password'].every(validateField);
 }
 
 // Form submission
 async function handleSubmit() {
-  serverError.value = '';
-  needsVerification.value = false;
+    serverError.value = '';
+    needsVerification.value = false;
 
-  if (!validateAll()) return;
+    if (!validateAll()) return;
 
-  isLoading.value = true;
+    isLoading.value = true;
 
-  const result = await api.login({
-    email: form.value.email,
-    password: form.value.password,
-    rememberMe: form.value.rememberMe,
-  });
+    const result = await api.login({
+        email: form.value.email,
+        password: form.value.password,
+        rememberMe: form.value.rememberMe,
+    });
 
-  isLoading.value = false;
+    isLoading.value = false;
 
-  if (result.error) {
-    if (result.error.message.includes('doğrulama') || result.error.message.includes('verification')) {
-      needsVerification.value = true;
-      verificationEmail.value = form.value.email;
-    } else {
-      serverError.value = result.error.message;
+    if (result.error) {
+        if (result.error.message.includes('doğrulama') || result.error.message.includes('verification')) {
+            needsVerification.value = true;
+            verificationEmail.value = form.value.email;
+        } else {
+            serverError.value = result.error.message;
+        }
+        return;
     }
-    return;
-  }
 
-  if (result.data) {
-    authStore.setAuth(result.data as { accessToken: string; refreshToken: string; user: any; });
-    // Honor a saved return URL, else route by identity (producer → tea hub,
-    // field officer → task queue, office/admin → Çaykur panel).
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : null;
-    router.push(redirect || authStore.homeRoute);
-  }
+    if (result.data) {
+        authStore.setAuth(result.data as Parameters<typeof authStore.setAuth>[0]);
+        // Honor a saved return URL, else route by identity (producer → tea hub,
+        // field officer → task queue, office/admin → Çaykur panel).
+        const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : null;
+        router.push(redirect || authStore.homeRoute);
+    }
 }
 
 // Resend verification
@@ -96,150 +99,115 @@ const resendLoading = ref(false);
 const resendMessage = ref('');
 
 async function resendVerification() {
-  resendLoading.value = true;
-  resendMessage.value = '';
+    resendLoading.value = true;
+    resendMessage.value = '';
 
-  const result = await api.resendVerification(verificationEmail.value);
+    const result = await api.resendVerification(verificationEmail.value);
 
-  resendLoading.value = false;
+    resendLoading.value = false;
 
-  if (result.error) {
-    resendMessage.value = result.error.message;
-    return;
-  }
+    if (result.error) {
+        resendMessage.value = result.error.message;
+        return;
+    }
 
-  resendMessage.value = 'Doğrulama emaili gönderildi';
+    resendMessage.value = 'Doğrulama emaili gönderildi';
 }
 </script>
 
 <template>
-  <div class="auth-page">
-    <header class="auth-header">
-      <RouterLink to="/" class="auth-logo">
-        <img v-if="themeStore.theme === 'dark'" src="@/assets/images/logo-dark.svg" alt="Çay Hesabım Logo" class="auth-logo-img" />
-        <img v-else src="@/assets/images/logo-light.svg" alt="Çay Hesabım Logo" class="auth-logo-img" />
-      </RouterLink>
-      <RouterLink to="/register" class="btn btn-secondary auth-header-cta">
-        <span class="auth-cta-prefix">Hesabınız yok mu?</span>
-        <span>Kayıt Olun</span>
-      </RouterLink>
-    </header>
+    <AuthLayout title="Giriş Yap" description="Hesabınıza giriş yapın">
+        <template #cta>
+            <Button as-child variant="outline" class="h-11 md:h-9">
+                <RouterLink to="/register">
+                    <span class="hidden sm:inline">Hesabınız yok mu?</span>
+                    <span>Kayıt Olun</span>
+                </RouterLink>
+            </Button>
+        </template>
 
-    <main class="auth-container">
-      <div class="auth-card card card-elevated">
-        <h1 class="auth-title">Giriş Yap</h1>
-        <p class="auth-subtitle">Hesabınıza giriş yapın</p>
+        <form class="space-y-5" novalidate @submit.prevent="handleSubmit">
+            <Alert v-if="serverError" variant="destructive">
+                <AlertDescription>{{ serverError }}</AlertDescription>
+            </Alert>
 
-        <!-- Server Error -->
-        <div v-if="serverError" class="message-box message-box-error">
-          <span>&#10060;</span>
-          <span>{{ serverError }}</span>
-        </div>
+            <Alert v-if="needsVerification" variant="warning">
+                <TriangleAlert aria-hidden="true" />
+                <AlertTitle>Email Doğrulaması Gerekli</AlertTitle>
+                <AlertDescription class="space-y-2">
+                    <p>Hesabınız henüz doğrulanmamış. Lütfen email adresinize gönderilen doğrulama linkine tıklayın.</p>
+                    <Button type="button" variant="link" class="h-auto p-0" :disabled="resendLoading" @click="resendVerification">
+                        <Spinner v-if="resendLoading" />
+                        Doğrulama Emailini Tekrar Gönder
+                    </Button>
+                    <p v-if="resendMessage">{{ resendMessage }}</p>
+                </AlertDescription>
+            </Alert>
 
-        <!-- Verification Required -->
-        <div v-if="needsVerification" class="message-box message-box-warning">
-          <div class="verification-warning">
-            <p><strong>&#9888;&#65039; Email Doğrulaması Gerekli</strong></p>
-            <p>Hesabınız henüz doğrulanmamış. Lütfen email adresinize gönderilen doğrulama linkine tıklayın.</p>
-            <AppButton
-              variant="link"
-              @click="resendVerification"
-              :loading="resendLoading"
-            >
-              Doğrulama Emailini Tekrar Gönder
-            </AppButton>
-            <p v-if="resendMessage" class="resend-result">{{ resendMessage }}</p>
-          </div>
-        </div>
-
-        <form @submit.prevent="handleSubmit" novalidate>
-          <!-- Email -->
-          <div class="form-group">
-            <AppInput
-              v-model="form.email"
-              label="Email Adresi"
-              type="email"
-              placeholder="ahmet@example.com"
-              :error="errors.email"
-              autocomplete="email"
-              @blur="validateField('email')"
-            />
-          </div>
-
-          <!-- Password -->
-          <div class="form-group">
-            <div class="password-header">
-              <span class="form-label-text">Şifre</span>
-              <RouterLink to="/forgot-password" class="forgot-link">
-                Şifrenizi mi unuttunuz?
-              </RouterLink>
+            <div class="space-y-2">
+                <Label for="login-email">Email Adresi</Label>
+                <Input
+                    id="login-email"
+                    v-model="form.email"
+                    type="email"
+                    placeholder="ahmet@example.com"
+                    autocomplete="email"
+                    class="h-11 md:h-9"
+                    :aria-invalid="!!errors.email"
+                    @blur="validateField('email')"
+                />
+                <p v-if="errors.email" class="text-xs text-destructive">{{ errors.email }}</p>
             </div>
-            <AppPasswordInput
-              v-model="form.password"
-              placeholder="Şifrenizi giriniz"
-              :error="errors.password"
-              @blur="validateField('password')"
-            />
-          </div>
 
-          <!-- Remember Me -->
-          <div class="form-group">
-            <AppCheckbox
-              v-model="form.rememberMe"
-              label="Beni Hatırla"
-            />
-          </div>
+            <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                    <Label for="login-password">Şifre</Label>
+                    <RouterLink to="/forgot-password" class="text-sm text-primary underline-offset-4 hover:underline">
+                        Şifrenizi mi unuttunuz?
+                    </RouterLink>
+                </div>
+                <div class="relative">
+                    <Input
+                        id="login-password"
+                        v-model="form.password"
+                        :type="showPassword ? 'text' : 'password'"
+                        placeholder="Şifrenizi giriniz"
+                        autocomplete="current-password"
+                        class="h-11 pr-11 md:h-9"
+                        :aria-invalid="!!errors.password"
+                        @blur="validateField('password')"
+                    />
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        class="absolute top-1/2 right-0.5 size-10 -translate-y-1/2 text-muted-foreground md:size-8"
+                        :aria-label="showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'"
+                        @click="showPassword = !showPassword"
+                    >
+                        <EyeOff v-if="showPassword" aria-hidden="true" />
+                        <Eye v-else aria-hidden="true" />
+                    </Button>
+                </div>
+                <p v-if="errors.password" class="text-xs text-destructive">{{ errors.password }}</p>
+            </div>
 
-          <!-- Submit -->
-          <AppButton
-            type="submit"
-            variant="primary"
-            size="lg"
-            block
-            :loading="isLoading"
-          >
-            {{ isLoading ? 'Giriş yapılıyor...' : 'Giriş Yap' }}
-          </AppButton>
+            <div class="flex items-center gap-2">
+                <Checkbox id="login-remember" :model-value="form.rememberMe" @update:model-value="form.rememberMe = $event === true" />
+                <Label for="login-remember" class="cursor-pointer font-normal">Beni Hatırla</Label>
+            </div>
+
+            <Button type="submit" class="h-11 w-full" :disabled="isLoading">
+                <Spinner v-if="isLoading" />
+                {{ isLoading ? 'Giriş yapılıyor...' : 'Giriş Yap' }}
+            </Button>
         </form>
 
-        <p class="auth-footer">
-          Hesabınız yok mu?
-          <RouterLink to="/register">Kayıt Olun</RouterLink>
-        </p>
-      </div>
-    </main>
-  </div>
+        <template #footer>
+            <p>
+                Hesabınız yok mu?
+                <RouterLink to="/register" class="font-medium text-primary underline-offset-4 hover:underline">Kayıt Olun</RouterLink>
+            </p>
+        </template>
+    </AuthLayout>
 </template>
-
-<style scoped>
-.password-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-2);
-}
-
-.form-label-text {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-secondary);
-}
-
-.forgot-link {
-  font-size: var(--font-size-sm);
-  color: var(--color-primary);
-}
-
-.verification-warning {
-  width: 100%;
-}
-
-.verification-warning p {
-  margin-bottom: var(--space-2);
-}
-
-.resend-result {
-  margin-top: var(--space-2);
-  font-size: var(--font-size-sm);
-}
-</style>

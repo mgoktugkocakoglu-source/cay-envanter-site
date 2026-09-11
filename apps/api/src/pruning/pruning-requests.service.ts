@@ -19,6 +19,19 @@ import {
 import { Role, CaykurRole, UserType } from '@/auth/enums';
 import { Paginated, paginate } from '@/common/dto/paginated.dto';
 import { PruningActor } from '@/pruning/pruning.service';
+import {
+    ParcelOwnersService,
+    ParcelOwnerView,
+    parcelKeyOf,
+    toParcelOwnerView,
+} from '@/fields/parcel-owners.service';
+
+/**
+ * A request as served to clients: the entity plus every registered owner of
+ * the same province + ada + parsel. More than one owner => hisseli parcel and
+ * the panel warns that a ruhsatlandirma measurement is needed.
+ */
+export type PruningRequestView = PruningRequest & { coOwners: ParcelOwnerView[] };
 
 /**
  * Budama talepleri workflow service. Producers open requests; Çaykur authorized
@@ -37,9 +50,10 @@ export class PruningRequestsService {
         private readonly userRepository: Repository<User>,
         @InjectRepository(Field)
         private readonly fieldRepository: Repository<Field>,
+        private readonly parcelOwners: ParcelOwnersService,
     ) {}
 
-    async create(actor: PruningActor, dto: CreatePruningRequestDto): Promise<PruningRequest> {
+    async create(actor: PruningActor, dto: CreatePruningRequestDto): Promise<PruningRequestView> {
         const user = await this.userRepository.findOne({ where: { id: actor.id } });
 
         // Producer account types may open a request; platform admin is always exempt.
@@ -77,7 +91,7 @@ export class PruningRequestsService {
         });
         const saved = await this.requestRepository.save(request);
         this.logger.log(`Pruning request created: ${saved.id} by producer ${actor.id}`);
-        return saved;
+        return this.withCoOwners(saved);
     }
 
     /** Field area normalized to m² (dekar/dönüm rows store 1 unit = 1000 m²). */
@@ -86,7 +100,7 @@ export class PruningRequestsService {
         return field.areaUnit === 'm2' ? area : area * 1000;
     }
 
-    async list(actor: PruningActor, query: PruningRequestQueryDto): Promise<Paginated<PruningRequest>> {
+    async list(actor: PruningActor, query: PruningRequestQueryDto): Promise<Paginated<PruningRequestView>> {
         const page = query.page ?? 1;
         const limit = query.limit ?? 50;
 
@@ -111,10 +125,10 @@ export class PruningRequestsService {
             .take(limit);
 
         const [rows, total] = await qb.getManyAndCount();
-        return paginate(rows, total, page, limit);
+        return paginate(await this.withCoOwnersMany(rows), total, page, limit);
     }
 
-    async findOne(id: string, actor: PruningActor): Promise<PruningRequest> {
+    async findOne(id: string, actor: PruningActor): Promise<PruningRequestView> {
         const request = await this.requestRepository.findOne({ where: { id } });
         if (!request) {
             throw new NotFoundException('Budama talebi bulunamadı');
@@ -122,14 +136,14 @@ export class PruningRequestsService {
         if (this.isProducer(actor) && request.producerId !== actor.id) {
             throw new ForbiddenException('Bu talebe erişiminiz yok');
         }
-        return request;
+        return this.withCoOwners(request);
     }
 
     async setAppointment(
         id: string,
         actor: PruningActor,
         dto: SetPruningAppointmentDto,
-    ): Promise<PruningRequest> {
+    ): Promise<PruningRequestView> {
         const request = await this.requireStaffAction(id, actor);
         request.appointmentDate = dto.appointmentDate;
         request.appointedById = actor.id;
@@ -137,14 +151,14 @@ export class PruningRequestsService {
         request.status = 'scheduled';
         const saved = await this.requestRepository.save(request);
         this.logger.log(`Pruning request ${id} scheduled for ${dto.appointmentDate}`);
-        return saved;
+        return this.withCoOwners(saved);
     }
 
     async saveMeasurement(
         id: string,
         actor: PruningActor,
         dto: SavePruningMeasurementResultDto,
-    ): Promise<PruningRequest> {
+    ): Promise<PruningRequestView> {
         const request = await this.requireStaffAction(id, actor);
         request.measuredAreaM2 = dto.measuredAreaM2;
         request.measurementPoints = dto.points;
@@ -157,30 +171,47 @@ export class PruningRequestsService {
         request.status = 'measured';
         const saved = await this.requestRepository.save(request);
         this.logger.log(`Pruning request ${id} measured (${dto.measuredAreaM2} m²)`);
-        return saved;
+        return this.withCoOwners(saved);
     }
 
-    async approve(id: string, actor: PruningActor): Promise<PruningRequest> {
+    async approve(id: string, actor: PruningActor): Promise<PruningRequestView> {
         const request = await this.requireStaffAction(id, actor);
         request.approvedAt = new Date();
         request.approvedByName = await this.actorName(actor);
         request.status = 'approved';
         const saved = await this.requestRepository.save(request);
         this.logger.log(`Pruning request ${id} approved`);
-        return saved;
+        return this.withCoOwners(saved);
     }
 
-    async reject(id: string, actor: PruningActor, dto: RejectPruningRequestDto): Promise<PruningRequest> {
+    async reject(id: string, actor: PruningActor, dto: RejectPruningRequestDto): Promise<PruningRequestView> {
         const request = await this.requireStaffAction(id, actor);
         request.approvedByName = await this.actorName(actor);
         request.notes = dto.reason ?? 'Talep reddedildi.';
         request.status = 'rejected';
         const saved = await this.requestRepository.save(request);
         this.logger.log(`Pruning request ${id} rejected`);
-        return saved;
+        return this.withCoOwners(saved);
     }
 
     // ── Helpers ──
+
+    private async withCoOwners(request: PruningRequest): Promise<PruningRequestView> {
+        const [view] = await this.withCoOwnersMany([request]);
+        return view;
+    }
+
+    /** Attach every registered owner of each request's parcel (one lookup per page). */
+    private async withCoOwnersMany(requests: PruningRequest[]): Promise<PruningRequestView[]> {
+        const owners = await this.parcelOwners.findOwnersForMany(
+            requests.map((r) => ({ province: r.il, adaNo: r.ada, parcelNo: r.parsel })),
+        );
+        return requests.map((r) => ({
+            ...r,
+            coOwners: (owners.get(parcelKeyOf({ province: r.il, adaNo: r.ada, parcelNo: r.parsel })) ?? [])
+                .map(toParcelOwnerView),
+        }));
+    }
 
     private async requireStaffAction(id: string, actor: PruningActor): Promise<PruningRequest> {
         const request = await this.requestRepository.findOne({ where: { id } });

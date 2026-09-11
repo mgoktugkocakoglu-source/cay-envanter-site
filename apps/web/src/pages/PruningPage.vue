@@ -1,14 +1,23 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
+import { ClipboardList, Ruler, Scissors } from '@lucide/vue';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
-import CaykurStatCard from '@/components/caykur/CaykurStatCard.vue';
-import StatusPill from '@/components/caykur/StatusPill.vue';
 import { useAuthStore } from '@/stores/authStore';
 import { useFieldsStore } from '@/stores/fieldsStore';
 import { usePruningRequestsStore } from '@/stores/pruningRequestsStore';
 import { PRUNING_REQUEST_STATUS_META } from '@/services/caykur';
-import type { Field } from '@/services/api';
+import type { Field, PruningRequest } from '@/services/api';
+import { toneVariant } from '@/components/caykur/tone';
+import { LoadingState, PageContainer, PageHeader, Spinner, StatCard } from '@/components/shared';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const auth = useAuthStore();
 const fieldsStore = useFieldsStore();
@@ -18,6 +27,12 @@ type Tab = 'request' | 'record';
 const tab = ref<Tab>('request');
 
 const user = computed(() => auth.user);
+
+const headerDescription = computed(() => {
+    if (!user.value) return '';
+    const location = user.value.district ? ` · ${user.value.district} / ${user.value.province}` : '';
+    return `${user.value.fullName}${location}`;
+});
 
 // ── Producer context (real data) ──
 function fieldToM2(f: Field): number {
@@ -47,6 +62,7 @@ function hasCadastralInfo(f: Field): boolean {
 }
 const selectableFields = computed(() => fieldsStore.fields);
 const selectedField = computed(() => fieldsStore.fields.find((f) => f.id === selectedFieldId.value) ?? null);
+const hasFieldsMissingCadastralInfo = computed(() => selectableFields.value.some((f) => !hasCadastralInfo(f)));
 
 function fieldOptionLabel(f: Field): string {
     const parcel = hasCadastralInfo(f) ? `Ada ${f.adaNo} / Parsel ${f.parcelNo}` : 'Ada/parsel eksik';
@@ -87,6 +103,10 @@ const tabs: Array<{ id: Tab; label: string }> = [
     { id: 'record', label: 'Budama Kaydı' },
 ];
 
+function onTabChange(value: string | number): void {
+    if (value === 'request' || value === 'record') tab.value = value;
+}
+
 function formatNumber(n: number): string {
     return n.toLocaleString('tr-TR', { maximumFractionDigits: 0 });
 }
@@ -94,6 +114,19 @@ function formatDate(iso: string | null): string {
     if (!iso) return '—';
     const d = new Date(iso);
     return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function methodLabel(r: PruningRequest): string {
+    if (r.method === 'gps') return 'GPS';
+    if (r.method === 'map') return 'Harita';
+    if (r.method === 'imu') return 'Lazer + IMU';
+    return '—';
+}
+
+function firstPointLabel(r: PruningRequest): string {
+    const p = r.measurementPoints[0];
+    if (!p) return '—';
+    return `${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}, ${p.altitudeMeters.toFixed(1)} m`;
 }
 
 onMounted(() => {
@@ -105,157 +138,213 @@ onMounted(() => {
 
 <template>
     <TeaBusinessLayout>
-        <div class="pp">
-            <header class="pp-head">
-                <div>
-                    <h1 class="pp-title">Budama</h1>
-                    <p class="pp-sub">{{ user?.fullName }}<template v-if="user?.district"> · {{ user.district }} / {{ user.province }}</template></p>
-                </div>
-            </header>
+        <PageContainer>
+            <PageHeader title="Budama" :description="headerDescription" />
 
-            <div class="ck-seg pp-tabs" role="tablist">
-                <button v-for="t in tabs" :key="t.id" type="button" class="ck-seg-btn" :class="{ 'is-active': tab === t.id }" role="tab" :aria-selected="tab === t.id" @click="tab = t.id">{{ t.label }}</button>
-            </div>
+            <Tabs :model-value="tab" @update:model-value="onTabChange">
+                <TabsList variant="line" aria-label="Budama bölümleri">
+                    <TabsTrigger v-for="t in tabs" :key="t.id" :value="t.id">{{ t.label }}</TabsTrigger>
+                </TabsList>
 
-            <!-- ══ Budama Talebi ══ -->
-            <template v-if="tab === 'request'">
-                <section class="ck-panel">
-                    <div class="ck-panel-head">
-                        <h2 class="ck-panel-title">Yeni budama talebi</h2>
-                    </div>
-                    <div class="ck-panel-body">
-                        <p class="pp-flow">Budadığınız tarlayı kayıtlı tarlalarınız arasından seçin; il/ilçe ve ada/parsel bilgisi tarla kaydından alınır. Çaykur yetkili personeli talebinizi değerlendirip bir <strong>randevu tarihi</strong> belirler; randevuda budanan çay hassas sensörlerle ölçülüp kaydedilir.</p>
-                        <div v-if="fieldsStore.isLoading && !selectableFields.length" class="pp-hint">Tarlalar yükleniyor…</div>
-                        <div v-else-if="!selectableFields.length" class="pp-hint">
-                            Henüz kayıtlı tarlanız yok. Talep açmak için önce <RouterLink to="/tea/fields/create" class="pp-link">tarla ekleyin</RouterLink>.
-                        </div>
-                        <div v-else class="pp-form">
-                            <label class="pp-field pp-field-full">
-                                <span>Tarla</span>
-                                <select v-model="selectedFieldId" class="pp-input">
-                                    <option value="" disabled>Tarla seçin</option>
-                                    <option v-for="f in selectableFields" :key="f.id" :value="f.id" :disabled="!hasCadastralInfo(f)">{{ fieldOptionLabel(f) }}</option>
-                                </select>
-                            </label>
-                            <template v-if="selectedField">
-                                <div class="pp-field"><span>İl / İlçe</span><p class="pp-readonly">{{ selectedField.province }} / {{ selectedField.district }}</p></div>
-                                <div class="pp-field"><span>Ada / Parsel</span><p class="pp-readonly">Ada {{ selectedField.adaNo }} / Parsel {{ selectedField.parcelNo }}</p></div>
-                                <div class="pp-field"><span>Mahalle</span><p class="pp-readonly">{{ selectedField.neighborhood || '—' }}</p></div>
-                                <div class="pp-field"><span>Alan</span><p class="pp-readonly">{{ formatNumber(fieldToM2(selectedField)) }} m²</p></div>
-                            </template>
-                            <p v-if="selectableFields.some((f) => !hasCadastralInfo(f))" class="pp-hint pp-field-full">
-                                Ada/parsel bilgisi eksik tarlalar seçilemez. <RouterLink to="/tea/fields" class="pp-link">Tarla kaydını düzenleyin</RouterLink>.
+                <!-- Budama Talebi -->
+                <TabsContent value="request" class="flex flex-col gap-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Yeni budama talebi</CardTitle>
+                            <CardDescription>
+                                Budadığınız tarlayı kayıtlı tarlalarınız arasından seçin; il/ilçe ve ada/parsel bilgisi tarla kaydından alınır.
+                                Çaykur yetkili personeli talebinizi değerlendirip bir
+                                <strong class="font-semibold text-foreground">randevu tarihi</strong> belirler; randevuda budanan çay hassas sensörlerle ölçülüp kaydedilir.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent class="flex flex-col gap-4">
+                            <LoadingState v-if="fieldsStore.isLoading && !selectableFields.length" text="Tarlalar yükleniyor..." class="min-h-24" />
+
+                            <p v-else-if="!selectableFields.length" class="text-sm text-muted-foreground">
+                                Henüz kayıtlı tarlanız yok. Talep açmak için önce
+                                <RouterLink to="/tea/fields/create" class="font-semibold text-primary underline underline-offset-4">tarla ekleyin</RouterLink>.
                             </p>
-                        </div>
-                        <p v-if="formError" class="pp-error">{{ formError }}</p>
-                        <div class="pp-form-actions">
-                            <button type="button" class="ck-btn ck-btn-primary" :disabled="submitting" @click="submit">{{ submitting ? 'Gönderiliyor…' : 'Talep oluştur' }}</button>
-                        </div>
-                    </div>
-                </section>
 
-                <section class="ck-panel">
-                    <div class="ck-panel-head">
-                        <h2 class="ck-panel-title">Taleplerim</h2>
-                        <span class="ck-panel-meta">{{ formatNumber(myRequests.length) }} talep</span>
-                    </div>
-                    <div class="ck-table-wrap">
-                        <table class="ck-table">
-                            <thead><tr><th>Ada / Parsel</th><th>İl / İlçe</th><th>Talep tarihi</th><th>Randevu</th><th>Durum</th></tr></thead>
-                            <tbody>
-                                <tr v-for="r in myRequests" :key="r.id">
-                                    <td class="strong">Ada {{ r.ada }} / Parsel {{ r.parsel }}</td>
-                                    <td>{{ r.il }} · {{ r.ilce }}</td>
-                                    <td style="white-space:nowrap">{{ formatDate(r.createdAt) }}</td>
-                                    <td style="white-space:nowrap">{{ formatDate(r.appointmentDate) }}</td>
-                                    <td><StatusPill :label="PRUNING_REQUEST_STATUS_META[r.status].label" :tone="PRUNING_REQUEST_STATUS_META[r.status].tone" /></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        <div v-if="!myRequests.length" class="ck-empty"><p class="ck-empty-title">Henüz talebiniz yok</p></div>
-                    </div>
-                </section>
-            </template>
+                            <div v-else class="grid gap-4 md:grid-cols-2">
+                                <div class="space-y-2 md:col-span-2">
+                                    <Label for="pruning-field-select">Tarla</Label>
+                                    <Select v-model="selectedFieldId">
+                                        <SelectTrigger id="pruning-field-select" class="w-full">
+                                            <SelectValue placeholder="Tarla seçin" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem v-for="f in selectableFields" :key="f.id" :value="f.id" :disabled="!hasCadastralInfo(f)">
+                                                {{ fieldOptionLabel(f) }}
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
 
-            <!-- ══ Budama Kaydı ══ -->
-            <template v-else>
-                <section class="ck-kpi-grid">
-                    <CaykurStatCard label="Toplam kayıtlı arazi" :value="formatNumber(registeredAreaM2)" unit="m²" sub="ruhsatlı bahçeniz" />
-                    <CaykurStatCard label="Budanacak miktar" :value="formatNumber(pruneTargetM2)" unit="m²" sub="1/7 hedef · %14,3" />
-                    <CaykurStatCard label="Ölçülen / onaylanan" :value="formatNumber(measuredTotalM2)" unit="m²" :sub="`${formatNumber(records.length)} kayıt`" />
-                </section>
+                                <template v-if="selectedField">
+                                    <div class="space-y-2">
+                                        <span class="text-sm font-medium">İl / İlçe</span>
+                                        <p class="flex min-h-11 items-center rounded-md border bg-muted px-3 text-sm font-semibold text-foreground md:min-h-9">
+                                            {{ selectedField.province }} / {{ selectedField.district }}
+                                        </p>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <span class="text-sm font-medium">Ada / Parsel</span>
+                                        <p class="flex min-h-11 items-center rounded-md border bg-muted px-3 text-sm font-semibold text-foreground md:min-h-9">
+                                            Ada {{ selectedField.adaNo }} / Parsel {{ selectedField.parcelNo }}
+                                        </p>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <span class="text-sm font-medium">Mahalle</span>
+                                        <p class="flex min-h-11 items-center rounded-md border bg-muted px-3 text-sm font-semibold text-foreground md:min-h-9">
+                                            {{ selectedField.neighborhood || '—' }}
+                                        </p>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <span class="text-sm font-medium">Alan</span>
+                                        <p class="flex min-h-11 items-center rounded-md border bg-muted px-3 text-sm font-semibold text-foreground tabular-nums md:min-h-9">
+                                            {{ formatNumber(fieldToM2(selectedField)) }} m²
+                                        </p>
+                                    </div>
+                                </template>
 
-                <section class="ck-panel">
-                    <div class="ck-panel-head">
-                        <h2 class="ck-panel-title">Budama kayıtları</h2>
-                        <span class="ck-panel-meta">{{ formatNumber(records.length) }} ölçüm</span>
-                    </div>
-                    <div class="ck-table-wrap">
-                        <table class="ck-table">
-                            <thead><tr><th>Ada / Parsel</th><th class="num">Ölçülen alan</th><th>Konum (enlem, boylam, yükseklik)</th><th>Yöntem</th><th>Durum</th><th>Tarih</th></tr></thead>
-                            <tbody>
-                                <tr v-for="r in records" :key="r.id">
-                                    <td class="strong">Ada {{ r.ada }} / Parsel {{ r.parsel }}</td>
-                                    <td class="num ck-money">{{ formatNumber(r.measuredAreaM2 ?? 0) }} m²</td>
-                                    <td>
-                                        <template v-if="r.measurementPoints.length">
-                                            {{ r.measurementPoints[0].lat.toFixed(6) }}, {{ r.measurementPoints[0].lng.toFixed(6) }}, {{ r.measurementPoints[0].altitudeMeters.toFixed(1) }} m
-                                            <span class="pp-pts">+{{ r.measurementPoints.length - 1 }} köşe</span>
-                                        </template>
-                                        <template v-else>—</template>
-                                    </td>
-                                    <td>{{ r.method === 'gps' ? 'GPS' : r.method === 'map' ? 'Harita' : r.method === 'imu' ? 'Lazer + IMU' : '—' }}</td>
-                                    <td><StatusPill :label="PRUNING_REQUEST_STATUS_META[r.status].label" :tone="PRUNING_REQUEST_STATUS_META[r.status].tone" /></td>
-                                    <td style="white-space:nowrap">{{ formatDate(r.measuredAt) }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        <div v-if="!records.length" class="ck-empty">
-                            <p class="ck-empty-title">Henüz budama kaydı yok</p>
-                            <p class="pp-empty-sub">Ölçüm, randevu tarihinde Çaykur yetkili personeli tarafından sahada yapılır.</p>
+                                <p v-if="hasFieldsMissingCadastralInfo" class="text-xs text-muted-foreground md:col-span-2">
+                                    Ada/parsel bilgisi eksik tarlalar seçilemez.
+                                    <RouterLink to="/tea/fields" class="font-semibold text-primary underline underline-offset-4">Tarla kaydını düzenleyin</RouterLink>.
+                                </p>
+                            </div>
+
+                            <Alert v-if="formError" variant="destructive">
+                                <AlertDescription>{{ formError }}</AlertDescription>
+                            </Alert>
+                        </CardContent>
+                        <CardFooter class="justify-end">
+                            <Button class="h-11 md:h-9" :disabled="submitting" @click="submit">
+                                <Spinner v-if="submitting" />
+                                <Scissors v-else aria-hidden="true" />
+                                {{ submitting ? 'Gönderiliyor…' : 'Talep oluştur' }}
+                            </Button>
+                        </CardFooter>
+                    </Card>
+
+                    <Card class="gap-4 overflow-hidden pb-0">
+                        <CardHeader>
+                            <CardTitle>Taleplerim</CardTitle>
+                            <CardAction>
+                                <Badge variant="secondary">{{ formatNumber(myRequests.length) }} talep</Badge>
+                            </CardAction>
+                        </CardHeader>
+                        <div class="border-t">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow class="hover:bg-transparent">
+                                        <TableHead class="pl-5">Ada / Parsel</TableHead>
+                                        <TableHead class="hidden md:table-cell">İl / İlçe</TableHead>
+                                        <TableHead class="hidden md:table-cell">Talep tarihi</TableHead>
+                                        <TableHead class="hidden md:table-cell">Randevu</TableHead>
+                                        <TableHead class="pr-5 text-right md:text-left">Durum</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    <TableEmpty v-if="!myRequests.length" :colspan="5">
+                                        <div class="flex flex-col items-center gap-2 text-center">
+                                            <ClipboardList class="size-6 text-muted-foreground" aria-hidden="true" />
+                                            <p class="text-sm font-medium text-foreground">Henüz talebiniz yok</p>
+                                        </div>
+                                    </TableEmpty>
+                                    <TableRow v-for="r in myRequests" v-else :key="r.id">
+                                        <TableCell class="pl-5">
+                                            <span class="block font-medium text-foreground">Ada {{ r.ada }} / Parsel {{ r.parsel }}</span>
+                                            <span class="block text-xs text-muted-foreground md:hidden">{{ r.il }} · {{ r.ilce }}</span>
+                                            <span class="block text-xs text-muted-foreground md:hidden">
+                                                Talep {{ formatDate(r.createdAt) }} · Randevu {{ formatDate(r.appointmentDate) }}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell class="hidden text-muted-foreground md:table-cell">{{ r.il }} · {{ r.ilce }}</TableCell>
+                                        <TableCell class="hidden whitespace-nowrap text-muted-foreground md:table-cell">{{ formatDate(r.createdAt) }}</TableCell>
+                                        <TableCell class="hidden whitespace-nowrap text-muted-foreground md:table-cell">{{ formatDate(r.appointmentDate) }}</TableCell>
+                                        <TableCell class="pr-5 text-right md:text-left">
+                                            <Badge :variant="toneVariant(PRUNING_REQUEST_STATUS_META[r.status].tone)">
+                                                {{ PRUNING_REQUEST_STATUS_META[r.status].label }}
+                                            </Badge>
+                                        </TableCell>
+                                    </TableRow>
+                                </TableBody>
+                            </Table>
                         </div>
-                    </div>
-                </section>
-            </template>
-        </div>
+                    </Card>
+                </TabsContent>
+
+                <!-- Budama Kaydı -->
+                <TabsContent value="record" class="flex flex-col gap-4">
+                    <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Budama özeti">
+                        <StatCard label="Toplam kayıtlı arazi" :value="`${formatNumber(registeredAreaM2)} m²`" hint="ruhsatlı bahçeniz" :icon="Scissors" />
+                        <StatCard label="Budanacak miktar" :value="`${formatNumber(pruneTargetM2)} m²`" hint="1/7 hedef · %14,3" :icon="Ruler" />
+                        <StatCard
+                            label="Ölçülen / onaylanan"
+                            :value="`${formatNumber(measuredTotalM2)} m²`"
+                            :hint="`${formatNumber(records.length)} kayıt`"
+                            :icon="ClipboardList"
+                        />
+                    </section>
+
+                    <Card class="gap-4 overflow-hidden pb-0">
+                        <CardHeader>
+                            <CardTitle>Budama kayıtları</CardTitle>
+                            <CardAction>
+                                <Badge variant="secondary">{{ formatNumber(records.length) }} ölçüm</Badge>
+                            </CardAction>
+                        </CardHeader>
+                        <div class="border-t">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow class="hover:bg-transparent">
+                                        <TableHead class="pl-5">Ada / Parsel</TableHead>
+                                        <TableHead class="pr-5 text-right md:pr-2">Ölçülen alan</TableHead>
+                                        <TableHead class="hidden md:table-cell">Konum (enlem, boylam, yükseklik)</TableHead>
+                                        <TableHead class="hidden md:table-cell">Yöntem</TableHead>
+                                        <TableHead class="hidden md:table-cell">Durum</TableHead>
+                                        <TableHead class="hidden pr-5 md:table-cell">Tarih</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    <TableEmpty v-if="!records.length" :colspan="6">
+                                        <div class="flex flex-col items-center gap-2 text-center">
+                                            <Ruler class="size-6 text-muted-foreground" aria-hidden="true" />
+                                            <p class="text-sm font-medium text-foreground">Henüz budama kaydı yok</p>
+                                            <p class="max-w-sm text-xs whitespace-normal text-muted-foreground">
+                                                Ölçüm, randevu tarihinde Çaykur yetkili personeli tarafından sahada yapılır.
+                                            </p>
+                                        </div>
+                                    </TableEmpty>
+                                    <TableRow v-for="r in records" v-else :key="r.id">
+                                        <TableCell class="pl-5">
+                                            <span class="block font-medium text-foreground">Ada {{ r.ada }} / Parsel {{ r.parsel }}</span>
+                                            <span class="block text-xs text-muted-foreground md:hidden">{{ methodLabel(r) }} · {{ formatDate(r.measuredAt) }}</span>
+                                            <Badge :variant="toneVariant(PRUNING_REQUEST_STATUS_META[r.status].tone)" class="mt-1 md:hidden">
+                                                {{ PRUNING_REQUEST_STATUS_META[r.status].label }}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell class="pr-5 text-right font-semibold text-foreground tabular-nums md:pr-2">
+                                            {{ formatNumber(r.measuredAreaM2 ?? 0) }} m²
+                                        </TableCell>
+                                        <TableCell class="hidden text-muted-foreground tabular-nums md:table-cell">
+                                            {{ firstPointLabel(r) }}
+                                            <span v-if="r.measurementPoints.length" class="ml-1 text-xs">+{{ r.measurementPoints.length - 1 }} köşe</span>
+                                        </TableCell>
+                                        <TableCell class="hidden text-muted-foreground md:table-cell">{{ methodLabel(r) }}</TableCell>
+                                        <TableCell class="hidden md:table-cell">
+                                            <Badge :variant="toneVariant(PRUNING_REQUEST_STATUS_META[r.status].tone)">
+                                                {{ PRUNING_REQUEST_STATUS_META[r.status].label }}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell class="hidden pr-5 whitespace-nowrap text-muted-foreground md:table-cell">{{ formatDate(r.measuredAt) }}</TableCell>
+                                    </TableRow>
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </Card>
+                </TabsContent>
+            </Tabs>
+        </PageContainer>
     </TeaBusinessLayout>
 </template>
-
-<style scoped>
-.pp { max-width: 1100px; margin: 0 auto; padding: var(--space-6) var(--space-6) var(--space-12); }
-.pp-head { margin-bottom: var(--space-5); }
-.pp-title { margin: 0; font-size: var(--font-size-2xl); font-weight: var(--font-weight-bold); color: var(--color-text-primary); letter-spacing: -0.01em; }
-.pp-sub { margin: 3px 0 0; font-size: var(--font-size-sm); color: var(--color-text-muted); }
-.pp-tabs { margin-bottom: var(--space-4); align-self: flex-start; }
-
-.pp-flow { margin: 0 0 var(--space-4); font-size: var(--font-size-sm); color: var(--color-text-secondary); line-height: 1.6; }
-.pp-form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
-@media (max-width: 640px) { .pp-form { grid-template-columns: 1fr; } }
-.pp-field { display: flex; flex-direction: column; gap: 6px; }
-.pp-field > span { font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); color: var(--color-text-secondary); }
-.pp-input {
-    min-height: 44px; padding: 0 14px;
-    border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-md);
-    background: var(--color-bg-primary);
-    color: var(--color-text-primary);
-    font-size: var(--font-size-sm);
-}
-.pp-input:focus { outline: none; border-color: var(--color-primary); }
-select.pp-input { cursor: pointer; }
-.pp-field-full { grid-column: 1 / -1; }
-.pp-readonly {
-    margin: 0; min-height: 44px; display: flex; align-items: center; padding: 0 14px;
-    border: 1px solid var(--color-border); border-radius: var(--radius-md);
-    background: var(--color-bg-secondary); color: var(--color-text-primary);
-    font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold);
-}
-.pp-hint { margin: 0; font-size: var(--font-size-xs); color: var(--color-text-muted); line-height: 1.5; }
-.pp-link { color: var(--color-primary); font-weight: var(--font-weight-semibold); text-decoration: underline; }
-.pp-error { margin: var(--space-3) 0 0; font-size: var(--font-size-xs); color: var(--color-danger); }
-.pp-form-actions { margin-top: var(--space-4); display: flex; justify-content: flex-end; }
-.pp-pts { color: var(--color-text-muted); font-size: var(--font-size-xs); margin-left: 6px; }
-.pp-empty-sub { margin: var(--space-2) 0 0; font-size: var(--font-size-xs); color: var(--color-text-muted); }
-.ck-panel + .ck-panel { margin-top: var(--space-4); }
-.ck-kpi-grid + .ck-panel { margin-top: var(--space-4); }
-</style>

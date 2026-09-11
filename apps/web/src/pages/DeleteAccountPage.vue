@@ -1,479 +1,245 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { RouterLink } from 'vue-router';
+import { Info } from '@lucide/vue';
+import AuthLayout from '@/layouts/AuthLayout.vue';
+import { PageContainer, PageHeader, Spinner } from '@/components/shared';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 const contactEmail = 'destek@cayhesabim.com';
 const appName = 'Çay Hesabım';
 
+const linkClass = 'text-primary underline underline-offset-4';
+
 const form = ref({
-  fullName: '',
-  email: '',
-  reason: '',
-  acknowledge: false,
+    fullName: '',
+    email: '',
+    reason: '',
+    acknowledge: false,
 });
 const submitLoading = ref(false);
 const submitError = ref('');
 const submitted = ref(false);
 
 const mailtoLink = computed(() => {
-  const subject = encodeURIComponent(`${appName} — Hesap Silme Talebi`);
-  const body = encodeURIComponent(
-    `Ad Soyad: ${form.value.fullName || ''}\n` +
-    `Hesap E-posta: ${form.value.email || ''}\n` +
-    `Sebep (opsiyonel): ${form.value.reason || ''}\n\n` +
-    `Bu hesaba ait tüm verilerin (profil, tarlalar, hasatlar, ödemeler, ilanlar, ` +
-    `topluluk gönderileri ve yorumları) ${appName} sistemlerinden kalıcı olarak ` +
-    `silinmesini talep ediyorum.`,
-  );
-  return `mailto:${contactEmail}?subject=${subject}&body=${body}`;
+    const subject = encodeURIComponent(`${appName} — Hesap Silme Talebi`);
+    const body = encodeURIComponent(
+        `Ad Soyad: ${form.value.fullName || ''}\n` +
+            `Hesap E-posta: ${form.value.email || ''}\n` +
+            `Sebep (opsiyonel): ${form.value.reason || ''}\n\n` +
+            `Bu hesaba ait tüm verilerin (profil, tarlalar, hasatlar, ödemeler, ilanlar, ` +
+            `topluluk gönderileri ve yorumları) ${appName} sistemlerinden kalıcı olarak ` +
+            `silinmesini talep ediyorum.`,
+    );
+    return `mailto:${contactEmail}?subject=${subject}&body=${body}`;
 });
 
+function onAcknowledgeChange(value: boolean | 'indeterminate') {
+    form.value.acknowledge = value === true;
+}
+
 function handleSubmit() {
-  submitError.value = '';
+    submitError.value = '';
 
-  if (!form.value.fullName.trim()) {
-    submitError.value = 'Ad Soyad gereklidir';
-    return;
-  }
-  if (!form.value.email.trim() || !/.+@.+\..+/.test(form.value.email)) {
-    submitError.value = 'Geçerli bir e-posta adresi girin';
-    return;
-  }
-  if (!form.value.acknowledge) {
-    submitError.value = 'Silme işleminin geri alınamaz olduğunu onaylamalısınız';
-    return;
-  }
+    if (!form.value.fullName.trim()) {
+        submitError.value = 'Ad Soyad gereklidir';
+        return;
+    }
+    if (!form.value.email.trim() || !/.+@.+\..+/.test(form.value.email)) {
+        submitError.value = 'Geçerli bir e-posta adresi girin';
+        return;
+    }
+    if (!form.value.acknowledge) {
+        submitError.value = 'Silme işleminin geri alınamaz olduğunu onaylamalısınız';
+        return;
+    }
 
-  submitLoading.value = true;
-  // Trigger the user's mail client; we don't auto-process here for security.
-  window.location.href = mailtoLink.value;
-  submitLoading.value = false;
-  submitted.value = true;
+    submitLoading.value = true;
+    // Trigger the user's mail client; we don't auto-process here for security.
+    window.location.href = mailtoLink.value;
+    submitLoading.value = false;
+    submitted.value = true;
 }
 </script>
 
 <template>
-  <div class="legal-page">
-    <header class="legal-header">
-      <RouterLink to="/" class="legal-logo">
-        <span class="legal-logo-icon">🍃</span>
-        <span>{{ appName }}</span>
-      </RouterLink>
-    </header>
+    <AuthLayout variant="page">
+        <PageContainer size="narrow">
+            <PageHeader
+                title="Hesap ve Veri Silme"
+                :description="`Bu sayfa, ${appName} hesabınızı ve hesabınıza bağlı verileri silme seçeneklerinizi açıklar. Google Play Veri Güvenliği gereklilikleri uyarınca uygulama içinden ve web üzerinden silme talebi mümkündür.`"
+                back-to="/"
+                back-label="Ana sayfaya dön"
+            />
 
-    <main class="legal-container">
-      <article class="legal-card card card-elevated">
-        <h1 class="legal-title">Hesap ve Veri Silme</h1>
-        <p class="legal-meta">
-          Bu sayfa, {{ appName }} hesabınızı ve hesabınıza bağlı verileri silme
-          seçeneklerinizi açıklar. Google Play Veri Güvenliği gereklilikleri
-          uyarınca uygulama içinden ve web üzerinden silme talebi mümkündür.
-        </p>
+            <article class="space-y-8 rounded-lg border bg-card p-4 text-sm leading-relaxed text-muted-foreground md:p-6">
+                <!-- 1) In-app deletion -->
+                <section class="space-y-4">
+                    <h2 class="text-lg font-semibold text-foreground">1. Uygulama İçinden Silme (Önerilen)</h2>
+                    <p>Hesabınızı uygulamadan birkaç adımda kalıcı olarak silebilirsiniz:</p>
+                    <ol class="list-decimal space-y-1 pl-5">
+                        <li>Uygulamaya giriş yapın.</li>
+                        <li>
+                            <strong class="font-medium text-foreground">Ayarlar &raquo; Hesap</strong> sekmesine gidin (alt menüden veya profil
+                            simgesinden ulaşabilirsiniz).
+                        </li>
+                        <li>
+                            Sayfanın altındaki <strong class="font-medium text-foreground">Tehlikeli Bölge</strong> kartında
+                            <strong class="font-medium text-foreground">“Hesabımı Sil”</strong> butonuna basın.
+                        </li>
+                        <li>
+                            Açılan pencerede mevcut şifrenizi girin ve onay alanına
+                            <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">SİL</code> yazın.
+                        </li>
+                        <li><strong class="font-medium text-foreground">“Hesabımı Kalıcı Olarak Sil”</strong> butonuna tıklayın.</li>
+                    </ol>
+                    <p class="text-xs">
+                        İşlem tamamlandıktan sonra otomatik olarak çıkış yapılır ve hesabınız ile tüm verileriniz veritabanından
+                        <strong class="font-medium text-foreground">geri alınamaz</strong> şekilde silinir.
+                    </p>
+                    <Button as-child class="h-11 md:h-9">
+                        <RouterLink to="/login">Uygulamaya Giriş Yap</RouterLink>
+                    </Button>
+                </section>
 
-        <!-- ── 1) In-app deletion ── -->
-        <section class="legal-section">
-          <h2>1. Uygulama İçinden Silme (Önerilen)</h2>
-          <p>Hesabınızı uygulamadan birkaç adımda kalıcı olarak silebilirsiniz:</p>
-          <ol class="steps-list">
-            <li>Uygulamaya giriş yapın.</li>
-            <li>
-              <strong>Ayarlar &raquo; Hesap</strong> sekmesine gidin (alt menüden veya
-              profil simgesinden ulaşabilirsiniz).
-            </li>
-            <li>Sayfanın altındaki <strong>Tehlikeli Bölge</strong> kartında <strong>“Hesabımı Sil”</strong> butonuna basın.</li>
-            <li>Açılan pencerede mevcut şifrenizi girin ve onay alanına <code>SİL</code> yazın.</li>
-            <li><strong>“Hesabımı Kalıcı Olarak Sil”</strong> butonuna tıklayın.</li>
-          </ol>
-          <p class="hint-text">
-            İşlem tamamlandıktan sonra otomatik olarak çıkış yapılır ve hesabınız ile
-            tüm verileriniz veritabanından <strong>geri alınamaz</strong> şekilde silinir.
-          </p>
-          <RouterLink to="/login" class="btn btn-primary">Uygulamaya Giriş Yap</RouterLink>
-        </section>
+                <!-- 2) Web request form -->
+                <section class="space-y-4">
+                    <h2 class="text-lg font-semibold text-foreground">2. Web Üzerinden Silme Talebi</h2>
+                    <p>
+                        Uygulamaya erişiminiz yoksa (örn. şifrenizi unuttuysanız ve sıfırlama yapamıyorsanız) aşağıdaki formu doldurarak bize
+                        silme talebi iletebilirsiniz. Talebiniz <strong class="font-medium text-foreground">en geç 30 gün</strong> içinde
+                        işleme alınır.
+                    </p>
 
-        <!-- ── 2) Web request form ── -->
-        <section class="legal-section">
-          <h2>2. Web Üzerinden Silme Talebi</h2>
-          <p>
-            Uygulamaya erişiminiz yoksa (örn. şifrenizi unuttuysanız ve sıfırlama
-            yapamıyorsanız) aşağıdaki formu doldurarak bize silme talebi
-            iletebilirsiniz. Talebiniz <strong>en geç 30 gün</strong> içinde işleme alınır.
-          </p>
+                    <Alert v-if="submitted" variant="info">
+                        <Info aria-hidden="true" />
+                        <AlertTitle>Talebiniz e-posta istemcinizde açıldı.</AlertTitle>
+                        <AlertDescription>
+                            Lütfen e-postayı
+                            <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">{{ contactEmail }}</code>
+                            adresine gönderdiğinizden emin olun. Onayınızı aldıktan sonra hesabınız 30 gün içinde silinecektir.
+                        </AlertDescription>
+                    </Alert>
 
-          <div v-if="submitted" class="message-box message-info">
-            <p>
-              <strong>Talebiniz e-posta istemcinizde açıldı.</strong> Lütfen e-postayı
-              <code>{{ contactEmail }}</code> adresine gönderdiğinizden emin olun.
-              Onayınızı aldıktan sonra hesabınız 30 gün içinde silinecektir.
-            </p>
-          </div>
+                    <form v-else class="space-y-4" novalidate @submit.prevent="handleSubmit">
+                        <div class="space-y-2">
+                            <Label for="delete-full-name">Ad Soyad *</Label>
+                            <Input
+                                id="delete-full-name"
+                                v-model="form.fullName"
+                                type="text"
+                                placeholder="Hesabınızdaki ad soyadınız"
+                                autocomplete="name"
+                                class="h-11 md:h-9"
+                                required
+                            />
+                        </div>
 
-          <form v-else class="delete-form" @submit.prevent="handleSubmit">
-            <div class="form-group">
-              <label class="form-label" for="fullName">Ad Soyad *</label>
-              <input
-                id="fullName"
-                v-model="form.fullName"
-                type="text"
-                class="form-input"
-                placeholder="Hesabınızdaki ad soyadınız"
-                required
-              />
-            </div>
+                        <div class="space-y-2">
+                            <Label for="delete-email">Hesap E-posta Adresi *</Label>
+                            <Input
+                                id="delete-email"
+                                v-model="form.email"
+                                type="email"
+                                placeholder="ornek@eposta.com"
+                                autocomplete="email"
+                                class="h-11 md:h-9"
+                                required
+                            />
+                            <p class="text-xs text-muted-foreground">Hesabınıza kayıtlı e-posta adresi — kimliğinizi doğrulamak için gereklidir.</p>
+                        </div>
 
-            <div class="form-group">
-              <label class="form-label" for="email">Hesap E-posta Adresi *</label>
-              <input
-                id="email"
-                v-model="form.email"
-                type="email"
-                class="form-input"
-                placeholder="ornek@eposta.com"
-                required
-              />
-              <span class="form-help">
-                Hesabınıza kayıtlı e-posta adresi — kimliğinizi doğrulamak için
-                gereklidir.
-              </span>
-            </div>
+                        <div class="space-y-2">
+                            <Label for="delete-reason">Sebep (opsiyonel)</Label>
+                            <Textarea
+                                id="delete-reason"
+                                v-model="form.reason"
+                                rows="3"
+                                placeholder="Talebinizin sebebini paylaşabilirsiniz (zorunlu değil)"
+                            />
+                        </div>
 
-            <div class="form-group">
-              <label class="form-label" for="reason">Sebep (opsiyonel)</label>
-              <textarea
-                id="reason"
-                v-model="form.reason"
-                class="form-input"
-                rows="3"
-                placeholder="Talebinizin sebebini paylaşabilirsiniz (zorunlu değil)"
-              ></textarea>
-            </div>
+                        <div class="flex items-start gap-2">
+                            <Checkbox id="delete-acknowledge" :model-value="form.acknowledge" class="mt-0.5" @update:model-value="onAcknowledgeChange" />
+                            <Label for="delete-acknowledge" class="inline cursor-pointer text-sm leading-relaxed font-normal text-muted-foreground">
+                                Hesabımın ve tüm verilerimin <strong class="font-medium text-foreground">kalıcı olarak</strong> silineceğini ve bu
+                                işlemin geri alınamayacağını anlıyorum.
+                            </Label>
+                        </div>
 
-            <div class="form-check">
-              <input
-                id="acknowledge"
-                v-model="form.acknowledge"
-                type="checkbox"
-              />
-              <label for="acknowledge">
-                Hesabımın ve tüm verilerimin <strong>kalıcı olarak</strong> silineceğini
-                ve bu işlemin geri alınamayacağını anlıyorum.
-              </label>
-            </div>
+                        <Alert v-if="submitError" variant="destructive">
+                            <AlertDescription>{{ submitError }}</AlertDescription>
+                        </Alert>
 
-            <p v-if="submitError" class="form-error" role="alert">{{ submitError }}</p>
+                        <Button type="submit" variant="destructive" class="h-11 w-full" :disabled="submitLoading">
+                            <Spinner v-if="submitLoading" />
+                            {{ submitLoading ? 'Hazırlanıyor...' : 'Silme Talebimi E-posta ile Gönder' }}
+                        </Button>
+                    </form>
 
-            <button type="submit" class="btn btn-danger btn-block" :disabled="submitLoading">
-              {{ submitLoading ? 'Hazırlanıyor...' : 'Silme Talebimi E-posta ile Gönder' }}
-            </button>
-          </form>
+                    <p class="text-xs">
+                        Form e-posta istemcinizi açar ve aşağıdaki adrese hazır bir mesaj iletir:
+                        <a :href="`mailto:${contactEmail}`" :class="linkClass">{{ contactEmail }}</a>
+                    </p>
+                </section>
 
-          <p class="hint-text">
-            Form e-posta istemcinizi açar ve aşağıdaki adrese hazır bir mesaj
-            iletir:
-            <a :href="`mailto:${contactEmail}`">{{ contactEmail }}</a>
-          </p>
-        </section>
+                <!-- 3) What gets deleted -->
+                <section class="space-y-4">
+                    <h2 class="text-lg font-semibold text-foreground">3. Hangi Veriler Silinir?</h2>
+                    <p>Hesabınızı sildiğinizde aşağıdaki veriler kalıcı olarak silinir:</p>
+                    <ul class="list-disc space-y-1 pl-5">
+                        <li><strong class="font-medium text-foreground">Hesap bilgileri:</strong> Ad-soyad, e-posta, telefon, şifre, profil fotoğrafı, kullanıcı tipi.</li>
+                        <li><strong class="font-medium text-foreground">Çay işletmesi verileri:</strong> Tarla kayıtları, hasat kayıtları, ödeme/alacak kayıtları.</li>
+                        <li><strong class="font-medium text-foreground">Sosyal hub içerikleri:</strong> İş ilanları, işçi ilanları, topluluk gönderileri ve yorumları, beğeniler.</li>
+                        <li><strong class="font-medium text-foreground">Oturumlar:</strong> Aktif tüm oturum ve refresh token kayıtları.</li>
+                        <li><strong class="font-medium text-foreground">Yüklediğiniz medya:</strong> Avatar ve ilan görselleri.</li>
+                    </ul>
+                </section>
 
-        <!-- ── 3) What gets deleted ── -->
-        <section class="legal-section">
-          <h2>3. Hangi Veriler Silinir?</h2>
-          <p>Hesabınızı sildiğinizde aşağıdaki veriler kalıcı olarak silinir:</p>
-          <ul>
-            <li><strong>Hesap bilgileri:</strong> Ad-soyad, e-posta, telefon, şifre, profil fotoğrafı, kullanıcı tipi.</li>
-            <li><strong>Çay işletmesi verileri:</strong> Tarla kayıtları, hasat kayıtları, ödeme/alacak kayıtları.</li>
-            <li><strong>Sosyal hub içerikleri:</strong> İş ilanları, işçi ilanları, topluluk gönderileri ve yorumları, beğeniler.</li>
-            <li><strong>Oturumlar:</strong> Aktif tüm oturum ve refresh token kayıtları.</li>
-            <li><strong>Yüklediğiniz medya:</strong> Avatar ve ilan görselleri.</li>
-          </ul>
-        </section>
+                <!-- 4) What may be retained -->
+                <section class="space-y-4">
+                    <h2 class="text-lg font-semibold text-foreground">4. Saklanabilen Veriler</h2>
+                    <p>Aşağıdaki veriler, ilgili mevzuat veya meşru menfaat çerçevesinde sınırlı süreyle saklanabilir:</p>
+                    <ul class="list-disc space-y-1 pl-5">
+                        <li>
+                            <strong class="font-medium text-foreground">Yedeklemeler:</strong> Mevcut yedekleme rotasyonu içinde kademeli olarak
+                            en geç <strong class="font-medium text-foreground">30 gün</strong> içinde temizlenir.
+                        </li>
+                        <li>
+                            <strong class="font-medium text-foreground">Yasal yükümlülükler:</strong> Vergi, fatura veya hukuki uyuşmazlıklar gibi
+                            konularda mevzuatın öngördüğü süreyle saklanması gereken veriler (varsa).
+                        </li>
+                        <li>
+                            <strong class="font-medium text-foreground">Anonim log kayıtları:</strong> Kişiyi tanımlamayan teknik log ve kullanım
+                            istatistikleri.
+                        </li>
+                    </ul>
+                </section>
 
-        <!-- ── 4) What may be retained ── -->
-        <section class="legal-section">
-          <h2>4. Saklanabilen Veriler</h2>
-          <p>
-            Aşağıdaki veriler, ilgili mevzuat veya meşru menfaat çerçevesinde
-            sınırlı süreyle saklanabilir:
-          </p>
-          <ul>
-            <li>
-              <strong>Yedeklemeler:</strong> Mevcut yedekleme rotasyonu içinde kademeli
-              olarak en geç <strong>30 gün</strong> içinde temizlenir.
-            </li>
-            <li>
-              <strong>Yasal yükümlülükler:</strong> Vergi, fatura veya hukuki
-              uyuşmazlıklar gibi konularda mevzuatın öngördüğü süreyle saklanması
-              gereken veriler (varsa).
-            </li>
-            <li>
-              <strong>Anonim log kayıtları:</strong> Kişiyi tanımlamayan teknik log
-              ve kullanım istatistikleri.
-            </li>
-          </ul>
-        </section>
+                <!-- 5) Contact -->
+                <section class="space-y-4">
+                    <h2 class="text-lg font-semibold text-foreground">5. Sorularınız mı Var?</h2>
+                    <p>Silme süreci veya kişisel verileriniz hakkında sorularınız için bize ulaşın:</p>
+                    <ul class="list-disc space-y-1 pl-5">
+                        <li><strong class="font-medium text-foreground">E-posta:</strong> <a :href="`mailto:${contactEmail}`" :class="linkClass">{{ contactEmail }}</a></li>
+                        <li>
+                            <strong class="font-medium text-foreground">Gizlilik Politikası:</strong>
+                            <RouterLink to="/privacy-policy" :class="linkClass">Gizlilik Politikamızı görüntüleyin</RouterLink>
+                        </li>
+                    </ul>
+                </section>
 
-        <!-- ── 5) Contact ── -->
-        <section class="legal-section">
-          <h2>5. Sorularınız mı Var?</h2>
-          <p>
-            Silme süreci veya kişisel verileriniz hakkında sorularınız için bize
-            ulaşın:
-          </p>
-          <ul>
-            <li><strong>E-posta:</strong> <a :href="`mailto:${contactEmail}`">{{ contactEmail }}</a></li>
-            <li>
-              <strong>Gizlilik Politikası:</strong>
-              <RouterLink to="/privacy-policy">Gizlilik Politikamızı görüntüleyin</RouterLink>
-            </li>
-          </ul>
-        </section>
-
-        <div class="legal-footer">
-          <RouterLink to="/" class="btn btn-secondary">← Ana Sayfaya Dön</RouterLink>
-        </div>
-      </article>
-    </main>
-  </div>
+                <div class="flex justify-center border-t pt-6">
+                    <Button as-child variant="outline" class="h-11 md:h-9">
+                        <RouterLink to="/">Ana Sayfaya Dön</RouterLink>
+                    </Button>
+                </div>
+            </article>
+        </PageContainer>
+    </AuthLayout>
 </template>
-
-<style scoped>
-.legal-page {
-  min-height: 100vh;
-  background: var(--color-bg-secondary, #f5f7fa);
-  display: flex;
-  flex-direction: column;
-}
-
-.legal-header {
-  padding: var(--space-4, 16px) var(--space-6, 24px);
-  background: var(--color-bg-primary, #fff);
-  border-bottom: 1px solid var(--color-border, #e5e7eb);
-}
-
-.legal-logo {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2, 8px);
-  font-weight: 700;
-  font-size: var(--font-size-lg, 18px);
-  color: var(--color-text-primary, #111);
-  text-decoration: none;
-}
-
-.legal-logo-icon {
-  font-size: 24px;
-}
-
-.legal-container {
-  flex: 1;
-  width: 100%;
-  max-width: 880px;
-  margin: 0 auto;
-  padding: var(--space-6, 24px) var(--space-4, 16px);
-}
-
-.legal-card {
-  background: var(--color-bg-primary, #fff);
-  border-radius: var(--radius-lg, 12px);
-  padding: var(--space-8, 32px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  line-height: 1.7;
-  color: var(--color-text-primary, #1f2937);
-}
-
-.legal-title {
-  font-size: var(--font-size-2xl, 28px);
-  font-weight: 700;
-  margin: 0 0 var(--space-3, 12px);
-  color: var(--color-text-primary, #111);
-}
-
-.legal-meta {
-  color: var(--color-text-muted, #6b7280);
-  font-size: var(--font-size-sm, 14px);
-  margin-bottom: var(--space-6, 24px);
-  padding-bottom: var(--space-4, 16px);
-  border-bottom: 1px solid var(--color-border, #e5e7eb);
-}
-
-.legal-section {
-  margin-bottom: var(--space-6, 24px);
-}
-
-.legal-section h2 {
-  font-size: var(--font-size-xl, 20px);
-  font-weight: 600;
-  margin: var(--space-6, 24px) 0 var(--space-3, 12px);
-  color: var(--color-text-primary, #111);
-}
-
-.legal-section p,
-.legal-section li {
-  color: var(--color-text-secondary, #374151);
-}
-
-.legal-section ul,
-.legal-section ol.steps-list {
-  padding-left: var(--space-6, 24px);
-  margin: var(--space-2, 8px) 0;
-}
-
-.legal-section li {
-  margin-bottom: var(--space-2, 8px);
-}
-
-.legal-section a {
-  color: var(--color-primary, #16a34a);
-  text-decoration: underline;
-}
-
-.delete-form {
-  margin: var(--space-4, 16px) 0;
-}
-
-.form-group {
-  margin-bottom: var(--space-4, 16px);
-}
-
-.form-label {
-  display: block;
-  font-size: 14px;
-  font-weight: 500;
-  margin-bottom: 6px;
-  color: var(--color-text-primary, #111);
-}
-
-.form-input {
-  width: 100%;
-  height: var(--control-height);
-  padding: 0 12px;
-  background: var(--color-bg-secondary, #f5f7fa);
-  border: 1px solid var(--color-border, #d1d5db);
-  border-radius: var(--radius-md, 8px);
-  color: var(--color-text-primary, #111);
-  font-size: 15px;
-  font-family: inherit;
-  box-sizing: border-box;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--color-primary, #16a34a);
-  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
-}
-
-.form-help {
-  display: block;
-  font-size: 12px;
-  color: var(--color-text-muted, #6b7280);
-  margin-top: 4px;
-}
-
-.form-check {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin: var(--space-4, 16px) 0;
-}
-
-.form-check input[type="checkbox"] {
-  margin-top: 4px;
-  flex-shrink: 0;
-}
-
-.form-check label {
-  font-size: 14px;
-  color: var(--color-text-secondary, #374151);
-  line-height: 1.5;
-}
-
-.form-error {
-  color: var(--color-danger, #ef4444);
-  font-size: 13px;
-  margin: 8px 0;
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 18px;
-  border-radius: var(--radius-md, 8px);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
-  text-decoration: none;
-  transition: opacity 0.15s ease;
-}
-
-.btn-block {
-  width: 100%;
-}
-
-.btn-primary {
-  background: var(--color-primary, #16a34a);
-  color: #fff;
-}
-
-.btn-secondary {
-  background: var(--color-bg-tertiary, #e5e7eb);
-  color: var(--color-text-primary, #111);
-}
-
-.btn-danger {
-  background: var(--color-danger, #ef4444);
-  color: #fff;
-}
-
-.btn:hover:not(:disabled) {
-  opacity: 0.9;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.message-box {
-  padding: var(--space-4, 16px);
-  border-radius: var(--radius-md, 8px);
-  margin: var(--space-4, 16px) 0;
-}
-
-.message-info {
-  background: rgba(59, 130, 246, 0.1);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  color: #1e40af;
-}
-
-.hint-text {
-  font-size: 13px;
-  color: var(--color-text-muted, #6b7280);
-  margin-top: var(--space-3, 12px);
-}
-
-code {
-  background: var(--color-bg-tertiary, #f3f4f6);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: ui-monospace, SFMono-Regular, monospace;
-  font-size: 0.9em;
-}
-
-.legal-footer {
-  margin-top: var(--space-8, 32px);
-  padding-top: var(--space-4, 16px);
-  border-top: 1px solid var(--color-border, #e5e7eb);
-  text-align: center;
-}
-
-@media (max-width: 600px) {
-  .legal-card {
-    padding: var(--space-4, 16px);
-  }
-  .legal-title {
-    font-size: 22px;
-  }
-}
-</style>

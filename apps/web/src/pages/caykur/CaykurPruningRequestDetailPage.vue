@@ -1,22 +1,98 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { CalendarDays, Check, ClipboardList, Ruler, Users, X } from '@lucide/vue';
 import CaykurLayout from '@/layouts/CaykurLayout.vue';
-import CaykurPanel from '@/components/caykur/CaykurPanel.vue';
-import StatusPill from '@/components/caykur/StatusPill.vue';
 import CaykurPruningMeasure from '@/components/caykur/CaykurPruningMeasure.vue';
+import CaykurLicensingMeasure from '@/components/caykur/CaykurLicensingMeasure.vue';
+import { EmptyState, PageContainer, PageHeader } from '@/components/shared';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { usePruningRequestsStore } from '@/stores/pruningRequestsStore';
+import { useToast } from '@/composables/useToast';
 import { PRUNING_REQUEST_STATUS_META, formatNumber, formatDate, formatDateTime } from '@/services/caykur';
-import type { MeasurementPoint } from '@/services/api';
+import {
+    api,
+    type LicensingApprovalStatus,
+    type LicensingMeasurement,
+    type LicensingMeasurementStatus,
+    type MeasurementPoint,
+} from '@/services/api';
 import type { AccuracyLevel, MeasurementMethod } from '@/services/caykur/pruning';
 
+/**
+ * Budama talebi detail: appointment → on-site measurement → decision. When the
+ * parcel is hisseli (registered by more than one producer) the page warns and
+ * offers the ruhsatlandırma flow: measure one owner's slice, then the other
+ * owners confirm it from their Bildirimler page.
+ */
 const route = useRoute();
 const router = useRouter();
 const store = usePruningRequestsStore();
+const toast = useToast();
 
-const id = computed(() => String(route.params.id));
+// `query.id` lets the DEV preview route render a mocked request.
+const id = computed(() => String(route.params.id ?? route.query.id ?? ''));
 const req = computed(() => store.byId(id.value));
 const busy = ref(false);
+
+type Panel = 'none' | 'measure' | 'licensing';
+const panel = ref<Panel>('none');
+
+// ── Hisseli (shared-title) parcel ──
+const coOwners = computed(() => req.value?.coOwners ?? []);
+const isShared = computed(() => coOwners.value.length > 1);
+
+// ── Licensing measurements on this request ──
+const licensing = ref<LicensingMeasurement[]>([]);
+const licensingLoading = ref(false);
+const measuredOwnerIds = computed(() => licensing.value.map((m) => m.ownerId));
+
+async function loadLicensing(): Promise<void> {
+    if (!req.value) return;
+    licensingLoading.value = true;
+    const res = await api.getLicensingMeasurements({ pruningRequestId: req.value.id, limit: 100 });
+    if (res.data) licensing.value = res.data.data;
+    licensingLoading.value = false;
+}
+
+async function onLicensingMeasured(result: {
+    ownerId: string;
+    notes?: string;
+    measuredAreaM2: number;
+    points: MeasurementPoint[];
+    accuracyLevel: AccuracyLevel | null;
+    method: MeasurementMethod;
+}): Promise<void> {
+    if (!req.value) return;
+    busy.value = true;
+    const res = await api.createLicensingMeasurement({
+        pruningRequestId: req.value.id,
+        ownerId: result.ownerId,
+        notes: result.notes,
+        measuredAreaM2: result.measuredAreaM2,
+        points: result.points,
+        method: result.method,
+        accuracyLevel: result.accuracyLevel ?? undefined,
+    });
+    busy.value = false;
+    if (res.data) {
+        panel.value = 'none';
+        licensing.value = [res.data, ...licensing.value];
+        const askCount = res.data.approvals?.length ?? 0;
+        toast.success(
+            askCount > 0
+                ? `Ruhsatlandırma ölçümü kaydedildi; ${askCount} ortak sahibe onay talebi gönderildi.`
+                : 'Ruhsatlandırma ölçümü kaydedildi.',
+        );
+    } else {
+        toast.error(res.error?.message ?? 'Ruhsatlandırma ölçümü kaydedilemedi.');
+    }
+}
 
 // ── Appointment ──
 const appointmentInput = ref('');
@@ -27,8 +103,7 @@ async function submitAppointment(): Promise<void> {
     busy.value = false;
 }
 
-// ── Measurement ──
-const measuring = ref(false);
+// ── Pruning measurement ──
 async function onMeasured(result: {
     measuredAreaM2: number;
     points: MeasurementPoint[];
@@ -44,7 +119,7 @@ async function onMeasured(result: {
         accuracyLevel: result.accuracyLevel ?? undefined,
     });
     busy.value = false;
-    measuring.value = false;
+    panel.value = 'none';
 }
 
 // ── Decision ──
@@ -61,141 +136,292 @@ async function reject(): Promise<void> {
     busy.value = false;
 }
 
-onMounted(() => store.fetchOne(id.value));
+// ── Labels ──
+function methodLabel(method: string | null): string {
+    if (method === 'gps') return 'GPS';
+    if (method === 'map') return 'Harita';
+    if (method === 'imu') return 'Lazer + IMU';
+    if (method === 'assisted') return 'Destekli';
+    return '—';
+}
+function accuracyLabel(level: string | null): string {
+    if (level === 'high') return 'Yüksek';
+    if (level === 'medium') return 'Orta';
+    if (level === 'low') return 'Düşük';
+    return '—';
+}
+const LICENSING_STATUS: Record<LicensingMeasurementStatus, { label: string; variant: 'warning' | 'success' | 'danger' }> = {
+    pending_approval: { label: 'Ortak onayı bekliyor', variant: 'warning' },
+    approved: { label: 'Ortaklar onayladı', variant: 'success' },
+    rejected: { label: 'İtiraz edildi', variant: 'danger' },
+};
+const APPROVAL_STATUS: Record<LicensingApprovalStatus, { label: string; variant: 'muted' | 'success' | 'danger' }> = {
+    pending: { label: 'Bekliyor', variant: 'muted' },
+    approved: { label: 'Onayladı', variant: 'success' },
+    rejected: { label: 'İtiraz etti', variant: 'danger' },
+};
+
+onMounted(async () => {
+    await store.fetchOne(id.value);
+    await loadLicensing();
+});
+watch(id, async (next) => {
+    panel.value = 'none';
+    await store.fetchOne(next);
+    await loadLicensing();
+});
 </script>
 
 <template>
     <CaykurLayout>
-        <button type="button" class="ck-back-link" @click="router.push('/caykur/pruning-requests')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
-            Budama Talepleri
-        </button>
+        <PageContainer size="wide">
+            <template v-if="req">
+                <PageHeader
+                    :title="req.producerName"
+                    :description="`Budama talebi · Ada ${req.ada} / Parsel ${req.parsel} · ${req.il} / ${req.ilce}`"
+                    back-to="/caykur/pruning-requests"
+                    back-label="Budama Talepleri"
+                >
+                    <template #meta>
+                        <Badge :variant="PRUNING_REQUEST_STATUS_META[req.status].tone">
+                            {{ PRUNING_REQUEST_STATUS_META[req.status].label }}
+                        </Badge>
+                        <Badge v-if="isShared" variant="warning">
+                            <Users aria-hidden="true" />
+                            Hisseli · {{ coOwners.length }} sahip
+                        </Badge>
+                    </template>
+                </PageHeader>
 
-        <template v-if="req">
-            <header class="ck-page-head">
-                <div>
-                    <h1 class="ck-page-title">{{ req.producerName }}</h1>
-                    <p class="ck-page-sub">Budama talebi · Ada {{ req.ada }} / Parsel {{ req.parsel }} · {{ req.il }} / {{ req.ilce }}</p>
-                </div>
-                <div class="ck-page-actions">
-                    <StatusPill :label="PRUNING_REQUEST_STATUS_META[req.status].label" :tone="PRUNING_REQUEST_STATUS_META[req.status].tone" />
-                </div>
-            </header>
-
-            <CaykurPanel v-if="measuring" title="Hassas ölçüm (3B)">
-                <div class="ck-panel-body">
-                    <CaykurPruningMeasure :parcel-polygon="req.parcelGeometry ?? undefined" @complete="onMeasured" @cancel="measuring = false" />
-                </div>
-            </CaykurPanel>
-
-            <div v-else class="ck-grid-2">
-                <div>
-                    <CaykurPanel title="Talep bilgileri">
-                        <dl class="ck-dl">
-                            <div class="ck-dl-item"><span class="ck-dl-term">Müstahsil</span><span class="ck-dl-val">{{ req.producerName }}</span></div>
-                            <div class="ck-dl-item"><span class="ck-dl-term">İl / İlçe</span><span class="ck-dl-val">{{ req.il }} / {{ req.ilce }}</span></div>
-                            <div class="ck-dl-item"><span class="ck-dl-term">Ada / Parsel</span><span class="ck-dl-val">Ada {{ req.ada }} / Parsel {{ req.parsel }}</span></div>
-                            <div class="ck-dl-item"><span class="ck-dl-term">Kayıtlı arazi</span><span class="ck-dl-val">{{ formatNumber(req.registeredAreaM2) }} m²</span></div>
-                            <div class="ck-dl-item"><span class="ck-dl-term">Talep tarihi</span><span class="ck-dl-val">{{ formatDateTime(req.createdAt) }}</span></div>
-                            <div v-if="req.appointmentDate" class="ck-dl-item"><span class="ck-dl-term">Randevu tarihi</span><span class="ck-dl-val">{{ formatDate(req.appointmentDate) }}<template v-if="req.appointedByName"> · {{ req.appointedByName }}</template></span></div>
-                        </dl>
-                    </CaykurPanel>
-
-                    <CaykurPanel title="İşlem">
-                        <div class="ck-panel-body action-body">
-                            <template v-if="req.status === 'pending'">
-                                <p class="action-hint">Talebi değerlendirin ve ölçüm için bir randevu tarihi belirleyin.</p>
-                                <div class="appt-row">
-                                    <input v-model="appointmentInput" type="date" class="ck-search-input" style="padding-left:12px" />
-                                    <button type="button" class="ck-btn ck-btn-primary" :disabled="!appointmentInput || busy" @click="submitAppointment">Randevu ver</button>
-                                </div>
-                            </template>
-
-                            <template v-else-if="req.status === 'scheduled'">
-                                <p class="action-hint">Randevu tarihi: <strong>{{ req.appointmentDate ? formatDate(req.appointmentDate) : '—' }}</strong>. Sahada hassas sensörlerle ölçümü yapın.</p>
-                                <button type="button" class="ck-btn ck-btn-primary" :disabled="busy" @click="measuring = true">Ölçümü başlat</button>
-                            </template>
-
-                            <template v-else-if="req.status === 'measured'">
-                                <p class="action-hint">Ölçüm tamamlandı. Kayıt için onaylayın ya da reddedin.</p>
-                                <div class="decide-row">
-                                    <button type="button" class="ck-btn" :disabled="busy" @click="reject">Reddet</button>
-                                    <button type="button" class="ck-btn ck-btn-primary" :disabled="busy" @click="approve">Onayla</button>
-                                </div>
-                                <button type="button" class="ck-btn ck-btn-sm remeasure" :disabled="busy" @click="measuring = true">Yeniden ölç</button>
-                            </template>
-
-                            <template v-else-if="req.status === 'approved'">
-                                <p class="action-done">✓ Talep onaylandı ve kayıt tamamlandı.<template v-if="req.approvedByName"> ({{ req.approvedByName }})</template></p>
-                            </template>
-
-                            <template v-else>
-                                <p class="action-rejected">Talep reddedildi.</p>
-                                <p v-if="req.notes" class="action-hint">{{ req.notes }}</p>
-                                <button type="button" class="ck-btn ck-btn-sm" :disabled="busy" @click="measuring = true">Yeniden ölç</button>
-                            </template>
+                <!-- Hisseli parcel warning + ruhsatlandırma entry point -->
+                <Alert v-if="isShared && panel !== 'licensing'" variant="warning">
+                    <Users aria-hidden="true" />
+                    <AlertTitle>Bu ada/parselde birden fazla kayıtlı cüzdan var</AlertTitle>
+                    <AlertDescription>
+                        <p>
+                            Aynı arazi {{ coOwners.length }} farklı üretici tarafından kaydedilmiş. Sahada, ölçümü yapılan cüzdan
+                            sahibinin payını ayrıca ölçüp kaydedin; kayıt diğer sahiplerin onayına sunulur.
+                        </p>
+                        <ul class="mt-2 flex flex-wrap gap-2">
+                            <li v-for="o in coOwners" :key="o.userId">
+                                <Badge variant="outline" class="gap-1.5">
+                                    <span class="font-medium">{{ o.fullName }}</span>
+                                    <span v-if="o.cuzdanNo" class="text-muted-foreground">· Cüzdan {{ o.cuzdanNo }}</span>
+                                    <Check v-if="measuredOwnerIds.includes(o.userId)" class="text-success" aria-label="ölçüldü" />
+                                </Badge>
+                            </li>
+                        </ul>
+                        <div class="mt-3">
+                            <Button class="h-11 md:h-9" :disabled="busy" @click="panel = 'licensing'">
+                                <Ruler aria-hidden="true" />
+                                Ruhsatlandırma ölçümü yap
+                            </Button>
                         </div>
-                    </CaykurPanel>
-                </div>
+                    </AlertDescription>
+                </Alert>
 
-                <CaykurPanel title="Ölçüm sonucu (3B)">
-                    <div class="ck-panel-body">
-                        <template v-if="req.measuredAreaM2 !== null">
-                            <div class="result-area">
-                                <span class="result-val">{{ formatNumber(req.measuredAreaM2) }} m²</span>
-                                <span class="result-sub">otomatik hesaplanan budama alanı</span>
-                            </div>
-                            <dl class="ck-dl" style="padding-left:0;padding-right:0">
-                                <div class="ck-dl-item"><span class="ck-dl-term">Yöntem</span><span class="ck-dl-val">{{ req.method === 'gps' ? 'GPS' : req.method === 'map' ? 'Harita' : req.method === 'imu' ? 'Lazer + IMU' : '—' }}</span></div>
-                                <div class="ck-dl-item"><span class="ck-dl-term">Doğruluk</span><span class="ck-dl-val">{{ req.accuracyLevel === 'high' ? 'Yüksek' : req.accuracyLevel === 'medium' ? 'Orta' : 'Düşük' }}</span></div>
-                                <div class="ck-dl-item"><span class="ck-dl-term">Köşe sayısı</span><span class="ck-dl-val">{{ formatNumber(req.measurementPoints.length) }}</span></div>
-                                <div class="ck-dl-item"><span class="ck-dl-term">Ölçen</span><span class="ck-dl-val">{{ req.measuredByName ?? '—' }}</span></div>
-                                <div v-if="req.measuredAt" class="ck-dl-item"><span class="ck-dl-term">Ölçüm tarihi</span><span class="ck-dl-val">{{ formatDateTime(req.measuredAt) }}</span></div>
-                            </dl>
+                <!-- Ruhsatlandırma capture -->
+                <Card v-if="panel === 'licensing'">
+                    <CardHeader>
+                        <CardTitle>Ruhsatlandırma ölçümü</CardTitle>
+                        <CardDescription>
+                            Ölçülen cüzdan sahibini seçin, payını haritada ya da lazer + IMU ile ölçün. Kayıt, arazideki diğer
+                            sahiplerin onayına gönderilir; onay gelene kadar kesinleşmez.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <CaykurLicensingMeasure
+                            :owners="coOwners"
+                            :parcel-polygon="req.parcelGeometry ?? undefined"
+                            :measured-owner-ids="measuredOwnerIds"
+                            :busy="busy"
+                            @complete="onLicensingMeasured"
+                            @cancel="panel = 'none'"
+                        />
+                    </CardContent>
+                </Card>
 
-                            <div v-if="req.measurementPoints.length" class="coords">
-                                <span class="coords-head">Enlem · Boylam · Yükseklik</span>
-                                <ul class="coords-list">
-                                    <li v-for="(p, i) in req.measurementPoints" :key="i">
-                                        <span class="cx-no">{{ i + 1 }}</span>
-                                        <span>{{ p.lat.toFixed(6) }}, {{ p.lng.toFixed(6) }}</span>
-                                        <span class="cx-alt">{{ p.altitudeMeters.toFixed(1) }} m</span>
-                                    </li>
-                                </ul>
-                            </div>
-                        </template>
-                        <div v-else class="ck-empty"><p class="ck-empty-title">Henüz ölçüm yapılmadı</p></div>
+                <!-- Pruning measurement capture -->
+                <Card v-else-if="panel === 'measure'">
+                    <CardHeader>
+                        <CardTitle>Hassas ölçüm (3B)</CardTitle>
+                        <CardDescription>Budanan alanı haritada işaretleyin ya da lazer + IMU ile ölçün.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <CaykurPruningMeasure :parcel-polygon="req.parcelGeometry ?? undefined" @complete="onMeasured" @cancel="panel = 'none'" />
+                    </CardContent>
+                </Card>
+
+                <div v-else class="grid gap-4 lg:grid-cols-2">
+                    <div class="flex flex-col gap-4">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Talep bilgileri</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <dl class="grid gap-3 text-sm sm:grid-cols-2">
+                                    <div><dt class="text-xs text-muted-foreground">Müstahsil</dt><dd class="font-medium text-foreground">{{ req.producerName }}</dd></div>
+                                    <div><dt class="text-xs text-muted-foreground">İl / İlçe</dt><dd class="text-foreground">{{ req.il }} / {{ req.ilce }}</dd></div>
+                                    <div><dt class="text-xs text-muted-foreground">Ada / Parsel</dt><dd class="text-foreground">Ada {{ req.ada }} / Parsel {{ req.parsel }}</dd></div>
+                                    <div><dt class="text-xs text-muted-foreground">Kayıtlı arazi</dt><dd class="font-semibold text-foreground tabular-nums">{{ formatNumber(req.registeredAreaM2) }} m²</dd></div>
+                                    <div><dt class="text-xs text-muted-foreground">Talep tarihi</dt><dd class="text-foreground">{{ formatDateTime(req.createdAt) }}</dd></div>
+                                    <div v-if="req.appointmentDate">
+                                        <dt class="text-xs text-muted-foreground">Randevu tarihi</dt>
+                                        <dd class="text-foreground">{{ formatDate(req.appointmentDate) }}<template v-if="req.appointedByName"> · {{ req.appointedByName }}</template></dd>
+                                    </div>
+                                </dl>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>İşlem</CardTitle>
+                            </CardHeader>
+                            <CardContent class="flex flex-col gap-3">
+                                <template v-if="req.status === 'pending'">
+                                    <p class="text-sm text-muted-foreground">Talebi değerlendirin ve ölçüm için bir randevu tarihi belirleyin.</p>
+                                    <div class="flex flex-col gap-2 sm:flex-row">
+                                        <div class="flex-1 space-y-2">
+                                            <Label for="appointment-date" class="sr-only">Randevu tarihi</Label>
+                                            <Input id="appointment-date" v-model="appointmentInput" type="date" class="h-11 md:h-9" />
+                                        </div>
+                                        <Button class="h-11 md:h-9" :disabled="!appointmentInput || busy" @click="submitAppointment">
+                                            <CalendarDays aria-hidden="true" />
+                                            Randevu ver
+                                        </Button>
+                                    </div>
+                                </template>
+
+                                <template v-else-if="req.status === 'scheduled'">
+                                    <p class="text-sm text-muted-foreground">
+                                        Randevu tarihi: <strong class="text-foreground">{{ req.appointmentDate ? formatDate(req.appointmentDate) : '—' }}</strong>.
+                                        Sahada hassas sensörlerle ölçümü yapın.
+                                    </p>
+                                    <Button class="h-11 self-start md:h-9" :disabled="busy" @click="panel = 'measure'">
+                                        <Ruler aria-hidden="true" />
+                                        Ölçümü başlat
+                                    </Button>
+                                </template>
+
+                                <template v-else-if="req.status === 'measured'">
+                                    <p class="text-sm text-muted-foreground">Ölçüm tamamlandı. Kayıt için onaylayın ya da reddedin.</p>
+                                    <div class="flex gap-2">
+                                        <Button variant="outline" class="h-11 flex-1 md:h-9" :disabled="busy" @click="reject">
+                                            <X aria-hidden="true" />
+                                            Reddet
+                                        </Button>
+                                        <Button class="h-11 flex-1 md:h-9" :disabled="busy" @click="approve">
+                                            <Check aria-hidden="true" />
+                                            Onayla
+                                        </Button>
+                                    </div>
+                                    <Button variant="ghost" size="sm" class="h-11 self-start md:h-9" :disabled="busy" @click="panel = 'measure'">Yeniden ölç</Button>
+                                </template>
+
+                                <template v-else-if="req.status === 'approved'">
+                                    <p class="text-sm font-semibold text-success">
+                                        ✓ Talep onaylandı ve kayıt tamamlandı.<template v-if="req.approvedByName"> ({{ req.approvedByName }})</template>
+                                    </p>
+                                </template>
+
+                                <template v-else>
+                                    <p class="text-sm font-semibold text-destructive">Talep reddedildi.</p>
+                                    <p v-if="req.notes" class="text-sm text-muted-foreground">{{ req.notes }}</p>
+                                    <Button variant="outline" size="sm" class="h-11 self-start md:h-9" :disabled="busy" @click="panel = 'measure'">Yeniden ölç</Button>
+                                </template>
+                            </CardContent>
+                        </Card>
                     </div>
-                </CaykurPanel>
-            </div>
-        </template>
 
-        <div v-else class="ck-empty">
-            <p class="ck-empty-title">Talep bulunamadı</p>
-            <button type="button" class="ck-btn" @click="router.push('/caykur/pruning-requests')">Listeye dön</button>
-        </div>
+                    <div class="flex flex-col gap-4">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Ölçüm sonucu (3B)</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <template v-if="req.measuredAreaM2 !== null">
+                                    <div class="mb-3 flex flex-col">
+                                        <span class="text-3xl font-bold leading-none text-foreground tabular-nums">{{ formatNumber(req.measuredAreaM2) }} m²</span>
+                                        <span class="mt-1 text-sm text-muted-foreground">otomatik hesaplanan budama alanı</span>
+                                    </div>
+                                    <dl class="grid gap-3 text-sm sm:grid-cols-2">
+                                        <div><dt class="text-xs text-muted-foreground">Yöntem</dt><dd class="text-foreground">{{ methodLabel(req.method) }}</dd></div>
+                                        <div><dt class="text-xs text-muted-foreground">Doğruluk</dt><dd class="text-foreground">{{ accuracyLabel(req.accuracyLevel) }}</dd></div>
+                                        <div><dt class="text-xs text-muted-foreground">Köşe sayısı</dt><dd class="text-foreground tabular-nums">{{ formatNumber(req.measurementPoints.length) }}</dd></div>
+                                        <div><dt class="text-xs text-muted-foreground">Ölçen</dt><dd class="text-foreground">{{ req.measuredByName ?? '—' }}</dd></div>
+                                        <div v-if="req.measuredAt"><dt class="text-xs text-muted-foreground">Ölçüm tarihi</dt><dd class="text-foreground">{{ formatDateTime(req.measuredAt) }}</dd></div>
+                                    </dl>
+
+                                    <div v-if="req.measurementPoints.length" class="mt-4">
+                                        <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Enlem · Boylam · Yükseklik</p>
+                                        <ol class="mt-2 flex flex-col gap-1 text-xs text-muted-foreground tabular-nums">
+                                            <li v-for="(p, i) in req.measurementPoints" :key="i" class="flex items-center gap-2">
+                                                <span class="flex size-5 shrink-0 items-center justify-center rounded-full border bg-muted text-[10px] font-semibold">{{ i + 1 }}</span>
+                                                <span>{{ p.lat.toFixed(6) }}, {{ p.lng.toFixed(6) }}</span>
+                                                <span class="ml-auto">{{ p.altitudeMeters.toFixed(1) }} m</span>
+                                            </li>
+                                        </ol>
+                                    </div>
+                                </template>
+                                <EmptyState v-else :icon="Ruler" title="Henüz ölçüm yapılmadı" class="min-h-40" />
+                            </CardContent>
+                        </Card>
+
+                        <!-- Ruhsatlandırma records (shared parcels only) -->
+                        <Card v-if="isShared || licensing.length">
+                            <CardHeader>
+                                <CardTitle>Ruhsatlandırma ölçümleri</CardTitle>
+                                <CardDescription>Her cüzdan sahibi için ölçülen pay ve diğer sahiplerin onay durumu.</CardDescription>
+                                <CardAction>
+                                    <Badge variant="secondary" class="tabular-nums">{{ licensing.length }} kayıt</Badge>
+                                </CardAction>
+                            </CardHeader>
+                            <CardContent class="flex flex-col gap-3">
+                                <p v-if="licensingLoading && !licensing.length" class="text-sm text-muted-foreground">Yükleniyor…</p>
+                                <EmptyState
+                                    v-else-if="!licensing.length"
+                                    :icon="ClipboardList"
+                                    title="Henüz ruhsatlandırma ölçümü yok"
+                                    description="Sahada her cüzdan sahibinin payını ayrı ayrı ölçüp kaydedin."
+                                    class="min-h-40"
+                                />
+                                <div v-for="m in licensing" :key="m.id" class="rounded-lg border p-3">
+                                    <div class="flex flex-wrap items-start justify-between gap-2">
+                                        <div class="min-w-0">
+                                            <p class="font-medium text-foreground">
+                                                {{ m.ownerName }}
+                                                <span v-if="m.ownerCuzdanNo" class="text-xs font-normal text-muted-foreground">· Cüzdan {{ m.ownerCuzdanNo }}</span>
+                                            </p>
+                                            <p class="text-xs text-muted-foreground">
+                                                {{ methodLabel(m.method) }} · {{ formatDateTime(m.measuredAt) }} · {{ m.measuredByName }}
+                                            </p>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-semibold text-foreground tabular-nums">{{ formatNumber(m.measuredAreaM2) }} m²</span>
+                                            <Badge :variant="LICENSING_STATUS[m.status].variant">{{ LICENSING_STATUS[m.status].label }}</Badge>
+                                        </div>
+                                    </div>
+                                    <ul v-if="m.approvals?.length" class="mt-2 flex flex-wrap gap-2">
+                                        <li v-for="a in m.approvals" :key="a.id">
+                                            <Badge :variant="APPROVAL_STATUS[a.status].variant" class="gap-1">
+                                                {{ a.approverName }} · {{ APPROVAL_STATUS[a.status].label }}
+                                            </Badge>
+                                        </li>
+                                    </ul>
+                                    <p v-for="a in (m.approvals ?? []).filter((x) => x.reason)" :key="`${a.id}-reason`" class="mt-1 text-xs text-muted-foreground">
+                                        {{ a.approverName }}: {{ a.reason }}
+                                    </p>
+                                    <p v-if="m.notes" class="mt-1 text-xs text-muted-foreground">Not: {{ m.notes }}</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
+            </template>
+
+            <EmptyState v-else :icon="ClipboardList" title="Talep bulunamadı">
+                <Button variant="outline" class="h-11 md:h-9" @click="router.push('/caykur/pruning-requests')">Listeye dön</Button>
+            </EmptyState>
+        </PageContainer>
     </CaykurLayout>
 </template>
-
-<style scoped>
-.action-body { display: flex; flex-direction: column; gap: var(--space-3); }
-.action-hint { margin: 0; font-size: var(--font-size-sm); color: var(--color-text-secondary); line-height: 1.5; }
-.appt-row { display: flex; gap: var(--space-2); }
-.appt-row .ck-search-input { flex: 1; }
-.decide-row { display: flex; gap: var(--space-2); }
-.decide-row .ck-btn { flex: 1; }
-.remeasure { align-self: flex-start; }
-.action-done { margin: 0; font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); color: var(--color-success); }
-.action-rejected { margin: 0; font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); color: var(--color-danger); }
-
-.result-area { display: flex; flex-direction: column; margin-bottom: var(--space-3); }
-.result-val { font-size: var(--font-size-3xl); font-weight: var(--font-weight-bold); color: var(--color-text-primary); line-height: 1; font-variant-numeric: tabular-nums; }
-.result-sub { font-size: var(--font-size-sm); color: var(--color-text-muted); margin-top: 4px; }
-
-.coords { margin-top: var(--space-3); }
-.coords-head { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); }
-.coords-list { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.coords-list li { display: flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-xs); color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
-.cx-no { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: var(--color-subtle-bg); border: 1px solid var(--color-border); font-weight: 600; flex-shrink: 0; }
-.cx-alt { margin-left: auto; color: var(--color-text-muted); }
-</style>

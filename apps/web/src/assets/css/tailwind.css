@@ -1,0 +1,189 @@
+/*
+ * Tailwind v4 + shadcn-vue entry.
+ *
+ * Preflight is intentionally NOT imported: the app already ships its own reset
+ * (base.css) and hand-written component CSS that relies on browser defaults.
+ * Only the theme + utilities layers are pulled in, plus a minimal base layer
+ * that shadcn-vue components expect (default border color, outline color).
+ *
+ * All shadcn tokens below are mapped onto the "Field Ledger" design system
+ * (DESIGN.md): slate-neutral surfaces, one working green, Inter everywhere.
+ */
+@layer theme, base, components, utilities;
+
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+@import 'tw-animate-css';
+
+/* Dark mode is class-based. The theme store toggles both `.dark` and
+ * `[data-theme="dark"]` on <html>; the legacy attribute keeps the existing
+ * hand-written CSS working while shadcn utilities key off the class. */
+@custom-variant dark (&:where(.dark, .dark *, [data-theme='dark'], [data-theme='dark'] *));
+
+:root {
+    --radius: 0.5rem;
+
+    --background: #f8fafc;
+    --foreground: #0f172a;
+    --card: #ffffff;
+    --card-foreground: #0f172a;
+    --popover: #ffffff;
+    --popover-foreground: #0f172a;
+    --primary: #15803d;
+    --primary-foreground: #ffffff;
+    --secondary: #f1f5f9;
+    --secondary-foreground: #0f172a;
+    --muted: #f1f5f9;
+    --muted-foreground: #64748b;
+    --accent: #f1f5f9;
+    --accent-foreground: #0f172a;
+    --destructive: #b91c1c;
+    --destructive-foreground: #ffffff;
+    --border: #e2e8f0;
+    --input: #cbd5e1;
+    --ring: #15803d;
+
+    --success: #15803d;
+    --success-foreground: #ffffff;
+    --warning: #b45309;
+    --warning-foreground: #ffffff;
+    --info: #1e3a8a;
+    --info-foreground: #ffffff;
+
+    --chart-1: #15803d;
+    --chart-2: #1e3a8a;
+    --chart-3: #b45309;
+    --chart-4: #475569;
+    --chart-5: #22c55e;
+
+    --sidebar: #ffffff;
+    --sidebar-foreground: #475569;
+    --sidebar-primary: #15803d;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #f1f5f9;
+    --sidebar-accent-foreground: #0f172a;
+    --sidebar-border: #e2e8f0;
+    --sidebar-ring: #15803d;
+}
+
+.dark,
+[data-theme='dark'] {
+    --background: #0f172a;
+    --foreground: #f8fafc;
+    --card: #111827;
+    --card-foreground: #f8fafc;
+    --popover: #1e293b;
+    --popover-foreground: #f8fafc;
+    --primary: #22c55e;
+    --primary-foreground: #0f172a;
+    --secondary: #1e293b;
+    --secondary-foreground: #f8fafc;
+    --muted: #1e293b;
+    --muted-foreground: #94a3b8;
+    --accent: #1e293b;
+    --accent-foreground: #f8fafc;
+    --destructive: #ef4444;
+    --destructive-foreground: #0f172a;
+    --border: #334155;
+    --input: #475569;
+    --ring: #22c55e;
+
+    --success: #22c55e;
+    --success-foreground: #0f172a;
+    --warning: #f59e0b;
+    --warning-foreground: #0f172a;
+    --info: #60a5fa;
+    --info-foreground: #0f172a;
+
+    --chart-1: #22c55e;
+    --chart-2: #60a5fa;
+    --chart-3: #f59e0b;
+    --chart-4: #94a3b8;
+    --chart-5: #4ade80;
+
+    --sidebar: #111827;
+    --sidebar-foreground: #cbd5e1;
+    --sidebar-primary: #22c55e;
+    --sidebar-primary-foreground: #0f172a;
+    --sidebar-accent: #1e293b;
+    --sidebar-accent-foreground: #f8fafc;
+    --sidebar-border: #334155;
+    --sidebar-ring: #22c55e;
+}
+
+@theme inline {
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    --color-success: var(--success);
+    --color-success-foreground: var(--success-foreground);
+    --color-warning: var(--warning);
+    --color-warning-foreground: var(--warning-foreground);
+    --color-info: var(--info);
+    --color-info-foreground: var(--info-foreground);
+
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+
+    /* Design system: 8px corners across the board, 4px for the small step. */
+    --radius-sm: calc(var(--radius) * 0.5);
+    --radius-md: var(--radius);
+    --radius-lg: var(--radius);
+    --radius-xl: var(--radius);
+    --radius-2xl: calc(var(--radius) * 1.5);
+}
+
+@layer base {
+    /* What shadcn-vue components assume from preflight, and nothing more. */
+    *,
+    ::before,
+    ::after {
+        border-color: var(--border);
+        outline-color: color-mix(in oklab, var(--ring) 50%, transparent);
+    }
+    svg {
+        display: inline-block;
+        vertical-align: middle;
+    }
+    /* Strip UA button chrome (outset border, grey fill) from shadcn buttons;
+     * variant utilities (`border`, `bg-*`) still win over this base rule. */
+    button[data-slot='button'],
+    button[data-slot^='dropdown-menu'],
+    button[data-slot='dialog-close'] {
+        border-width: 0;
+        background-color: transparent;
+        color: inherit;
+        font: inherit;
+    }
+}

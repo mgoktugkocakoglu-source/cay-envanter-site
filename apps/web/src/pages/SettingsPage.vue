@@ -1,28 +1,60 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue';
-import { useFocusTrap } from '@/composables/useFocusTrap';
+import { computed, onMounted, ref } from 'vue';
+import type { Component } from 'vue';
 import { useRouter } from 'vue-router';
+import type { AcceptableValue } from 'reka-ui';
+import {
+    AlertCircle,
+    AlertTriangle,
+    Camera,
+    CheckCircle2,
+    Eye,
+    EyeOff,
+    Lock,
+    LogOut,
+    Monitor,
+    MonitorSmartphone,
+    Moon,
+    Save,
+    Settings,
+    Smartphone,
+    Sun,
+    Tablet,
+    Trash2,
+    User,
+} from '@lucide/vue';
 import { api } from '@/services/api';
 import type { Session } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
-import AppEmptyState from '@/components/ui/AppEmptyState.vue';
+import { ConfirmDialog, EmptyState, LoadingState, PageContainer, PageHeader, Spinner } from '@/components/shared';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const router = useRouter();
-const HubLayout = computed(() => TeaBusinessLayout);
 
 const authStore = useAuthStore();
 const themeStore = useThemeStore();
 
-const activeTab = ref<'profile' | 'security' | 'sessions' | 'appearance' | 'account'>('profile');
+type SettingsTab = 'profile' | 'security' | 'sessions' | 'appearance' | 'account';
+const SETTINGS_TABS: SettingsTab[] = ['profile', 'security', 'sessions', 'appearance', 'account'];
+const activeTab = ref<SettingsTab>('profile');
 
 // Profile form
 const profileForm = ref({
-  fullName: '',
-  phone: '',
-  province: '',
-  district: '',
+    fullName: '',
+    phone: '',
+    province: '',
+    district: '',
 });
 const profileLoading = ref(false);
 const profileSuccess = ref('');
@@ -30,9 +62,9 @@ const profileError = ref('');
 
 // Password change form
 const passwordForm = ref({
-  currentPassword: '',
-  newPassword: '',
-  confirmPassword: '',
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
 });
 const passwordErrors = ref<Record<string, string>>({});
 const passwordLoading = ref(false);
@@ -49,8 +81,6 @@ const revokeAllLoading = ref(false);
 
 // Deletion (in-app, Google Play compliant)
 const showDeleteModal = ref(false);
-const deleteModalRef = ref<HTMLElement | null>(null);
-useFocusTrap(showDeleteModal, deleteModalRef);
 const deletePassword = ref('');
 const deleteConfirmText = ref('');
 const showDeletePassword = ref(false);
@@ -65,1740 +95,819 @@ const avatarError = ref('');
 
 // Initialize profile form with user data
 onMounted(() => {
-  if (authStore.user) {
-    profileForm.value = {
-      fullName: authStore.user.fullName || '',
-      phone: authStore.user.phone || '',
-      province: authStore.user.province || '',
-      district: authStore.user.district || '',
-    };
-  }
+    if (authStore.user) {
+        profileForm.value = {
+            fullName: authStore.user.fullName || '',
+            phone: authStore.user.phone || '',
+            province: authStore.user.province || '',
+            district: authStore.user.district || '',
+        };
+    }
 });
 
 // Profile handlers
 async function handleProfileSave() {
-  profileError.value = '';
-  profileSuccess.value = '';
+    profileError.value = '';
+    profileSuccess.value = '';
 
-  if (!profileForm.value.fullName.trim()) {
-    profileError.value = 'Ad Soyad alani gereklidir';
-    return;
-  }
+    if (!profileForm.value.fullName.trim()) {
+        profileError.value = 'Ad Soyad alani gereklidir';
+        return;
+    }
 
-  profileLoading.value = true;
+    profileLoading.value = true;
 
-  // For now, profile update uses the user store's fetchCurrentUser after update
-  // The backend /auth/me endpoint returns current user data
-  // We need a profile update endpoint - for now show a message
-  profileLoading.value = false;
-  profileSuccess.value = 'Profil bilgileri kaydedildi';
+    // For now, profile update uses the user store's fetchCurrentUser after update
+    // The backend /auth/me endpoint returns current user data
+    // We need a profile update endpoint - for now show a message
+    profileLoading.value = false;
+    profileSuccess.value = 'Profil bilgileri kaydedildi';
 
-  // Update local store
-  if (authStore.user) {
-    authStore.user.fullName = profileForm.value.fullName;
-    authStore.user.phone = profileForm.value.phone;
-    authStore.user.province = profileForm.value.province;
-    authStore.user.district = profileForm.value.district;
-  }
+    // Update local store
+    if (authStore.user) {
+        authStore.user.fullName = profileForm.value.fullName;
+        authStore.user.phone = profileForm.value.phone;
+        authStore.user.province = profileForm.value.province;
+        authStore.user.district = profileForm.value.district;
+    }
 }
 
 /** Open the hidden file input when the avatar is clicked */
 function handleAvatarClick() {
-  avatarFileInput.value?.click();
+    avatarFileInput.value?.click();
 }
 
 /** Handle avatar file selection and upload */
 async function handleAvatarUpload(event: Event) {
-  const target = event.target as HTMLInputElement;
-  const file = target.files?.[0];
-  if (!file) return;
+    const target = event.target as HTMLInputElement;
+    const file = target.files?.[0];
+    if (!file) return;
 
-  // Validate client-side
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-  if (!allowedTypes.includes(file.type)) {
-    avatarError.value = 'Sadece JPEG, PNG, GIF ve WebP dosyaları yüklenebilir.';
-    return;
-  }
-  if (file.size > 2 * 1024 * 1024) {
-    avatarError.value = 'Dosya boyutu en fazla 2MB olabilir.';
-    return;
-  }
+    // Validate client-side
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+        avatarError.value = 'Sadece JPEG, PNG, GIF ve WebP dosyaları yüklenebilir.';
+        return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+        avatarError.value = 'Dosya boyutu en fazla 2MB olabilir.';
+        return;
+    }
 
-  avatarError.value = '';
-  avatarLoading.value = true;
+    avatarError.value = '';
+    avatarLoading.value = true;
 
-  const result = await api.uploadAvatar(file);
+    const result = await api.uploadAvatar(file);
 
-  avatarLoading.value = false;
+    avatarLoading.value = false;
 
-  if (result.error) {
-    avatarError.value = result.error.message;
-    return;
-  }
+    if (result.error) {
+        avatarError.value = result.error.message;
+        return;
+    }
 
-  if (authStore.user && result.data) {
-    authStore.user.avatarUrl = result.data.avatarUrl;
-  }
+    if (authStore.user && result.data) {
+        authStore.user.avatarUrl = result.data.avatarUrl;
+    }
 
-  // Reset file input
-  target.value = '';
+    // Reset file input
+    target.value = '';
 }
 
 /** Remove the current avatar */
 async function handleAvatarRemove() {
-  avatarError.value = '';
-  avatarLoading.value = true;
+    avatarError.value = '';
+    avatarLoading.value = true;
 
-  const result = await api.removeAvatar();
+    const result = await api.removeAvatar();
 
-  avatarLoading.value = false;
+    avatarLoading.value = false;
 
-  if (result.error) {
-    avatarError.value = result.error.message;
-    return;
-  }
+    if (result.error) {
+        avatarError.value = result.error.message;
+        return;
+    }
 
-  if (authStore.user) {
-    authStore.user.avatarUrl = null;
-  }
+    if (authStore.user) {
+        authStore.user.avatarUrl = null;
+    }
 }
 
 // Password strength
 const passwordStrength = computed(() => {
-  const pwd = passwordForm.value.newPassword;
-  if (!pwd) return { level: 0, label: '', class: '' };
+    const pwd = passwordForm.value.newPassword;
+    if (!pwd) return { level: 0, label: '', barClass: '', textClass: '' };
 
-  let score = 0;
-  if (pwd.length >= 8) score++;
-  if (/[a-z]/.test(pwd)) score++;
-  if (/[A-Z]/.test(pwd)) score++;
-  if (/[0-9]/.test(pwd)) score++;
-  if (/[^a-zA-Z0-9]/.test(pwd)) score++;
+    let score = 0;
+    if (pwd.length >= 8) score++;
+    if (/[a-z]/.test(pwd)) score++;
+    if (/[A-Z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd)) score++;
+    if (/[^a-zA-Z0-9]/.test(pwd)) score++;
 
-  if (score <= 2) return { level: 1, label: 'Zayif', class: 'strength-weak' };
-  if (score <= 3) return { level: 2, label: 'Orta', class: 'strength-medium' };
-  return { level: 3, label: 'Guclu', class: 'strength-strong' };
+    if (score <= 2) return { level: 1, label: 'Zayif', barClass: 'bg-destructive', textClass: 'text-destructive' };
+    if (score <= 3) return { level: 2, label: 'Orta', barClass: 'bg-warning', textClass: 'text-warning' };
+    return { level: 3, label: 'Guclu', barClass: 'bg-success', textClass: 'text-success' };
 });
 
 function validatePasswordField(field: string): boolean {
-  passwordErrors.value[field] = '';
+    passwordErrors.value[field] = '';
 
-  switch (field) {
-    case 'currentPassword':
-      if (!passwordForm.value.currentPassword) {
-        passwordErrors.value[field] = 'Mevcut sifre gereklidir';
-      }
-      break;
+    switch (field) {
+        case 'currentPassword':
+            if (!passwordForm.value.currentPassword) {
+                passwordErrors.value[field] = 'Mevcut sifre gereklidir';
+            }
+            break;
 
-    case 'newPassword': {
-      const pwd = passwordForm.value.newPassword;
-      if (!pwd) {
-        passwordErrors.value[field] = 'Yeni sifre gereklidir';
-      } else if (pwd.length < 8) {
-        passwordErrors.value[field] = 'Şifre en az 8 karakter olmalıdır';
-      } else if (!/[a-z]/.test(pwd)) {
-        passwordErrors.value[field] = 'Şifre en az bir küçük harf içermelidir';
-      } else if (!/[A-Z]/.test(pwd)) {
-        passwordErrors.value[field] = 'Şifre en az bir büyük harf içermelidir';
-      } else if (!/[0-9]/.test(pwd)) {
-        passwordErrors.value[field] = 'Şifre en az bir rakam içermelidir';
-      }
-      break;
+        case 'newPassword': {
+            const pwd = passwordForm.value.newPassword;
+            if (!pwd) {
+                passwordErrors.value[field] = 'Yeni sifre gereklidir';
+            } else if (pwd.length < 8) {
+                passwordErrors.value[field] = 'Şifre en az 8 karakter olmalıdır';
+            } else if (!/[a-z]/.test(pwd)) {
+                passwordErrors.value[field] = 'Şifre en az bir küçük harf içermelidir';
+            } else if (!/[A-Z]/.test(pwd)) {
+                passwordErrors.value[field] = 'Şifre en az bir büyük harf içermelidir';
+            } else if (!/[0-9]/.test(pwd)) {
+                passwordErrors.value[field] = 'Şifre en az bir rakam içermelidir';
+            }
+            break;
+        }
+
+        case 'confirmPassword':
+            if (!passwordForm.value.confirmPassword) {
+                passwordErrors.value[field] = 'Şifre tekrarı gereklidir';
+            } else if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
+                passwordErrors.value[field] = 'Şifreler eşleşmiyor';
+            }
+            break;
     }
 
-    case 'confirmPassword':
-      if (!passwordForm.value.confirmPassword) {
-        passwordErrors.value[field] = 'Şifre tekrarı gereklidir';
-      } else if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
-        passwordErrors.value[field] = 'Şifreler eşleşmiyor';
-      }
-      break;
-  }
-
-  return !passwordErrors.value[field];
+    return !passwordErrors.value[field];
 }
 
 async function handlePasswordChange() {
-  passwordSuccess.value = '';
+    passwordSuccess.value = '';
 
-  const fields = ['currentPassword', 'newPassword', 'confirmPassword'];
-  if (!fields.every(validatePasswordField)) return;
+    const fields = ['currentPassword', 'newPassword', 'confirmPassword'];
+    if (!fields.every(validatePasswordField)) return;
 
-  passwordLoading.value = true;
+    passwordLoading.value = true;
 
-  const result = await api.changePassword(
-    passwordForm.value.currentPassword,
-    passwordForm.value.newPassword
-  );
+    const result = await api.changePassword(passwordForm.value.currentPassword, passwordForm.value.newPassword);
 
-  passwordLoading.value = false;
+    passwordLoading.value = false;
 
-  if (result.error) {
-    passwordErrors.value.currentPassword = result.error.message;
-    return;
-  }
+    if (result.error) {
+        passwordErrors.value.currentPassword = result.error.message;
+        return;
+    }
 
-  passwordSuccess.value = 'Şifre başarıyla değiştirildi';
-  passwordForm.value = { currentPassword: '', newPassword: '', confirmPassword: '' };
+    passwordSuccess.value = 'Şifre başarıyla değiştirildi';
+    passwordForm.value = { currentPassword: '', newPassword: '', confirmPassword: '' };
 }
 
 // Session handlers
 async function loadSessions() {
-  sessionsLoading.value = true;
-  sessionsError.value = '';
+    sessionsLoading.value = true;
+    sessionsError.value = '';
 
-  const result = await api.getSessions();
+    const result = await api.getSessions();
 
-  sessionsLoading.value = false;
+    sessionsLoading.value = false;
 
-  if (result.error) {
-    sessionsError.value = result.error.message;
-    return;
-  }
+    if (result.error) {
+        sessionsError.value = result.error.message;
+        return;
+    }
 
-  sessions.value = result.data || [];
+    sessions.value = result.data || [];
 }
 
 async function handleRevokeSession(sessionId: string) {
-  revokingSessionId.value = sessionId;
+    revokingSessionId.value = sessionId;
 
-  const result = await api.revokeSession(sessionId);
+    const result = await api.revokeSession(sessionId);
 
-  revokingSessionId.value = null;
+    revokingSessionId.value = null;
 
-  if (result.error) {
-    sessionsError.value = result.error.message;
-    return;
-  }
+    if (result.error) {
+        sessionsError.value = result.error.message;
+        return;
+    }
 
-  sessions.value = sessions.value.filter(s => s.id !== sessionId);
+    sessions.value = sessions.value.filter((s) => s.id !== sessionId);
 }
 
 async function handleRevokeAll() {
-  revokeAllLoading.value = true;
+    revokeAllLoading.value = true;
 
-  const result = await api.revokeAllSessions();
+    const result = await api.revokeAllSessions();
 
-  revokeAllLoading.value = false;
+    revokeAllLoading.value = false;
 
-  if (result.error) {
-    sessionsError.value = result.error.message;
-    return;
-  }
+    if (result.error) {
+        sessionsError.value = result.error.message;
+        return;
+    }
 
-  await loadSessions();
+    await loadSessions();
 }
 
 function formatSessionDate(dateStr: string) {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('tr-TR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('tr-TR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 }
 
-function getDeviceIcon(deviceType: string) {
-  if (deviceType === 'mobile') return 'mobile';
-  if (deviceType === 'tablet') return 'tablet';
-  return 'desktop';
+function getDeviceIcon(deviceType: string): Component {
+    if (deviceType === 'mobile') return Smartphone;
+    if (deviceType === 'tablet') return Tablet;
+    return Monitor;
+}
+
+function sessionDeviceLabel(session: Session) {
+    return [session.browser || 'Bilinmiyor', session.os || ''].filter(Boolean).join(' · ');
 }
 
 // Delete handlers (in-app deletion: password + 'SİL' confirmation)
 function openDeleteModal() {
-  showDeleteModal.value = true;
-  deletePassword.value = '';
-  deleteConfirmText.value = '';
-  deleteError.value = '';
-  showDeletePassword.value = false;
-  nextTick(() => deleteModalRef.value?.focus());
+    showDeleteModal.value = true;
+    deletePassword.value = '';
+    deleteConfirmText.value = '';
+    deleteError.value = '';
+    showDeletePassword.value = false;
 }
 
 function closeDeleteModal() {
-  if (deleteLoading.value) return;
-  showDeleteModal.value = false;
+    if (deleteLoading.value) return;
+    showDeleteModal.value = false;
+}
+
+/** Dialog open-state change: ignore close requests while a deletion is in flight. */
+function onDeleteDialogOpenChange(open: boolean) {
+    if (open) {
+        showDeleteModal.value = true;
+        return;
+    }
+    closeDeleteModal();
 }
 
 async function handleDeleteAccount() {
-  deleteError.value = '';
+    deleteError.value = '';
 
-  if (!deletePassword.value) {
-    deleteError.value = 'Şifrenizi girin';
-    return;
-  }
+    if (!deletePassword.value) {
+        deleteError.value = 'Şifrenizi girin';
+        return;
+    }
 
-  if (deleteConfirmText.value.trim().toUpperCase() !== DELETE_CONFIRM_PHRASE) {
-    deleteError.value = `Onaylamak için "${DELETE_CONFIRM_PHRASE}" yazın`;
-    return;
-  }
+    if (deleteConfirmText.value.trim().toUpperCase() !== DELETE_CONFIRM_PHRASE) {
+        deleteError.value = `Onaylamak için "${DELETE_CONFIRM_PHRASE}" yazın`;
+        return;
+    }
 
-  deleteLoading.value = true;
-  const result = await api.deleteOwnAccount(deletePassword.value);
-  deleteLoading.value = false;
+    deleteLoading.value = true;
+    const result = await api.deleteOwnAccount(deletePassword.value);
+    deleteLoading.value = false;
 
-  if (result.error) {
-    deleteError.value = result.error.message || 'Hesap silinemedi';
-    return;
-  }
+    if (result.error) {
+        deleteError.value = result.error.message || 'Hesap silinemedi';
+        return;
+    }
 
-  showDeleteModal.value = false;
-  await authStore.logout();
-  router.replace({ name: 'login', query: { deleted: '1' } });
+    showDeleteModal.value = false;
+    await authStore.logout();
+    router.replace({ name: 'login', query: { deleted: '1' } });
 }
 
 // User type label
 const userTypeLabel = computed(() => {
-  switch (authStore.user?.userType) {
-    case 'land_owner': return 'Arazi Sahibi';
-    case 'worker': return 'Isci';
-    case 'self_farmer': return 'Kendi Ciftcisi';
-    default: return '-';
-  }
+    switch (authStore.user?.userType) {
+        case 'land_owner':
+            return 'Arazi Sahibi';
+        case 'worker':
+            return 'Isci';
+        case 'self_farmer':
+            return 'Kendi Ciftcisi';
+        default:
+            return '-';
+    }
 });
 
+const userInitial = computed(() => authStore.user?.fullName?.charAt(0)?.toUpperCase() || 'U');
+
 // Tab change handler
-function switchTab(tab: typeof activeTab.value) {
-  activeTab.value = tab;
-  if (tab === 'sessions' && sessions.value.length === 0) {
-    loadSessions();
-  }
+function switchTab(tab: SettingsTab) {
+    activeTab.value = tab;
+    if (tab === 'sessions' && sessions.value.length === 0) {
+        loadSessions();
+    }
+}
+
+function isSettingsTab(value: unknown): value is SettingsTab {
+    return typeof value === 'string' && (SETTINGS_TABS as string[]).includes(value);
+}
+
+function onTabChange(value: string | number) {
+    if (isSettingsTab(value)) switchTab(value);
+}
+
+function onThemeChange(value: AcceptableValue) {
+    if (value === 'dark' || value === 'light') themeStore.setTheme(value);
 }
 </script>
 
 <template>
-  <component :is="HubLayout">
-    <div class="settings-page">
-      <main class="settings-content">
-        <!-- Header -->
-        <div class="settings-header-section">
-          <div class="settings-avatar-wrapper">
-            <div class="settings-avatar" role="button" tabindex="0" aria-label="Profil fotoğrafını değiştir" @click="handleAvatarClick" @keydown.enter="handleAvatarClick" @keydown.space.prevent="handleAvatarClick" :class="{ 'has-avatar': authStore.user?.avatarUrl }">
-              <img
-                v-if="authStore.user?.avatarUrl"
-                :src="authStore.user.avatarUrl"
-                alt="Avatar"
-                class="avatar-image"
-              />
-              <span v-else>{{ authStore.user?.fullName?.charAt(0)?.toUpperCase() || 'U' }}</span>
-              <div class="avatar-overlay" v-if="!avatarLoading">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                  <circle cx="12" cy="13" r="4"/>
-                </svg>
-              </div>
-              <div class="avatar-loading" v-if="avatarLoading">
-                <span class="spinner-sm"></span>
-              </div>
-            </div>
-            <input
-              ref="avatarFileInput"
-              type="file"
-              accept="image/jpeg,image/png,image/gif,image/webp"
-              class="avatar-file-input"
-              @change="handleAvatarUpload"
-            />
-            <button
-              v-if="authStore.user?.avatarUrl"
-              class="avatar-remove-btn"
-              @click="handleAvatarRemove"
-              :disabled="avatarLoading"
-            >
-              Kaldır
-            </button>
-            <p v-if="avatarError" class="avatar-error">{{ avatarError }}</p>
-          </div>
-          <div class="settings-header-info">
-            <h1 class="settings-title">Hesap Ayarları</h1>
-            <p class="settings-email">{{ authStore.user?.email }}</p>
-          </div>
-        </div>
-
-        <!-- Tabs -->
-        <div class="settings-tabs app-tabs">
-          <button
-            class="tab-btn app-tab-btn"
-            :class="{ active: activeTab === 'profile' }"
-            @click="switchTab('profile')"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            Profil
-          </button>
-          <button
-            class="tab-btn app-tab-btn"
-            :class="{ active: activeTab === 'security' }"
-            @click="switchTab('security')"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            Güvenlik
-          </button>
-          <button
-            class="tab-btn app-tab-btn"
-            :class="{ active: activeTab === 'sessions' }"
-            @click="switchTab('sessions')"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-            Oturumlar
-          </button>
-          <button
-            class="tab-btn app-tab-btn"
-            :class="{ active: activeTab === 'appearance' }"
-            @click="switchTab('appearance')"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-            Görünüm
-          </button>
-          <button
-            class="tab-btn app-tab-btn"
-            :class="{ active: activeTab === 'account' }"
-            @click="switchTab('account')"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-            Hesap
-          </button>
-        </div>
-
-        <!-- ═══════ Profile Tab ═══════ -->
-        <div v-if="activeTab === 'profile'" class="tab-content">
-          <div class="card">
-            <div class="card-header">
-              <h2>Profil Bilgileri</h2>
-              <span class="badge">{{ userTypeLabel }}</span>
-            </div>
-
-            <div v-if="profileSuccess" class="message-box message-success">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-              {{ profileSuccess }}
-            </div>
-            <div v-if="profileError" class="message-box message-error">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              {{ profileError }}
-            </div>
-
-            <form @submit.prevent="handleProfileSave" class="profile-form">
-              <div class="form-row">
-                <div class="form-group">
-                  <label class="form-label" for="profileEmail">Email</label>
-                  <input
-                    id="profileEmail"
-                    type="email"
-                    class="form-input"
-                    :value="authStore.user?.email"
-                    disabled
-                  />
-                  <span class="form-help">Email degistirilemez</span>
-                </div>
-                <div class="form-group">
-                  <label class="form-label" for="profileName">Ad Soyad</label>
-                  <input
-                    id="profileName"
-                    v-model="profileForm.fullName"
-                    type="text"
-                    class="form-input"
-                    placeholder="Ad Soyad"
-                  />
-                </div>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group">
-                  <label class="form-label" for="profilePhone">Telefon</label>
-                  <input
-                    id="profilePhone"
-                    v-model="profileForm.phone"
-                    type="tel"
-                    class="form-input"
-                    placeholder="05XX XXX XX XX"
-                  />
-                </div>
-                <div class="form-group">
-                  <label class="form-label" for="profileProvince">İl</label>
-                  <input
-                    id="profileProvince"
-                    v-model="profileForm.province"
-                    type="text"
-                    class="form-input"
-                    placeholder="İl"
-                  />
-                </div>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group">
-                  <label class="form-label" for="profileDistrict">İlçe</label>
-                  <input
-                    id="profileDistrict"
-                    v-model="profileForm.district"
-                    type="text"
-                    class="form-input"
-                    placeholder="İlçe"
-                  />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Kullanıcı Tipi</label>
-                  <input
-                    type="text"
-                    class="form-input"
-                    :value="userTypeLabel"
-                    disabled
-                  />
-                  <span class="form-help">Kullanıcı tipi değiştirilemez</span>
-                </div>
-              </div>
-
-              <div class="form-actions">
-                <button type="submit" class="btn btn-primary" :disabled="profileLoading">
-                  <svg v-if="!profileLoading" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                  <span v-else class="spinner-sm"></span>
-                  {{ profileLoading ? 'Kaydediliyor...' : 'Kaydet' }}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <!-- ═══════ Security Tab ═══════ -->
-        <div v-if="activeTab === 'security'" class="tab-content">
-          <div class="card">
-            <div class="card-header">
-              <h2>Şifre Değiştir</h2>
-            </div>
-
-            <div v-if="passwordSuccess" class="message-box message-success">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-              {{ passwordSuccess }}
-            </div>
-
-            <form @submit.prevent="handlePasswordChange" class="password-form">
-              <div class="form-group">
-                <label class="form-label" for="currentPassword">Mevcut Şifre</label>
-                <div class="input-with-action">
-                  <input
-                    id="currentPassword"
-                    v-model="passwordForm.currentPassword"
-                    :type="showCurrentPassword ? 'text' : 'password'"
-                    class="form-input"
-                    :class="{ 'has-error': passwordErrors.currentPassword }"
-                    @blur="validatePasswordField('currentPassword')"
-                  />
-                  <button type="button" class="input-action-btn" @click="showCurrentPassword = !showCurrentPassword">
-                    <svg v-if="showCurrentPassword" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                    <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  </button>
-                </div>
-                <p v-if="passwordErrors.currentPassword" class="form-error">{{ passwordErrors.currentPassword }}</p>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label" for="newPassword">Yeni Şifre</label>
-                <div class="input-with-action">
-                  <input
-                    id="newPassword"
-                    v-model="passwordForm.newPassword"
-                    :type="showNewPassword ? 'text' : 'password'"
-                    class="form-input"
-                    :class="{ 'has-error': passwordErrors.newPassword }"
-                    @blur="validatePasswordField('newPassword')"
-                  />
-                  <button type="button" class="input-action-btn" @click="showNewPassword = !showNewPassword">
-                    <svg v-if="showNewPassword" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                    <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  </button>
-                </div>
-                <div v-if="passwordForm.newPassword" class="password-strength">
-                  <div class="strength-track">
-                    <div
-                      class="strength-fill"
-                      :class="passwordStrength.class"
-                      :style="{ width: `${(passwordStrength.level / 3) * 100}%` }"
-                    ></div>
-                  </div>
-                  <span class="strength-label" :class="passwordStrength.class">{{ passwordStrength.label }}</span>
-                </div>
-                <p v-if="passwordErrors.newPassword" class="form-error">{{ passwordErrors.newPassword }}</p>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label" for="confirmPassword">Yeni Şifre Tekrarı</label>
-                <input
-                  id="confirmPassword"
-                  v-model="passwordForm.confirmPassword"
-                  type="password"
-                  class="form-input"
-                  :class="{ 'has-error': passwordErrors.confirmPassword }"
-                  @blur="validatePasswordField('confirmPassword')"
-                />
-                <p v-if="passwordErrors.confirmPassword" class="form-error">{{ passwordErrors.confirmPassword }}</p>
-              </div>
-
-              <div class="form-actions">
-                <button type="submit" class="btn btn-primary" :disabled="passwordLoading">
-                  <svg v-if="!passwordLoading" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                  <span v-else class="spinner-sm"></span>
-                  {{ passwordLoading ? 'Değiştiriliyor...' : 'Şifreyi Değiştir' }}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <!-- ═══════ Sessions Tab ═══════ -->
-        <div v-if="activeTab === 'sessions'" class="tab-content">
-          <div class="card">
-            <div class="card-header">
-              <h2>Aktif Oturumlar</h2>
-              <button
-                v-if="sessions.length > 1"
-                class="btn btn-outline btn-sm"
-                :disabled="revokeAllLoading"
-                @click="handleRevokeAll"
-              >
-                <span v-if="revokeAllLoading" class="spinner-sm"></span>
-                <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                Tüm Oturumları Kapat
-              </button>
-            </div>
-
-            <p class="card-description">
-              Hesabınıza giriş yapılan cihazları ve oturumları buradan yönetebilirsiniz.
-            </p>
-
-            <div v-if="sessionsError" class="message-box message-error">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              {{ sessionsError }}
-            </div>
-
-            <!-- Loading -->
-            <div v-if="sessionsLoading" class="sessions-loading">
-              <span class="spinner-md"></span>
-              <span>Oturumlar yükleniyor...</span>
-            </div>
-
-            <!-- Sessions List -->
-            <div v-else-if="sessions.length > 0" class="sessions-list">
-              <div
-                v-for="session in sessions"
-                :key="session.id"
-                class="session-item"
-                :class="{ 'session-active': session.isActive }"
-              >
-                <div class="session-icon" :class="`device-${getDeviceIcon(session.deviceType)}`">
-                  <!-- Desktop -->
-                  <svg v-if="getDeviceIcon(session.deviceType) === 'desktop'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                  <!-- Mobile -->
-                  <svg v-else-if="getDeviceIcon(session.deviceType) === 'mobile'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-                  <!-- Tablet -->
-                  <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-                </div>
-
-                <div class="session-info">
-                  <div class="session-device">
-                    <span class="session-browser">{{ session.browser || 'Bilinmiyor' }}</span>
-                    <span class="session-os">{{ session.os || '' }}</span>
-                  </div>
-                  <div class="session-meta">
-                    <span v-if="session.ipAddress">{{ session.ipAddress }}</span>
-                    <span v-if="session.location"> &middot; {{ session.location }}</span>
-                    <span> &middot; {{ formatSessionDate(session.lastActivityAt || session.createdAt) }}</span>
-                  </div>
-                </div>
-
-                <button
-                  class="btn btn-ghost btn-sm session-revoke"
-                  :disabled="revokingSessionId === session.id"
-                  @click="handleRevokeSession(session.id)"
-                >
-                  <span v-if="revokingSessionId === session.id" class="spinner-sm"></span>
-                  <span v-else>Sonlandir</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- Empty -->
-            <AppEmptyState v-else icon="document" title="Aktif oturum bulunamadi" />
-          </div>
-        </div>
-
-        <!-- ═══════ Appearance Tab ═══════ -->
-        <div v-if="activeTab === 'appearance'" class="tab-content">
-          <div class="card">
-            <div class="card-header">
-              <h2>Tema Ayarlari</h2>
-            </div>
-            <p class="card-description">
-              Uygulamanin görünümünü tercihlerinize göre ayarlayın.
-            </p>
-
-            <div class="theme-selector">
-              <button
-                class="theme-option"
-                :class="{ active: themeStore.theme === 'dark' }"
-                @click="themeStore.setTheme('dark')"
-              >
-                <div class="theme-preview theme-preview-dark">
-                  <div class="preview-header"></div>
-                  <div class="preview-body">
-                    <div class="preview-sidebar"></div>
-                    <div class="preview-content">
-                      <div class="preview-line"></div>
-                      <div class="preview-line short"></div>
+    <TeaBusinessLayout>
+        <PageContainer size="narrow">
+            <PageHeader title="Ayarlar" description="Profil, güvenlik ve görünüm tercihlerinizi yönetin.">
+                <template #meta>
+                    <div class="flex w-full items-center gap-4 pt-2">
+                        <button
+                            type="button"
+                            class="group relative size-16 shrink-0 cursor-pointer rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-wait"
+                            aria-label="Profil fotoğrafını değiştir"
+                            :disabled="avatarLoading"
+                            @click="handleAvatarClick"
+                        >
+                            <Avatar class="size-16 border">
+                                <AvatarImage v-if="authStore.user?.avatarUrl" :src="authStore.user.avatarUrl" alt="Avatar" class="object-cover" />
+                                <AvatarFallback class="bg-primary/10 text-xl font-bold text-primary">{{ userInitial }}</AvatarFallback>
+                            </Avatar>
+                            <span
+                                class="absolute inset-0 flex items-center justify-center rounded-full bg-foreground/60 text-background transition-opacity"
+                                :class="avatarLoading ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'"
+                                aria-hidden="true"
+                            >
+                                <Spinner v-if="avatarLoading" class="size-5" />
+                                <Camera v-else class="size-5" />
+                            </span>
+                        </button>
+                        <input
+                            ref="avatarFileInput"
+                            type="file"
+                            accept="image/jpeg,image/png,image/gif,image/webp"
+                            class="sr-only"
+                            tabindex="-1"
+                            @change="handleAvatarUpload"
+                        />
+                        <div class="min-w-0 flex-1 space-y-1">
+                            <p class="truncate text-base font-semibold text-foreground">{{ authStore.user?.fullName || 'Kullanıcı' }}</p>
+                            <p class="truncate text-sm text-muted-foreground">{{ authStore.user?.email }}</p>
+                            <div class="flex flex-wrap items-center gap-2 pt-1">
+                                <Badge variant="secondary">{{ userTypeLabel }}</Badge>
+                                <Button
+                                    v-if="authStore.user?.avatarUrl"
+                                    variant="ghost"
+                                    size="sm"
+                                    class="h-8 text-muted-foreground hover:text-destructive"
+                                    :disabled="avatarLoading"
+                                    @click="handleAvatarRemove"
+                                >
+                                    Kaldır
+                                </Button>
+                            </div>
+                            <p v-if="avatarError" class="text-xs text-destructive" role="alert">{{ avatarError }}</p>
+                        </div>
                     </div>
-                  </div>
-                </div>
-                <div class="theme-option-info">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                  <span>Koyu Tema</span>
-                </div>
-              </button>
+                </template>
+            </PageHeader>
 
-              <button
-                class="theme-option"
-                :class="{ active: themeStore.theme === 'light' }"
-                @click="themeStore.setTheme('light')"
-              >
-                <div class="theme-preview theme-preview-light">
-                  <div class="preview-header"></div>
-                  <div class="preview-body">
-                    <div class="preview-sidebar"></div>
-                    <div class="preview-content">
-                      <div class="preview-line"></div>
-                      <div class="preview-line short"></div>
+            <Tabs :model-value="activeTab" @update:model-value="onTabChange">
+                <TabsList variant="line" class="w-full" aria-label="Ayar bölümleri">
+                    <TabsTrigger value="profile">
+                        <User aria-hidden="true" />
+                        Profil
+                    </TabsTrigger>
+                    <TabsTrigger value="security">
+                        <Lock aria-hidden="true" />
+                        Güvenlik
+                    </TabsTrigger>
+                    <TabsTrigger value="sessions">
+                        <MonitorSmartphone aria-hidden="true" />
+                        Oturumlar
+                    </TabsTrigger>
+                    <TabsTrigger value="appearance">
+                        <Sun aria-hidden="true" />
+                        Görünüm
+                    </TabsTrigger>
+                    <TabsTrigger value="account">
+                        <Settings aria-hidden="true" />
+                        Hesap
+                    </TabsTrigger>
+                </TabsList>
+
+                <!-- Profile -->
+                <TabsContent value="profile">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Profil Bilgileri</CardTitle>
+                            <CardDescription>Ad, telefon ve adres bilgilerinizi güncelleyin.</CardDescription>
+                            <CardAction>
+                                <Badge variant="secondary">{{ userTypeLabel }}</Badge>
+                            </CardAction>
+                        </CardHeader>
+                        <CardContent class="space-y-4">
+                            <Alert v-if="profileSuccess" variant="success">
+                                <CheckCircle2 aria-hidden="true" />
+                                <AlertDescription>{{ profileSuccess }}</AlertDescription>
+                            </Alert>
+                            <Alert v-if="profileError" variant="destructive">
+                                <AlertCircle aria-hidden="true" />
+                                <AlertDescription>{{ profileError }}</AlertDescription>
+                            </Alert>
+
+                            <form id="profile-form" class="grid gap-4 md:grid-cols-2" @submit.prevent="handleProfileSave">
+                                <div class="space-y-2">
+                                    <Label for="profileEmail">Email</Label>
+                                    <Input id="profileEmail" type="email" class="h-11 md:h-9" :model-value="authStore.user?.email ?? ''" disabled />
+                                    <p class="text-xs text-muted-foreground">Email degistirilemez</p>
+                                </div>
+                                <div class="space-y-2">
+                                    <Label for="profileName">Ad Soyad</Label>
+                                    <Input id="profileName" v-model="profileForm.fullName" type="text" class="h-11 md:h-9" placeholder="Ad Soyad" />
+                                </div>
+                                <div class="space-y-2">
+                                    <Label for="profilePhone">Telefon</Label>
+                                    <Input id="profilePhone" v-model="profileForm.phone" type="tel" class="h-11 md:h-9" placeholder="05XX XXX XX XX" />
+                                </div>
+                                <div class="space-y-2">
+                                    <Label for="profileProvince">İl</Label>
+                                    <Input id="profileProvince" v-model="profileForm.province" type="text" class="h-11 md:h-9" placeholder="İl" />
+                                </div>
+                                <div class="space-y-2">
+                                    <Label for="profileDistrict">İlçe</Label>
+                                    <Input id="profileDistrict" v-model="profileForm.district" type="text" class="h-11 md:h-9" placeholder="İlçe" />
+                                </div>
+                                <div class="space-y-2">
+                                    <Label for="profileUserType">Kullanıcı Tipi</Label>
+                                    <Input id="profileUserType" type="text" class="h-11 md:h-9" :model-value="userTypeLabel" disabled />
+                                    <p class="text-xs text-muted-foreground">Kullanıcı tipi değiştirilemez</p>
+                                </div>
+                            </form>
+                        </CardContent>
+                        <CardFooter class="justify-end border-t">
+                            <Button type="submit" form="profile-form" class="h-11 md:h-9" :disabled="profileLoading">
+                                <Spinner v-if="profileLoading" />
+                                <Save v-else aria-hidden="true" />
+                                {{ profileLoading ? 'Kaydediliyor...' : 'Kaydet' }}
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                </TabsContent>
+
+                <!-- Security -->
+                <TabsContent value="security">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Şifre Değiştir</CardTitle>
+                            <CardDescription>En az 8 karakter; büyük harf, küçük harf ve rakam içermelidir.</CardDescription>
+                        </CardHeader>
+                        <CardContent class="space-y-4">
+                            <Alert v-if="passwordSuccess" variant="success">
+                                <CheckCircle2 aria-hidden="true" />
+                                <AlertDescription>{{ passwordSuccess }}</AlertDescription>
+                            </Alert>
+
+                            <form id="password-form" class="space-y-4" @submit.prevent="handlePasswordChange">
+                                <div class="space-y-2">
+                                    <Label for="currentPassword">Mevcut Şifre</Label>
+                                    <div class="relative">
+                                        <Input
+                                            id="currentPassword"
+                                            v-model="passwordForm.currentPassword"
+                                            :type="showCurrentPassword ? 'text' : 'password'"
+                                            class="h-11 pr-11 md:h-9 md:pr-9"
+                                            autocomplete="current-password"
+                                            :aria-invalid="passwordErrors.currentPassword ? true : undefined"
+                                            @blur="validatePasswordField('currentPassword')"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            class="absolute top-0 right-0 size-11 text-muted-foreground md:size-9"
+                                            :aria-label="showCurrentPassword ? 'Şifreyi gizle' : 'Şifreyi göster'"
+                                            @click="showCurrentPassword = !showCurrentPassword"
+                                        >
+                                            <EyeOff v-if="showCurrentPassword" aria-hidden="true" />
+                                            <Eye v-else aria-hidden="true" />
+                                        </Button>
+                                    </div>
+                                    <p v-if="passwordErrors.currentPassword" class="text-xs text-destructive">{{ passwordErrors.currentPassword }}</p>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <Label for="newPassword">Yeni Şifre</Label>
+                                    <div class="relative">
+                                        <Input
+                                            id="newPassword"
+                                            v-model="passwordForm.newPassword"
+                                            :type="showNewPassword ? 'text' : 'password'"
+                                            class="h-11 pr-11 md:h-9 md:pr-9"
+                                            autocomplete="new-password"
+                                            :aria-invalid="passwordErrors.newPassword ? true : undefined"
+                                            @blur="validatePasswordField('newPassword')"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            class="absolute top-0 right-0 size-11 text-muted-foreground md:size-9"
+                                            :aria-label="showNewPassword ? 'Şifreyi gizle' : 'Şifreyi göster'"
+                                            @click="showNewPassword = !showNewPassword"
+                                        >
+                                            <EyeOff v-if="showNewPassword" aria-hidden="true" />
+                                            <Eye v-else aria-hidden="true" />
+                                        </Button>
+                                    </div>
+                                    <div v-if="passwordForm.newPassword" class="flex items-center gap-3" aria-live="polite">
+                                        <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+                                            <div
+                                                class="h-full rounded-full transition-[width]"
+                                                :class="passwordStrength.barClass"
+                                                :style="{ width: `${(passwordStrength.level / 3) * 100}%` }"
+                                            ></div>
+                                        </div>
+                                        <span class="text-xs font-medium" :class="passwordStrength.textClass">{{ passwordStrength.label }}</span>
+                                    </div>
+                                    <p v-if="passwordErrors.newPassword" class="text-xs text-destructive">{{ passwordErrors.newPassword }}</p>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <Label for="confirmPassword">Yeni Şifre Tekrarı</Label>
+                                    <Input
+                                        id="confirmPassword"
+                                        v-model="passwordForm.confirmPassword"
+                                        type="password"
+                                        class="h-11 md:h-9"
+                                        autocomplete="new-password"
+                                        :aria-invalid="passwordErrors.confirmPassword ? true : undefined"
+                                        @blur="validatePasswordField('confirmPassword')"
+                                    />
+                                    <p v-if="passwordErrors.confirmPassword" class="text-xs text-destructive">{{ passwordErrors.confirmPassword }}</p>
+                                </div>
+                            </form>
+                        </CardContent>
+                        <CardFooter class="justify-end border-t">
+                            <Button type="submit" form="password-form" class="h-11 md:h-9" :disabled="passwordLoading">
+                                <Spinner v-if="passwordLoading" />
+                                <Lock v-else aria-hidden="true" />
+                                {{ passwordLoading ? 'Değiştiriliyor...' : 'Şifreyi Değiştir' }}
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                </TabsContent>
+
+                <!-- Sessions -->
+                <TabsContent value="sessions">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Aktif Oturumlar</CardTitle>
+                            <CardDescription>Hesabınıza giriş yapılan cihazları ve oturumları buradan yönetebilirsiniz.</CardDescription>
+                            <CardAction v-if="sessions.length > 1">
+                                <Button variant="outline" class="h-11 md:h-9" :disabled="revokeAllLoading" @click="handleRevokeAll">
+                                    <Spinner v-if="revokeAllLoading" />
+                                    <LogOut v-else aria-hidden="true" />
+                                    Tüm Oturumları Kapat
+                                </Button>
+                            </CardAction>
+                        </CardHeader>
+                        <CardContent class="space-y-4">
+                            <Alert v-if="sessionsError" variant="destructive">
+                                <AlertCircle aria-hidden="true" />
+                                <AlertDescription>{{ sessionsError }}</AlertDescription>
+                            </Alert>
+
+                            <LoadingState v-if="sessionsLoading" text="Oturumlar yükleniyor..." />
+
+                            <div v-else-if="sessions.length > 0" class="overflow-hidden rounded-lg border">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow class="hover:bg-transparent">
+                                            <TableHead class="pl-4">Cihaz</TableHead>
+                                            <TableHead class="hidden md:table-cell">Konum</TableHead>
+                                            <TableHead class="hidden md:table-cell">Son etkinlik</TableHead>
+                                            <TableHead class="pr-4 text-right"><span class="sr-only">İşlemler</span></TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        <TableRow v-for="session in sessions" :key="session.id">
+                                            <TableCell class="pl-4">
+                                                <div class="flex items-center gap-3">
+                                                    <span class="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground" aria-hidden="true">
+                                                        <component :is="getDeviceIcon(session.deviceType)" class="size-4" />
+                                                    </span>
+                                                    <div class="min-w-0 space-y-0.5">
+                                                        <div class="flex flex-wrap items-center gap-2">
+                                                            <span class="truncate font-medium text-foreground">{{ sessionDeviceLabel(session) }}</span>
+                                                            <Badge v-if="session.isActive" variant="success">Aktif</Badge>
+                                                        </div>
+                                                        <p class="text-xs text-muted-foreground md:hidden">
+                                                            <span v-if="session.ipAddress">{{ session.ipAddress }}</span>
+                                                            <span v-if="session.location"> · {{ session.location }}</span>
+                                                            <span> · {{ formatSessionDate(session.lastActivityAt || session.createdAt) }}</span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell class="hidden text-muted-foreground md:table-cell">
+                                                <span class="block">{{ session.ipAddress || '—' }}</span>
+                                                <span v-if="session.location" class="block text-xs">{{ session.location }}</span>
+                                            </TableCell>
+                                            <TableCell class="hidden text-muted-foreground tabular-nums md:table-cell">
+                                                {{ formatSessionDate(session.lastActivityAt || session.createdAt) }}
+                                            </TableCell>
+                                            <TableCell class="pr-4 text-right">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    class="size-11 text-muted-foreground hover:text-destructive md:size-9"
+                                                    :disabled="revokingSessionId === session.id"
+                                                    :aria-label="`${sessionDeviceLabel(session)} oturumunu sonlandır`"
+                                                    @click="handleRevokeSession(session.id)"
+                                                >
+                                                    <Spinner v-if="revokingSessionId === session.id" />
+                                                    <LogOut v-else aria-hidden="true" />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    </TableBody>
+                                </Table>
+                            </div>
+
+                            <EmptyState v-else :icon="MonitorSmartphone" title="Aktif oturum bulunamadi" />
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <!-- Appearance -->
+                <TabsContent value="appearance">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Tema Ayarlari</CardTitle>
+                            <CardDescription>Uygulamanin görünümünü tercihlerinize göre ayarlayın.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <RadioGroup :model-value="themeStore.theme" class="grid gap-4 sm:grid-cols-2" aria-label="Tema" @update:model-value="onThemeChange">
+                                <Label
+                                    for="theme-dark"
+                                    class="flex cursor-pointer flex-col gap-3 rounded-lg border p-4 transition-colors hover:border-input has-[[data-state=checked]]:border-primary"
+                                >
+                                    <div class="dark flex flex-col gap-1 rounded-md border bg-background p-2" aria-hidden="true">
+                                        <div class="h-2 w-1/2 rounded-sm bg-primary"></div>
+                                        <div class="flex gap-1">
+                                            <div class="h-8 w-4 rounded-sm bg-muted"></div>
+                                            <div class="flex flex-1 flex-col gap-1">
+                                                <div class="h-1.5 w-full rounded-sm bg-foreground/20"></div>
+                                                <div class="h-1.5 w-2/3 rounded-sm bg-foreground/20"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <RadioGroupItem id="theme-dark" value="dark" />
+                                        <Moon class="size-4 text-muted-foreground" aria-hidden="true" />
+                                        <span class="text-sm font-medium">Koyu Tema</span>
+                                    </div>
+                                </Label>
+                                <Label
+                                    for="theme-light"
+                                    class="flex cursor-pointer flex-col gap-3 rounded-lg border p-4 transition-colors hover:border-input has-[[data-state=checked]]:border-primary"
+                                >
+                                    <div class="flex flex-col gap-1 rounded-md border bg-background p-2" aria-hidden="true">
+                                        <div class="h-2 w-1/2 rounded-sm bg-primary"></div>
+                                        <div class="flex gap-1">
+                                            <div class="h-8 w-4 rounded-sm bg-muted"></div>
+                                            <div class="flex flex-1 flex-col gap-1">
+                                                <div class="h-1.5 w-full rounded-sm bg-foreground/20"></div>
+                                                <div class="h-1.5 w-2/3 rounded-sm bg-foreground/20"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <RadioGroupItem id="theme-light" value="light" />
+                                        <Sun class="size-4 text-muted-foreground" aria-hidden="true" />
+                                        <span class="text-sm font-medium">Açık Tema</span>
+                                    </div>
+                                </Label>
+                            </RadioGroup>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <!-- Account -->
+                <TabsContent value="account" class="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Hesap Bilgileri</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <dl class="grid gap-4 sm:grid-cols-3">
+                                <div class="space-y-1">
+                                    <dt class="text-xs text-muted-foreground">Hesap ID</dt>
+                                    <dd class="text-sm font-medium text-foreground tabular-nums">{{ authStore.user?.id?.substring(0, 8) }}...</dd>
+                                </div>
+                                <div class="space-y-1">
+                                    <dt class="text-xs text-muted-foreground">Email</dt>
+                                    <dd class="truncate text-sm font-medium text-foreground">{{ authStore.user?.email }}</dd>
+                                </div>
+                                <div class="space-y-1">
+                                    <dt class="text-xs text-muted-foreground">Kullanıcı Tipi</dt>
+                                    <dd class="text-sm font-medium text-foreground">{{ userTypeLabel }}</dd>
+                                </div>
+                            </dl>
+                        </CardContent>
+                    </Card>
+
+                    <Card class="border-destructive/40">
+                        <CardHeader>
+                            <CardTitle class="flex items-center gap-2 text-destructive">
+                                <AlertTriangle class="size-4" aria-hidden="true" />
+                                Tehlikeli Bölge
+                            </CardTitle>
+                            <CardDescription>
+                                Hesabınızı silmek <strong class="text-foreground">geri alınamaz</strong> bir işlemdir. Hesabınız ve ona bağlı tüm veriler
+                                (tarlalar, hasatlar, ödemeler, ilanlar, topluluk gönderileri, yorumlar) kalıcı olarak silinecektir.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardFooter>
+                            <Button variant="destructive" class="h-11 md:h-9" @click="openDeleteModal">
+                                <Trash2 aria-hidden="true" />
+                                Hesabımı Sil
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                </TabsContent>
+            </Tabs>
+        </PageContainer>
+
+        <!-- Delete account (in-app deletion: password + 'SİL' confirmation) -->
+        <ConfirmDialog
+            :open="showDeleteModal"
+            title="Hesabı Sil"
+            description="Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz. Tüm verileriniz (tarlalar, hasatlar, ödemeler, ilanlar, topluluk içerikleri) kalıcı olarak silinecektir."
+            :confirm-text="deleteLoading ? 'Siliniyor...' : 'Hesabımı Kalıcı Olarak Sil'"
+            :loading="deleteLoading"
+            @update:open="onDeleteDialogOpenChange"
+            @confirm="handleDeleteAccount"
+        >
+            <template #body>
+                <div class="space-y-4">
+                    <div class="space-y-2">
+                        <Label for="deletePassword">Şifreniz (güvenlik doğrulaması)</Label>
+                        <div class="relative">
+                            <Input
+                                id="deletePassword"
+                                v-model="deletePassword"
+                                :type="showDeletePassword ? 'text' : 'password'"
+                                class="h-11 pr-11 md:h-9 md:pr-9"
+                                placeholder="Mevcut şifreniz"
+                                autocomplete="current-password"
+                                :disabled="deleteLoading"
+                                :aria-invalid="deleteError && !deletePassword ? true : undefined"
+                                @keyup.enter="handleDeleteAccount"
+                            />
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                class="absolute top-0 right-0 size-11 text-muted-foreground md:size-9"
+                                :disabled="deleteLoading"
+                                :aria-label="showDeletePassword ? 'Şifreyi gizle' : 'Şifreyi göster'"
+                                @click="showDeletePassword = !showDeletePassword"
+                            >
+                                <EyeOff v-if="showDeletePassword" aria-hidden="true" />
+                                <Eye v-else aria-hidden="true" />
+                            </Button>
+                        </div>
                     </div>
-                  </div>
+
+                    <div class="space-y-2">
+                        <Label for="deleteConfirm">
+                            <span>Onaylamak için <strong>{{ DELETE_CONFIRM_PHRASE }}</strong> yazın:</span>
+                        </Label>
+                        <Input
+                            id="deleteConfirm"
+                            v-model="deleteConfirmText"
+                            type="text"
+                            class="h-11 md:h-9"
+                            :placeholder="DELETE_CONFIRM_PHRASE"
+                            autocomplete="off"
+                            :disabled="deleteLoading"
+                            @keyup.enter="handleDeleteAccount"
+                        />
+                    </div>
+
+                    <p v-if="deleteError" class="text-xs text-destructive" role="alert">{{ deleteError }}</p>
                 </div>
-                <div class="theme-option-info">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-                  <span>Açık Tema</span>
-                </div>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- ═══════ Account Tab ═══════ -->
-        <div v-if="activeTab === 'account'" class="tab-content">
-          <!-- Account Info -->
-          <div class="card">
-            <div class="card-header">
-              <h2>Hesap Bilgileri</h2>
-            </div>
-            <div class="account-info-grid">
-              <div class="account-info-item">
-                <span class="account-info-label">Hesap ID</span>
-                <span class="account-info-value">{{ authStore.user?.id?.substring(0, 8) }}...</span>
-              </div>
-              <div class="account-info-item">
-                <span class="account-info-label">Email</span>
-                <span class="account-info-value">{{ authStore.user?.email }}</span>
-              </div>
-              <div class="account-info-item">
-                <span class="account-info-label">Kullanıcı Tipi</span>
-                <span class="account-info-value">{{ userTypeLabel }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Danger Zone -->
-          <div class="card danger-card">
-            <div class="card-header">
-              <h2 class="danger-title">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                Tehlikeli Bölge
-              </h2>
-            </div>
-            <p class="danger-text">
-              Hesabınızı silmek <strong>geri alınamaz</strong> bir işlemdir. Hesabınız ve
-              ona bağlı tüm veriler (tarlalar, hasatlar, ödemeler, ilanlar, topluluk
-              gönderileri, yorumlar) kalıcı olarak silinecektir.
-            </p>
-
-            <button class="btn btn-danger" @click="openDeleteModal">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-              Hesabımı Sil
-            </button>
-          </div>
-        </div>
-      </main>
-    </div>
-
-    <!-- Delete Modal (in-app deletion: password + 'SİL' confirmation) -->
-    <Teleport to="body">
-      <div v-if="showDeleteModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title" @click.self="closeDeleteModal" @keydown.esc="closeDeleteModal">
-        <div class="modal" ref="deleteModalRef" tabindex="-1">
-          <div class="modal-header">
-            <h2 id="delete-modal-title" class="modal-title danger-title">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-              Hesabı Sil
-            </h2>
-            <button class="modal-close" aria-label="Kapat" @click="closeDeleteModal" :disabled="deleteLoading">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </div>
-
-          <p>Hesabınızı silmek istediğinizden emin misiniz?</p>
-          <p class="modal-warning">
-            Bu işlem geri alınamaz. Tüm verileriniz (tarlalar, hasatlar, ödemeler,
-            ilanlar, topluluk içerikleri) kalıcı olarak silinecektir.
-          </p>
-
-          <div class="form-group">
-            <label class="form-label" for="deletePassword">Şifreniz (güvenlik doğrulaması)</label>
-            <div class="input-with-action">
-              <input
-                id="deletePassword"
-                v-model="deletePassword"
-                :type="showDeletePassword ? 'text' : 'password'"
-                class="form-input"
-                :class="{ 'has-error': deleteError && !deletePassword }"
-                placeholder="Mevcut şifreniz"
-                autocomplete="current-password"
-                :disabled="deleteLoading"
-                @keyup.enter="handleDeleteAccount"
-              />
-              <button
-                type="button"
-                class="input-action-btn"
-                @click="showDeletePassword = !showDeletePassword"
-                :disabled="deleteLoading"
-                aria-label="Şifreyi göster/gizle"
-              >
-                <svg v-if="showDeletePassword" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              </button>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="deleteConfirm">
-              Onaylamak için <strong>SİL</strong> yazın:
-            </label>
-            <input
-              id="deleteConfirm"
-              v-model="deleteConfirmText"
-              type="text"
-              class="form-input"
-              placeholder="SİL"
-              autocomplete="off"
-              :disabled="deleteLoading"
-              @keyup.enter="handleDeleteAccount"
-            />
-          </div>
-
-          <p v-if="deleteError" class="form-error" role="alert">{{ deleteError }}</p>
-
-          <div class="modal-actions">
-            <button class="btn btn-secondary" @click="closeDeleteModal" :disabled="deleteLoading">
-              İptal
-            </button>
-            <button
-              class="btn btn-danger"
-              @click="handleDeleteAccount"
-              :disabled="deleteLoading || !deletePassword || deleteConfirmText.trim().toUpperCase() !== DELETE_CONFIRM_PHRASE"
-            >
-              <span v-if="deleteLoading" class="spinner-sm"></span>
-              {{ deleteLoading ? 'Siliniyor...' : 'Hesabımı Kalıcı Olarak Sil' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-  </component>
+            </template>
+        </ConfirmDialog>
+    </TeaBusinessLayout>
 </template>
-
-<style scoped>
-.settings-page {
-  min-height: 100vh;
-  background: var(--color-bg-primary);
-}
-
-.settings-content {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: var(--space-6) var(--space-4) var(--space-8);
-}
-
-/* ── Header Section ── */
-.settings-header-section {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  margin-bottom: var(--space-6);
-}
-
-.settings-avatar-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-1);
-  flex-shrink: 0;
-}
-
-.settings-avatar {
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius-full);
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-bold);
-  flex-shrink: 0;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  transition: box-shadow 0.2s ease;
-}
-
-.settings-avatar:hover {
-  box-shadow: 0 0 0 3px var(--color-primary-alpha, rgba(34, 197, 94, 0.25));
-}
-
-.settings-avatar.has-avatar {
-  background: var(--color-bg-tertiary);
-}
-
-.avatar-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: var(--radius-full);
-}
-
-.avatar-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.45);
-  border-radius: var(--radius-full);
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  color: white;
-}
-
-.settings-avatar:hover .avatar-overlay {
-  opacity: 1;
-}
-
-.avatar-loading {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: var(--radius-full);
-}
-
-.avatar-file-input {
-  display: none;
-}
-
-.avatar-remove-btn {
-  background: none;
-  border: none;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
-  cursor: pointer;
-  padding: 2px 4px;
-  transition: color 0.15s ease;
-}
-
-.avatar-remove-btn:hover {
-  color: var(--color-error, #ef4444);
-}
-
-.avatar-remove-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.avatar-error {
-  color: var(--color-error, #ef4444);
-  font-size: var(--font-size-xs);
-  margin-top: 2px;
-  text-align: center;
-  max-width: 120px;
-}
-
-.settings-title {
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary);
-  margin-bottom: 2px;
-}
-
-.settings-email {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-}
-
-/* ── Tabs ── */
-.settings-tabs {
-  display: flex;
-  gap: var(--space-1);
-  margin-bottom: var(--space-5);
-  background: var(--color-subtle-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-1);
-  box-shadow: var(--shadow-sm);
-}
-
-.tab-btn {
-  position: relative;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  min-height: 44px;
-  padding: 0 var(--space-5);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: calc(var(--radius-md) - 1px);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  cursor: pointer;
-  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
-  white-space: nowrap;
-}
-
-.tab-btn:hover {
-  color: var(--color-text-primary);
-  background: var(--color-bg-secondary);
-  border-color: var(--color-border);
-}
-
-.tab-btn.active {
-  background: var(--color-bg-secondary);
-  border-color: var(--color-border-strong);
-  color: var(--color-primary);
-  box-shadow: var(--shadow-md);
-}
-
-.tab-btn.active::before {
-  content: '';
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: 5px;
-  height: 2px;
-  border-radius: var(--radius-full);
-  background: var(--color-primary);
-}
-
-/* ── Card ── */
-.card {
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  padding: var(--space-6);
-  margin-bottom: var(--space-4);
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-4);
-}
-
-.card-header h2 {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-}
-
-.card-description {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  margin-bottom: var(--space-5);
-}
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 10px;
-  background: var(--color-primary-light);
-  color: var(--color-primary);
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-}
-
-/* ── Form ── */
-.profile-form, .password-form {
-  max-width: 100%;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
-}
-
-.form-group {
-  margin-bottom: var(--space-4);
-}
-
-.form-group:last-child {
-  margin-bottom: 0;
-}
-
-.form-label {
-  display: block;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-secondary);
-  margin-bottom: var(--space-2);
-}
-
-.form-input {
-  width: 100%;
-  height: var(--control-height);
-  padding: 0 var(--space-4);
-  background: var(--color-bg-tertiary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-text-primary);
-  font-size: var(--font-size-base);
-  font-family: var(--font-family);
-  transition: all var(--transition-fast);
-  box-sizing: border-box;
-}
-
-.form-input::placeholder {
-  color: var(--color-text-muted);
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-light);
-}
-
-.form-input:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.form-input.has-error {
-  border-color: var(--color-danger);
-}
-
-.form-help {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
-  margin-top: 4px;
-  display: block;
-}
-
-.form-error {
-  font-size: var(--font-size-xs);
-  color: var(--color-danger);
-  margin-top: 4px;
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--color-border);
-  margin-top: var(--space-4);
-}
-
-/* ── Input With Action (password toggle) ── */
-.input-with-action {
-  position: relative;
-}
-
-.input-with-action .form-input {
-  padding-right: 44px;
-}
-
-.input-action-btn {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  padding: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-sm);
-  transition: color var(--transition-fast);
-}
-
-.input-action-btn:hover {
-  color: var(--color-text-primary);
-}
-
-/* ── Password Strength ── */
-.password-strength {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-top: var(--space-2);
-}
-
-.strength-track {
-  flex: 1;
-  height: 4px;
-  background: var(--color-bg-tertiary);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.strength-fill {
-  height: 100%;
-  border-radius: 2px;
-  transition: width 0.3s ease, background 0.3s ease;
-}
-
-.strength-fill.strength-weak { background: var(--color-danger); }
-.strength-fill.strength-medium { background: var(--color-warning); }
-.strength-fill.strength-strong { background: var(--color-primary); }
-
-.strength-label {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-  white-space: nowrap;
-}
-
-.strength-label.strength-weak { color: var(--color-danger); }
-.strength-label.strength-medium { color: var(--color-warning); }
-.strength-label.strength-strong { color: var(--color-primary); }
-
-/* ── Sessions ── */
-.sessions-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-  padding: var(--space-8);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-}
-
-.sessions-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.session-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  background: var(--color-bg-tertiary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  transition: border-color var(--transition-fast);
-}
-
-.session-item:hover {
-  border-color: var(--color-text-muted);
-}
-
-.session-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  background: var(--color-bg-secondary);
-  color: var(--color-text-muted);
-}
-
-.session-icon.device-desktop { color: var(--color-info); background: rgba(59, 130, 246, 0.1); }
-.session-icon.device-mobile { color: var(--color-primary); background: rgba(16, 185, 129, 0.1); }
-.session-icon.device-tablet { color: var(--color-warning); background: rgba(245, 158, 11, 0.1); }
-
-.session-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.session-device {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: 2px;
-}
-
-.session-browser {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-primary);
-}
-
-.session-os {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
-}
-
-.session-meta {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
-}
-
-.session-revoke {
-  flex-shrink: 0;
-}
-
-.sessions-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-8);
-  color: var(--color-text-muted);
-}
-
-.sessions-empty p {
-  font-size: var(--font-size-sm);
-}
-
-/* ── Account Info ── */
-.account-info-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: var(--space-4);
-}
-
-.account-info-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.account-info-label {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
-  font-weight: var(--font-weight-medium);
-}
-
-.account-info-value {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-primary);
-  font-weight: var(--font-weight-medium);
-}
-
-/* ── Danger Zone ── */
-.danger-card {
-  border-color: rgba(239, 68, 68, 0.3);
-}
-
-.danger-title {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--color-danger);
-}
-
-.danger-text {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  margin-bottom: var(--space-4);
-}
-
-/* ── Message Box ── */
-.message-box {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  margin-bottom: var(--space-4);
-}
-
-.message-success {
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.2);
-  color: var(--color-primary);
-}
-
-.message-error {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  color: var(--color-danger);
-}
-
-.message-info {
-  background: rgba(59, 130, 246, 0.1);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  color: var(--color-info);
-}
-
-/* ── Buttons ── */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-5);
-  border-radius: var(--radius-lg);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-  border: none;
-  transition: all var(--transition-fast);
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-sm {
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--font-size-xs);
-}
-
-.btn-primary {
-  background: var(--color-primary);
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
-}
-
-.btn-secondary {
-  background: var(--color-bg-tertiary);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-secondary);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: var(--color-bg-secondary);
-  color: var(--color-text-primary);
-}
-
-.btn-outline {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  color: var(--color-text-secondary);
-}
-
-.btn-outline:hover:not(:disabled) {
-  border-color: var(--color-text-muted);
-  color: var(--color-text-primary);
-}
-
-.btn-ghost {
-  background: transparent;
-  color: var(--color-text-muted);
-  border: 1px solid transparent;
-}
-
-.btn-ghost:hover:not(:disabled) {
-  background: var(--color-bg-tertiary);
-  color: var(--color-danger);
-  border-color: rgba(239, 68, 68, 0.2);
-}
-
-.btn-danger {
-  background: var(--color-danger);
-  color: white;
-}
-
-.btn-danger:hover:not(:disabled) {
-  opacity: 0.9;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
-}
-
-/* ── Modal ── */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: var(--z-modal, 1000);
-  padding: var(--space-4);
-}
-
-.modal {
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  padding: var(--space-6);
-  max-width: 480px;
-  width: 100%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-4);
-}
-
-.modal-title {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color var(--transition-fast);
-}
-
-.modal-close:hover {
-  color: var(--color-text-primary);
-}
-
-.modal-warning {
-  color: var(--color-danger);
-  font-weight: var(--font-weight-medium);
-  font-size: var(--font-size-sm);
-  margin: var(--space-3) 0 var(--space-5);
-}
-
-.modal-actions {
-  display: flex;
-  gap: var(--space-3);
-  margin-top: var(--space-5);
-}
-
-.modal-actions .btn {
-  flex: 1;
-}
-
-/* ── Spinners ── */
-.spinner-sm {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: currentColor;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-
-.spinner-md {
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--color-border);
-  border-top-color: var(--color-primary);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* ── Responsive ── */
-@media (max-width: 768px) {
-  .settings-content {
-    padding: var(--space-4) var(--space-3);
-  }
-
-  .settings-tabs {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .tab-btn {
-    font-size: var(--font-size-xs);
-    padding: 0 var(--space-3);
-  }
-
-  .tab-btn svg {
-    display: none;
-  }
-
-  .form-row {
-    grid-template-columns: 1fr;
-  }
-
-  .account-info-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .session-item {
-    flex-wrap: wrap;
-  }
-
-  .session-info {
-    flex: 1 1 calc(100% - 56px);
-  }
-
-  .session-revoke {
-    flex: 1 1 100%;
-  }
-}
-
-/* ── Theme Selector ── */
-.theme-selector {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-4);
-}
-
-.theme-option {
-  background: var(--color-bg-tertiary);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  padding: var(--space-4);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-align: center;
-}
-
-.theme-option:hover {
-  border-color: var(--color-text-muted);
-}
-
-.theme-option.active {
-  border-color: var(--color-primary);
-  background: var(--color-primary-light);
-}
-
-.theme-preview {
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  margin-bottom: var(--space-3);
-  height: 80px;
-}
-
-.theme-preview-dark {
-  background: #0F172A;
-  border: 1px solid #334155;
-}
-
-.theme-preview-dark .preview-header {
-  height: 16px;
-  background: #1E293B;
-  border-bottom: 1px solid #334155;
-}
-
-.theme-preview-dark .preview-body {
-  display: flex;
-  height: calc(100% - 16px);
-}
-
-.theme-preview-dark .preview-sidebar {
-  width: 24px;
-  background: #1E293B;
-  border-right: 1px solid #334155;
-}
-
-.theme-preview-dark .preview-content {
-  flex: 1;
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.theme-preview-dark .preview-line {
-  height: 6px;
-  background: #334155;
-  border-radius: 3px;
-}
-
-.theme-preview-dark .preview-line.short {
-  width: 60%;
-}
-
-.theme-preview-light {
-  background: #F8FAFC;
-  border: 1px solid #E2E8F0;
-}
-
-.theme-preview-light .preview-header {
-  height: 16px;
-  background: #FFFFFF;
-  border-bottom: 1px solid #E2E8F0;
-}
-
-.theme-preview-light .preview-body {
-  display: flex;
-  height: calc(100% - 16px);
-}
-
-.theme-preview-light .preview-sidebar {
-  width: 24px;
-  background: #FFFFFF;
-  border-right: 1px solid #E2E8F0;
-}
-
-.theme-preview-light .preview-content {
-  flex: 1;
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.theme-preview-light .preview-line {
-  height: 6px;
-  background: #E2E8F0;
-  border-radius: 3px;
-}
-
-.theme-preview-light .preview-line.short {
-  width: 60%;
-}
-
-.theme-option-info {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-secondary);
-}
-
-.theme-option.active .theme-option-info {
-  color: var(--color-primary);
-}
-
-@media (max-width: 480px) {
-  .card {
-    padding: var(--space-4);
-  }
-
-  .modal {
-    padding: var(--space-4);
-  }
-
-  .theme-selector {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

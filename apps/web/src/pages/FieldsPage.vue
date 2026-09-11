@@ -1,86 +1,73 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, nextTick, watch } from 'vue';
-import { useFocusTrap } from '@/composables/useFocusTrap';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { LayoutGrid, List, Map, MapPin, Pencil, RefreshCw, Trash2, Users } from '@lucide/vue';
 import { useFieldsStore } from '@/stores/fieldsStore';
 import { useToast } from '@/composables/useToast';
 import type { Field } from '@/services/api';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
-import AppSelect from '@/components/ui/AppSelect.vue';
-import AppEmptyState from '@/components/ui/AppEmptyState.vue';
+import { ConfirmDialog, EmptyState, ListToolbar, LoadingState, PageContainer, PageHeader, SearchInput, Spinner } from '@/components/shared';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 const router = useRouter();
 const fieldsStore = useFieldsStore();
 const toast = useToast();
 
+const ALL_PROVINCES = 'all';
 const searchQuery = ref('');
-const provinceFilter = ref('');
+const provinceFilter = ref(ALL_PROVINCES);
+const viewMode = ref<'grid' | 'list'>('grid');
 
-// Delete modal state
-const showDeleteModal = ref(false);
-const fieldDeleteModalRef = ref<HTMLElement | null>(null);
-watch(showDeleteModal, (v) => { if (v) nextTick(() => fieldDeleteModalRef.value?.focus()); });
-useFocusTrap(showDeleteModal, fieldDeleteModalRef);
+// Delete dialog state
+const showDeleteDialog = ref(false);
 const fieldToDelete = ref<Field | null>(null);
 const isDeleting = ref(false);
 
-// Rename ("Arazimi isimlendir") modal state
-const showRenameModal = ref(false);
-const renameInputRef = ref<HTMLInputElement | null>(null);
-watch(showRenameModal, (v) => { if (v) nextTick(() => renameInputRef.value?.focus()); });
+// Rename ("Arazimi isimlendir") dialog state
+const showRenameDialog = ref(false);
 const fieldToRename = ref<Field | null>(null);
 const renameValue = ref('');
 const isRenaming = ref(false);
 
-// View mode
-const viewMode = ref<'grid' | 'list'>('grid');
-
 const provinces = ['Rize', 'Trabzon', 'Artvin', 'Giresun', 'Ordu'];
-
-const provinceOptions = computed(() => [
-    { value: '', label: 'Tüm İller' },
-    ...provinces.map(p => ({ value: p, label: p }))
-]);
 
 const filteredFields = computed(() => {
     let result = fieldsStore.fields;
-    if (provinceFilter.value) {
-        result = result.filter(f => f.province === provinceFilter.value);
+    if (provinceFilter.value !== ALL_PROVINCES) {
+        result = result.filter((f) => f.province === provinceFilter.value);
     }
     if (searchQuery.value) {
         const query = searchQuery.value.toLowerCase();
-        result = result.filter(f => f.name.toLowerCase().includes(query));
+        result = result.filter((f) => displayName(f).toLowerCase().includes(query) || parcelAdaLabel(f).toLowerCase().includes(query));
     }
     return result;
 });
 
-const totalArea = computed(() => {
-    return fieldsStore.fields.reduce((sum, f) => {
-        if (f.areaUnit === 'm2') return sum + f.area;
-        return sum + f.area * 1000;
-    }, 0);
-});
+const totalArea = computed(() =>
+    fieldsStore.fields.reduce((sum, f) => (f.areaUnit === 'm2' ? sum + f.area : sum + f.area * 1000), 0),
+);
 
 onMounted(() => {
     fieldsStore.fetchFields();
 });
 
 function navigateToField(id: string) {
-    router.push(`/fields/${id}`);
+    router.push(`/tea/fields/${id}`);
 }
 
-// ── Rename ("Arazimi isimlendir") ──
-function openRenameModal(field: Field, event: Event) {
-    event.stopPropagation();
+function openRenameDialog(field: Field) {
     fieldToRename.value = field;
     renameValue.value = field.name || '';
-    showRenameModal.value = true;
-}
-
-function closeRenameModal() {
-    showRenameModal.value = false;
-    fieldToRename.value = null;
-    renameValue.value = '';
+    showRenameDialog.value = true;
 }
 
 async function confirmRename() {
@@ -90,13 +77,12 @@ async function confirmRename() {
         toast.error('Lütfen bir arazi adı giriniz');
         return;
     }
-
     isRenaming.value = true;
     try {
         const updated = await fieldsStore.updateField(fieldToRename.value.id, { name });
         if (updated) {
             toast.success('Arazi adı kaydedildi');
-            closeRenameModal();
+            showRenameDialog.value = false;
         } else {
             toast.error('Arazi adı kaydedilirken bir hata oluştu');
         }
@@ -105,26 +91,19 @@ async function confirmRename() {
     }
 }
 
-function openDeleteModal(field: Field, event: Event) {
-    event.stopPropagation();
+function openDeleteDialog(field: Field) {
     fieldToDelete.value = field;
-    showDeleteModal.value = true;
-}
-
-function closeDeleteModal() {
-    showDeleteModal.value = false;
-    fieldToDelete.value = null;
+    showDeleteDialog.value = true;
 }
 
 async function confirmDelete() {
     if (!fieldToDelete.value) return;
-
     isDeleting.value = true;
     try {
         const success = await fieldsStore.deleteField(fieldToDelete.value.id);
         if (success) {
             toast.success('Arazi başarıyla silindi');
-            closeDeleteModal();
+            showDeleteDialog.value = false;
         } else {
             toast.error('Arazi silinirken bir hata oluştu');
         }
@@ -135,19 +114,15 @@ async function confirmDelete() {
 
 function formatArea(area: number, unit: string) {
     const formatted = area.toLocaleString('tr-TR', { maximumFractionDigits: 2 });
-    const unitLabels: Record<string, string> = {
-        'donum': 'donum',
-        'dekar': 'dekar',
-        'm2': 'm\u00B2'
-    };
+    const unitLabels: Record<string, string> = { donum: 'dönüm', dekar: 'dekar', m2: 'm²' };
     return `${formatted} ${unitLabels[unit] || unit}`;
 }
 
 function formatTotalArea(area: number) {
     if (area >= 10000) {
-        return (area / 10000).toLocaleString('tr-TR', { maximumFractionDigits: 1 }) + ' ha';
+        return `${(area / 10000).toLocaleString('tr-TR', { maximumFractionDigits: 1 })} ha`;
     }
-    return area.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' m\u00B2';
+    return `${area.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} m²`;
 }
 
 function displayName(field: Field) {
@@ -160,7 +135,7 @@ function getFieldInitial(field: Field) {
     return field.parcelNo ? field.parcelNo.charAt(0) : '?';
 }
 
-// "Ada 142 / Parsel 11" — the cadastral identifiers from the Çaykur/TKGM record.
+/** "Ada 142 / Parsel 11" — cadastral identifiers from the Çaykur/TKGM record. */
 function parcelAdaLabel(field: Field) {
     const parts: string[] = [];
     if (field.adaNo) parts.push(`Ada ${field.adaNo}`);
@@ -175,1087 +150,226 @@ function isUnnamed(field: Field) {
 
 <template>
     <TeaBusinessLayout>
-        <div class="fields-page">
-            <!-- Header -->
-            <header class="page-header">
-                <div class="header-left">
-                    <h1>Arazilerim</h1>
-                    <div class="header-stats">
-                        <span class="stat-chip">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                            {{ fieldsStore.fieldCount }} arazi
-                        </span>
-                        <span v-if="totalArea > 0" class="stat-chip">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
-                            {{ formatTotalArea(totalArea) }}
-                        </span>
-                    </div>
-                </div>
-                <span class="caykur-source-chip" title="Araziler Çaykur cüzdan numaranızdan otomatik yüklenir">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                    Çaykur cüzdanından yüklendi
-                </span>
-            </header>
+        <PageContainer>
+            <PageHeader title="Arazilerim" description="Çaykur cüzdan numaranıza kayıtlı araziler otomatik olarak listelenir.">
+                <template #meta>
+                    <Badge variant="secondary">{{ fieldsStore.fieldCount }} arazi</Badge>
+                    <Badge v-if="totalArea > 0" variant="secondary">{{ formatTotalArea(totalArea) }} toplam</Badge>
+                </template>
+                <template #actions>
+                    <Badge variant="outline" class="h-9 gap-1.5 px-3 text-xs font-medium text-muted-foreground">
+                        <RefreshCw aria-hidden="true" />
+                        Çaykur cüzdanından yüklendi
+                    </Badge>
+                </template>
+            </PageHeader>
 
-            <!-- Toolbar -->
-            <div class="toolbar">
-                <div class="search-wrap">
-                    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    <input
-                        v-model="searchQuery"
-                        type="text"
-                        placeholder="Arazi ara..."
-                        class="search-input"
-                    />
-                    <button v-if="searchQuery" class="search-clear" @click="searchQuery = ''">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    </button>
-                </div>
-                <div class="toolbar-right">
-                    <AppSelect
-                        v-model="provinceFilter"
-                        :options="provinceOptions"
-                        placeholder="İl Seçin"
-                    />
-                    <div class="view-toggle">
-                        <button
-                            class="view-btn"
-                            :class="{ active: viewMode === 'grid' }"
-                            @click="viewMode = 'grid'"
-                            title="Izgara görünümü"
-                        >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                        </button>
-                        <button
-                            class="view-btn"
-                            :class="{ active: viewMode === 'list' }"
-                            @click="viewMode = 'list'"
-                            title="Liste görünümü"
-                        >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <ListToolbar>
+                <SearchInput v-model="searchQuery" placeholder="Arazi, ada veya parsel ara" />
+                <template #filters>
+                    <Select v-model="provinceFilter">
+                        <SelectTrigger class="w-40" aria-label="İl filtresi">
+                            <SelectValue placeholder="İl seçin" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem :value="ALL_PROVINCES">Tüm iller</SelectItem>
+                            <SelectItem v-for="province in provinces" :key="province" :value="province">{{ province }}</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <ToggleGroup v-model="viewMode" type="single" aria-label="Görünüm" class="hidden md:inline-flex">
+                        <ToggleGroupItem value="grid" aria-label="Kart görünümü">
+                            <LayoutGrid aria-hidden="true" />
+                        </ToggleGroupItem>
+                        <ToggleGroupItem value="list" aria-label="Liste görünümü">
+                            <List aria-hidden="true" />
+                        </ToggleGroupItem>
+                    </ToggleGroup>
+                </template>
+            </ListToolbar>
 
-            <!-- Loading -->
-            <div v-if="fieldsStore.isLoading" class="loading-state">
-                <div class="spinner"></div>
-                <p>Araziler yükleniyor...</p>
-            </div>
+            <LoadingState v-if="fieldsStore.isLoading" text="Araziler yükleniyor..." />
 
-            <!-- Error -->
-            <div v-else-if="fieldsStore.error" class="error-state">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                {{ fieldsStore.error }}
-            </div>
+            <Alert v-else-if="fieldsStore.error" variant="destructive">
+                <AlertDescription>{{ fieldsStore.error }}</AlertDescription>
+            </Alert>
 
-            <!-- Empty -->
-            <AppEmptyState
+            <EmptyState
                 v-else-if="filteredFields.length === 0"
-                icon="field"
-                title="Henüz arazi bulunamadı"
-                description="Çaykur cüzdan numaranıza kayıtlı araziler burada otomatik olarak listelenir."
-            />
+                :icon="MapPin"
+                :title="searchQuery || provinceFilter !== ALL_PROVINCES ? 'Filtreye uyan arazi yok' : 'Henüz arazi bulunamadı'"
+                :description="
+                    searchQuery || provinceFilter !== ALL_PROVINCES
+                        ? 'Arama veya il filtresini değiştirerek tekrar deneyin.'
+                        : 'Çaykur cüzdan numaranıza kayıtlı araziler burada otomatik olarak listelenir.'
+                "
+            >
+                <Button v-if="searchQuery || provinceFilter !== ALL_PROVINCES" variant="outline" class="h-11 md:h-9" @click="searchQuery = ''; provinceFilter = ALL_PROVINCES">
+                    Filtreleri temizle
+                </Button>
+            </EmptyState>
 
-            <!-- Grid View -->
-            <div v-else-if="viewMode === 'grid'" class="fields-grid">
-                <div
+            <!-- Card view (always on mobile) -->
+            <div v-else-if="viewMode === 'grid'" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <Card
                     v-for="field in filteredFields"
                     :key="field.id"
-                    class="field-card"
+                    class="cursor-pointer gap-4 py-4 transition-colors hover:border-input focus-visible:ring-3 focus-visible:ring-ring/50"
+                    role="link"
+                    tabindex="0"
                     @click="navigateToField(field.id)"
+                    @keydown.enter="navigateToField(field.id)"
                 >
-                    <!-- Card Top Accent -->
-                    <div class="card-accent"></div>
-
-                    <div class="card-content">
-                        <div class="card-top">
-                            <div class="field-avatar">
+                    <CardContent class="flex flex-col gap-4 px-4">
+                        <div class="flex items-start gap-3">
+                            <span class="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-base font-bold text-primary" aria-hidden="true">
                                 {{ getFieldInitial(field) }}
-                            </div>
-                            <div class="field-title-wrap">
-                                <h3 class="field-name" :class="{ 'field-name--unnamed': isUnnamed(field) }">{{ displayName(field) }}</h3>
-                                <span class="field-location">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <h3 class="truncate text-base font-semibold" :class="isUnnamed(field) ? 'text-muted-foreground italic' : 'text-foreground'">
+                                    {{ displayName(field) }}
+                                </h3>
+                                <p class="flex items-center gap-1 truncate text-sm text-muted-foreground">
+                                    <MapPin class="size-3.5 shrink-0" aria-hidden="true" />
                                     {{ field.province }} / {{ field.district }}
-                                </span>
+                                </p>
                             </div>
-                            <span class="area-tag">{{ formatArea(field.area, field.areaUnit) }}</span>
+                            <span class="shrink-0 text-sm font-semibold text-foreground tabular-nums">{{ formatArea(field.area, field.areaUnit) }}</span>
                         </div>
 
-                        <div class="card-meta">
-                            <span v-if="parcelAdaLabel(field)" class="meta-item meta-item--parcel">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-                                {{ parcelAdaLabel(field) }}
-                            </span>
-                            <span class="meta-item">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></svg>
-                                {{ field.neighborhood }}
-                            </span>
-                            <span v-if="field.partnerCount > 1" class="meta-item">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                                {{ field.partnerCount }} ortak
-                            </span>
-                        </div>
+                        <dl class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                            <div v-if="parcelAdaLabel(field)" class="flex items-center gap-1">
+                                <Map class="size-3.5" aria-hidden="true" />
+                                <dd>{{ parcelAdaLabel(field) }}</dd>
+                            </div>
+                            <div v-if="field.neighborhood" class="flex items-center gap-1">
+                                <dd>{{ field.neighborhood }}</dd>
+                            </div>
+                            <div v-if="field.partnerCount > 1" class="flex items-center gap-1">
+                                <Users class="size-3.5" aria-hidden="true" />
+                                <dd>{{ field.partnerCount }} ortak</dd>
+                            </div>
+                        </dl>
 
-                        <div class="card-actions">
-                            <button
-                                class="btn-name"
-                                @click="openRenameModal(field, $event)"
-                            >
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        <div class="flex items-center gap-2 border-t pt-3">
+                            <Button variant="outline" class="h-11 flex-1 md:h-9" @click.stop="openRenameDialog(field)">
+                                <Pencil aria-hidden="true" />
                                 {{ isUnnamed(field) ? 'Arazimi isimlendir' : 'Adı düzenle' }}
-                            </button>
-                            <button
-                                class="action-btn action-btn--danger"
-                                title="Sil"
-                                @click="openDeleteModal(field, $event)"
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                class="size-11 text-muted-foreground hover:text-destructive md:size-9"
+                                :aria-label="`${displayName(field)} arazisini sil`"
+                                @click.stop="openDeleteDialog(field)"
                             >
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                            </button>
+                                <Trash2 aria-hidden="true" />
+                            </Button>
                         </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
             </div>
 
-            <!-- List View -->
-            <div v-else class="fields-list">
-                <div class="list-header">
-                    <span class="lh-name">Arazi Adı</span>
-                    <span class="lh-location">Konum</span>
-                    <span class="lh-area">Alan</span>
-                    <span class="lh-partners">Ada / Parsel</span>
-                    <span class="lh-actions"></span>
-                </div>
-                <div
-                    v-for="field in filteredFields"
-                    :key="field.id"
-                    class="list-row"
-                    @click="navigateToField(field.id)"
-                >
-                    <div class="lr-name">
-                        <div class="field-avatar field-avatar--sm">
-                            {{ getFieldInitial(field) }}
-                        </div>
-                        <span :class="{ 'field-name--unnamed': isUnnamed(field) }">{{ displayName(field) }}</span>
-                    </div>
-                    <div class="lr-location">
-                        <span class="lr-location-main">{{ field.province }} / {{ field.district }}</span>
-                        <span class="lr-location-sub">{{ field.neighborhood }}</span>
-                    </div>
-                    <div class="lr-area">
-                        <span class="area-tag area-tag--sm">{{ formatArea(field.area, field.areaUnit) }}</span>
-                    </div>
-                    <div class="lr-partners">
-                        <span v-if="parcelAdaLabel(field)">{{ parcelAdaLabel(field) }}</span>
-                        <span v-else class="text-muted">-</span>
-                    </div>
-                    <div class="lr-actions">
-                        <button class="action-btn" title="Arazimi isimlendir" @click="openRenameModal(field, $event)">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                        </button>
-                        <button class="action-btn action-btn--danger" title="Sil" @click="openDeleteModal(field, $event)">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                        </button>
-                    </div>
-                </div>
+            <!-- Table view (desktop) -->
+            <div v-else class="overflow-hidden rounded-lg border bg-card">
+                <Table>
+                    <TableHeader>
+                        <TableRow class="hover:bg-transparent">
+                            <TableHead class="pl-4">Arazi</TableHead>
+                            <TableHead>Konum</TableHead>
+                            <TableHead>Ada / Parsel</TableHead>
+                            <TableHead class="text-right">Alan</TableHead>
+                            <TableHead class="pr-4 text-right"><span class="sr-only">İşlemler</span></TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        <TableRow
+                            v-for="field in filteredFields"
+                            :key="field.id"
+                            class="cursor-pointer"
+                            tabindex="0"
+                            @click="navigateToField(field.id)"
+                            @keydown.enter="navigateToField(field.id)"
+                        >
+                            <TableCell class="pl-4">
+                                <div class="flex items-center gap-3">
+                                    <span class="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-sm font-bold text-primary" aria-hidden="true">
+                                        {{ getFieldInitial(field) }}
+                                    </span>
+                                    <span class="font-medium" :class="isUnnamed(field) ? 'text-muted-foreground italic' : 'text-foreground'">
+                                        {{ displayName(field) }}
+                                    </span>
+                                </div>
+                            </TableCell>
+                            <TableCell>
+                                <span class="block text-foreground">{{ field.province }} / {{ field.district }}</span>
+                                <span class="block text-xs text-muted-foreground">{{ field.neighborhood }}</span>
+                            </TableCell>
+                            <TableCell class="text-muted-foreground">{{ parcelAdaLabel(field) || '—' }}</TableCell>
+                            <TableCell class="text-right font-semibold text-foreground tabular-nums">{{ formatArea(field.area, field.areaUnit) }}</TableCell>
+                            <TableCell class="pr-4 text-right">
+                                <div class="flex justify-end gap-1">
+                                    <Button variant="ghost" size="icon" class="size-9" :aria-label="`${displayName(field)} adını düzenle`" @click.stop="openRenameDialog(field)">
+                                        <Pencil aria-hidden="true" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" class="size-9 text-muted-foreground hover:text-destructive" :aria-label="`${displayName(field)} arazisini sil`" @click.stop="openDeleteDialog(field)">
+                                        <Trash2 aria-hidden="true" />
+                                    </Button>
+                                </div>
+                            </TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
             </div>
 
-            <!-- Filter result info -->
-            <div v-if="!fieldsStore.isLoading && searchQuery && filteredFields.length > 0" class="result-info">
-                "{{ searchQuery }}" icin {{ filteredFields.length }} sonuc bulundu
-            </div>
+            <p v-if="!fieldsStore.isLoading && searchQuery && filteredFields.length > 0" class="text-sm text-muted-foreground">
+                "{{ searchQuery }}" için {{ filteredFields.length }} sonuç bulundu
+            </p>
+        </PageContainer>
 
-            <!-- Delete Modal -->
-            <Teleport to="body">
-                <Transition name="modal">
-                    <div v-if="showDeleteModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="field-delete-title" @click.self="closeDeleteModal" @keydown.esc="closeDeleteModal">
-                        <div class="modal-card" ref="fieldDeleteModalRef" tabindex="-1">
-                            <div class="modal-icon-wrap">
-                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                            </div>
-                            <h2 id="field-delete-title">Araziyi Sil</h2>
-                            <p>
-                                <strong>{{ fieldToDelete ? displayName(fieldToDelete) : '' }}</strong> arazinizi silmek istediginize emin misiniz?
-                            </p>
-                            <div class="modal-warning">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                                Bu işlem geri alınamaz. Araziye ait tüm hasat kayıtları da etkilenebilir.
-                            </div>
+        <ConfirmDialog
+            v-model:open="showDeleteDialog"
+            title="Araziyi sil"
+            :description="`${fieldToDelete ? displayName(fieldToDelete) : ''} arazinizi silmek istediğinize emin misiniz? Bu işlem geri alınamaz; araziye ait hasat kayıtları etkilenebilir.`"
+            confirm-text="Evet, sil"
+            :loading="isDeleting"
+            @confirm="confirmDelete"
+        >
+            <template v-if="fieldsStore.error" #body>
+                <Alert variant="destructive">
+                    <AlertDescription>{{ fieldsStore.error }}</AlertDescription>
+                </Alert>
+            </template>
+        </ConfirmDialog>
 
-                            <div v-if="fieldsStore.error" class="modal-error">
-                                {{ fieldsStore.error }}
-                            </div>
-
-                            <div class="modal-actions">
-                                <button class="btn-modal-cancel" @click="closeDeleteModal" :disabled="isDeleting">
-                                    İptal
-                                </button>
-                                <button class="btn-modal-danger" @click="confirmDelete" :disabled="isDeleting">
-                                    <span v-if="isDeleting" class="spinner-sm"></span>
-                                    {{ isDeleting ? 'Siliniyor...' : 'Evet, Sil' }}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </Transition>
-            </Teleport>
-
-            <!-- Rename Modal -->
-            <Teleport to="body">
-                <Transition name="modal">
-                    <div v-if="showRenameModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="field-rename-title" @click.self="closeRenameModal" @keydown.esc="closeRenameModal">
-                        <div class="modal-card modal-card--form">
-                            <h2 id="field-rename-title">Arazimi İsimlendir</h2>
-                            <p>
-                                <strong>{{ fieldToRename ? parcelAdaLabel(fieldToRename) || fieldToRename.district : '' }}</strong>
-                                arazinize tanıyabileceğiniz bir isim verin.
-                            </p>
-                            <input
-                                ref="renameInputRef"
-                                v-model="renameValue"
-                                type="text"
-                                class="rename-input"
-                                maxlength="50"
-                                placeholder="Örn: Evin Yanı, Üst Tarla"
-                                @keydown.enter="confirmRename"
-                            />
-                            <div class="modal-actions">
-                                <button class="btn-modal-cancel" @click="closeRenameModal" :disabled="isRenaming">
-                                    İptal
-                                </button>
-                                <button class="btn-modal-primary" @click="confirmRename" :disabled="isRenaming">
-                                    <span v-if="isRenaming" class="spinner-sm"></span>
-                                    {{ isRenaming ? 'Kaydediliyor...' : 'Kaydet' }}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </Transition>
-            </Teleport>
-        </div>
+        <Dialog v-model:open="showRenameDialog">
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Arazimi isimlendir</DialogTitle>
+                    <DialogDescription>
+                        <strong class="text-foreground">{{ fieldToRename ? parcelAdaLabel(fieldToRename) || fieldToRename.district : '' }}</strong>
+                        arazinize tanıyabileceğiniz bir isim verin.
+                    </DialogDescription>
+                </DialogHeader>
+                <div class="space-y-2">
+                    <Label for="field-rename-input">Arazi adı</Label>
+                    <Input
+                        id="field-rename-input"
+                        v-model="renameValue"
+                        maxlength="50"
+                        placeholder="Örn: Evin Yanı, Üst Tarla"
+                        class="h-11 md:h-9"
+                        autofocus
+                        @keydown.enter="confirmRename"
+                    />
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" class="h-11 md:h-9" :disabled="isRenaming" @click="showRenameDialog = false">İptal</Button>
+                    <Button class="h-11 md:h-9" :disabled="isRenaming" @click="confirmRename">
+                        <Spinner v-if="isRenaming" />
+                        {{ isRenaming ? 'Kaydediliyor...' : 'Kaydet' }}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </TeaBusinessLayout>
 </template>
-
-<style scoped>
-.fields-page {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: var(--space-6);
-}
-
-/* ── Header ── */
-.page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: var(--space-5);
-}
-
-.header-left h1 {
-    font-size: var(--font-size-2xl);
-    font-weight: var(--font-weight-bold);
-    color: var(--color-text-primary);
-    margin-bottom: var(--space-2);
-}
-
-.header-stats {
-    display: flex;
-    gap: var(--space-3);
-}
-
-.stat-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    font-size: var(--font-size-xs);
-    color: var(--color-text-muted);
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    padding: 3px 10px;
-    border-radius: var(--radius-full);
-}
-
-.btn-create {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    background: var(--color-primary);
-    color: white;
-    border: none;
-    padding: var(--space-3) var(--space-5);
-    border-radius: var(--radius-lg);
-    font-weight: var(--font-weight-semibold);
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    flex-shrink: 0;
-}
-
-.btn-create:hover {
-    background: var(--color-primary-hover);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
-}
-
-.btn-create--sm {
-    padding: var(--space-2) var(--space-4);
-}
-
-.caykur-source-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    background: var(--color-primary-light);
-    color: var(--color-primary);
-    border: 1px solid var(--color-primary);
-    padding: var(--space-2) var(--space-4);
-    border-radius: var(--radius-full);
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-semibold);
-    flex-shrink: 0;
-}
-
-/* Name fallback for auto-loaded, not-yet-named lands */
-.field-name--unnamed {
-    color: var(--color-text-muted);
-    font-style: italic;
-}
-
-.meta-item--parcel {
-    color: var(--color-text-secondary);
-    font-weight: var(--font-weight-medium);
-}
-
-/* "Arazimi isimlendir" primary action on each card */
-.btn-name {
-    flex: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-2);
-    height: 34px;
-    padding: 0 var(--space-3);
-    background: var(--color-primary-light);
-    border: 1px solid var(--color-primary);
-    border-radius: var(--radius-md);
-    color: var(--color-primary);
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-semibold);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-}
-
-.btn-name:hover {
-    background: var(--color-primary);
-    color: white;
-}
-
-.modal-card--form {
-    text-align: left;
-}
-
-.rename-input {
-    width: 100%;
-    height: var(--control-height);
-    padding: 0 var(--space-4);
-    margin-bottom: var(--space-5);
-    background: var(--color-bg-primary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    color: var(--color-text-primary);
-    font-size: var(--font-size-sm);
-    font-family: var(--font-family);
-}
-
-.rename-input:focus {
-    outline: none;
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px var(--color-primary-light);
-}
-
-.btn-modal-primary {
-    display: inline-flex;
-    align-items: center;
-    padding: var(--space-3) var(--space-6);
-    background: var(--color-primary);
-    border: none;
-    border-radius: var(--radius-lg);
-    color: white;
-    font-weight: var(--font-weight-semibold);
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-}
-
-.btn-modal-primary:hover:not(:disabled) {
-    background: var(--color-primary-hover);
-}
-
-.btn-modal-primary:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-/* ── Toolbar ── */
-.toolbar {
-    display: flex;
-    gap: var(--space-3);
-    margin-bottom: var(--space-5);
-    align-items: center;
-}
-
-.search-wrap {
-    position: relative;
-    flex: 1;
-    max-width: 320px;
-}
-
-.search-icon {
-    position: absolute;
-    left: 14px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--color-text-muted);
-    pointer-events: none;
-}
-
-.search-input {
-    width: 100%;
-    height: var(--control-height);
-    padding: 0 var(--space-4) 0 40px;
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    color: var(--color-text-primary);
-    font-size: var(--font-size-sm);
-    font-family: var(--font-family);
-    transition: all var(--transition-fast);
-}
-
-.search-input::placeholder {
-    color: var(--color-text-muted);
-}
-
-.search-input:focus {
-    outline: none;
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px var(--color-primary-light);
-}
-
-.search-clear {
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: var(--color-bg-tertiary);
-    border: none;
-    border-radius: var(--radius-full);
-    color: var(--color-text-muted);
-    width: 22px;
-    height: 22px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all var(--transition-fast);
-}
-
-.search-clear:hover {
-    background: var(--color-border);
-    color: var(--color-text-primary);
-}
-
-.toolbar-right {
-    display: flex;
-    gap: var(--space-3);
-    align-items: center;
-}
-
-.view-toggle {
-    display: flex;
-    height: var(--control-height);
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-}
-
-.view-btn {
-    background: none;
-    border: none;
-    padding: var(--space-2) var(--space-3);
-    color: var(--color-text-muted);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    display: flex;
-    align-items: center;
-}
-
-.view-btn.active {
-    background: var(--color-bg-tertiary);
-    color: var(--color-primary);
-}
-
-.view-btn:hover:not(.active) {
-    color: var(--color-text-secondary);
-}
-
-/* ── Grid View ── */
-.fields-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: var(--space-4);
-}
-
-.field-card {
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-xl);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    overflow: hidden;
-    position: relative;
-}
-
-.field-card:hover {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 1px var(--color-primary), var(--shadow-lg);
-    transform: translateY(-2px);
-}
-
-.card-accent {
-    height: 3px;
-    background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
-    opacity: 0;
-    transition: opacity var(--transition-fast);
-}
-
-.field-card:hover .card-accent {
-    opacity: 1;
-}
-
-.card-content {
-    padding: var(--space-5);
-}
-
-.card-top {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--space-3);
-    margin-bottom: var(--space-4);
-}
-
-.field-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: var(--radius-lg);
-    background: var(--color-primary-light);
-    color: var(--color-primary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: var(--font-weight-bold);
-    font-size: var(--font-size-base);
-    flex-shrink: 0;
-}
-
-.field-avatar--sm {
-    width: 32px;
-    height: 32px;
-    font-size: var(--font-size-sm);
-}
-
-.field-title-wrap {
-    flex: 1;
-    min-width: 0;
-}
-
-.field-name {
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text-primary);
-    margin-bottom: 2px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.field-location {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: var(--font-size-xs);
-    color: var(--color-text-muted);
-}
-
-.area-tag {
-    background: var(--color-primary);
-    color: white;
-    padding: 3px 10px;
-    border-radius: var(--radius-full);
-    font-size: 11px;
-    font-weight: var(--font-weight-semibold);
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
-.area-tag--sm {
-    padding: 2px 8px;
-    font-size: 10px;
-}
-
-.card-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3);
-    margin-bottom: var(--space-4);
-    padding-bottom: var(--space-4);
-    border-bottom: 1px solid var(--color-border);
-}
-
-.meta-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: var(--font-size-xs);
-    color: var(--color-text-muted);
-}
-
-.card-actions {
-    display: flex;
-    gap: var(--space-2);
-}
-
-.action-btn {
-    width: 34px;
-    height: 34px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--color-bg-tertiary);
-    border: 1px solid transparent;
-    border-radius: var(--radius-md);
-    color: var(--color-text-muted);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-}
-
-.action-btn:hover {
-    color: var(--color-primary);
-    border-color: var(--color-primary);
-    background: var(--color-primary-light);
-}
-
-.action-btn--danger:hover {
-    color: var(--color-danger);
-    border-color: var(--color-danger);
-    background: rgba(239, 68, 68, 0.1);
-}
-
-/* ── List View ── */
-.fields-list {
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-xl);
-    overflow: hidden;
-}
-
-.list-header {
-    display: grid;
-    grid-template-columns: 2fr 2fr 1fr 1fr 80px;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-5);
-    background: var(--color-bg-primary);
-    border-bottom: 1px solid var(--color-border);
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.list-row {
-    display: grid;
-    grid-template-columns: 2fr 2fr 1fr 1fr 80px;
-    gap: var(--space-3);
-    padding: var(--space-4) var(--space-5);
-    align-items: center;
-    border-bottom: 1px solid var(--color-border);
-    cursor: pointer;
-    transition: background var(--transition-fast);
-}
-
-.list-row:last-child {
-    border-bottom: none;
-}
-
-.list-row:hover {
-    background: rgba(16, 185, 129, 0.04);
-}
-
-.lr-name {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    font-weight: var(--font-weight-medium);
-    color: var(--color-text-primary);
-    min-width: 0;
-}
-
-.lr-name span {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.lr-location {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    min-width: 0;
-}
-
-.lr-location-main {
-    font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
-}
-
-.lr-location-sub {
-    font-size: var(--font-size-xs);
-    color: var(--color-text-muted);
-}
-
-.lr-area {
-    display: flex;
-    align-items: center;
-}
-
-.lr-partners {
-    font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
-}
-
-.text-muted {
-    color: var(--color-text-muted);
-}
-
-.lr-actions {
-    display: flex;
-    gap: var(--space-2);
-    justify-content: flex-end;
-}
-
-/* ── States ── */
-.loading-state {
-    text-align: center;
-    padding: var(--space-16);
-    color: var(--color-text-muted);
-}
-
-.spinner {
-    width: 36px;
-    height: 36px;
-    border: 3px solid var(--color-border);
-    border-top-color: var(--color-primary);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin: 0 auto var(--space-4);
-}
-
-.spinner-sm {
-    display: inline-block;
-    width: 14px;
-    height: 14px;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-top-color: white;
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-    margin-right: var(--space-2);
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
-.error-state {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-3);
-    padding: var(--space-8);
-    background: rgba(239, 68, 68, 0.08);
-    border: 1px solid rgba(239, 68, 68, 0.15);
-    border-radius: var(--radius-xl);
-    color: var(--color-danger);
-    font-size: var(--font-size-sm);
-}
-
-.empty-state {
-    text-align: center;
-    padding: var(--space-16);
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-xl);
-}
-
-.empty-illustration {
-    margin-bottom: var(--space-4);
-    opacity: 0.5;
-}
-
-.empty-state h3 {
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text-primary);
-    margin-bottom: var(--space-2);
-}
-
-.empty-state p {
-    color: var(--color-text-muted);
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-6);
-}
-
-.result-info {
-    text-align: center;
-    padding: var(--space-4);
-    color: var(--color-text-muted);
-    font-size: var(--font-size-xs);
-}
-
-/* ── Modal ── */
-.modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: var(--z-modal);
-    backdrop-filter: blur(4px);
-}
-
-.modal-card {
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-xl);
-    padding: var(--space-8);
-    max-width: 420px;
-    width: 90%;
-    text-align: center;
-    box-shadow: var(--shadow-xl);
-}
-
-.modal-icon-wrap {
-    width: 56px;
-    height: 56px;
-    border-radius: var(--radius-full);
-    background: rgba(239, 68, 68, 0.1);
-    color: var(--color-danger);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto var(--space-4);
-}
-
-.modal-card h2 {
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-bold);
-    color: var(--color-text-primary);
-    margin-bottom: var(--space-3);
-}
-
-.modal-card p {
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-4);
-    line-height: var(--line-height-relaxed);
-}
-
-.modal-warning {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-3) var(--space-4);
-    background: rgba(245, 158, 11, 0.1);
-    border-radius: var(--radius-md);
-    color: var(--color-warning);
-    font-size: var(--font-size-xs);
-    margin-bottom: var(--space-5);
-    text-align: left;
-}
-
-.modal-error {
-    padding: var(--space-3);
-    background: rgba(239, 68, 68, 0.1);
-    border-radius: var(--radius-md);
-    color: var(--color-danger);
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-4);
-}
-
-.modal-actions {
-    display: flex;
-    gap: var(--space-3);
-    justify-content: center;
-}
-
-.btn-modal-cancel {
-    padding: var(--space-3) var(--space-6);
-    background: var(--color-bg-tertiary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    color: var(--color-text-secondary);
-    font-weight: var(--font-weight-medium);
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-}
-
-.btn-modal-cancel:hover:not(:disabled) {
-    background: var(--color-bg-secondary);
-    color: var(--color-text-primary);
-}
-
-.btn-modal-danger {
-    display: inline-flex;
-    align-items: center;
-    padding: var(--space-3) var(--space-6);
-    background: var(--color-danger);
-    border: none;
-    border-radius: var(--radius-lg);
-    color: white;
-    font-weight: var(--font-weight-semibold);
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-}
-
-.btn-modal-danger:hover:not(:disabled) {
-    opacity: 0.9;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
-}
-
-.btn-modal-danger:disabled,
-.btn-modal-cancel:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-/* Modal Transition */
-.modal-enter-active {
-    transition: opacity 0.2s ease;
-}
-.modal-enter-active .modal-card {
-    transition: transform 0.2s ease, opacity 0.2s ease;
-}
-.modal-leave-active {
-    transition: opacity 0.15s ease;
-}
-.modal-leave-active .modal-card {
-    transition: transform 0.15s ease, opacity 0.15s ease;
-}
-.modal-enter-from {
-    opacity: 0;
-}
-.modal-enter-from .modal-card {
-    transform: scale(0.95);
-    opacity: 0;
-}
-.modal-leave-to {
-    opacity: 0;
-}
-.modal-leave-to .modal-card {
-    transform: scale(0.95);
-    opacity: 0;
-}
-
-/* ── Responsive ── */
-@media (max-width: 1024px) {
-    .list-header,
-    .list-row {
-        grid-template-columns: 2fr 2fr 1fr 80px;
-    }
-    .lh-partners,
-    .lr-partners {
-        display: none;
-    }
-}
-
-@media (max-width: 768px) {
-    .fields-page {
-        padding: var(--space-4);
-    }
-
-    .page-header {
-        flex-direction: column;
-        gap: var(--space-4);
-        align-items: flex-start;
-    }
-
-    .btn-create {
-        width: 100%;
-        justify-content: center;
-    }
-
-    .toolbar {
-        flex-direction: row;
-        gap: var(--space-3);
-        align-items: stretch;
-    }
-
-    .search-wrap {
-        flex: 1 1 0;
-        min-width: 0;
-        max-width: 100%;
-    }
-
-    .toolbar-right {
-        flex: 0 0 140px;
-        min-width: 0;
-        justify-content: flex-end;
-    }
-
-    .fields-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .view-toggle {
-        display: none;
-    }
-
-    .list-header {
-        display: none;
-    }
-
-    .list-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--space-2);
-        padding: var(--space-4);
-    }
-
-    .lr-name {
-        flex: 1 1 100%;
-    }
-
-    .lr-location {
-        flex: 1;
-    }
-
-    .lr-area {
-        flex-shrink: 0;
-    }
-
-    .lr-partners {
-        display: none;
-    }
-
-    .lr-actions {
-        flex: 0 0 auto;
-    }
-}
-</style>

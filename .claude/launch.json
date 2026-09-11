@@ -4,20 +4,65 @@
     {
       "name": "api",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev:api"],
+      "runtimeArgs": [
+        "dev:api"
+      ],
       "port": 3000
     },
     {
       "name": "web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev:web"],
+      "runtimeArgs": [
+        "dev:web"
+      ],
       "port": 5173
     },
     {
       "name": "web-preview",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev:web", "--port", "5273", "--strictPort"],
+      "runtimeArgs": [
+        "dev:web",
+        "--port",
+        "5273",
+        "--strictPort"
+      ],
       "port": 5273,
+      "autoPort": false
+    },
+    {
+      "name": "web-5575",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "dev:web",
+        "--port",
+        "5575",
+        "--strictPort"
+      ],
+      "port": 5575,
+      "autoPort": false
+    },
+    {
+      "name": "web-5676",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "dev:web",
+        "--port",
+        "5676",
+        "--strictPort"
+      ],
+      "port": 5676,
+      "autoPort": false
+    },
+    {
+      "name": "web-5777",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "dev:web",
+        "--port",
+        "5777",
+        "--strictPort"
+      ],
+      "port": 5777,
       "autoPort": false
     }
   ]

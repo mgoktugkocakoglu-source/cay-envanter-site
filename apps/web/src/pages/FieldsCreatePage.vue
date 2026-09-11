@@ -1,12 +1,39 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import type { AcceptableValue } from 'reka-ui';
+import {
+    Check,
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    CircleAlert,
+    Info,
+    Landmark,
+    Map,
+    MapPin,
+    NotebookPen,
+    Plus,
+    Square,
+    TriangleAlert,
+    Users,
+    X,
+} from '@lucide/vue';
 import { useGeoStore } from '@/stores/geoStore';
 import { useFieldsStore } from '@/stores/fieldsStore';
 import { api } from '@/services/api';
 import type { GeoParcelDetail, Field } from '@/services/api';
-import AppSelect from '@/components/ui/AppSelect.vue';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
+import { PageContainer, PageHeader, Spinner } from '@/components/shared';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -55,12 +82,11 @@ function getCssVar(name: string, fallback: string): string {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
-
-
 // ═══════ WIZARD STEP MANAGEMENT ═══════
 // activeStep is manually controlled - only changes via user action or goToStep
 const activeStep = ref(1);
 const TOTAL_STEPS = 6;
+const STEP_NUMBERS = Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1);
 
 // Check if a step's data is filled
 function isStepComplete(s: number): boolean {
@@ -178,6 +204,9 @@ const completedSteps = computed(() => {
     }
     return steps;
 });
+
+const progressValue = computed(() => (activeStep.value / TOTAL_STEPS) * 100);
+const filledPartnerCount = computed(() => partners.value.filter(hasPartnerValue).length);
 
 function isAllowedProvince(provinceName: string) {
     return provinceName.trim().toLocaleLowerCase('tr-TR') !== 'ordu';
@@ -301,7 +330,7 @@ function zoomToBounds(coordinates: number[][][]) {
         geometry: { type: 'Polygon', coordinates }
     };
 
-    const primary = getCssVar('--color-primary', '#10b981');
+    const primary = getCssVar('--primary', '#10b981');
     currentLayer = L.geoJSON(geoJson, {
         style: { color: primary, weight: 2, fillOpacity: 0.08, fillColor: primary }
     }).addTo(map);
@@ -319,9 +348,10 @@ function displayRoads(roads: typeof geoStore.roads) {
         geometry: { type: 'MultiLineString', coordinates: road.geometry }
     }));
 
-    const primaryColor = getCssVar('--color-primary', '#10b981');
-    const mutedColor = getCssVar('--color-text-muted', '#64748b');
-    roadLayers = L.geoJSON({ type: 'FeatureCollection', features } as any, {
+    const primaryColor = getCssVar('--primary', '#10b981');
+    const mutedColor = getCssVar('--muted-foreground', '#64748b');
+    const collection: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features };
+    roadLayers = L.geoJSON(collection, {
         style: (feature) => ({
             color: feature?.properties?.id === geoStore.selectedRoadId ? primaryColor : mutedColor,
             weight: feature?.properties?.id === geoStore.selectedRoadId ? 5 : 2,
@@ -342,8 +372,8 @@ function displayRoads(roads: typeof geoStore.roads) {
 function refreshRoadStyles() {
     if (!roadLayers) return;
 
-    const primaryColor = getCssVar('--color-primary', '#10b981');
-    const mutedColor = getCssVar('--color-text-muted', '#64748b');
+    const primaryColor = getCssVar('--primary', '#10b981');
+    const mutedColor = getCssVar('--muted-foreground', '#64748b');
     roadLayers.setStyle((feature) => ({
         color: feature?.properties?.id === geoStore.selectedRoadId ? primaryColor : mutedColor,
         weight: feature?.properties?.id === geoStore.selectedRoadId ? 5 : 2,
@@ -400,19 +430,20 @@ function displayClickedParcel(parcel: GeoParcelDetail) {
     if (!map) return;
     clearClickedParcelLayer();
 
-    clickedParcelLayer = L.geoJSON({
+    const parcelFeature: GeoJSON.Feature = {
         type: 'Feature',
         properties: { parselNo: parcel.properties.parselNo, alan: parcel.properties.alan, ozet: parcel.properties.ozet },
         geometry: { type: 'Polygon', coordinates: parcel.polygon }
-    } as any, {
-        style: { color: getCssVar('--color-warning', '#f59e0b'), weight: 3, fillOpacity: 0.2, fillColor: getCssVar('--color-warning', '#f59e0b'), dashArray: '6 4' }
+    };
+    clickedParcelLayer = L.geoJSON(parcelFeature, {
+        style: { color: getCssVar('--warning', '#f59e0b'), weight: 3, fillOpacity: 0.2, fillColor: getCssVar('--warning', '#f59e0b'), dashArray: '6 4' }
     }).addTo(map);
 
     clickedParcelLayer.bindPopup(`
         <div style="font-family: Inter, sans-serif; font-size: 13px; line-height: 1.5;">
             <strong>${parcel.properties.ozet}</strong><br>
-            <span style="color: var(--color-text-muted);">Alan:</span> ${parcel.properties.alan} m&sup2;<br>
-            <span style="color: var(--color-text-muted);">Nitelik:</span> ${parcel.properties.nitelik}
+            <span style="color: var(--muted-foreground);">Alan:</span> ${parcel.properties.alan} m&sup2;<br>
+            <span style="color: var(--muted-foreground);">Nitelik:</span> ${parcel.properties.nitelik}
         </div>
     `).openPopup();
 
@@ -427,30 +458,55 @@ function clearClickedParcelLayer() {
 }
 
 // ═══════ FORM HANDLERS ═══════
-type SelectValue = string | number | (string | number)[] | null;
+/** Sentinel for the optional road select — reka-ui Select cannot represent "none" with ''. */
+const NO_ROAD = 'none';
+type SelectValue = AcceptableValue | AcceptableValue[] | undefined;
+
+/** Normalises a reka-ui Select payload to a store id (`null` for empty / sentinel). */
+function toSelectId(value: SelectValue): string | null {
+    const v = Array.isArray(value) ? value[0] : value;
+    if (typeof v === 'string') return v && v !== NO_ROAD ? v : null;
+    if (typeof v === 'number' || typeof v === 'bigint') return String(v);
+    return null;
+}
 
 function handleProvinceChange(value: SelectValue) {
-    const v = Array.isArray(value) ? value[0] : value;
-    geoStore.selectProvince(v ? String(v) : null);
+    const v = toSelectId(value);
+    geoStore.selectProvince(v);
     if (v) nextStep();
 }
 
 function handleDistrictChange(value: SelectValue) {
-    const v = Array.isArray(value) ? value[0] : value;
-    geoStore.selectDistrict(v ? String(v) : null);
+    const v = toSelectId(value);
+    geoStore.selectDistrict(v);
     if (v) nextStep();
 }
 
 function handleNeighborhoodChange(value: SelectValue) {
-    const v = Array.isArray(value) ? value[0] : value;
-    geoStore.selectNeighborhood(v ? String(v) : null);
+    const v = toSelectId(value);
+    geoStore.selectNeighborhood(v);
     if (v) nextStep();
 }
 
 function handleRoadChange(value: SelectValue) {
-    const v = Array.isArray(value) ? value[0] : value;
-    geoStore.selectRoad(v ? String(v) : null);
+    geoStore.selectRoad(toSelectId(value));
     fitSelectedRoad();
+}
+
+function handleAreaUnitChange(value: SelectValue) {
+    const v = Array.isArray(value) ? value[0] : value;
+    if (v === 'm2' || v === 'donum' || v === 'dekar') {
+        fieldAreaUnit.value = v;
+    }
+}
+
+/** Parses a numeric Input payload; empty or non-numeric input becomes `null`. */
+function toNumberOrNull(value: string | number): number | null {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    const trimmed = value.trim();
+    if (trimmed === '') return null;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
 }
 
 function addPartner() {
@@ -564,726 +620,410 @@ function goBack() {
 
 <template>
     <TeaBusinessLayout>
-        <div class="create-field-page">
-            <!-- Page Header -->
-            <header class="page-header">
-                <button class="btn-back" @click="goBack">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                    Geri Dön
-                </button>
-                <div class="header-center">
-                    <h1>{{ isEditMode ? 'Tarlayı Düzenle' : 'Yeni Tarla Ekle' }}</h1>
-                    <p class="header-sub">{{ isEditMode ? 'Tarla bilgilerini güncelleyin' : `Adım ${activeStep} / ${TOTAL_STEPS}` }}</p>
-                </div>
-            </header>
+        <PageContainer size="narrow">
+            <PageHeader
+                back-to="/tea/fields"
+                :title="isEditMode ? 'Araziyi Düzenle' : 'Yeni Arazi'"
+                :description="isEditMode ? 'Tarla bilgilerini güncelleyin' : `Adım ${activeStep} / ${TOTAL_STEPS}`"
+            />
 
-            <!-- Progress Bar -->
-            <div v-if="!isEditMode" class="progress-track">
-                <div class="progress-fill" :style="{ width: `${(activeStep / TOTAL_STEPS) * 100}%` }"></div>
+            <!-- Step indicator -->
+            <div v-if="!isEditMode" class="space-y-2">
+                <Progress :model-value="progressValue" :aria-label="`Adım ${activeStep} / ${TOTAL_STEPS}`" />
+                <ol class="flex flex-wrap gap-x-3 gap-y-1 text-xs" aria-label="Adımlar">
+                    <li
+                        v-for="s in STEP_NUMBERS"
+                        :key="s"
+                        class="flex items-center gap-1"
+                        :class="s === activeStep ? 'font-semibold text-foreground' : 'text-muted-foreground'"
+                        :aria-current="s === activeStep ? 'step' : undefined"
+                    >
+                        <Check v-if="s < activeStep" class="size-3 text-primary" aria-hidden="true" />
+                        <span v-else class="tabular-nums">{{ s }}.</span>
+                        {{ stepLabel(s) }}
+                    </li>
+                </ol>
             </div>
 
-            <!-- Map - Always Visible -->
-            <div v-if="!isEditMode" class="map-section">
-                <div class="map-card">
-                    <div ref="mapContainer" class="map-container"></div>
-                    <div class="map-status">
-                        <div v-if="isLoadingParcel" class="map-status-item map-status-loading">
-                            <span class="spinner"></span>
-                            Parsel bilgisi yükleniyor...
+            <!-- Map (always visible while creating) -->
+            <Card v-if="!isEditMode" class="gap-0 overflow-hidden py-0">
+                <div ref="mapContainer" class="h-72 w-full bg-muted md:h-96"></div>
+                <div class="flex items-center gap-3 border-t px-4 py-3 text-sm" aria-live="polite">
+                    <template v-if="isLoadingParcel">
+                        <Spinner class="shrink-0 text-warning" />
+                        <span class="text-muted-foreground">Parsel bilgisi yükleniyor...</span>
+                    </template>
+                    <template v-else-if="clickedParcel">
+                        <MapPin class="size-4 shrink-0 text-primary" aria-hidden="true" />
+                        <div class="min-w-0 flex-1">
+                            <span class="block truncate font-medium text-foreground">{{ clickedParcel.properties.ozet }}</span>
+                            <span class="block text-xs text-muted-foreground">{{ clickedParcel.properties.alan }} m&sup2; &middot; {{ clickedParcel.properties.nitelik }}</span>
                         </div>
-                        <div v-else-if="clickedParcel" class="map-status-item map-status-selected">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                            <div class="map-status-text">
-                                <span class="map-status-title">{{ clickedParcel.properties.ozet }}</span>
-                                <span class="map-status-meta">{{ clickedParcel.properties.alan }} m&sup2; &middot; {{ clickedParcel.properties.nitelik }}</span>
-                            </div>
-                            <span class="area-chip">{{ clickedParcel.properties.alan }} m&sup2;</span>
-                        </div>
-                        <div v-else-if="geoStore.selectedRoad" class="map-status-item map-status-selected">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                            <div class="map-status-text">
-                                <span class="map-status-title">Yol: {{ geoStore.selectedRoad.name }}</span>
-                            </div>
-                        </div>
-                        <div v-else-if="geoStore.selectedNeighborhoodId" class="map-status-item map-status-hint">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                            Yol seçip haritaya tıklayarak parsel seçebilirsiniz
-                        </div>
-                        <div v-else class="map-status-item map-status-default">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
-                            Konum secimi icin adimlari takip edin
-                        </div>
-                    </div>
+                        <Badge class="tabular-nums">{{ clickedParcel.properties.alan }} m&sup2;</Badge>
+                    </template>
+                    <template v-else-if="geoStore.selectedRoad">
+                        <MapPin class="size-4 shrink-0 text-primary" aria-hidden="true" />
+                        <span class="min-w-0 flex-1 truncate font-medium text-foreground">Yol: {{ geoStore.selectedRoad.name }}</span>
+                    </template>
+                    <template v-else-if="geoStore.selectedNeighborhoodId">
+                        <Info class="size-4 shrink-0 text-info" aria-hidden="true" />
+                        <span class="text-muted-foreground">Yol seçip haritaya tıklayarak parsel seçebilirsiniz</span>
+                    </template>
+                    <template v-else>
+                        <Map class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                        <span class="text-muted-foreground">Konum secimi icin adimlari takip edin</span>
+                    </template>
                 </div>
-            </div>
+            </Card>
 
-            <!-- Breadcrumb: completed steps (clickable to go back) -->
-            <div v-if="completedSteps.length > 0" class="breadcrumb">
-                <button
+            <!-- Completed steps (clickable to go back) -->
+            <div v-if="completedSteps.length > 0 && !isEditMode" class="flex flex-wrap gap-2" aria-label="Tamamlanan adımlar">
+                <Button
                     v-for="s in completedSteps"
                     :key="s"
-                    class="breadcrumb-item"
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    class="h-11 max-w-full rounded-full md:h-8"
                     @click="goToStep(s)"
                 >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    <span class="breadcrumb-label">{{ stepLabel(s) }}:</span>
-                    <span class="breadcrumb-value">{{ stepValue(s) }}</span>
-                </button>
+                    <Check class="text-primary" aria-hidden="true" />
+                    <span class="text-muted-foreground">{{ stepLabel(s) }}:</span>
+                    <span class="max-w-32 truncate font-semibold text-foreground">{{ stepValue(s) }}</span>
+                </Button>
             </div>
 
-            <!-- Active Step Card -->
-            <form @submit.prevent="handleSubmit" class="form-flow">
-                <Transition name="wizard" mode="out-in">
-
-                    <!-- Step 1: Field Name -->
-                    <div v-if="activeStep === 1" key="step1" class="step-card">
-                        <div class="step-header">
-                            <div class="step-badge">1</div>
-                            <div>
-                                <h2 class="step-title">Tarla Adı <span class="required">*</span></h2>
-                                <p class="step-hint">Tarlanıza kolay hatırlanacak bir isim verin</p>
-                            </div>
-                        </div>
-                        <input
+            <form class="flex flex-col gap-6" @submit.prevent="handleSubmit">
+                <!-- Step 1: Field Name -->
+                <Card v-if="activeStep === 1" key="step1">
+                    <CardHeader>
+                        <CardTitle>Tarla Adı <span class="text-destructive" aria-hidden="true">*</span></CardTitle>
+                        <CardDescription>Tarlanıza kolay hatırlanacak bir isim verin</CardDescription>
+                    </CardHeader>
+                    <CardContent class="space-y-2">
+                        <Label for="fieldName" class="sr-only">Tarla adı</Label>
+                        <Input
                             id="fieldName"
                             v-model="fieldName"
                             type="text"
-                            class="form-input"
+                            class="h-11 md:h-9"
                             placeholder="Örn: Üst Bahçe"
                             autofocus
+                            required
                             @keyup.enter="nextStep"
                         />
-                        <div class="step-actions">
-                            <div></div>
-                            <button type="button" class="btn-next" :disabled="!isStepComplete(1)" @click="nextStep">
-                                Devam
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                            </button>
-                        </div>
-                    </div>
+                    </CardContent>
+                    <CardFooter class="justify-end border-t">
+                        <Button type="button" class="h-11 md:h-9" :disabled="!isStepComplete(1)" @click="nextStep">
+                            Devam
+                            <ChevronRight aria-hidden="true" />
+                        </Button>
+                    </CardFooter>
+                </Card>
 
-                    <!-- Step 2: Province -->
-                    <div v-else-if="activeStep === 2" key="step2" class="step-card">
-                        <div class="step-header">
-                            <button v-if="!isEditMode" type="button" class="btn-step-back" aria-label="Önceki adım" @click="prevStep">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                            </button>
-                            <div class="step-badge">2</div>
-                            <div>
-                                <h2 class="step-title">İl Seçin <span class="required">*</span></h2>
-                                <p class="step-hint">Tarlanızın bulunduğu ili seçin</p>
-                            </div>
-                        </div>
-                        <AppSelect
-                            :model-value="geoStore.selectedProvinceId?.toString() || ''"
-                            :options="provinceOptions"
-                            placeholder="İl Seçin"
+                <!-- Step 2: Province -->
+                <Card v-else-if="activeStep === 2" key="step2">
+                    <CardHeader>
+                        <CardTitle>İl Seçin <span class="text-destructive" aria-hidden="true">*</span></CardTitle>
+                        <CardDescription>Tarlanızın bulunduğu ili seçin</CardDescription>
+                    </CardHeader>
+                    <CardContent class="space-y-2">
+                        <Label for="province-select">İl</Label>
+                        <Select
+                            :model-value="geoStore.selectedProvinceId ?? undefined"
                             :disabled="geoStore.isLoadingProvinces"
                             required
-                            searchable
                             @update:model-value="handleProvinceChange"
-                        />
-                    </div>
+                        >
+                            <SelectTrigger id="province-select" class="w-full">
+                                <SelectValue placeholder="İl Seçin" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="option in provinceOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p v-if="geoStore.isLoadingProvinces" class="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Spinner class="size-3" /> Yükleniyor...
+                        </p>
+                    </CardContent>
+                    <CardFooter class="justify-between border-t">
+                        <Button v-if="!isEditMode" type="button" variant="ghost" class="h-11 md:h-9" @click="prevStep">
+                            <ChevronLeft aria-hidden="true" />
+                            Geri
+                        </Button>
+                    </CardFooter>
+                </Card>
 
-                    <!-- Step 3: District -->
-                    <div v-else-if="activeStep === 3" key="step3" class="step-card">
-                        <div class="step-header">
-                            <button type="button" class="btn-step-back" aria-label="Önceki adım" @click="prevStep">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                            </button>
-                            <div class="step-badge">3</div>
-                            <div>
-                                <h2 class="step-title">İlçe Seçin <span class="required">*</span></h2>
-                                <p class="step-hint">Tarlanızın bulunduğu ilçeyi seçin</p>
-                            </div>
-                        </div>
-                        <AppSelect
-                            :model-value="geoStore.selectedDistrictId?.toString() || ''"
-                            :options="geoStore.districts.map(d => ({ value: d.id.toString(), label: d.name }))"
-                            placeholder="İlçe Seçin"
+                <!-- Step 3: District -->
+                <Card v-else-if="activeStep === 3" key="step3">
+                    <CardHeader>
+                        <CardTitle>İlçe Seçin <span class="text-destructive" aria-hidden="true">*</span></CardTitle>
+                        <CardDescription>Tarlanızın bulunduğu ilçeyi seçin</CardDescription>
+                    </CardHeader>
+                    <CardContent class="space-y-2">
+                        <Label for="district-select">İlçe</Label>
+                        <Select
+                            :model-value="geoStore.selectedDistrictId ?? undefined"
                             :disabled="!geoStore.selectedProvinceId || geoStore.isLoadingDistricts"
                             required
-                            searchable
                             @update:model-value="handleDistrictChange"
-                        />
-                        <span v-if="geoStore.isLoadingDistricts" class="loading-text">
-                            <span class="spinner-tiny"></span> Yükleniyor...
-                        </span>
-                    </div>
+                        >
+                            <SelectTrigger id="district-select" class="w-full">
+                                <SelectValue placeholder="İlçe Seçin" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="d in geoStore.districts" :key="d.id" :value="d.id.toString()">{{ d.name }}</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p v-if="geoStore.isLoadingDistricts" class="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Spinner class="size-3" /> Yükleniyor...
+                        </p>
+                    </CardContent>
+                    <CardFooter class="justify-between border-t">
+                        <Button type="button" variant="ghost" class="h-11 md:h-9" @click="prevStep">
+                            <ChevronLeft aria-hidden="true" />
+                            Geri
+                        </Button>
+                    </CardFooter>
+                </Card>
 
-                    <!-- Step 4: Neighborhood -->
-                    <div v-else-if="activeStep === 4" key="step4" class="step-card">
-                        <div class="step-header">
-                            <button type="button" class="btn-step-back" aria-label="Önceki adım" @click="prevStep">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                            </button>
-                            <div class="step-badge">4</div>
-                            <div>
-                                <h2 class="step-title">Mahalle Seçin <span class="required">*</span></h2>
-                                <p class="step-hint">Tarlanızın bulunduğu mahalleyi seçin</p>
-                            </div>
-                        </div>
-                        <AppSelect
-                            :model-value="geoStore.selectedNeighborhoodId?.toString() || ''"
-                            :options="geoStore.neighborhoods.map(n => ({ value: n.id.toString(), label: n.name }))"
-                            placeholder="Mahalle Seçin"
+                <!-- Step 4: Neighborhood -->
+                <Card v-else-if="activeStep === 4" key="step4">
+                    <CardHeader>
+                        <CardTitle>Mahalle Seçin <span class="text-destructive" aria-hidden="true">*</span></CardTitle>
+                        <CardDescription>Tarlanızın bulunduğu mahalleyi seçin</CardDescription>
+                    </CardHeader>
+                    <CardContent class="space-y-2">
+                        <Label for="neighborhood-select">Mahalle</Label>
+                        <Select
+                            :model-value="geoStore.selectedNeighborhoodId ?? undefined"
                             :disabled="!geoStore.selectedDistrictId || geoStore.isLoadingNeighborhoods"
                             required
-                            searchable
                             @update:model-value="handleNeighborhoodChange"
-                        />
-                        <span v-if="geoStore.isLoadingNeighborhoods" class="loading-text">
-                            <span class="spinner-tiny"></span> Yükleniyor...
-                        </span>
-                    </div>
+                        >
+                            <SelectTrigger id="neighborhood-select" class="w-full">
+                                <SelectValue placeholder="Mahalle Seçin" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="n in geoStore.neighborhoods" :key="n.id" :value="n.id.toString()">{{ n.name }}</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p v-if="geoStore.isLoadingNeighborhoods" class="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Spinner class="size-3" /> Yükleniyor...
+                        </p>
+                    </CardContent>
+                    <CardFooter class="justify-between border-t">
+                        <Button type="button" variant="ghost" class="h-11 md:h-9" @click="prevStep">
+                            <ChevronLeft aria-hidden="true" />
+                            Geri
+                        </Button>
+                    </CardFooter>
+                </Card>
 
-                    <!-- Step 5: Parcel -->
-                    <div v-else-if="activeStep === 5" key="step5" class="step-card">
-                        <div class="step-header">
-                            <button type="button" class="btn-step-back" aria-label="Önceki adım" @click="prevStep">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                            </button>
-                            <div class="step-badge">5</div>
-                            <div>
-                                <h2 class="step-title">Parsel Seçin</h2>
-                                <p class="step-hint">Önce yolu seçin, sonra haritada parselin üzerine tıklayın</p>
-                            </div>
-                        </div>
-                        <AppSelect
-                            :model-value="geoStore.selectedRoadId?.toString() || ''"
-                            :options="geoStore.roads.map(r => ({ value: r.id.toString(), label: r.name }))"
-                            placeholder="Yol Seçiniz"
-                            :disabled="!geoStore.selectedNeighborhoodId || geoStore.isLoadingRoads"
-                            searchable
-                            @update:model-value="handleRoadChange"
-                        />
-                        <span v-if="geoStore.isLoadingRoads" class="loading-text">
-                            <span class="spinner-tiny"></span> Yollar yükleniyor...
-                        </span>
-
-                        <div v-if="selectedArea > 0" class="area-inline">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
-                            <span>Tarla Alanı: <strong>{{ selectedArea.toLocaleString('tr-TR') }} m&sup2;</strong></span>
-                        </div>
-
-                        <!-- Skip parcel button -->
-                        <div class="step-actions">
-                            <div></div>
-                            <button type="button" class="btn-skip" @click="activeStep = 6">
-                                Parselsiz Devam Et
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Step 6: Details -->
-                    <div v-else-if="activeStep === 6" key="step6" class="step-card step-card-final">
-                        <div class="step-header">
-                            <button type="button" class="btn-step-back" aria-label="Önceki adım" @click="prevStep">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                            </button>
-                            <div class="step-badge done">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                            </div>
-                            <div>
-                                <h2 class="step-title">{{ isEditMode ? 'Tarla Bilgileri' : 'Son Adım: Detaylar' }}</h2>
-                                <p class="step-hint">{{ isEditMode ? 'Ad, alan ve not bilgilerini düzenleyin' : 'Notlarinizi ve ortak bilgilerinizi ekleyin' }}</p>
-                            </div>
+                <!-- Step 5: Parcel -->
+                <Card v-else-if="activeStep === 5" key="step5">
+                    <CardHeader>
+                        <CardTitle>Parsel Seçin</CardTitle>
+                        <CardDescription>Önce yolu seçin, sonra haritada parselin üzerine tıklayın</CardDescription>
+                    </CardHeader>
+                    <CardContent class="space-y-4">
+                        <div class="space-y-2">
+                            <Label for="road-select">Yol</Label>
+                            <Select
+                                :model-value="geoStore.selectedRoadId ?? NO_ROAD"
+                                :disabled="!geoStore.selectedNeighborhoodId || geoStore.isLoadingRoads"
+                                @update:model-value="handleRoadChange"
+                            >
+                                <SelectTrigger id="road-select" class="w-full">
+                                    <SelectValue placeholder="Yol Seçiniz" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem :value="NO_ROAD">Yol seçilmedi</SelectItem>
+                                    <SelectItem v-for="r in geoStore.roads" :key="r.id" :value="r.id.toString()">{{ r.name }}</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p v-if="geoStore.isLoadingRoads" class="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Spinner class="size-3" /> Yollar yükleniyor...
+                            </p>
                         </div>
 
-                        <div v-if="isEditMode" class="edit-fields-grid">
-                            <div class="detail-group">
-                                <label for="editFieldName" class="detail-label">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
+                        <p v-if="selectedArea > 0" class="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Square class="size-4 text-primary" aria-hidden="true" />
+                            Tarla Alanı:
+                            <span class="font-semibold text-foreground tabular-nums">{{ selectedArea.toLocaleString('tr-TR') }} m&sup2;</span>
+                        </p>
+                    </CardContent>
+                    <CardFooter class="justify-between border-t">
+                        <Button type="button" variant="ghost" class="h-11 md:h-9" @click="prevStep">
+                            <ChevronLeft aria-hidden="true" />
+                            Geri
+                        </Button>
+                        <Button type="button" variant="outline" class="h-11 md:h-9" @click="activeStep = 6">
+                            Parselsiz Devam Et
+                            <ChevronRight aria-hidden="true" />
+                        </Button>
+                    </CardFooter>
+                </Card>
+
+                <!-- Step 6: Details -->
+                <Card v-else-if="activeStep === 6" key="step6">
+                    <CardHeader>
+                        <CardTitle>{{ isEditMode ? 'Tarla Bilgileri' : 'Son Adım: Detaylar' }}</CardTitle>
+                        <CardDescription>{{ isEditMode ? 'Ad, alan ve not bilgilerini düzenleyin' : 'Notlarinizi ve ortak bilgilerinizi ekleyin' }}</CardDescription>
+                    </CardHeader>
+                    <CardContent class="space-y-6">
+                        <div v-if="isEditMode" class="grid gap-4 md:grid-cols-2">
+                            <div class="space-y-2">
+                                <Label for="editFieldName">
+                                    <Landmark class="size-4 text-muted-foreground" aria-hidden="true" />
                                     Tarla Adı
-                                </label>
-                                <input id="editFieldName" v-model="fieldName" type="text" class="form-input" placeholder="Tarla adı" />
+                                </Label>
+                                <Input id="editFieldName" v-model="fieldName" type="text" class="h-11 md:h-9" placeholder="Tarla adı" required />
                             </div>
-                            <div class="detail-group">
-                                <label for="editFieldArea" class="detail-label">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
+                            <div class="space-y-2">
+                                <Label for="editFieldArea">
+                                    <Square class="size-4 text-muted-foreground" aria-hidden="true" />
                                     Alan
-                                </label>
-                                <div class="area-edit-row">
-                                    <input id="editFieldArea" v-model.number="fieldArea" type="number" min="0.01" step="0.01" class="form-input" placeholder="Alan" />
-                                    <select v-model="fieldAreaUnit" class="form-input area-unit-select">
-                                        <option value="m2">m²</option>
-                                        <option value="donum">dönüm</option>
-                                        <option value="dekar">dekar</option>
-                                    </select>
+                                </Label>
+                                <div class="grid grid-cols-[1fr_7.5rem] gap-2">
+                                    <Input
+                                        id="editFieldArea"
+                                        :model-value="fieldArea ?? undefined"
+                                        type="number"
+                                        min="0.01"
+                                        step="0.01"
+                                        class="h-11 tabular-nums md:h-9"
+                                        placeholder="Alan"
+                                        @update:model-value="fieldArea = toNumberOrNull($event)"
+                                    />
+                                    <Select :model-value="fieldAreaUnit" @update:model-value="handleAreaUnitChange">
+                                        <SelectTrigger class="w-full" aria-label="Alan birimi">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="m2">m²</SelectItem>
+                                            <SelectItem value="donum">dönüm</SelectItem>
+                                            <SelectItem value="dekar">dekar</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Notes -->
-                        <div class="detail-group">
-                            <label for="notes" class="detail-label">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
+                        <div class="space-y-2">
+                            <Label for="notes">
+                                <NotebookPen class="size-4 text-muted-foreground" aria-hidden="true" />
                                 Notlar
-                            </label>
-                            <textarea id="notes" v-model="notes" rows="3" class="form-textarea" placeholder="Istege bagli"></textarea>
+                            </Label>
+                            <Textarea id="notes" v-model="notes" rows="3" placeholder="Istege bagli" />
                         </div>
 
                         <!-- Partners -->
-                        <div v-if="!isEditMode" class="detail-group">
-                            <button type="button" class="partners-toggle" @click="isPartnersOpen = !isPartnersOpen">
-                                <div class="partners-toggle-left">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                                    <span class="detail-label-text">Ortaklar</span>
-                                    <span v-if="partners.filter(hasPartnerValue).length > 0" class="partner-badge">{{ partners.filter(hasPartnerValue).length }}</span>
-                                </div>
-                                <svg class="chevron" :class="{ open: isPartnersOpen }" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-                            </button>
-                            <div class="partners-body" :class="{ open: isPartnersOpen }">
-                                <div class="partners-content">
-                                    <button type="button" class="btn-add-partner" @click="addPartner">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                        Ortak Ekle
-                                    </button>
-                                    <div v-for="(partner, index) in partners" :key="index" class="partner-row">
-                                        <input v-model="partner.firstName" type="text" placeholder="Ad" class="form-input partner-name-input" />
-                                        <input v-model="partner.lastName" type="text" placeholder="Soyad" class="form-input partner-name-input" />
-                                        <input v-model="partner.identityNumber" type="text" maxlength="11" inputmode="numeric" placeholder="TC No" class="form-input partner-tc-input" />
-                                        <div class="partner-share-input-wrap">
-                                            <input v-model.number="partner.sharePercentage" type="number" min="1" max="100" step="0.01" placeholder="Pay" class="form-input partner-share-input" />
-                                            <span>%</span>
+                        <div v-if="!isEditMode" class="space-y-4">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                class="h-11 w-full justify-between md:h-9"
+                                :aria-expanded="isPartnersOpen"
+                                aria-controls="partners-panel"
+                                @click="isPartnersOpen = !isPartnersOpen"
+                            >
+                                <span class="flex items-center gap-2">
+                                    <Users class="text-muted-foreground" aria-hidden="true" />
+                                    <span class="font-semibold">Ortaklar</span>
+                                    <Badge v-if="filledPartnerCount > 0" variant="secondary">{{ filledPartnerCount }}</Badge>
+                                </span>
+                                <ChevronDown class="text-muted-foreground transition-transform" :class="{ 'rotate-180': isPartnersOpen }" aria-hidden="true" />
+                            </Button>
+
+                            <div v-show="isPartnersOpen" id="partners-panel" class="space-y-3">
+                                <Button type="button" variant="outline" size="sm" class="h-11 border-dashed md:h-8" @click="addPartner">
+                                    <Plus aria-hidden="true" />
+                                    Ortak Ekle
+                                </Button>
+
+                                <Card v-for="(partner, index) in partners" :key="index" class="gap-3 py-4">
+                                    <CardContent class="px-4">
+                                        <div class="grid gap-2 sm:grid-cols-[1fr_1fr_8rem_5.5rem_auto] sm:items-end">
+                                            <div class="space-y-1">
+                                                <Label :for="`partner-first-${index}`" class="text-xs text-muted-foreground">Ad</Label>
+                                                <Input :id="`partner-first-${index}`" v-model="partner.firstName" type="text" placeholder="Ad" class="h-11 md:h-9" />
+                                            </div>
+                                            <div class="space-y-1">
+                                                <Label :for="`partner-last-${index}`" class="text-xs text-muted-foreground">Soyad</Label>
+                                                <Input :id="`partner-last-${index}`" v-model="partner.lastName" type="text" placeholder="Soyad" class="h-11 md:h-9" />
+                                            </div>
+                                            <div class="space-y-1">
+                                                <Label :for="`partner-tc-${index}`" class="text-xs text-muted-foreground">TC No</Label>
+                                                <Input
+                                                    :id="`partner-tc-${index}`"
+                                                    v-model="partner.identityNumber"
+                                                    type="text"
+                                                    maxlength="11"
+                                                    inputmode="numeric"
+                                                    placeholder="TC No"
+                                                    class="h-11 tabular-nums md:h-9"
+                                                />
+                                            </div>
+                                            <div class="space-y-1">
+                                                <Label :for="`partner-share-${index}`" class="text-xs text-muted-foreground">Pay (%)</Label>
+                                                <Input
+                                                    :id="`partner-share-${index}`"
+                                                    :model-value="partner.sharePercentage ?? undefined"
+                                                    type="number"
+                                                    min="1"
+                                                    max="100"
+                                                    step="0.01"
+                                                    placeholder="Pay"
+                                                    class="h-11 tabular-nums md:h-9"
+                                                    @update:model-value="partner.sharePercentage = toNumberOrNull($event)"
+                                                />
+                                            </div>
+                                            <Button
+                                                v-if="partners.length > 1"
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                class="size-11 justify-self-end text-muted-foreground hover:text-destructive md:size-9"
+                                                :aria-label="`${index + 1}. ortağı kaldır`"
+                                                @click="removePartner(index)"
+                                            >
+                                                <X aria-hidden="true" />
+                                            </Button>
                                         </div>
-                                        <button v-if="partners.length > 1" type="button" class="btn-remove" @click="removePartner(index)">
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                        </button>
-                                    </div>
-                                    <div v-if="partners.some(hasPartnerValue)" class="pct-warning-bar">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                                        TC No eşleşen kullanıcı bu araziye bağlı hasat ve ödeme kayıtlarını görebilir.
-                                    </div>
-                                </div>
+                                    </CardContent>
+                                </Card>
+
+                                <Alert v-if="partners.some(hasPartnerValue)" variant="warning">
+                                    <TriangleAlert aria-hidden="true" />
+                                    <AlertDescription>TC No eşleşen kullanıcı bu araziye bağlı hasat ve ödeme kayıtlarını görebilir.</AlertDescription>
+                                </Alert>
                             </div>
                         </div>
 
                         <!-- Error -->
-                        <div v-if="formError || geoStore.error" class="error-banner">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                            {{ formError || geoStore.error }}
+                        <Alert v-if="formError || geoStore.error" variant="destructive">
+                            <CircleAlert aria-hidden="true" />
+                            <AlertDescription>{{ formError || geoStore.error }}</AlertDescription>
+                        </Alert>
+                    </CardContent>
+                    <CardFooter class="flex-wrap justify-between gap-2 border-t">
+                        <div class="flex items-center gap-2">
+                            <Button v-if="!isEditMode" type="button" variant="ghost" class="h-11 md:h-9" @click="prevStep">
+                                <ChevronLeft aria-hidden="true" />
+                                Geri
+                            </Button>
+                            <Button type="button" variant="outline" class="h-11 md:h-9" @click="goBack">İptal</Button>
                         </div>
-
-                        <!-- Submit -->
-                        <div class="step-actions">
-                            <button type="button" class="btn-cancel" @click="goBack">İptal</button>
-                            <button type="submit" class="btn-submit" :disabled="!isFormValid || isSubmitting">
-                                <span v-if="isSubmitting" class="spinner"></span>
-                                <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                                {{ isSubmitting ? 'Kaydediliyor...' : (isEditMode ? 'Değişiklikleri Kaydet' : 'Tarla Ekle') }}
-                            </button>
-                        </div>
-                    </div>
-
-                </Transition>
+                        <Button type="submit" class="h-11 md:h-9" :disabled="!isFormValid || isSubmitting">
+                            <Spinner v-if="isSubmitting" />
+                            <Check v-else aria-hidden="true" />
+                            {{ isSubmitting ? 'Kaydediliyor...' : (isEditMode ? 'Değişiklikleri Kaydet' : 'Tarla Ekle') }}
+                        </Button>
+                    </CardFooter>
+                </Card>
             </form>
-        </div>
+        </PageContainer>
     </TeaBusinessLayout>
 </template>
-
-<style scoped>
-.create-field-page {
-    max-width: 1120px;
-    margin: 0 auto;
-    padding: var(--space-4) var(--space-4) var(--space-8);
-}
-
-/* ── Header ── */
-.page-header {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
-    margin-bottom: var(--space-4);
-}
-
-.btn-back {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    color: var(--color-text-secondary);
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-lg);
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    flex-shrink: 0;
-}
-
-.btn-back:hover {
-    color: var(--color-text-primary);
-    border-color: var(--color-text-muted);
-    background: var(--color-bg-tertiary);
-}
-
-.header-center h1 {
-    font-size: var(--font-size-xl);
-    font-weight: var(--font-weight-bold);
-    color: var(--color-text-primary);
-    margin-bottom: 2px;
-}
-
-.header-sub {
-    font-size: var(--font-size-sm);
-    color: var(--color-text-muted);
-}
-
-/* ── Progress ── */
-.progress-track {
-    height: 4px;
-    background: var(--color-bg-tertiary);
-    border-radius: 2px;
-    margin-bottom: var(--space-5);
-    overflow: hidden;
-}
-
-.progress-fill {
-    height: 100%;
-    background: var(--color-primary);
-    border-radius: 2px;
-    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* ── Map ── */
-.map-section {
-    margin-bottom: var(--space-4);
-    position: sticky;
-    top: 64px;
-    z-index: 10;
-}
-
-.map-card {
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-xl);
-    overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-}
-
-.map-container {
-    height: min(64vh, 640px);
-    min-height: 460px;
-    width: 100%;
-    background: var(--color-bg-primary);
-}
-
-.map-status { border-top: 1px solid var(--color-border); }
-.map-status-item { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); font-size: var(--font-size-sm); }
-.map-status-loading { color: var(--color-warning); background: rgba(245, 158, 11, 0.06); }
-.map-status-selected { color: var(--color-text-primary); background: rgba(16, 185, 129, 0.06); }
-.map-status-hint { color: var(--color-info); background: rgba(59, 130, 246, 0.06); }
-.map-status-default { color: var(--color-text-muted); }
-.map-status-text { flex: 1; min-width: 0; }
-.map-status-title { display: block; font-weight: var(--font-weight-medium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.map-status-meta { font-size: var(--font-size-xs); color: var(--color-text-muted); }
-.area-chip { background: var(--color-primary); color: white; padding: 2px 10px; border-radius: var(--radius-full); font-size: 11px; font-weight: var(--font-weight-semibold); white-space: nowrap; flex-shrink: 0; }
-
-/* ── Breadcrumb ── */
-.breadcrumb {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    margin-bottom: var(--space-4);
-}
-
-.breadcrumb-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-full);
-    font-size: var(--font-size-xs);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    color: var(--color-text-secondary);
-}
-
-.breadcrumb-item:hover {
-    border-color: var(--color-primary);
-    background: var(--color-primary-light);
-    color: var(--color-primary);
-}
-
-.breadcrumb-item svg {
-    color: var(--color-primary);
-    flex-shrink: 0;
-}
-
-.breadcrumb-label {
-    color: var(--color-text-muted);
-    font-weight: var(--font-weight-medium);
-}
-
-.breadcrumb-value {
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text-primary);
-    max-width: 120px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.breadcrumb-item:hover .breadcrumb-value {
-    color: var(--color-primary);
-}
-
-/* ── Step Card ── */
-.form-flow {
-    min-height: 200px;
-}
-
-.step-card {
-    padding: var(--space-6);
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-xl);
-}
-
-.step-card-final {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 1px var(--color-primary), 0 4px 20px rgba(16, 185, 129, 0.1);
-}
-
-.step-header {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    margin-bottom: var(--space-5);
-}
-
-.btn-step-back {
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--color-bg-tertiary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    color: var(--color-text-muted);
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: all var(--transition-fast);
-}
-
-.btn-step-back:hover {
-    color: var(--color-text-primary);
-    border-color: var(--color-text-muted);
-    background: var(--color-bg-secondary);
-}
-
-.step-badge {
-    width: 32px;
-    height: 32px;
-    border-radius: var(--radius-full);
-    background: var(--color-primary-light);
-    color: var(--color-primary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    font-weight: var(--font-weight-bold);
-    flex-shrink: 0;
-    border: 2px solid var(--color-primary);
-}
-
-.step-badge.done {
-    background: var(--color-primary);
-    color: white;
-}
-
-.step-title {
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text-primary);
-    margin-bottom: 1px;
-}
-
-.step-hint {
-    font-size: var(--font-size-xs);
-    color: var(--color-text-muted);
-}
-
-.required { color: var(--color-danger); }
-
-/* ── Wizard Transition ── */
-.wizard-enter-active {
-    animation: wizardIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.wizard-leave-active {
-    animation: wizardOut 0.2s ease-in forwards;
-}
-
-@keyframes wizardIn {
-    from { opacity: 0; transform: translateX(30px); }
-    to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes wizardOut {
-    from { opacity: 1; transform: translateX(0); }
-    to { opacity: 0; transform: translateX(-20px); }
-}
-
-/* ── Step Actions ── */
-.step-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: var(--space-5);
-    padding-top: var(--space-4);
-    border-top: 1px solid var(--color-border);
-}
-
-.btn-next {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-3) var(--space-6);
-    background: var(--color-primary);
-    border: none;
-    border-radius: var(--radius-lg);
-    color: white;
-    font-weight: var(--font-weight-semibold);
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-}
-
-.btn-next:hover:not(:disabled) {
-    background: var(--color-primary-hover);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
-}
-
-.btn-next:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.btn-skip {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-4);
-    background: transparent;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    color: var(--color-text-muted);
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-}
-
-.btn-skip:hover {
-    border-color: var(--color-text-muted);
-    color: var(--color-text-primary);
-}
-
-/* ── Form Elements ── */
-.form-input, .form-textarea {
-    width: 100%;
-    padding: var(--space-3) var(--space-4);
-    background: var(--color-bg-tertiary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    color: var(--color-text-primary);
-    font-size: var(--font-size-base);
-    font-family: var(--font-family);
-    transition: all var(--transition-fast);
-    box-sizing: border-box;
-}
-
-.form-input {
-    height: var(--control-height);
-    padding-top: 0;
-    padding-bottom: 0;
-}
-
-.form-input::placeholder, .form-textarea::placeholder { color: var(--color-text-muted); }
-.form-input:focus, .form-textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-light); }
-.form-textarea { resize: vertical; min-height: 80px; }
-.edit-fields-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: var(--space-4); margin-bottom: var(--space-4); }
-.area-edit-row { display: grid; grid-template-columns: 1fr 120px; gap: var(--space-3); }
-.area-unit-select { cursor: pointer; }
-
-.loading-text {
-    display: flex; align-items: center; gap: var(--space-1);
-    font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-1);
-}
-
-.area-inline {
-    display: flex; align-items: center; gap: var(--space-2);
-    margin-top: var(--space-3); padding: var(--space-3) var(--space-4);
-    background: rgba(16, 185, 129, 0.08); border-radius: var(--radius-md);
-    font-size: var(--font-size-sm); color: var(--color-primary);
-}
-.area-inline strong { font-weight: var(--font-weight-bold); }
-
-/* ── Details ── */
-.detail-group { margin-bottom: var(--space-4); }
-.detail-label { display: flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); color: var(--color-text-secondary); margin-bottom: var(--space-2); }
-.detail-label-text { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); }
-
-/* ── Partners ── */
-.partners-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; background: var(--color-bg-tertiary); border: 1px solid var(--color-border); cursor: pointer; padding: var(--space-3) var(--space-4); color: inherit; border-radius: var(--radius-md); transition: all var(--transition-fast); }
-.partners-toggle:hover { border-color: var(--color-text-muted); }
-.partners-toggle-left { display: flex; align-items: center; gap: var(--space-2); }
-.partner-badge { background: var(--color-primary); color: white; width: 20px; height: 20px; border-radius: var(--radius-full); font-size: 11px; font-weight: var(--font-weight-semibold); display: flex; align-items: center; justify-content: center; }
-.chevron { color: var(--color-text-muted); transition: transform var(--transition-normal); }
-.chevron.open { transform: rotate(180deg); }
-.partners-body { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
-.partners-body.open { max-height: 600px; }
-.partners-content { padding-top: var(--space-4); }
-
-.btn-add-partner { display: inline-flex; align-items: center; gap: var(--space-2); background: transparent; border: 1.5px dashed var(--color-primary); color: var(--color-primary); padding: var(--space-2) var(--space-4); border-radius: var(--radius-md); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); cursor: pointer; transition: all var(--transition-fast); margin-bottom: var(--space-4); }
-.btn-add-partner:hover { background: var(--color-primary-light); border-style: solid; }
-
-.partner-row { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
-.partner-name-input { flex: 1 1 140px; min-width: 120px; }
-.partner-tc-input { flex: 0 1 132px; min-width: 118px; }
-.partner-share-input-wrap { display: flex; align-items: center; gap: 6px; flex: 0 0 96px; color: var(--color-text-muted); font-size: var(--font-size-sm); }
-.partner-share-input { width: 72px; text-align: right; }
-.btn-remove { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: rgba(239, 68, 68, 0.1); border: none; border-radius: var(--radius-md); color: var(--color-danger); cursor: pointer; flex-shrink: 0; transition: all var(--transition-fast); }
-.btn-remove:hover { background: rgba(239, 68, 68, 0.2); }
-.pct-warning-bar { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); background: rgba(245, 158, 11, 0.1); border-radius: var(--radius-md); color: var(--color-warning); font-size: var(--font-size-xs); font-weight: var(--font-weight-medium); }
-
-/* ── Error ── */
-.error-banner { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: var(--radius-md); color: var(--color-danger); font-size: var(--font-size-sm); margin-bottom: var(--space-4); }
-
-/* ── Submit ── */
-.btn-cancel { padding: var(--space-3) var(--space-6); background: var(--color-bg-tertiary); border: 1px solid var(--color-border); border-radius: var(--radius-lg); color: var(--color-text-secondary); font-weight: var(--font-weight-medium); font-size: var(--font-size-sm); cursor: pointer; transition: all var(--transition-fast); }
-.btn-cancel:hover { background: var(--color-bg-secondary); color: var(--color-text-primary); border-color: var(--color-text-muted); }
-.btn-submit { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-6); background: var(--color-primary); border: none; border-radius: var(--radius-lg); color: white; font-weight: var(--font-weight-semibold); font-size: var(--font-size-sm); cursor: pointer; transition: all var(--transition-fast); }
-.btn-submit:hover:not(:disabled) { background: var(--color-primary-hover); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35); }
-.btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
-
-/* ── Spinner ── */
-.spinner { width: 16px; height: 16px; border: 2px solid rgba(255, 255, 255, 0.3); border-top-color: currentColor; border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
-.spinner-tiny { display: inline-block; width: 10px; height: 10px; border: 1.5px solid var(--color-border); border-top-color: var(--color-text-muted); border-radius: 50%; animation: spin 0.7s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* ── Responsive ── */
-@media (max-width: 768px) {
-    .create-field-page { padding: var(--space-3); }
-    .page-header { flex-direction: column; align-items: flex-start; }
-    .map-container {
-        height: 52vh;
-        min-height: 360px;
-    }
-    .map-section { position: static; }
-    .step-card { padding: var(--space-4); }
-    .edit-fields-grid { grid-template-columns: 1fr; }
-    .area-edit-row { grid-template-columns: 1fr; }
-    .partner-row { flex-wrap: wrap; }
-    .partner-name-input,
-    .partner-tc-input,
-    .partner-share-input-wrap { flex: 1 1 100%; }
-    .partner-share-input { width: 100%; text-align: left; }
-    .breadcrumb { gap: var(--space-1); }
-    .breadcrumb-item { padding: 4px 8px; font-size: 11px; }
-    .breadcrumb-value { max-width: 80px; }
-}
-</style>

@@ -270,4 +270,63 @@ export class MailService {
       html,
     });
   }
+
+  /**
+   * Ruhsatlandırma: a co-owner of a hisseli parcel is asked to confirm the
+   * slice Çaykur staff measured for another registered owner.
+   */
+  async sendLicensingApprovalRequestEmail(
+    email: string,
+    fullName: string,
+    details: {
+      ownerName: string;
+      il: string;
+      ilce: string;
+      ada: string;
+      parsel: string;
+      measuredAreaM2: number;
+      measuredByName: string;
+    },
+  ): Promise<boolean> {
+    const appUrl = this.configService.get<string>('APP_URL');
+    const approvalsLink = `${appUrl}/tea/notifications`;
+    const area = Math.round(details.measuredAreaM2).toLocaleString('tr-TR');
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #15803D;">Çay Üreticisi Platformu</h2>
+        <p>Merhaba ${fullName},</p>
+        <p>
+          Ortak sahibi olduğunuz <strong>${details.il} / ${details.ilce} · Ada ${details.ada} / Parsel ${details.parsel}</strong>
+          arazisinde Çaykur yetkili personeli (${details.measuredByName}) tarafından bir
+          <strong>ruhsatlandırma ölçümü</strong> yapıldı.
+        </p>
+        <div style="background: #f5f5f5; padding: 15px; border-radius: 6px; margin: 20px 0;">
+          <p style="margin: 5px 0;"><strong>Ölçülen sahip:</strong> ${details.ownerName}</p>
+          <p style="margin: 5px 0;"><strong>Ölçülen alan:</strong> ${area} m²</p>
+        </div>
+        <p>Bu ölçümün kesinleşmesi için arazideki diğer sahiplerin onayı gerekiyor. Onaylamak ya da itiraz etmek için:</p>
+        <p style="text-align: center; margin: 30px 0;">
+          <a href="${approvalsLink}"
+             style="background-color: #15803D; color: white; padding: 12px 30px;
+                    text-decoration: none; border-radius: 8px; display: inline-block;">
+            Onay Taleplerimi Gör
+          </a>
+        </p>
+        <p style="color: #666; font-size: 14px;">
+          Karar vermeden önce ölçüm detaylarını uygulamadaki Bildirimler sayfasından inceleyebilirsiniz.
+        </p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+        <p style="color: #999; font-size: 12px;">
+          İyi günler,<br>Çay Üreticisi Platformu Ekibi
+        </p>
+      </div>
+    `;
+
+    return this.sendEmail({
+      to: email,
+      subject: `Ruhsatlandırma onayı bekleniyor - Ada ${details.ada} / Parsel ${details.parsel}`,
+      html,
+    });
+  }
 }
