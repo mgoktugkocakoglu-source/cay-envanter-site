@@ -42,8 +42,8 @@ function fieldToM2(f: Field): number {
 const registeredAreaM2 = computed(() =>
     Math.round(fieldsStore.fields.reduce((s, f) => s + fieldToM2(f), 0)),
 );
-// 1/7 rotation rule.
-const pruneTargetM2 = computed(() => Math.round(registeredAreaM2.value / 7));
+// 1/10 rotation rule.
+const pruneTargetM2 = computed(() => Math.round(registeredAreaM2.value / 10));
 
 const myRequests = computed(() => store.requests);
 const records = computed(() =>
@@ -278,7 +278,7 @@ onMounted(() => {
                 <TabsContent value="record" class="flex flex-col gap-4">
                     <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Budama özeti">
                         <StatCard label="Toplam kayıtlı arazi" :value="`${formatNumber(registeredAreaM2)} m²`" hint="ruhsatlı bahçeniz" :icon="Scissors" />
-                        <StatCard label="Budanacak miktar" :value="`${formatNumber(pruneTargetM2)} m²`" hint="1/7 hedef · %14,3" :icon="Ruler" />
+                        <StatCard label="Budanacak miktar" :value="`${formatNumber(pruneTargetM2)} m²`" hint="1/10 hedef · %10" :icon="Ruler" />
                         <StatCard
                             label="Ölçülen / onaylanan"
                             :value="`${formatNumber(measuredTotalM2)} m²`"

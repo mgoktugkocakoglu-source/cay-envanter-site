@@ -97,7 +97,7 @@ const filtered = computed(() => {
     });
 });
 
-/** Ratio meter spans 0–25 %; the 1/7 target sits inside that range. */
+/** Ratio meter spans 0–25 %; the 1/10 target sits inside that range. */
 const RATIO_SCALE_MAX = 25;
 const targetMarkerPct = (BUDAMA_TARGET_PCT / RATIO_SCALE_MAX) * 100;
 
@@ -119,7 +119,7 @@ function openMeasurement(id: string): void {
 <template>
     <CaykurLayout>
         <PageContainer size="wide">
-            <PageHeader title="Budama Denetimi" :description="`1/7 rotasyon kuralı · hedef %${formatNumber(BUDAMA_TARGET_PCT, 1)}`" />
+            <PageHeader title="Budama Denetimi" :description="`1/10 rotasyon kuralı · hedef %${formatNumber(BUDAMA_TARGET_PCT, 0)}`" />
 
             <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Özet">
                 <StatCard label="Toplam ölçüm" :value="formatNumber(summary.total)" hint="kayıtlı" />

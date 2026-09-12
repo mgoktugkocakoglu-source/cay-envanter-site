@@ -2,32 +2,23 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { ArrowLeft, ChevronRight, Search } from '@lucide/vue';
-import type { AcceptableValue } from 'reka-ui';
 import type { NavGroup } from '@/config/navigation';
 import ShellLayout from '@/layouts/ShellLayout.vue';
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuLabel,
-    DropdownMenuRadioGroup,
-    DropdownMenuRadioItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import CaykurCommandPalette from '@/components/caykur/CaykurCommandPalette.vue';
 import { Icons } from '@/lib/icons';
+import { useAuthStore } from '@/stores/authStore';
 import { useCaykurStore } from '@/stores/caykurStore';
 import { NAV_GROUPS } from '@/services/caykur/nav';
-import { MODULE_LABELS, ROLE_DEFS, type CaykurRole, type ModuleKey } from '@/services/caykur/roles';
+import { MODULE_LABELS, type ModuleKey } from '@/services/caykur/roles';
 import caykurLogo from '@/assets/caykur-logo.svg';
 
 /**
  * Çaykur institution panel shell: the shared `ShellLayout` fed with the
- * role-filtered Kurum navigation, plus the persona switcher and ⌘K palette.
+ * role-filtered Kurum navigation, the signed-in staff badge and ⌘K palette.
  */
 const props = defineProps<{
     title?: string;
@@ -36,6 +27,7 @@ const props = defineProps<{
 const router = useRouter();
 const route = useRoute();
 const caykur = useCaykurStore();
+const auth = useAuthStore();
 
 const paletteOpen = ref(false);
 
@@ -72,14 +64,8 @@ const crumbs = computed<Crumb[]>(() => {
 });
 
 const isMac = navigator.platform.toUpperCase().includes('MAC');
-const personaInitial = computed(() => caykur.persona.name.charAt(0).toUpperCase());
-
-/** Radio group emits a generic `AcceptableValue`; only known role ids are applied. */
-function onRoleChange(value: AcceptableValue): void {
-    if (typeof value !== 'string') return;
-    const role = ROLE_DEFS.find((def) => def.id === value);
-    if (role) caykur.setRole(role.id as CaykurRole);
-}
+const staffName = computed(() => auth.user?.fullName?.trim() || caykur.currentRoleDef.label);
+const staffInitial = computed(() => staffName.value.charAt(0).toUpperCase());
 
 function onGlobalKeydown(e: KeyboardEvent): void {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -163,64 +149,17 @@ watch(
                 </kbd>
             </Button>
 
-            <DropdownMenu v-if="caykur.canSwitchPersona">
-                <DropdownMenuTrigger as-child>
-                    <Button
-                        variant="outline"
-                        class="h-11 gap-2 px-1.5 md:h-9"
-                        aria-label="Demo rolünü değiştir"
-                    >
-                        <Avatar class="size-8 md:size-7">
-                            <AvatarFallback class="bg-secondary text-xs font-bold text-secondary-foreground">
-                                {{ personaInitial }}
-                            </AvatarFallback>
-                        </Avatar>
-                        <span class="hidden flex-col items-start leading-tight lg:flex">
-                            <span class="text-xs font-semibold text-foreground">{{ caykur.persona.name }}</span>
-                            <span class="text-xs font-normal text-muted-foreground">
-                                {{ caykur.currentRoleDef.label }}
-                            </span>
-                        </span>
-                        <component
-                            :is="Icons.chevronDown"
-                            :size="16"
-                            class="hidden text-muted-foreground lg:block"
-                            aria-hidden="true"
-                        />
-                    </Button>
-                </DropdownMenuTrigger>
-
-                <DropdownMenuContent align="end" class="w-80">
-                    <DropdownMenuLabel class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Demo · rol değiştir
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuRadioGroup :model-value="caykur.role" @update:model-value="onRoleChange">
-                        <DropdownMenuRadioItem
-                            v-for="role in ROLE_DEFS"
-                            :key="role.id"
-                            :value="role.id"
-                            class="min-h-11 flex-col items-start gap-0.5 py-2 md:min-h-9"
-                        >
-                            <span class="text-sm font-semibold text-foreground">{{ role.label }}</span>
-                            <span class="text-xs leading-snug text-muted-foreground">{{ role.description }}</span>
-                        </DropdownMenuRadioItem>
-                    </DropdownMenuRadioGroup>
-                </DropdownMenuContent>
-            </DropdownMenu>
-
             <div
-                v-else
                 class="flex h-11 items-center gap-2 rounded-md border px-1.5 md:h-9"
-                :title="`${caykur.persona.name} · ${caykur.currentRoleDef.label}`"
+                :title="`${staffName} · ${caykur.currentRoleDef.label}`"
             >
                 <Avatar class="size-8 md:size-7">
                     <AvatarFallback class="bg-secondary text-xs font-bold text-secondary-foreground">
-                        {{ personaInitial }}
+                        {{ staffInitial }}
                     </AvatarFallback>
                 </Avatar>
                 <span class="hidden flex-col items-start leading-tight lg:flex">
-                    <span class="text-xs font-semibold text-foreground">{{ caykur.persona.name }}</span>
+                    <span class="text-xs font-semibold text-foreground">{{ staffName }}</span>
                     <span class="text-xs text-muted-foreground">{{ caykur.currentRoleDef.label }}</span>
                 </span>
             </div>

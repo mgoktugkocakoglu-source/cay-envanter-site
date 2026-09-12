@@ -3,9 +3,7 @@
  *
  * Two surfaces share one identity layer: the Kurum (institution) panel for
  * Çaykur staff, and the Müstahsil (producer) portal. Each institutional role
- * sees a different slice of the panel. The demo exposes a persona switcher so
- * a pitch can walk through "what the field officer sees" vs "what finance sees"
- * without re-authenticating.
+ * sees a different slice of the panel.
  */
 
 /** Every navigable area of the Kurum panel — the unit of access control. */
@@ -95,29 +93,4 @@ export function roleLabel(id: CaykurRole): string {
 export function canAccess(role: CaykurRole, moduleKey: ModuleKey): boolean {
     const def = roleDef(role);
     return def.access === 'all' || def.access.includes(moduleKey);
-}
-
-/**
- * Demo personas for the in-panel role switcher. Each maps to a real seeded
- * staff member (see the seeded staff registry) so scoping reads as authentic.
- */
-export interface Persona {
-    role: CaykurRole;
-    name: string;
-    title: string;
-    /** Org scope shown under the name, e.g. "Çayeli Fab." */
-    scope: string;
-}
-
-export const PERSONAS: Persona[] = [
-    { role: 'kurum_admin', name: 'Selçuk Aydın', title: 'Kurum Yöneticisi', scope: 'Genel Müdürlük' },
-    { role: 'fabrika_sorumlusu', name: 'Naci Hocaoğlu', title: 'Fabrika Sorumlusu', scope: 'Çayeli Fab.' },
-    { role: 'alim_yeri_personeli', name: 'Erkan Kara', title: 'Alım Yeri Personeli', scope: 'Çayeli Merkez Alım' },
-    { role: 'saha_personeli', name: 'Davut Şahin', title: 'Saha Personeli', scope: 'Rize / Çayeli' },
-    { role: 'denetci', name: 'Ayla Demir', title: 'Denetçi', scope: 'Bölge Denetim' },
-    { role: 'finans', name: 'Hülya Yıldız', title: 'Finans Personeli', scope: 'Mali İşler' },
-];
-
-export function personaForRole(role: CaykurRole): Persona {
-    return PERSONAS.find((p) => p.role === role) ?? PERSONAS[0];
 }

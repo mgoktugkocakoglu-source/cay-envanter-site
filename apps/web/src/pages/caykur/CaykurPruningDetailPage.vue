@@ -80,7 +80,7 @@ const infoRows = computed<Array<{ term: string; value: string }>>(() => {
         { term: 'Budanan alan', value: `${formatNumber(cur.prunedAreaM2)} m²` },
         { term: 'Doğruluk', value: cur.gpsAccuracyMeters ? `${accuracy} · ±${cur.gpsAccuracyMeters}m` : accuracy },
         { term: 'Saha kontrolü', value: cur.fieldCheckDone ? 'Yapıldı' : 'Yapılmadı' },
-        { term: '1/7 hedef', value: `%${formatNumber(BUDAMA_TARGET_PCT, 1)}` },
+        { term: '1/10 hedef', value: `%${formatNumber(BUDAMA_TARGET_PCT, 0)}` },
     ];
 });
 
@@ -184,14 +184,14 @@ async function reject(): Promise<void> {
 
                     <Card>
                         <CardHeader>
-                            <CardTitle>Budama oranı (1/7 kuralı)</CardTitle>
+                            <CardTitle>Budama oranı (1/10 kuralı)</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div class="flex items-stretch gap-6">
                                 <div
                                     class="relative h-56 w-32 shrink-0 overflow-hidden rounded-md border bg-muted/40"
                                     role="img"
-                                    :aria-label="`Parselin ${formatPct(m.ratioPercent, 1)} kadarı budanmış; hedef %${formatNumber(BUDAMA_TARGET_PCT, 1)}`"
+                                    :aria-label="`Parselin ${formatPct(m.ratioPercent, 1)} kadarı budanmış; hedef %${formatNumber(BUDAMA_TARGET_PCT, 0)}`"
                                 >
                                     <div
                                         class="absolute inset-x-0 bottom-0 flex items-start justify-center border-t-2 border-primary bg-primary/25 pt-1"
@@ -200,7 +200,7 @@ async function reject(): Promise<void> {
                                         <span class="text-xs font-semibold text-primary">budanan</span>
                                     </div>
                                     <div class="absolute inset-x-0 h-0 border-t-2 border-dashed border-muted-foreground" :style="{ bottom: `${targetHeight}%` }">
-                                        <span class="absolute -top-4 right-1 bg-card px-0.5 text-[10px] text-muted-foreground">hedef %{{ formatNumber(BUDAMA_TARGET_PCT, 1) }}</span>
+                                        <span class="absolute -top-4 right-1 bg-card px-0.5 text-[10px] text-muted-foreground">hedef %{{ formatNumber(BUDAMA_TARGET_PCT, 0) }}</span>
                                     </div>
                                 </div>
                                 <div class="flex flex-col justify-center gap-1.5">
@@ -209,7 +209,7 @@ async function reject(): Promise<void> {
                                 </div>
                             </div>
                             <p class="mt-4 text-xs leading-relaxed text-muted-foreground">
-                                1/7 rotasyon kuralı her yıl bahçenin yaklaşık %{{ formatNumber(BUDAMA_TARGET_PCT, 1) }}'ünün budanmasını öngörür. %11–20 bandı uyumlu sayılır.
+                                1/10 rotasyon kuralı her yıl bahçenin %{{ formatNumber(BUDAMA_TARGET_PCT, 0) }}'unun budanmasını öngörür. %8–14 bandı uyumlu sayılır.
                             </p>
                         </CardContent>
                     </Card>

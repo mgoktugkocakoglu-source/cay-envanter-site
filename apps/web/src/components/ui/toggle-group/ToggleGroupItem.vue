@@ -22,7 +22,7 @@ const delegatedProps = reactiveOmit(props, 'class', 'size', 'variant');
         :class="
             cn(
                 toggleVariants({ variant: context?.variant.value ?? variant, size: context?.size.value ?? size }),
-                'min-w-0 flex-1 shrink-0 rounded-none shadow-none first:rounded-l-md last:rounded-r-md focus:z-10 focus-visible:z-10',
+                'shrink-0 grow rounded-none shadow-none first:rounded-l-md last:rounded-r-md focus:z-10 focus-visible:z-10',
                 'group-data-[variant=outline]/toggle-group:border-l-0 group-data-[variant=outline]/toggle-group:first:border-l',
                 'data-[state=on]:bg-primary/10 data-[state=on]:text-primary',
                 props.class,

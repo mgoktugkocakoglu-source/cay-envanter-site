@@ -59,7 +59,7 @@ export class CaykurProducer {
     @Column({ type: 'int' })
     prunedThisYearM2: number;
 
-    // 7-year pruning rotation: did the producer prune that year's slice.
+    // 10-year pruning rotation: did the producer prune that year's slice.
     @Column({ type: 'jsonb' })
     rotationHistory: boolean[];
 

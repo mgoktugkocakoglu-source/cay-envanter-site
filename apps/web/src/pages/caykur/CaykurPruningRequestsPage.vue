@@ -104,7 +104,7 @@ function openRequest(id: string): void {
                 </template>
             </ListToolbar>
 
-            <ToggleGroup :model-value="view" type="single" variant="outline" aria-label="Görünüm" class="flex-wrap justify-start" @update:model-value="onViewChange">
+            <ToggleGroup :model-value="view" type="single" variant="outline" aria-label="Görünüm" class="w-full md:w-fit" @update:model-value="onViewChange">
                 <ToggleGroupItem v-for="opt in viewOptions" :key="opt.value" :value="opt.value" class="h-11 px-3 md:h-9">
                     {{ opt.label }}
                 </ToggleGroupItem>

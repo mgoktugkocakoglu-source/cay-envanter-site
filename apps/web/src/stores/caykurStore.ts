@@ -7,15 +7,7 @@ import {
     type Producer,
 } from '@/services/caykurData';
 import { api } from '@/services/api';
-import {
-    PERSONAS,
-    personaForRole,
-    canAccess,
-    roleDef,
-    type CaykurRole,
-    type ModuleKey,
-    type Persona,
-} from '@/services/caykur/roles';
+import { canAccess, roleDef, type CaykurRole, type ModuleKey } from '@/services/caykur/roles';
 import { useAuthStore } from '@/stores/authStore';
 
 /**
@@ -25,9 +17,8 @@ import { useAuthStore } from '@/stores/authStore';
  * the single seam to swap for real API aggregation endpoints later: replace the
  * initializers with fetches and keep the computed getters intact.
  *
- * Also holds the demo *persona* — the current institutional role — which gates
- * the panel navigation and page access (Faz 1). Swapping persona lets a pitch
- * walk through each role's view without re-authenticating.
+ * Also exposes the signed-in user's institutional role, which gates the panel
+ * navigation and page access (Faz 1).
  */
 export const useCaykurStore = defineStore('caykur', () => {
     // Producer registry — loaded from the database (no mock data).
@@ -62,29 +53,12 @@ export const useCaykurStore = defineStore('caykur', () => {
         return producers.value.find((p) => p.id === id);
     }
 
-    // ── Persona / role-based access ──
-    // The active role is the authenticated user's real caykurRole. Admins may
-    // override it to demo "what each persona sees" without re-authenticating;
-    // real staff are locked to their assigned role.
+    // ── Role-based access ──
+    // The active role is the authenticated user's real caykurRole.
     const auth = useAuthStore();
-    const demoOverride = ref<CaykurRole | null>(null);
-    const canSwitchPersona = computed(() => auth.user?.role === 'admin');
-
-    const role = computed<CaykurRole>(() => {
-        if (canSwitchPersona.value && demoOverride.value) {
-            return demoOverride.value;
-        }
-        return (auth.user?.caykurRole as CaykurRole | undefined) ?? 'kurum_admin';
-    });
-    const persona = computed<Persona>(() => personaForRole(role.value));
-    const personas = ref<Persona[]>(PERSONAS);
-
-    function setRole(next: CaykurRole): void {
-        // Only admins can switch personas (demo); ignored for real staff.
-        if (canSwitchPersona.value) {
-            demoOverride.value = next;
-        }
-    }
+    const role = computed<CaykurRole>(
+        () => (auth.user?.caykurRole as CaykurRole | undefined) ?? 'kurum_admin',
+    );
 
     function can(moduleKey: ModuleKey): boolean {
         return canAccess(role.value, moduleKey);
@@ -101,13 +75,9 @@ export const useCaykurStore = defineStore('caykur', () => {
         overview,
         flagged,
         producerById,
-        // persona / access
+        // access
         role,
-        persona,
-        personas,
         currentRoleDef,
-        canSwitchPersona,
-        setRole,
         can,
     };
 });

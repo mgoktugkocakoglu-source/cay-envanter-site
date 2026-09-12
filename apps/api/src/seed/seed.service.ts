@@ -384,7 +384,7 @@ export class SeedService implements OnModuleInit {
                 parcelNo: f0.parcelNo ?? null,
                 producerName: producer.fullName,
                 dueDate: null,
-                notes: '1/7 budama rotasyon ölçümü',
+                notes: '1/10 budama rotasyon ölçümü',
             }),
         );
 
@@ -427,7 +427,7 @@ export class SeedService implements OnModuleInit {
                     parcelNo: f1.parcelNo ?? null,
                     producerName: producer.fullName,
                     dueDate: null,
-                    notes: '1/7 budama rotasyon ölçümü',
+                    notes: '1/10 budama rotasyon ölçümü',
                 }),
             );
         }

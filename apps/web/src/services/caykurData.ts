@@ -4,14 +4,14 @@
  * This is a self-contained, deterministic synthetic dataset of müstahsil
  * (tea producers) used to power the Çaykur monitoring panel demo. It also
  * serves as the spec for the real backend seed/aggregation endpoints:
- * every derived metric here (kota usage, 1/7 budama rotation compliance,
+ * every derived metric here (kota usage, 1/10 budama rotation compliance,
  * sürgün breakdown, quality) maps 1:1 to a column or computed value.
  *
  * Domain rules encoded:
  *  - Quota (kota): annual quota = quotaPerDekar × licensed dekar. Çaykur
  *    sets this off the ruhsatlı (licensed) area; organic gets a lower tier.
- *  - Budama rotation: the government rule prunes 1/7 of each licensed garden
- *    per year on a 7-year cycle (≈14.3% target band). Tazminat (income-loss
+ *  - Budama rotation: the government rule prunes 1/10 of each licensed garden
+ *    per year on a 10-year cycle (10% target band). Tazminat (income-loss
  *    compensation) is paid for compliant rotation.
  *  - Quality: share of standart dışı (out-of-standard / kaba) leaf.
  *
@@ -39,7 +39,7 @@ export interface Producer {
     quotaKg: number;
     /** Total garden area (m²) ≈ licensedDekar × 1000. */
     gardenM2: number;
-    /** Area pruned this year (m²); the 1/7 rule targets gardenM2 / 7. */
+    /** Area pruned this year (m²); the 1/10 rule targets gardenM2 / 10. */
     prunedThisYearM2: number;
     /** Last 7 years' rotation: did the producer prune that year's slice. */
     rotationHistory: boolean[];
@@ -47,8 +47,8 @@ export interface Producer {
     outOfStandardPct: number;
 }
 
-/** The 1/7 rotation target, as a percentage of total garden area per year. */
-export const BUDAMA_TARGET_PCT = 100 / 7; // ≈ 14.3%
+/** The 1/10 rotation target, as a percentage of total garden area per year. */
+export const BUDAMA_TARGET_PCT = 100 / 10; // 10%
 
 const QUOTA_PER_DEKAR_CONVENTIONAL = 2000;
 const QUOTA_PER_DEKAR_ORGANIC = 1500;
@@ -137,22 +137,22 @@ function buildProducer(i: number): Producer {
     const ratioSeed = noise(i * 8.3 + 6);
     let prunedRatio: number;
     if (profileSeed < 0.6) {
-        prunedRatio = 0.12 + ratioSeed * 0.07; // compliant band ~12–19%
+        prunedRatio = 0.08 + ratioSeed * 0.05; // compliant band ~8–13%
     } else if (profileSeed < 0.85) {
-        prunedRatio = 0.06 + ratioSeed * 0.05; // partial ~6–11%
+        prunedRatio = 0.04 + ratioSeed * 0.035; // partial ~4–7.5%
     } else {
-        prunedRatio = ratioSeed * 0.05; // noncompliant 0–5%
+        prunedRatio = ratioSeed * 0.035; // noncompliant 0–3.5%
     }
     const prunedThisYearM2 = Math.round(gardenM2 * prunedRatio);
 
-    // 7-year rotation history: compliant producers prune most years.
-    const rotationHistory = Array.from({ length: 7 }, (_, y) => {
+    // 10-year rotation history: compliant producers prune most years.
+    const rotationHistory = Array.from({ length: 10 }, (_, y) => {
         const base = profileSeed < 0.6 ? 0.82 : profileSeed < 0.85 ? 0.55 : 0.3;
         return noise(i * 10 + y * 1.3 + 13) < base;
     });
     // The current year's slice must match this year's actual pruning ratio
-    // (≥6% of the garden counts as pruned), so the timeline can't contradict it.
-    rotationHistory[rotationHistory.length - 1] = prunedRatio >= 0.06;
+    // (≥4% of the garden counts as pruned), so the timeline can't contradict it.
+    rotationHistory[rotationHistory.length - 1] = prunedRatio >= 0.04;
 
     // Quality: out-of-standard share; weaker rotation correlates with more kaba leaf.
     const qualityBase = 2 + noise(i * 5.5 + 8) * 14;
@@ -214,8 +214,8 @@ export function budamaRatioPct(p: Producer): number {
 
 export function budamaStatus(p: Producer): ComplianceStatus {
     const ratio = budamaRatioPct(p);
-    if (ratio >= 11 && ratio <= 20) return 'compliant';
-    if (ratio >= 6) return 'partial';
+    if (ratio >= 8 && ratio <= 14) return 'compliant';
+    if (ratio >= 4) return 'partial';
     return 'noncompliant';
 }
 
