@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { RouterLink } from 'vue-router';
-import { Clock, Hourglass, Layers, LayoutGrid, MapPin, Settings, Wallet } from '@lucide/vue';
+import { Clock, Hourglass, Layers, MapPin, Wallet } from '@lucide/vue';
 import { useAuthStore } from '@/stores/authStore';
 import { useFieldsStore } from '@/stores/fieldsStore';
 import { useHarvestsStore } from '@/stores/harvestsStore';
@@ -423,28 +423,8 @@ onUnmounted(stopClock);
                                 <dd class="mt-1 text-base font-semibold text-foreground">{{ appointmentDays.join(', ') }}</dd>
                             </div>
                         </dl>
-                        <p class="text-sm text-muted-foreground">
-                            {{ totalArea.toFixed(1) }} dekar × {{ caykurQuota }} kg kontenjan × {{ appointmentDays.length }} randevu günü =
-                            haftalık <strong class="font-semibold text-foreground">{{ formatKg(weeklyCapacityKg) }} kg</strong> satış hakkı.
-                        </p>
                     </CardContent>
                 </Card>
-
-                <!-- Quick links -->
-                <nav class="flex flex-wrap gap-2" aria-label="Hızlı bağlantılar">
-                    <Button as-child variant="outline" class="h-11 md:h-9">
-                        <RouterLink to="/tea/settings">
-                            <Settings aria-hidden="true" />
-                            Ayarlar
-                        </RouterLink>
-                    </Button>
-                    <Button as-child variant="outline" class="h-11 md:h-9">
-                        <RouterLink to="/tea/fields">
-                            <LayoutGrid aria-hidden="true" />
-                            Arazilerim
-                        </RouterLink>
-                    </Button>
-                </nav>
             </template>
         </PageContainer>
     </TeaBusinessLayout>

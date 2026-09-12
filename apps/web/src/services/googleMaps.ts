@@ -22,7 +22,7 @@ export function hasGoogleMapsKey(): boolean {
 /** Loads the maps and geometry libraries once; safe to call repeatedly. */
 export async function loadGoogleMaps(): Promise<GoogleMapsLibraries> {
     if (!hasGoogleMapsKey()) {
-        throw new Error('Google Maps API anahtarı tanımlı değil (VITE_GOOGLE_MAPS_API_KEY).');
+        throw new Error('Harita anahtarı tanımlı değil (VITE_GOOGLE_MAPS_API_KEY).');
     }
     if (!configured) {
         setOptions({ key: API_KEY, v: 'weekly', language: 'tr', region: 'TR' });

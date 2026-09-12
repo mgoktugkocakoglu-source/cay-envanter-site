@@ -79,6 +79,8 @@ let sensorPolygon: google.maps.Polygon | null = null;
 let parcelOutline: google.maps.Polygon | null = null;
 
 const DEFAULT_CENTER: google.maps.LatLngLiteral = { lat: 41.02, lng: 40.52 }; // Rize
+/** Highest zoom level the roadmap/hybrid map types serve. */
+const MAX_ZOOM = 22;
 const POLYGON_STYLE: google.maps.PolygonOptions = {
     strokeColor: '#15803D',
     strokeOpacity: 1,
@@ -106,6 +108,8 @@ async function initMap(): Promise<void> {
             center: ring[0] ?? DEFAULT_CENTER,
             zoom: ring.length ? 18 : 13,
             mapTypeId: 'hybrid',
+            /** Let users zoom to the deepest level the imagery supports; the map clamps to available tiles. */
+            maxZoom: MAX_ZOOM,
             tilt: 0,
             mapTypeControl: true,
             mapTypeControlOptions: { mapTypeIds: ['hybrid', 'satellite', 'roadmap'] },
@@ -497,14 +501,14 @@ onUnmounted(() => {
                     role="status"
                 >
                     <template v-if="keyMissing">
-                        <b class="text-foreground">Google Haritalar anahtarı tanımlı değil.</b>
-                        <span><code class="text-xs">VITE_GOOGLE_MAPS_API_KEY</code> değişkenini ayarlayıp uygulamayı yeniden derleyin.</span>
+                        <b class="text-foreground">Uydu haritası bu ortamda kullanılamıyor.</b>
+                        <span>Harita anahtarı tanımlı değil; sistem yöneticinize başvurun.</span>
                     </template>
                     <template v-else-if="mapError">
                         <b class="text-foreground">Harita yüklenemedi.</b>
                         <span>{{ mapError }}</span>
                     </template>
-                    <span v-else>Google uydu görüntüsü yükleniyor…</span>
+                    <span v-else>Uydu görüntüsü yükleniyor…</span>
                 </div>
                 <div v-else class="pointer-events-none absolute bottom-7 left-3 z-5 flex flex-col rounded-md border bg-card px-3 py-2 shadow-md" aria-live="polite">
                     <span class="text-lg font-bold text-foreground tabular-nums">{{ formatMeters(areaM2) }} m²</span>
@@ -515,7 +519,7 @@ onUnmounted(() => {
             <aside class="flex flex-col gap-4">
                 <Card v-if="mode === 'map'" class="gap-4 py-4">
                     <CardHeader class="flex flex-row items-center justify-between gap-2 px-4">
-                        <CardTitle class="text-sm">Google uydu görüntüsünde çiz</CardTitle>
+                        <CardTitle class="text-sm">Uydu görüntüsünde çiz</CardTitle>
                         <Button v-if="drawing" size="sm" class="h-9 md:h-8" :disabled="points.length < 3" @click="finishDrawing">Çizimi bitir</Button>
                         <Button v-else variant="outline" size="sm" class="h-9 md:h-8" @click="restartDrawing">Yeni çizim</Button>
                     </CardHeader>
@@ -541,7 +545,7 @@ onUnmounted(() => {
                             </div>
                         </dl>
 
-                        <p class="text-xs leading-relaxed text-muted-foreground">Alan ve çevre Google'ın küresel geometri hesabıyla otomatik bulunur. Sarı çizgi tapu parselinin sınırıdır.</p>
+                        <p class="text-xs leading-relaxed text-muted-foreground">Alan ve çevre otomatik hesaplanır. Sarı çizgi tapu parselinin sınırıdır.</p>
                     </CardContent>
                 </Card>
 
