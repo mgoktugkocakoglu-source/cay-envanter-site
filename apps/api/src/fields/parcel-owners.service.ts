@@ -24,6 +24,9 @@ export interface ParcelOwner {
     fieldId: string;
     fieldName: string;
     areaM2: number;
+    /** "Alan no" once the owner's slice was approved (see FieldBoundaryService). */
+    shareNo: number | null;
+    boundaryDetermined: boolean;
 }
 
 /** Public projection of a ParcelOwner (no e-mail) for API responses. */
@@ -88,6 +91,8 @@ export class ParcelOwnersService {
                 fieldId: f.id,
                 fieldName: f.name,
                 areaM2: fieldAreaM2(f),
+                shareNo: f.shareNo ?? null,
+                boundaryDetermined: f.boundaryMeasurementId != null,
             });
             map.set(key, list);
         }

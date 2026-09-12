@@ -24,6 +24,7 @@ import { PruningActor } from '@/pruning/pruning.service';
 import { LicensingService } from '@/licensing/licensing.service';
 import {
     CreateLicensingMeasurementDto,
+    CreateProducerBoundaryDto,
     DecideLicensingApprovalDto,
     LicensingMeasurementQueryDto,
     LicensingApprovalQueryDto,
@@ -59,6 +60,16 @@ export class LicensingController {
         @Body() dto: CreateLicensingMeasurementDto,
     ): Promise<LicensingMeasurement> {
         return this.service.create(req.user, dto);
+    }
+
+    @Post('boundary')
+    @ApiOperation({ summary: 'Producer submits their own slice of a hisseli parcel drawn on the satellite map' })
+    @ApiResponse({ status: 201, description: 'Boundary saved; co-owner approvals created and notified' })
+    async createBoundary(
+        @Request() req: AuthenticatedRequest,
+        @Body() dto: CreateProducerBoundaryDto,
+    ): Promise<LicensingMeasurement> {
+        return this.service.createProducerBoundary(req.user, dto);
     }
 
     @Get()

@@ -272,8 +272,9 @@ export class MailService {
   }
 
   /**
-   * Ruhsatlandırma: a co-owner of a hisseli parcel is asked to confirm the
-   * slice Çaykur staff measured for another registered owner.
+   * Boundary determination on a hisseli parcel: a co-owner is asked to confirm
+   * the slice recorded for another registered owner — either measured on site
+   * by Çaykur staff or drawn by the owner on the satellite map.
    */
   async sendLicensingApprovalRequestEmail(
     email: string,
@@ -286,26 +287,30 @@ export class MailService {
       parsel: string;
       measuredAreaM2: number;
       measuredByName: string;
+      source: 'staff' | 'producer';
     },
   ): Promise<boolean> {
     const appUrl = this.configService.get<string>('APP_URL');
     const approvalsLink = `${appUrl}/tea/notifications`;
     const area = Math.round(details.measuredAreaM2).toLocaleString('tr-TR');
+    const parcel = `<strong>${details.il} / ${details.ilce} · Ada ${details.ada} / Parsel ${details.parsel}</strong>`;
+    const intro =
+      details.source === 'producer'
+        ? `Ortak sahibi olduğunuz ${parcel} arazisinde <strong>${details.ownerName}</strong>
+          kendi payının sınırını uydu haritasında çizdi.`
+        : `Ortak sahibi olduğunuz ${parcel} arazisinde Çaykur yetkili personeli (${details.measuredByName})
+          tarafından bir <strong>ruhsatlandırma ölçümü</strong> yapıldı.`;
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #15803D;">Çay Üreticisi Platformu</h2>
         <p>Merhaba ${fullName},</p>
-        <p>
-          Ortak sahibi olduğunuz <strong>${details.il} / ${details.ilce} · Ada ${details.ada} / Parsel ${details.parsel}</strong>
-          arazisinde Çaykur yetkili personeli (${details.measuredByName}) tarafından bir
-          <strong>ruhsatlandırma ölçümü</strong> yapıldı.
-        </p>
+        <p>${intro}</p>
         <div style="background: #f5f5f5; padding: 15px; border-radius: 6px; margin: 20px 0;">
-          <p style="margin: 5px 0;"><strong>Ölçülen sahip:</strong> ${details.ownerName}</p>
-          <p style="margin: 5px 0;"><strong>Ölçülen alan:</strong> ${area} m²</p>
+          <p style="margin: 5px 0;"><strong>Sahip:</strong> ${details.ownerName}</p>
+          <p style="margin: 5px 0;"><strong>Belirlenen alan:</strong> ${area} m²</p>
         </div>
-        <p>Bu ölçümün kesinleşmesi için arazideki diğer sahiplerin onayı gerekiyor. Onaylamak ya da itiraz etmek için:</p>
+        <p>Bu sınırın kesinleşmesi için arazideki diğer sahiplerin onayı gerekiyor. Onaylamak ya da itiraz etmek için:</p>
         <p style="text-align: center; margin: 30px 0;">
           <a href="${approvalsLink}"
              style="background-color: #15803D; color: white; padding: 12px 30px;
@@ -325,7 +330,10 @@ export class MailService {
 
     return this.sendEmail({
       to: email,
-      subject: `Ruhsatlandırma onayı bekleniyor - Ada ${details.ada} / Parsel ${details.parsel}`,
+      subject:
+        details.source === 'producer'
+          ? `Arazi sınırı onayı bekleniyor - Ada ${details.ada} / Parsel ${details.parsel}`
+          : `Ruhsatlandırma onayı bekleniyor - Ada ${details.ada} / Parsel ${details.parsel}`,
       html,
     });
   }

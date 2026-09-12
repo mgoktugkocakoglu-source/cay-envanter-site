@@ -8,6 +8,8 @@ import { Field } from '@/fields/entities/field.entity';
 import { Payment, PaymentHarvest } from '@/payments/entities';
 import { Harvest } from '@/harvests/entities';
 import { PruningMeasurement, PruningTask, PruningRequest } from '@/pruning/entities';
+import { LicensingMeasurement, LicensingApproval } from '@/licensing/entities';
+import { LandMeasurementRequest } from '@/measurement-requests/entities';
 
 /**
  * Demo seeder. Gated behind SEED_DEMO=true so it never runs in production.
@@ -27,6 +29,9 @@ import { PruningMeasurement, PruningTask, PruningRequest } from '@/pruning/entit
             PruningMeasurement,
             PruningTask,
             PruningRequest,
+            LicensingMeasurement,
+            LicensingApproval,
+            LandMeasurementRequest,
         ]),
     ],
     providers: [SeedService],

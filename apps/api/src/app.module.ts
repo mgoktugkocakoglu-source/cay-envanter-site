@@ -19,6 +19,7 @@ import { KnowledgeModule } from '@/knowledge/knowledge.module';
 import { PruningModule } from '@/pruning/pruning.module';
 import { CaykurModule } from '@/caykur/caykur.module';
 import { LicensingModule } from '@/licensing/licensing.module';
+import { MeasurementRequestsModule } from '@/measurement-requests/measurement-requests.module';
 import { SeedModule } from '@/seed/seed.module';
 
 @Module({
@@ -98,6 +99,7 @@ import { SeedModule } from '@/seed/seed.module';
         PruningModule,
         CaykurModule,
         LicensingModule,
+        MeasurementRequestsModule,
         SeedModule,
     ],
     providers: [

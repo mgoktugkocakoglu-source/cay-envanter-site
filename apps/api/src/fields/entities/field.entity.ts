@@ -16,6 +16,7 @@ export type AreaUnit = 'donum' | 'dekar' | 'm2';
 
 @Entity('fields')
 @Index(['userId', 'deleted'])
+@Index(['province', 'adaNo', 'parcelNo'])
 export class Field {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -65,6 +66,21 @@ export class Field {
 
     @Column({ type: 'text', nullable: true })
     notes: string | null;
+
+    // ── Boundary determination on a hisseli (shared-title) parcel ──
+    // Set once every co-registrant approved a measurement for this field
+    // (see LicensingMeasurement). Kept as a plain uuid to avoid an entity
+    // import cycle; the derived status lives in FieldBoundaryService.
+    @Column({ type: 'uuid', name: 'boundary_measurement_id', nullable: true })
+    boundaryMeasurementId: string | null;
+
+    @Column({ type: 'timestamp', name: 'boundary_determined_at', nullable: true })
+    boundaryDeterminedAt: Date | null;
+
+    // "Alan no": sequential share slot (1, 2, 3 …) per province + ada + parsel,
+    // assigned in approval order and never reassigned.
+    @Column({ type: 'int', name: 'share_no', nullable: true })
+    shareNo: number | null;
 
     @Column({ type: 'boolean', default: false })
     deleted: boolean;

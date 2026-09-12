@@ -582,6 +582,8 @@ async function handleSubmit() {
     try {
         const parcelCoordinates = clickedParcel.value?.polygon || geoStore.selectedNeighborhood?.bounds || [];
         const parcelNo = clickedParcel.value?.properties.parselNo || null;
+        // Ada no is what pairs this field with other accounts on the same parcel (hisseli detection).
+        const adaNo = clickedParcel.value?.properties.adaNo || null;
 
         const fieldData: Omit<Partial<Field>, 'partners'> & { partners?: Array<{ partnerName: string; partnerPhone: string | null; partnerIdentityNumber: string | null; sharePercentage: number; isPrimaryOwner: boolean }> } = {
             name: fieldName.value.trim(),
@@ -589,7 +591,7 @@ async function handleSubmit() {
             district: clickedParcel.value?.properties.ilceAd || geoStore.selectedDistrict?.name || '',
             neighborhood: clickedParcel.value?.properties.mahalleAd || geoStore.selectedNeighborhood?.name || '',
             road: geoStore.selectedRoad?.name || null,
-            parcelNo, coordinates: parcelCoordinates, area: selectedArea.value, areaUnit: 'm2' as const,
+            parcelNo, adaNo, coordinates: parcelCoordinates, area: selectedArea.value, areaUnit: 'm2' as const,
             notes: notes.value.trim() || null,
             partners: filledPartners.map(p => ({
                 partnerName: `${p.firstName.trim()} ${p.lastName.trim()}`,

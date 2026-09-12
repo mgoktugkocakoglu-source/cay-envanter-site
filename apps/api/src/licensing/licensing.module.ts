@@ -4,13 +4,14 @@ import { LicensingController } from '@/licensing/licensing.controller';
 import { LicensingService } from '@/licensing/licensing.service';
 import { LicensingMeasurement, LicensingApproval } from '@/licensing/entities';
 import { PruningRequest } from '@/pruning/entities';
+import { LandMeasurementRequest } from '@/measurement-requests/entities';
 import { User } from '@/users/entities/user.entity';
 import { FieldsModule } from '@/fields/fields.module';
 import { MailModule } from '@/mail/mail.module';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([LicensingMeasurement, LicensingApproval, PruningRequest, User]),
+        TypeOrmModule.forFeature([LicensingMeasurement, LicensingApproval, PruningRequest, LandMeasurementRequest, User]),
         FieldsModule,
         MailModule,
     ],

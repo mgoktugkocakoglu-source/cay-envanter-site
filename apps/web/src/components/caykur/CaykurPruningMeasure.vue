@@ -25,6 +25,16 @@ import type { AccuracyLevel, MeasurementMethod } from '@/services/caykur/pruning
 const props = defineProps<{
     /** [lng, lat] ring to center/outline the parcel on the map. */
     parcelPolygon?: number[][];
+    /**
+     * Map drawing only (no laser+IMU mode) — used by the producer's
+     * "Arazini Belirle" page. A dedicated map-only component
+     * (components/map/ParcelBoundaryDrawer.vue) is the intended follow-up.
+     */
+    mapOnly?: boolean;
+    /** Label of the primary action; defaults to "Ölçümü kaydet". */
+    saveLabel?: string;
+    /** What is being outlined, for the instruction copy; defaults to "Budanan alanın". */
+    subject?: string;
 }>();
 
 const emit = defineEmits<{
@@ -472,7 +482,7 @@ onUnmounted(() => {
 
 <template>
     <div class="flex flex-col gap-4">
-        <ToggleGroup :model-value="mode" type="single" aria-label="Ölçüm yöntemi" class="h-11 md:h-9" @update:model-value="onModeChange">
+        <ToggleGroup v-if="!props.mapOnly" :model-value="mode" type="single" aria-label="Ölçüm yöntemi" class="h-11 md:h-9" @update:model-value="onModeChange">
             <ToggleGroupItem value="map" class="h-full px-3">Harita ile</ToggleGroupItem>
             <ToggleGroupItem value="sensor" class="h-full px-3">Lazer + IMU</ToggleGroupItem>
         </ToggleGroup>
@@ -511,7 +521,7 @@ onUnmounted(() => {
                     </CardHeader>
                     <CardContent class="flex flex-col gap-4 px-4">
                         <ol class="flex list-decimal flex-col gap-1 pl-5 text-xs leading-relaxed text-muted-foreground">
-                            <li>Budanan alanın köşelerine sırayla dokunun; her dokunuş bir köşe ekler.</li>
+                            <li>{{ props.subject ?? 'Budanan alanın' }} köşelerine sırayla dokunun; her dokunuş bir köşe ekler.</li>
                             <li>Tüm köşeler işaretlenince <b class="text-foreground">Çizimi bitir</b>'e basın.</li>
                             <li>Köşeleri sürükleyerek düzeltin; kenar ortasındaki açık noktalar yeni köşe ekler. Bir köşeyi silmek için üzerine sağ tıklayın (telefonda basılı tutun). Alanı bütün olarak da sürükleyebilirsiniz.</li>
                         </ol>
@@ -668,7 +678,7 @@ onUnmounted(() => {
 
                 <div class="flex gap-2">
                     <Button variant="outline" class="h-11 flex-1 md:h-9" @click="emit('cancel')">Vazgeç</Button>
-                    <Button class="h-11 flex-1 md:h-9" :disabled="!canSave" @click="save">Ölçümü kaydet</Button>
+                    <Button class="h-11 flex-1 md:h-9" :disabled="!canSave" @click="save">{{ props.saveLabel ?? 'Ölçümü kaydet' }}</Button>
                 </div>
                 <p v-if="!canSave" class="text-xs leading-relaxed text-muted-foreground">
                     {{ mode === 'sensor' && corners.length >= 3 ? "Önce Bitir'e basarak poligonu haritaya yerleştirin." : 'Alan oluşturmak için en az 3 köşe işaretleyin.' }}

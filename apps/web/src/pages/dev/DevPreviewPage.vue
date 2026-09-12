@@ -13,6 +13,7 @@ const PAGES: Record<string, ReturnType<typeof defineAsyncComponent>> = {
     settings: defineAsyncComponent(() => import('@/pages/SettingsPage.vue')),
     'ai-agent': defineAsyncComponent(() => import('@/pages/TeaAiAgentPage.vue')),
     'field-detail': defineAsyncComponent(() => import('@/pages/FieldDetailPage.vue')),
+    'field-boundary': defineAsyncComponent(() => import('@/pages/FieldBoundaryPage.vue')),
     'fields-create': defineAsyncComponent(() => import('@/pages/FieldsCreatePage.vue')),
     admin: defineAsyncComponent(() => import('@/pages/AdminPage.vue')),
     'admin-users': defineAsyncComponent(() => import('@/pages/AdminUsersPage.vue')),
@@ -21,6 +22,8 @@ const PAGES: Record<string, ReturnType<typeof defineAsyncComponent>> = {
     'caykur-pruning': defineAsyncComponent(() => import('@/pages/caykur/CaykurPruningPage.vue')),
     'caykur-requests': defineAsyncComponent(() => import('@/pages/caykur/CaykurPruningRequestsPage.vue')),
     'caykur-request-detail': defineAsyncComponent(() => import('@/pages/caykur/CaykurPruningRequestDetailPage.vue')),
+    'caykur-measurement-requests': defineAsyncComponent(() => import('@/pages/caykur/CaykurMeasurementRequestsPage.vue')),
+    'caykur-measurement-request-detail': defineAsyncComponent(() => import('@/pages/caykur/CaykurMeasurementRequestDetailPage.vue')),
     notifications: defineAsyncComponent(() => import('@/pages/NotificationsPage.vue')),
 };
 

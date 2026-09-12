@@ -22,6 +22,7 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { FieldsService } from '@/fields/fields.service';
+import { FieldView } from '@/fields/field-boundary.service';
 import {
     CreateFieldDto,
     UpdateFieldDto,
@@ -29,7 +30,7 @@ import {
     UpdateFieldPartnerDto,
     FieldQueryDto,
 } from '@/fields/dto';
-import { Field, FieldPartner } from '@/fields/entities';
+import { FieldPartner } from '@/fields/entities';
 
 interface AuthenticatedRequest {
     user: { id: string };
@@ -48,7 +49,7 @@ export class FieldsController {
     async create(
         @Request() req: AuthenticatedRequest,
         @Body() dto: CreateFieldDto,
-    ): Promise<Field> {
+    ): Promise<FieldView> {
         return this.fieldsService.create(req.user.id, dto);
     }
 
@@ -58,7 +59,7 @@ export class FieldsController {
     async findAll(
         @Request() req: AuthenticatedRequest,
         @Query() query: FieldQueryDto,
-    ): Promise<Field[]> {
+    ): Promise<FieldView[]> {
         return this.fieldsService.findAll(req.user.id, query);
     }
 
@@ -70,7 +71,7 @@ export class FieldsController {
     async findOne(
         @Request() req: AuthenticatedRequest,
         @Param('id', ParseUUIDPipe) id: string,
-    ): Promise<Field> {
+    ): Promise<FieldView> {
         return this.fieldsService.findOne(id, req.user.id);
     }
 
@@ -82,7 +83,7 @@ export class FieldsController {
         @Request() req: AuthenticatedRequest,
         @Param('id', ParseUUIDPipe) id: string,
         @Body() dto: UpdateFieldDto,
-    ): Promise<Field> {
+    ): Promise<FieldView> {
         return this.fieldsService.update(id, req.user.id, dto);
     }
 
@@ -105,7 +106,7 @@ export class FieldsController {
     async restore(
         @Request() req: AuthenticatedRequest,
         @Param('id', ParseUUIDPipe) id: string,
-    ): Promise<Field> {
+    ): Promise<FieldView> {
         return this.fieldsService.restore(id, req.user.id);
     }
 

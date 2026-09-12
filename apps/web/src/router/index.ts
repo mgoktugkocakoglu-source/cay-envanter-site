@@ -94,6 +94,12 @@ const router = createRouter({
             meta: { requiresAuth: true, hub: 'tea' },
         },
         {
+            path: '/tea/fields/:id/determine',
+            name: 'tea-field-determine',
+            component: () => import('@/pages/FieldBoundaryPage.vue'),
+            meta: { requiresAuth: true, hub: 'tea' },
+        },
+        {
             path: '/tea/fields/:id',
             name: 'tea-field-detail',
             component: () => import('@/pages/FieldDetailPage.vue'),
@@ -186,6 +192,18 @@ const router = createRouter({
             meta: { requiresAuth: true, module: 'pruning_requests' },
         },
         {
+            path: '/caykur/measurement-requests',
+            name: 'caykur-measurement-requests',
+            component: () => import('@/pages/caykur/CaykurMeasurementRequestsPage.vue'),
+            meta: { requiresAuth: true, module: 'measurement_requests' },
+        },
+        {
+            path: '/caykur/measurement-requests/:id',
+            name: 'caykur-measurement-request-detail',
+            component: () => import('@/pages/caykur/CaykurMeasurementRequestDetailPage.vue'),
+            meta: { requiresAuth: true, module: 'measurement_requests' },
+        },
+        {
             path: '/caykur/pruning',
             name: 'caykur-pruning',
             component: () => import('@/pages/caykur/CaykurPruningPage.vue'),
@@ -205,6 +223,7 @@ const router = createRouter({
         { path: '/fields', redirect: '/tea/fields' },
         { path: '/fields/create', redirect: '/tea/fields/create' },
         { path: '/fields/:id/edit', redirect: to => `/tea/fields/${to.params.id}/edit` },
+        { path: '/fields/:id/determine', redirect: to => `/tea/fields/${to.params.id}/determine` },
         { path: '/fields/:id', redirect: to => `/tea/fields/${to.params.id}` },
         { path: '/firms/:id?', redirect: '/tea/dashboard' },
         { path: '/tea/firms/:id?', redirect: '/tea/dashboard' },

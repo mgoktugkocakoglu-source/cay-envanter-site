@@ -23,6 +23,8 @@ const props = defineProps<{
     parcelPolygon?: number[][];
     /** Owners who already have a measurement on this request (shown as a hint). */
     measuredOwnerIds?: string[];
+    /** Preselected owner (e.g. the producer who opened a measurement request). */
+    defaultOwnerId?: string;
     busy?: boolean;
 }>();
 
@@ -38,7 +40,7 @@ const emit = defineEmits<{
     (e: 'cancel'): void;
 }>();
 
-const ownerId = ref('');
+const ownerId = ref(props.defaultOwnerId ?? '');
 const notes = ref('');
 
 const selectedOwner = computed(() => props.owners.find((o) => o.userId === ownerId.value) ?? null);

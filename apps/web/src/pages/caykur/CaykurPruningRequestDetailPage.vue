@@ -150,10 +150,11 @@ function accuracyLabel(level: string | null): string {
     if (level === 'low') return 'Düşük';
     return '—';
 }
-const LICENSING_STATUS: Record<LicensingMeasurementStatus, { label: string; variant: 'warning' | 'success' | 'danger' }> = {
+const LICENSING_STATUS: Record<LicensingMeasurementStatus, { label: string; variant: 'warning' | 'success' | 'danger' | 'muted' }> = {
     pending_approval: { label: 'Ortak onayı bekliyor', variant: 'warning' },
     approved: { label: 'Ortaklar onayladı', variant: 'success' },
     rejected: { label: 'İtiraz edildi', variant: 'danger' },
+    superseded: { label: 'Yenilendi', variant: 'muted' },
 };
 const APPROVAL_STATUS: Record<LicensingApprovalStatus, { label: string; variant: 'muted' | 'success' | 'danger' }> = {
     pending: { label: 'Bekliyor', variant: 'muted' },

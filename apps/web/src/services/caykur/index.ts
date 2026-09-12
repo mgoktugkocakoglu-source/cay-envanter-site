@@ -9,6 +9,7 @@ export * from '@/services/caykur/rng';
 export * from '@/services/caykur/roles';
 export * from '@/services/caykur/pruning';
 export * from '@/services/caykur/pruningRequests';
+export * from '@/services/caykur/measurementRequests';
 
 // Core producer registry + compliance model (kept at its original path so the
 // existing Çaykur pages keep working).

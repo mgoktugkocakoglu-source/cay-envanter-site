@@ -10,6 +10,7 @@ import {
     MaxLength,
     Max,
     Min,
+    ValidateIf,
     ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -20,15 +21,22 @@ import type { LicensingMeasurementStatus, LicensingApprovalStatus } from '@/lice
 
 const METHODS: MeasurementMethod[] = ['map', 'gps', 'assisted', 'imu'];
 const ACCURACY_LEVELS: AccuracyLevel[] = ['high', 'medium', 'low'];
-const MEASUREMENT_STATUSES: LicensingMeasurementStatus[] = ['pending_approval', 'approved', 'rejected'];
+const MEASUREMENT_STATUSES: LicensingMeasurementStatus[] = ['pending_approval', 'approved', 'rejected', 'superseded'];
 const APPROVAL_STATUSES: LicensingApprovalStatus[] = ['pending', 'approved', 'rejected'];
 const DECISIONS = ['approved', 'rejected'] as const;
 export type LicensingDecision = (typeof DECISIONS)[number];
 
 export class CreateLicensingMeasurementDto {
-    @ApiProperty({ description: 'Budama request UUID the measurement belongs to' })
+    // Exactly one of the two request ids must be given (checked in the service).
+    @ApiPropertyOptional({ description: 'Budama request UUID the measurement belongs to' })
+    @ValidateIf((o: CreateLicensingMeasurementDto) => !o.measurementRequestId)
     @IsUUID()
-    pruningRequestId: string;
+    pruningRequestId?: string;
+
+    @ApiPropertyOptional({ description: 'Land measurement request UUID the measurement belongs to' })
+    @ValidateIf((o: CreateLicensingMeasurementDto) => !o.pruningRequestId)
+    @IsUUID()
+    measurementRequestId?: string;
 
     @ApiProperty({ description: 'Registered owner (user UUID) whose slice was measured' })
     @IsUUID()
@@ -67,6 +75,30 @@ export class CreateLicensingMeasurementDto {
     notes?: string;
 }
 
+/** Producer draws their own slice on the satellite map ("Arazini Belirle"). */
+export class CreateProducerBoundaryDto {
+    @ApiProperty({ description: 'Field UUID owned by the caller on a hisseli parcel' })
+    @IsUUID()
+    fieldId: string;
+
+    @ApiProperty({ description: 'Drawn slice area in m²' })
+    @IsNumber()
+    @Min(0)
+    measuredAreaM2: number;
+
+    @ApiProperty({ description: 'Polygon vertices (lat/lng; altitude 0 for map drawings)', type: [MeasurementPointDto] })
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => MeasurementPointDto)
+    points: MeasurementPointDto[];
+
+    @ApiPropertyOptional({ description: 'Notes for the co-owners', maxLength: 1000 })
+    @IsOptional()
+    @IsString()
+    @MaxLength(1000)
+    notes?: string;
+}
+
 export class DecideLicensingApprovalDto {
     @ApiProperty({ description: 'Co-owner decision', enum: DECISIONS })
     @IsIn(DECISIONS)
@@ -99,6 +131,16 @@ export class LicensingMeasurementQueryDto {
     @IsOptional()
     @IsUUID()
     pruningRequestId?: string;
+
+    @ApiPropertyOptional({ description: 'Filter by land measurement request UUID' })
+    @IsOptional()
+    @IsUUID()
+    measurementRequestId?: string;
+
+    @ApiPropertyOptional({ description: 'Filter by field UUID' })
+    @IsOptional()
+    @IsUUID()
+    fieldId?: string;
 
     @ApiPropertyOptional({ enum: MEASUREMENT_STATUSES })
     @IsOptional()

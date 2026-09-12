@@ -6,7 +6,7 @@ import {
     ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Field, FieldPartner } from '@/fields/entities';
 import {
     CreateFieldDto,
@@ -16,6 +16,7 @@ import {
     FieldQueryDto,
 } from '@/fields/dto';
 import { UsersService } from '@/users/users.service';
+import { FieldBoundaryService, FieldView } from '@/fields/field-boundary.service';
 
 @Injectable()
 export class FieldsService {
@@ -27,9 +28,10 @@ export class FieldsService {
         @InjectRepository(FieldPartner)
         private readonly partnerRepository: Repository<FieldPartner>,
         private readonly usersService: UsersService,
+        private readonly fieldBoundary: FieldBoundaryService,
     ) { }
 
-    async create(userId: string, dto: CreateFieldDto): Promise<Field> {
+    async create(userId: string, dto: CreateFieldDto): Promise<FieldView> {
         this.validatePartners(dto.partners);
 
         const field = this.fieldRepository.create({
@@ -70,25 +72,17 @@ export class FieldsService {
         return this.findOne(savedField.id, userId);
     }
 
-    async findAll(userId: string, query: FieldQueryDto): Promise<Field[]> {
-        const user = await this.usersService.findById(userId);
-
+    /**
+     * "Arazilerim": only the caller's own registrations. Fields of other
+     * accounts that merely list the caller as a declared partner are NOT
+     * included — on a hisseli parcel that row belongs to the other owner and
+     * would show up as a duplicate card.
+     */
+    async findAll(userId: string, query: FieldQueryDto): Promise<FieldView[]> {
         const qb = this.fieldRepository
             .createQueryBuilder('field')
             .leftJoinAndSelect('field.partners', 'partners')
-            .where(new Brackets((where) => {
-                where.where('field.userId = :userId', { userId });
-
-                if (user?.farmerIdNumber) {
-                    where.orWhere('partners.partnerIdentityNumber = :identityNumber', {
-                        identityNumber: user.farmerIdNumber,
-                    });
-                }
-
-                if (user?.phone) {
-                    where.orWhere('partners.partnerPhone = :phone', { phone: user.phone });
-                }
-            }))
+            .where('field.userId = :userId', { userId })
             .andWhere('field.deleted = :deleted', { deleted: false });
 
         const normalizedProvince = query.province?.trim();
@@ -115,10 +109,10 @@ export class FieldsService {
 
         qb.orderBy(sortBy, sortOrder);
 
-        return qb.getMany();
+        return this.fieldBoundary.enrichMany(await qb.getMany());
     }
 
-    async findOne(id: string, userId: string): Promise<Field> {
+    async findOne(id: string, userId: string): Promise<FieldView> {
         const field = await this.fieldRepository.findOne({
             where: { id, deleted: false },
             relations: ['partners'],
@@ -138,7 +132,7 @@ export class FieldsService {
             throw new ForbiddenException('Access denied');
         }
 
-        return field;
+        return this.fieldBoundary.enrichOne(field);
     }
 
     /**
@@ -159,7 +153,7 @@ export class FieldsService {
         return field;
     }
 
-    async update(id: string, userId: string, dto: UpdateFieldDto): Promise<Field> {
+    async update(id: string, userId: string, dto: UpdateFieldDto): Promise<FieldView> {
         const field = await this.findOwnedField(id, userId);
 
         if (dto.name !== undefined) field.name = dto.name;
@@ -183,7 +177,7 @@ export class FieldsService {
         this.logger.log(`Field soft deleted: ${id}`);
     }
 
-    async restore(id: string, userId: string): Promise<Field> {
+    async restore(id: string, userId: string): Promise<FieldView> {
         const field = await this.fieldRepository.findOne({
             where: { id, deleted: true },
         });

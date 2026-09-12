@@ -5,6 +5,7 @@ import { LayoutGrid, List, Map, MapPin, Pencil, RefreshCw, Trash2, Users } from 
 import { useFieldsStore } from '@/stores/fieldsStore';
 import { useToast } from '@/composables/useToast';
 import type { Field } from '@/services/api';
+import { fieldBoundaryMeta, needsBoundary, parcelLabel } from '@/services/fieldBoundary';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
 import { ConfirmDialog, EmptyState, ListToolbar, LoadingState, PageContainer, PageHeader, SearchInput, Spinner } from '@/components/shared';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -14,17 +15,19 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
+/**
+ * Arazilerim — the producer's own registrations. A field on a hisseli
+ * (shared-title) parcel carries a boundary badge: red until the owner's slice
+ * is determined, yellow while the co-owners decide, green once approved.
+ */
 const router = useRouter();
 const fieldsStore = useFieldsStore();
 const toast = useToast();
 
-const ALL_PROVINCES = 'all';
 const searchQuery = ref('');
-const provinceFilter = ref(ALL_PROVINCES);
 const viewMode = ref<'grid' | 'list'>('grid');
 
 // Delete dialog state
@@ -38,16 +41,11 @@ const fieldToRename = ref<Field | null>(null);
 const renameValue = ref('');
 const isRenaming = ref(false);
 
-const provinces = ['Rize', 'Trabzon', 'Artvin', 'Giresun', 'Ordu'];
-
 const filteredFields = computed(() => {
     let result = fieldsStore.fields;
-    if (provinceFilter.value !== ALL_PROVINCES) {
-        result = result.filter((f) => f.province === provinceFilter.value);
-    }
     if (searchQuery.value) {
         const query = searchQuery.value.toLowerCase();
-        result = result.filter((f) => displayName(f).toLowerCase().includes(query) || parcelAdaLabel(f).toLowerCase().includes(query));
+        result = result.filter((f) => displayName(f).toLowerCase().includes(query) || parcelLabel(f).toLowerCase().includes(query));
     }
     return result;
 });
@@ -55,6 +53,9 @@ const filteredFields = computed(() => {
 const totalArea = computed(() =>
     fieldsStore.fields.reduce((sum, f) => (f.areaUnit === 'm2' ? sum + f.area : sum + f.area * 1000), 0),
 );
+
+/** Shared parcels whose slice for this owner is still unsettled (red or yellow). */
+const unsettledCount = computed(() => fieldsStore.fields.filter(needsBoundary).length);
 
 onMounted(() => {
     fieldsStore.fetchFields();
@@ -135,14 +136,6 @@ function getFieldInitial(field: Field) {
     return field.parcelNo ? field.parcelNo.charAt(0) : '?';
 }
 
-/** "Ada 142 / Parsel 11" — cadastral identifiers from the Çaykur/TKGM record. */
-function parcelAdaLabel(field: Field) {
-    const parts: string[] = [];
-    if (field.adaNo) parts.push(`Ada ${field.adaNo}`);
-    if (field.parcelNo) parts.push(`Parsel ${field.parcelNo}`);
-    return parts.join(' / ');
-}
-
 function isUnnamed(field: Field) {
     return !field.name?.trim();
 }
@@ -155,6 +148,7 @@ function isUnnamed(field: Field) {
                 <template #meta>
                     <Badge variant="secondary">{{ fieldsStore.fieldCount }} arazi</Badge>
                     <Badge v-if="totalArea > 0" variant="secondary">{{ formatTotalArea(totalArea) }} toplam</Badge>
+                    <Badge v-if="unsettledCount > 0" variant="danger">{{ unsettledCount }} arazide sınır bekliyor</Badge>
                 </template>
                 <template #actions>
                     <Badge variant="outline" class="h-9 gap-1.5 px-3 text-xs font-medium text-muted-foreground">
@@ -167,15 +161,6 @@ function isUnnamed(field: Field) {
             <ListToolbar>
                 <SearchInput v-model="searchQuery" placeholder="Arazi, ada veya parsel ara" />
                 <template #filters>
-                    <Select v-model="provinceFilter">
-                        <SelectTrigger class="w-40" aria-label="İl filtresi">
-                            <SelectValue placeholder="İl seçin" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem :value="ALL_PROVINCES">Tüm iller</SelectItem>
-                            <SelectItem v-for="province in provinces" :key="province" :value="province">{{ province }}</SelectItem>
-                        </SelectContent>
-                    </Select>
                     <ToggleGroup v-model="viewMode" type="single" aria-label="Görünüm" class="hidden md:inline-flex">
                         <ToggleGroupItem value="grid" aria-label="Kart görünümü">
                             <LayoutGrid aria-hidden="true" />
@@ -196,15 +181,15 @@ function isUnnamed(field: Field) {
             <EmptyState
                 v-else-if="filteredFields.length === 0"
                 :icon="MapPin"
-                :title="searchQuery || provinceFilter !== ALL_PROVINCES ? 'Filtreye uyan arazi yok' : 'Henüz arazi bulunamadı'"
+                :title="searchQuery ? 'Aramaya uyan arazi yok' : 'Henüz arazi bulunamadı'"
                 :description="
-                    searchQuery || provinceFilter !== ALL_PROVINCES
-                        ? 'Arama veya il filtresini değiştirerek tekrar deneyin.'
+                    searchQuery
+                        ? 'Aramayı değiştirerek tekrar deneyin.'
                         : 'Çaykur cüzdan numaranıza kayıtlı araziler burada otomatik olarak listelenir.'
                 "
             >
-                <Button v-if="searchQuery || provinceFilter !== ALL_PROVINCES" variant="outline" class="h-11 md:h-9" @click="searchQuery = ''; provinceFilter = ALL_PROVINCES">
-                    Filtreleri temizle
+                <Button v-if="searchQuery" variant="outline" class="h-11 md:h-9" @click="searchQuery = ''">
+                    Aramayı temizle
                 </Button>
             </EmptyState>
 
@@ -214,6 +199,11 @@ function isUnnamed(field: Field) {
                     v-for="field in filteredFields"
                     :key="field.id"
                     class="cursor-pointer gap-4 py-4 transition-colors hover:border-input focus-visible:ring-3 focus-visible:ring-ring/50"
+                    :class="{
+                        'border-l-2 border-l-destructive': fieldBoundaryMeta(field)?.tone === 'danger',
+                        'border-l-2 border-l-warning': fieldBoundaryMeta(field)?.tone === 'warning',
+                        'border-l-2 border-l-success': fieldBoundaryMeta(field)?.tone === 'success',
+                    }"
                     role="link"
                     tabindex="0"
                     @click="navigateToField(field.id)"
@@ -237,18 +227,22 @@ function isUnnamed(field: Field) {
                         </div>
 
                         <dl class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                            <div v-if="parcelAdaLabel(field)" class="flex items-center gap-1">
+                            <div v-if="parcelLabel(field)" class="flex items-center gap-1">
                                 <Map class="size-3.5" aria-hidden="true" />
-                                <dd>{{ parcelAdaLabel(field) }}</dd>
+                                <dd>{{ parcelLabel(field) }}</dd>
                             </div>
                             <div v-if="field.neighborhood" class="flex items-center gap-1">
                                 <dd>{{ field.neighborhood }}</dd>
                             </div>
-                            <div v-if="field.partnerCount > 1" class="flex items-center gap-1">
+                            <div v-if="field.isShared" class="flex items-center gap-1">
                                 <Users class="size-3.5" aria-hidden="true" />
-                                <dd>{{ field.partnerCount }} ortak</dd>
+                                <dd>{{ field.coOwnerCount }} kayıtlı üretici</dd>
                             </div>
                         </dl>
+
+                        <Badge v-if="fieldBoundaryMeta(field)" :variant="fieldBoundaryMeta(field)!.tone" class="self-start">
+                            {{ fieldBoundaryMeta(field)!.label }}
+                        </Badge>
 
                         <div class="flex items-center gap-2 border-t pt-3">
                             <Button variant="outline" class="h-11 flex-1 md:h-9" @click.stop="openRenameDialog(field)">
@@ -304,7 +298,12 @@ function isUnnamed(field: Field) {
                                 <span class="block text-foreground">{{ field.province }} / {{ field.district }}</span>
                                 <span class="block text-xs text-muted-foreground">{{ field.neighborhood }}</span>
                             </TableCell>
-                            <TableCell class="text-muted-foreground">{{ parcelAdaLabel(field) || '—' }}</TableCell>
+                            <TableCell class="text-muted-foreground">
+                                <span class="block">{{ parcelLabel(field) || '—' }}</span>
+                                <Badge v-if="fieldBoundaryMeta(field)" :variant="fieldBoundaryMeta(field)!.tone" class="mt-1">
+                                    {{ fieldBoundaryMeta(field)!.short }}
+                                </Badge>
+                            </TableCell>
                             <TableCell class="text-right font-semibold text-foreground tabular-nums">{{ formatArea(field.area, field.areaUnit) }}</TableCell>
                             <TableCell class="pr-4 text-right">
                                 <div class="flex justify-end gap-1">
@@ -346,7 +345,7 @@ function isUnnamed(field: Field) {
                 <DialogHeader>
                     <DialogTitle>Arazimi isimlendir</DialogTitle>
                     <DialogDescription>
-                        <strong class="text-foreground">{{ fieldToRename ? parcelAdaLabel(fieldToRename) || fieldToRename.district : '' }}</strong>
+                        <strong class="text-foreground">{{ fieldToRename ? parcelLabel(fieldToRename) || fieldToRename.district : '' }}</strong>
                         arazinize tanıyabileceğiniz bir isim verin.
                     </DialogDescription>
                 </DialogHeader>

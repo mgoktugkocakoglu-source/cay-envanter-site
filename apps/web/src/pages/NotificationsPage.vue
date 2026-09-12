@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { Bell, Check, MapPinned, Ruler, UserRound, X } from '@lucide/vue';
+import { Bell, Check, MapPinned, PenLine, Ruler, UserRound, X } from '@lucide/vue';
 import TeaBusinessLayout from '@/layouts/TeaBusinessLayout.vue';
+import BoundarySketch from '@/components/map/BoundarySketch.vue';
 import { ConfirmDialog, EmptyState, LoadingState, PageContainer, PageHeader } from '@/components/shared';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -22,10 +23,10 @@ import { useToast } from '@/composables/useToast';
 import type { LicensingApproval, LicensingApprovalStatus } from '@/services/api';
 
 /**
- * Bildirimler — ruhsatlandırma onay talepleri. A co-owner of a hisseli parcel
- * sees the slice Çaykur staff measured for another registered owner and
- * approves or rejects it; the measurement is final only when every co-owner
- * approved.
+ * Bildirimler — boundary approval requests on hisseli parcels. A co-owner sees
+ * the slice recorded for another registered owner (drawn by that owner on the
+ * satellite map, or measured on site by Çaykur staff) and approves or rejects
+ * it; the boundary is final only when every co-owner approved.
  */
 const store = useNotificationsStore();
 const toast = useToast();
@@ -98,6 +99,12 @@ function parcelLabel(a: LicensingApproval): string {
     const m = a.measurement;
     return m ? `${m.il} / ${m.ilce} · Ada ${m.ada} / Parsel ${m.parsel}` : 'Parsel bilgisi yok';
 }
+function isProducerDrawn(a: LicensingApproval): boolean {
+    return a.measurement?.source === 'producer_map';
+}
+function titleOf(a: LicensingApproval): string {
+    return isProducerDrawn(a) ? 'Arazi sınırı belirleme' : 'Ruhsatlandırma ölçümü';
+}
 
 onMounted(() => store.fetchApprovals());
 </script>
@@ -107,7 +114,7 @@ onMounted(() => store.fetchApprovals());
         <PageContainer size="narrow">
             <PageHeader
                 title="Bildirimler"
-                description="Ortak sahibi olduğunuz arazilerde yapılan ruhsatlandırma ölçümleri onayınızı bekler."
+                description="Ortak sahibi olduğunuz arazilerde çizilen sınırlar ve ruhsatlandırma ölçümleri onayınızı bekler."
             >
                 <template #meta>
                     <Badge v-if="store.pendingApprovals.length" variant="warning">{{ store.pendingApprovals.length }} bekleyen onay</Badge>
@@ -125,7 +132,7 @@ onMounted(() => store.fetchApprovals());
                 v-else-if="!store.approvals.length"
                 :icon="Bell"
                 title="Bildiriminiz yok"
-                description="Ortak sahibi olduğunuz bir arazide ruhsatlandırma ölçümü yapıldığında burada onayınıza sunulur."
+                description="Ortak sahibi olduğunuz bir arazide sınır çizildiğinde ya da ruhsatlandırma ölçümü yapıldığında burada onayınıza sunulur."
             />
 
             <template v-else>
@@ -136,8 +143,9 @@ onMounted(() => store.fetchApprovals());
                             <div class="flex flex-wrap items-start justify-between gap-2">
                                 <div class="min-w-0">
                                     <CardTitle class="flex items-center gap-2">
-                                        <Ruler class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                                        Ruhsatlandırma ölçümü
+                                        <PenLine v-if="isProducerDrawn(a)" class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                        <Ruler v-else class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                        {{ titleOf(a) }}
                                     </CardTitle>
                                     <CardDescription class="mt-1 flex items-center gap-1">
                                         <MapPinned class="size-3.5 shrink-0" aria-hidden="true" />
@@ -148,36 +156,52 @@ onMounted(() => store.fetchApprovals());
                             </div>
                         </CardHeader>
                         <CardContent class="flex flex-col gap-4 px-4">
-                            <p class="text-sm text-muted-foreground">
+                            <p v-if="isProducerDrawn(a)" class="text-sm text-muted-foreground">
+                                Ortak sahibi <strong class="text-foreground">{{ a.measurement?.ownerName ?? '—' }}</strong>,
+                                bu arazide kendi payının sınırını uydu haritasında çizdi.
+                                Sınırın kesinleşmesi için onayınız gerekiyor.
+                            </p>
+                            <p v-else class="text-sm text-muted-foreground">
                                 Çaykur yetkili personeli <strong class="text-foreground">{{ a.measurement?.measuredByName ?? '—' }}</strong>,
                                 bu arazide <strong class="text-foreground">{{ a.measurement?.ownerName ?? '—' }}</strong> adına kayıtlı alanı ölçtü.
                                 Ölçümün kesinleşmesi için onayınız gerekiyor.
                             </p>
 
-                            <dl class="grid gap-3 rounded-lg border bg-muted/30 p-3 text-sm sm:grid-cols-2">
-                                <div class="flex items-start gap-2">
-                                    <UserRound class="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                                    <div class="min-w-0">
-                                        <dt class="text-xs text-muted-foreground">Ölçülen sahip</dt>
-                                        <dd class="font-medium text-foreground">
-                                            {{ a.measurement?.ownerName ?? '—' }}
-                                            <span v-if="a.measurement?.ownerCuzdanNo" class="text-xs font-normal text-muted-foreground">· Cüzdan {{ a.measurement.ownerCuzdanNo }}</span>
-                                        </dd>
+                            <div class="grid gap-3 sm:grid-cols-[160px_1fr]">
+                                <BoundarySketch
+                                    v-if="(a.measurement?.measurementPoints.length ?? 0) >= 3"
+                                    :points="a.measurement!.measurementPoints"
+                                    class="max-w-40"
+                                />
+                                <dl class="grid gap-3 rounded-lg border bg-muted/30 p-3 text-sm sm:grid-cols-2">
+                                    <div class="flex items-start gap-2">
+                                        <UserRound class="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                        <div class="min-w-0">
+                                            <dt class="text-xs text-muted-foreground">Sahip</dt>
+                                            <dd class="font-medium text-foreground">
+                                                {{ a.measurement?.ownerName ?? '—' }}
+                                                <span v-if="a.measurement?.ownerCuzdanNo" class="text-xs font-normal text-muted-foreground">· Cüzdan {{ a.measurement.ownerCuzdanNo }}</span>
+                                            </dd>
+                                        </div>
                                     </div>
-                                </div>
-                                <div>
-                                    <dt class="text-xs text-muted-foreground">Ölçülen alan</dt>
-                                    <dd class="font-semibold text-foreground tabular-nums">{{ formatNumber(a.measurement?.measuredAreaM2 ?? 0) }} m²</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-xs text-muted-foreground">Yöntem</dt>
-                                    <dd class="text-foreground">{{ methodLabel(a.measurement?.method) }}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-xs text-muted-foreground">Ölçüm tarihi</dt>
-                                    <dd class="text-foreground">{{ formatDateTime(a.measurement?.measuredAt) }}</dd>
-                                </div>
-                            </dl>
+                                    <div>
+                                        <dt class="text-xs text-muted-foreground">Belirlenen alan</dt>
+                                        <dd class="font-semibold text-foreground tabular-nums">{{ formatNumber(a.measurement?.measuredAreaM2 ?? 0) }} m²</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-xs text-muted-foreground">Yöntem</dt>
+                                        <dd class="text-foreground">{{ isProducerDrawn(a) ? 'Uydu haritasında çizim' : methodLabel(a.measurement?.method) }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-xs text-muted-foreground">Tarih</dt>
+                                        <dd class="text-foreground">{{ formatDateTime(a.measurement?.measuredAt) }}</dd>
+                                    </div>
+                                    <div v-if="a.measurement?.notes" class="sm:col-span-2">
+                                        <dt class="text-xs text-muted-foreground">Not</dt>
+                                        <dd class="text-foreground">{{ a.measurement.notes }}</dd>
+                                    </div>
+                                </dl>
+                            </div>
 
                             <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
                                 <Button variant="outline" class="h-11 md:h-9" :disabled="busyId === a.id" @click="openReject(a)">
@@ -199,8 +223,14 @@ onMounted(() => store.fetchApprovals());
                         <ul class="divide-y">
                             <li v-for="a in store.decidedApprovals" :key="a.id" class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
                                 <div class="min-w-0">
-                                    <p class="font-medium text-foreground">{{ a.measurement?.ownerName ?? '—' }} · {{ formatNumber(a.measurement?.measuredAreaM2 ?? 0) }} m²</p>
-                                    <p class="truncate text-xs text-muted-foreground">{{ parcelLabel(a) }} · {{ formatDateTime(a.decidedAt) }}</p>
+                                    <p class="font-medium text-foreground">
+                                        {{ a.measurement?.ownerName ?? '—' }} · {{ formatNumber(a.measurement?.measuredAreaM2 ?? 0) }} m²
+                                        <span class="text-xs font-normal text-muted-foreground">· {{ titleOf(a) }}</span>
+                                    </p>
+                                    <p class="truncate text-xs text-muted-foreground">
+                                        {{ parcelLabel(a) }} · {{ formatDateTime(a.decidedAt) }}
+                                        <template v-if="a.measurement?.status === 'superseded'"> · ölçüm yenilendi</template>
+                                    </p>
                                     <p v-if="a.reason" class="mt-1 text-xs text-muted-foreground">Gerekçe: {{ a.reason }}</p>
                                 </div>
                                 <Badge :variant="STATUS_META[a.status].variant">{{ STATUS_META[a.status].label }}</Badge>
@@ -224,9 +254,15 @@ onMounted(() => store.fetchApprovals());
         <Dialog v-model:open="rejectOpen">
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Ölçüme itiraz et</DialogTitle>
+                    <DialogTitle>{{ rejectTarget && isProducerDrawn(rejectTarget) ? 'Sınıra itiraz et' : 'Ölçüme itiraz et' }}</DialogTitle>
                     <DialogDescription>
-                        İtirazınız ölçümü durdurur; Çaykur personeli yeniden ölçüm yapabilir. Gerekçenizi yazmanız incelemeyi hızlandırır.
+                        <template v-if="rejectTarget && isProducerDrawn(rejectTarget)">
+                            İtirazınız çizimi durdurur; üretici sınırı yeniden çizebilir ya da Çaykur personelinden sahada ölçüm isteyebilir.
+                        </template>
+                        <template v-else>
+                            İtirazınız ölçümü durdurur; Çaykur personeli yeniden ölçüm yapabilir.
+                        </template>
+                        Gerekçenizi yazmanız incelemeyi hızlandırır.
                     </DialogDescription>
                 </DialogHeader>
                 <div class="space-y-2">

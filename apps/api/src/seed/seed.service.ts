@@ -12,6 +12,8 @@ import { Payment } from '@/payments/entities/payment.entity';
 import { Harvest } from '@/harvests/entities/harvest.entity';
 import { PaymentHarvest } from '@/payments/entities/payment-harvest.entity';
 import { PruningMeasurement, PruningTask, PruningRequest } from '@/pruning/entities';
+import { LicensingMeasurement, LicensingApproval } from '@/licensing/entities';
+import { LandMeasurementRequest } from '@/measurement-requests/entities';
 
 interface TariffSeed {
     paymentTerm: PaymentTerm;
@@ -130,6 +132,9 @@ export class SeedService implements OnModuleInit {
         @InjectRepository(PruningMeasurement) private readonly measurementRepo: Repository<PruningMeasurement>,
         @InjectRepository(PruningTask) private readonly taskRepo: Repository<PruningTask>,
         @InjectRepository(PruningRequest) private readonly pruningRequestRepo: Repository<PruningRequest>,
+        @InjectRepository(LicensingMeasurement) private readonly licensingRepo: Repository<LicensingMeasurement>,
+        @InjectRepository(LicensingApproval) private readonly approvalRepo: Repository<LicensingApproval>,
+        @InjectRepository(LandMeasurementRequest) private readonly measurementRequestRepo: Repository<LandMeasurementRequest>,
     ) { }
 
     async onModuleInit(): Promise<void> {
@@ -144,6 +149,10 @@ export class SeedService implements OnModuleInit {
             }
             await this.seedFirms();
             await this.seedFields(user);
+            const coOwner = await this.ensureCoOwner();
+            if (coOwner) {
+                await this.seedSharedParcel(user, coOwner);
+            }
             await this.seedDeliveries(user);
             const sahaUser = await this.ensureStaff();
             if (sahaUser) {
@@ -248,6 +257,130 @@ export class SeedService implements OnModuleInit {
                     area: seed.area,
                     areaUnit: 'm2',
                     partnerCount: 1,
+                }),
+            );
+        }
+    }
+
+    /**
+     * Second demo producer registered on the same ada/parsel as the demo user's
+     * "Merkez Bahçe" — makes the hisseli (shared) parcel states demoable.
+     */
+    private async ensureCoOwner(): Promise<User | null> {
+        const email = 'demo2@cayhesabim.com';
+        const existing = await this.userRepo.findOne({ where: { email, deleted: false } });
+        if (existing) return existing;
+
+        const password = this.configService.get<string>('SEED_DEMO_PASSWORD') || 'Caykur2026';
+        const user = this.userRepo.create({
+            fullName: 'Fatma Karadeniz',
+            email,
+            password: await bcrypt.hash(password, 12),
+            phone: '5550000043',
+            province: 'Rize',
+            district: 'Merkez',
+            farmerIdNumber: '99999999043',
+            cuzdanNo: '100043',
+            userType: UserType.LAND_OWNER,
+            role: Role.USER,
+            emailVerified: true,
+            verifiedAt: new Date(),
+            quotaPerDekarKg: 30,
+        });
+        const saved = await this.userRepo.save(user);
+        this.logger.log(`Demo co-owner created: ${email} (password: ${password})`);
+        return saved;
+    }
+
+    /**
+     * Shared-parcel demo: the co-owner registers Rize / Merkez / ada 142 /
+     * parsel 11 too, draws her slice on the map (pending the demo user's
+     * approval) and the demo user opens an on-site measurement request.
+     */
+    private async seedSharedParcel(user: User, coOwner: User): Promise<void> {
+        const shared = FIELD_SEEDS[0];
+        const ownField = await this.fieldRepo.findOne({
+            where: { userId: user.id, adaNo: shared.adaNo, parcelNo: shared.parcelNo, deleted: false },
+        });
+        if (!ownField) return;
+
+        let coField = await this.fieldRepo.findOne({
+            where: { userId: coOwner.id, adaNo: shared.adaNo, parcelNo: shared.parcelNo, deleted: false },
+        });
+        if (!coField) {
+            coField = await this.fieldRepo.save(
+                this.fieldRepo.create({
+                    userId: coOwner.id,
+                    name: 'Alt Bahçe',
+                    province: 'Rize',
+                    district: shared.district,
+                    neighborhood: shared.neighborhood,
+                    parcelNo: shared.parcelNo,
+                    adaNo: shared.adaNo,
+                    coordinates: this.squarePolygon(shared.lng + 0.0006, shared.lat),
+                    area: 1400,
+                    areaUnit: 'm2',
+                    partnerCount: 1,
+                }),
+            );
+        }
+
+        const measurements = await this.licensingRepo.count({ where: { fieldId: coField.id } });
+        if (measurements === 0) {
+            // Eastern half of the co-owner's square, drawn on the satellite map.
+            const d = 0.0008;
+            const ring = [
+                { lat: shared.lat - d, lng: shared.lng + 0.0006 },
+                { lat: shared.lat - d, lng: shared.lng + 0.0006 + d },
+                { lat: shared.lat + d, lng: shared.lng + 0.0006 + d },
+                { lat: shared.lat + d, lng: shared.lng + 0.0006 },
+            ].map((p) => ({ ...p, altitudeMeters: 0 }));
+            await this.licensingRepo.save(
+                this.licensingRepo.create({
+                    source: 'producer_map',
+                    pruningRequestId: null,
+                    measurementRequestId: null,
+                    fieldId: coField.id,
+                    il: 'Rize',
+                    ilce: shared.district,
+                    ada: shared.adaNo,
+                    parsel: shared.parcelNo,
+                    ownerId: coOwner.id,
+                    ownerName: coOwner.fullName,
+                    ownerCuzdanNo: coOwner.cuzdanNo ?? null,
+                    measuredAreaM2: 1350,
+                    measurementPoints: ring,
+                    method: 'map',
+                    accuracyLevel: 'medium',
+                    fixQuality: null,
+                    measuredById: coOwner.id,
+                    measuredByName: coOwner.fullName,
+                    measuredAt: new Date('2026-09-05T10:30:00'),
+                    status: 'pending_approval',
+                    resolvedAt: null,
+                    notes: 'Yol tarafındaki yarım; taş duvar sınırdır.',
+                    approvals: [
+                        this.approvalRepo.create({ approverId: user.id, approverName: user.fullName, status: 'pending' }),
+                    ],
+                }),
+            );
+        }
+
+        const requests = await this.measurementRequestRepo.count({ where: { fieldId: ownField.id } });
+        if (requests === 0) {
+            await this.measurementRequestRepo.save(
+                this.measurementRequestRepo.create({
+                    producerId: user.id,
+                    producerName: user.fullName,
+                    fieldId: ownField.id,
+                    il: 'Rize',
+                    ilce: shared.district,
+                    ada: shared.adaNo,
+                    parsel: shared.parcelNo,
+                    registeredAreaM2: Number(ownField.area),
+                    parcelGeometry: ownField.coordinates?.[0] ?? null,
+                    producerNote: 'Uydu görüntüsünde sınır seçilemiyor; ağaçlar kapatıyor.',
+                    status: 'pending',
                 }),
             );
         }

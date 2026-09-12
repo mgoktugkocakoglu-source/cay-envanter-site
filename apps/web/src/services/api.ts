@@ -99,8 +99,26 @@ async function request<T>(
 }
 
 // Types
+/**
+ * Where a field stands on a hisseli (shared-title) parcel — derived server-side.
+ *  - undetermined:     shared, nobody settled this owner's slice yet (red)
+ *  - pending_approval: a boundary was drawn/measured; co-owners must confirm (yellow)
+ *  - determined:       every co-owner approved (green, "Alan N")
+ */
+export type FieldBoundaryStatus = 'undetermined' | 'pending_approval' | 'determined';
+
+/** Another producer registered on the same province + ada + parsel. */
+export interface FieldCoOwner {
+    userId: string;
+    fullName: string;
+    cuzdanNo: string | null;
+    shareNo: number | null;
+    boundaryDetermined: boolean;
+}
+
 export interface Field {
     id: string;
+    userId: string;
     name: string;
     province: string;
     district: string;
@@ -114,6 +132,18 @@ export interface Field {
     partnerCount: number;
     notes: string | null;
     partners: FieldPartner[];
+    /** Set once every co-owner approved this field's boundary. */
+    boundaryMeasurementId: string | null;
+    boundaryDeterminedAt: string | null;
+    /** "Alan no" — share slot on the parcel (1, 2, 3 …), assigned in approval order. */
+    shareNo: number | null;
+    // ── Derived by the API (FieldBoundaryService) ──
+    isShared: boolean;
+    coOwnerCount: number;
+    boundaryStatus: FieldBoundaryStatus;
+    pendingMeasurementId: string | null;
+    pendingRequestId: string | null;
+    coOwners: FieldCoOwner[];
     createdAt: string;
     updatedAt: string;
 }
@@ -248,6 +278,8 @@ export interface PruningCoOwner {
     fieldId: string;
     fieldName: string;
     areaM2: number;
+    shareNo?: number | null;
+    boundaryDetermined?: boolean;
 }
 
 export interface CreatePruningRequestPayload {
@@ -268,8 +300,10 @@ export interface SavePruningMeasurementResultPayload {
 }
 
 // ── Ruhsatlandırma (licensing) — one owner's slice on a hisseli parcel ──
-export type LicensingMeasurementStatus = 'pending_approval' | 'approved' | 'rejected';
+export type LicensingMeasurementStatus = 'pending_approval' | 'approved' | 'rejected' | 'superseded';
 export type LicensingApprovalStatus = 'pending' | 'approved' | 'rejected';
+/** staff_pruning / staff_request: measured on site by Çaykur staff; producer_map: drawn by the owner. */
+export type LicensingMeasurementSource = 'staff_pruning' | 'staff_request' | 'producer_map';
 
 export interface LicensingApproval {
     id: string;
@@ -288,7 +322,11 @@ export interface LicensingApproval {
 
 export interface LicensingMeasurement {
     id: string;
-    pruningRequestId: string;
+    source: LicensingMeasurementSource;
+    pruningRequestId: string | null;
+    measurementRequestId: string | null;
+    /** The measured owner's field record (null on legacy rows). */
+    fieldId: string | null;
     il: string;
     ilce: string;
     ada: string;
@@ -314,9 +352,51 @@ export interface LicensingMeasurement {
 }
 
 export interface CreateLicensingMeasurementPayload extends SavePruningMeasurementResultPayload {
-    pruningRequestId: string;
+    /** Exactly one of the two request ids. */
+    pruningRequestId?: string;
+    measurementRequestId?: string;
     ownerId: string;
     notes?: string;
+}
+
+/** Producer draws their own slice on the satellite map ("Arazini Belirle"). */
+export interface CreateProducerBoundaryPayload {
+    fieldId: string;
+    measuredAreaM2: number;
+    points: MeasurementPoint[];
+    notes?: string;
+}
+
+// ── Arazide ölçüm talepleri (on-site measurement requests) ──
+export type MeasurementRequestStatus = 'pending' | 'scheduled' | 'measured' | 'closed' | 'rejected' | 'cancelled';
+
+export interface MeasurementRequest {
+    id: string;
+    producerId: string;
+    producerName: string;
+    fieldId: string;
+    il: string;
+    ilce: string;
+    ada: string;
+    parsel: string;
+    registeredAreaM2: number;
+    parcelGeometry: number[][] | null;
+    status: MeasurementRequestStatus;
+    appointmentDate: string | null;
+    appointedById: string | null;
+    appointedByName: string | null;
+    producerNote: string | null;
+    notes: string | null;
+    closedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+    /** Every registered owner of the parcel (the requester included). */
+    coOwners: PruningCoOwner[];
+}
+
+export interface CreateMeasurementRequestPayload {
+    fieldId: string;
+    producerNote?: string;
 }
 
 export interface PaginationMeta {
@@ -944,7 +1024,9 @@ export const api = {
     // Ruhsatlandırma (licensing) — staff capture + co-owner approvals
     createLicensingMeasurement: (data: CreateLicensingMeasurementPayload) =>
         request<LicensingMeasurement>('/licensing', { method: 'POST', body: JSON.stringify(data) }),
-    getLicensingMeasurements: (params?: { pruningRequestId?: string; status?: LicensingMeasurementStatus; page?: number; limit?: number }) => {
+    createProducerBoundary: (data: CreateProducerBoundaryPayload) =>
+        request<LicensingMeasurement>('/licensing/boundary', { method: 'POST', body: JSON.stringify(data) }),
+    getLicensingMeasurements: (params?: { pruningRequestId?: string; measurementRequestId?: string; fieldId?: string; status?: LicensingMeasurementStatus; page?: number; limit?: number }) => {
         const query = new URLSearchParams(params as Record<string, string>).toString();
         return request<Paginated<LicensingMeasurement>>(`/licensing${query ? `?${query}` : ''}`);
     },
@@ -956,6 +1038,21 @@ export const api = {
     getPendingLicensingApprovalCount: () => request<{ count: number }>('/licensing/approvals/pending-count'),
     decideLicensingApproval: (id: string, decision: 'approved' | 'rejected', reason?: string) =>
         request<LicensingApproval>(`/licensing/approvals/${id}/decision`, { method: 'PATCH', body: JSON.stringify({ decision, reason }) }),
+
+    // Arazide ölçüm talepleri (on-site measurement requests)
+    getMeasurementRequests: (params?: { status?: MeasurementRequestStatus; search?: string; page?: number; limit?: number }) => {
+        const query = new URLSearchParams(params as Record<string, string>).toString();
+        return request<Paginated<MeasurementRequest>>(`/measurement-requests${query ? `?${query}` : ''}`);
+    },
+    getMeasurementRequest: (id: string) => request<MeasurementRequest>(`/measurement-requests/${id}`),
+    createMeasurementRequest: (data: CreateMeasurementRequestPayload) =>
+        request<MeasurementRequest>('/measurement-requests', { method: 'POST', body: JSON.stringify(data) }),
+    cancelMeasurementRequest: (id: string) =>
+        request<MeasurementRequest>(`/measurement-requests/${id}/cancel`, { method: 'PATCH', body: JSON.stringify({}) }),
+    setMeasurementRequestAppointment: (id: string, appointmentDate: string) =>
+        request<MeasurementRequest>(`/measurement-requests/${id}/appointment`, { method: 'PATCH', body: JSON.stringify({ appointmentDate }) }),
+    rejectMeasurementRequest: (id: string, reason?: string) =>
+        request<MeasurementRequest>(`/measurement-requests/${id}/reject`, { method: 'PATCH', body: JSON.stringify({ reason }) }),
 
     // Çaykur staff (management onboarding) endpoints
     getCaykurStaff: (params?: { page?: number; limit?: number; search?: string; caykurRole?: CaykurStaffRole; status?: 'active' | 'suspended' }) => {

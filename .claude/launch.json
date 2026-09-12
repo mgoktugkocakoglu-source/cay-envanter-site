@@ -10,6 +10,15 @@
       "port": 3000
     },
     {
+      "name": "api-seed",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set SEED_DEMO=true&& pnpm dev:api"
+      ],
+      "port": 3000
+    },
+    {
       "name": "web",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": [

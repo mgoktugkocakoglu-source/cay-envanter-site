@@ -11,37 +11,69 @@ import {
 } from 'typeorm';
 import { User } from '@/users/entities/user.entity';
 import { PruningRequest, MeasurementPoint } from '@/pruning/entities';
+import { Field } from '@/fields/entities/field.entity';
+import { LandMeasurementRequest } from '@/measurement-requests/entities/land-measurement-request.entity';
 import { LicensingApproval } from '@/licensing/entities/licensing-approval.entity';
 
 /**
  * Ruhsatlandırma ölçümü lifecycle.
- *  - pending_approval: captured by staff; the other registrants of the parcel
- *    must confirm the slice measured for the selected owner
- *  - approved: every co-owner confirmed
+ *  - pending_approval: captured; the other registrants of the parcel must
+ *    confirm the slice recorded for the selected owner
+ *  - approved: every co-owner confirmed — the owner's field is updated
  *  - rejected: at least one co-owner objected (reason on the approval row)
+ *  - superseded: replaced by a newer measurement for the same field before
+ *    it was decided (its pending approvals are dropped)
  */
-export type LicensingMeasurementStatus = 'pending_approval' | 'approved' | 'rejected';
+export type LicensingMeasurementStatus = 'pending_approval' | 'approved' | 'rejected' | 'superseded';
 
 /**
- * Ruhsatlandırma (licensing) measurement — on a hisseli (shared-title) parcel
- * the Çaykur authorized person measures the slice that belongs to ONE of the
- * registered owners. Saving it does not settle ownership: the remaining
- * registrants receive an e-mail + in-app approval request and each must
- * confirm (see LicensingApproval).
+ * Who captured the boundary.
+ *  - staff_pruning: Çaykur staff, entered from a budama request
+ *  - staff_request: Çaykur staff, entered from a land measurement request
+ *  - producer_map: the producer drew their own slice on the satellite map
+ */
+export type LicensingMeasurementSource = 'staff_pruning' | 'staff_request' | 'producer_map';
+
+/**
+ * Boundary determination record of a hisseli (shared-title) parcel: the slice
+ * that belongs to ONE of the registered owners. Saving it does not settle
+ * ownership: the remaining registrants receive an e-mail + in-app approval
+ * request and each must confirm (see LicensingApproval). Once approved, the
+ * owner's Field takes the polygon, the area and a per-parcel share number.
  */
 @Entity('licensing_measurements')
 @Index(['pruningRequestId', 'createdAt'])
+@Index(['measurementRequestId', 'createdAt'])
+@Index(['fieldId', 'status'])
 @Index(['ownerId', 'status'])
 export class LicensingMeasurement {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column({ type: 'uuid', name: 'pruning_request_id' })
-    pruningRequestId: string;
+    @Column({ type: 'varchar', length: 16, default: 'staff_pruning' })
+    source: LicensingMeasurementSource;
 
-    @ManyToOne(() => PruningRequest, { onDelete: 'CASCADE' })
+    @Column({ type: 'uuid', name: 'pruning_request_id', nullable: true })
+    pruningRequestId: string | null;
+
+    @ManyToOne(() => PruningRequest, { nullable: true, onDelete: 'CASCADE' })
     @JoinColumn({ name: 'pruning_request_id' })
-    pruningRequest: PruningRequest;
+    pruningRequest: PruningRequest | null;
+
+    @Column({ type: 'uuid', name: 'measurement_request_id', nullable: true })
+    measurementRequestId: string | null;
+
+    @ManyToOne(() => LandMeasurementRequest, { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'measurement_request_id' })
+    measurementRequest: LandMeasurementRequest | null;
+
+    // The measured owner's field record on this parcel (null for legacy rows).
+    @Column({ type: 'uuid', name: 'field_id', nullable: true })
+    fieldId: string | null;
+
+    @ManyToOne(() => Field, { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'field_id' })
+    field: Field | null;
 
     // Parcel snapshot (mirrors the request so the row is self-describing).
     @Column({ type: 'varchar', length: 100 })

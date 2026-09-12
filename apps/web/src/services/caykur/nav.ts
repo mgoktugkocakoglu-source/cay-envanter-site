@@ -5,7 +5,7 @@
  * filtered groups can be handed straight to `ShellLayout`.
  */
 
-import { ClipboardCheck } from '@lucide/vue';
+import { ClipboardCheck, Ruler } from '@lucide/vue';
 import type { NavGroup, NavItem } from '@/config/navigation';
 import { Icons } from '@/lib/icons';
 import type { ModuleKey } from '@/services/caykur/roles';
@@ -36,6 +36,12 @@ export const NAV_GROUPS: CaykurNavGroup[] = [
                 icon: ClipboardCheck,
             },
             { label: 'Budama Denetimi', to: '/caykur/pruning', module: 'pruning', icon: Icons.pruning },
+            {
+                label: 'Ölçüm Talepleri',
+                to: '/caykur/measurement-requests',
+                module: 'measurement_requests',
+                icon: Ruler,
+            },
         ],
     },
 ];
