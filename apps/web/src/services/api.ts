@@ -788,15 +788,28 @@ export interface KnowledgeDocument {
     status: KnowledgeDocumentStatus;
     charCount: number;
     chunkCount: number;
+    embeddedChunkCount: number;
+    pageCount: number;
+    /** Whether the original file is stored and can be opened/downloaded. */
+    hasFile: boolean;
+    suggestedQuestions: string[];
     errorMessage: string | null;
     createdAt: string;
 }
 
+/** One cited passage; `index` matches the `[n]` markers in the answer. */
 export interface KnowledgeChatSource {
+    index: number;
+    chunkId: string;
     documentId: string;
     title: string;
+    fileName: string;
+    pageNumber: number | null;
     snippet: string;
+    score: number;
 }
+
+export type KnowledgeRetrievalMode = 'hybrid' | 'keyword' | 'none';
 
 export interface KnowledgeChatHistoryMessage {
     role: 'user' | 'assistant';
@@ -807,14 +820,61 @@ export interface KnowledgeChatResponse {
     answer: string;
     sources: KnowledgeChatSource[];
     usedAi: boolean;
+    retrievalMode: KnowledgeRetrievalMode;
+    followUps: string[];
 }
+
+export type KnowledgeChatStreamEvent =
+    | { type: 'meta'; sources: KnowledgeChatSource[]; retrievalMode: KnowledgeRetrievalMode; usedAi: boolean }
+    | { type: 'delta'; text: string }
+    | { type: 'done'; answer: string; followUps: string[] }
+    | { type: 'error'; message: string };
 
 export interface KnowledgeStatus {
     aiConfigured: boolean;
     model: string;
+    embeddingModel: string;
+    fileStorage: 'r2' | 'database';
     documentCount: number;
     readyDocumentCount: number;
     chunkCount: number;
+    embeddedChunkCount: number;
+    pageCount: number;
+}
+
+/**
+ * Raw authenticated fetch for endpoints whose body is not JSON (SSE streams,
+ * file downloads). Mirrors `request()`: attaches the Bearer token and retries
+ * once after a token refresh on 401.
+ */
+async function authorizedFetch(endpoint: string, options: RequestInit = {}, _retry = 0): Promise<Response> {
+    const authStore = useAuthStore();
+    const token = authStore.accessToken;
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+        ...options,
+        headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...options.headers,
+        },
+    });
+
+    if (response.status === 401 && _retry === 0 && authStore.refreshToken) {
+        const refreshed = await refreshTokenIfNeeded();
+        if (refreshed) {
+            return authorizedFetch(endpoint, options, 1);
+        }
+        window.location.href = '/login';
+    }
+    return response;
+}
+
+async function readErrorMessage(response: Response, fallback: string): Promise<string> {
+    try {
+        const data = await response.json();
+        return typeof data?.message === 'string' ? data.message : fallback;
+    } catch {
+        return fallback;
+    }
 }
 
 export const api = {
@@ -1235,6 +1295,75 @@ export const api = {
             method: 'POST',
             body: JSON.stringify({ message, history }),
         }),
+    /**
+     * Streams an answer over server-sent events. `onEvent` receives `meta`,
+     * `delta`, `done` and `error` events in order. Resolves when the stream
+     * closes; rejects on network/HTTP failure (not on an `error` event).
+     */
+    streamKnowledgeChat: async (
+        message: string,
+        history: KnowledgeChatHistoryMessage[],
+        onEvent: (event: KnowledgeChatStreamEvent) => void,
+        signal?: AbortSignal,
+    ): Promise<void> => {
+        const response = await authorizedFetch('/knowledge/chat/stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+            body: JSON.stringify({ message, history }),
+            signal,
+        });
+
+        if (!response.ok || !response.body) {
+            throw new Error(await readErrorMessage(response, 'Yanıt alınamadı.'));
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        const dispatch = (block: string): void => {
+            const dataLines = block
+                .split('\n')
+                .filter((line) => line.startsWith('data:'))
+                .map((line) => line.slice(5).trim());
+            if (!dataLines.length) return;
+            try {
+                onEvent(JSON.parse(dataLines.join('\n')) as KnowledgeChatStreamEvent);
+            } catch {
+                // Ignore malformed frames; the stream continues.
+            }
+        };
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            let boundary = buffer.indexOf('\n\n');
+            while (boundary !== -1) {
+                dispatch(buffer.slice(0, boundary));
+                buffer = buffer.slice(boundary + 2);
+                boundary = buffer.indexOf('\n\n');
+            }
+        }
+        if (buffer.trim()) dispatch(buffer);
+    },
+    /** Fetches the original document as a Blob (for in-app viewing or saving). */
+    getKnowledgeDocumentFile: async (id: string, download = false): Promise<ApiResponse<Blob>> => {
+        try {
+            const response = await authorizedFetch(`/knowledge/documents/${id}/file${download ? '?download=true' : ''}`);
+            if (!response.ok) {
+                return {
+                    error: { message: await readErrorMessage(response, 'Dosya alınamadı.'), statusCode: response.status },
+                };
+            }
+            return { data: await response.blob() };
+        } catch {
+            return { error: { message: 'Dosya indirilirken bağlantı hatası oluştu.', statusCode: 0 } };
+        }
+    },
+    reindexKnowledgeDocument: (id: string) =>
+        request<KnowledgeDocument>(`/knowledge/documents/${id}/reindex`, { method: 'POST' }),
+    reindexKnowledge: () => request<{ queued: number }>('/knowledge/reindex', { method: 'POST' }),
     deleteKnowledgeDocument: (id: string) =>
         request<void>(`/knowledge/documents/${id}`, { method: 'DELETE' }),
     uploadKnowledgeDocument: async (

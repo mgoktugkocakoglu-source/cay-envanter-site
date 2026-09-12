@@ -13,7 +13,9 @@ import { KnowledgeDocumentChunk } from '@/knowledge/entities/document-chunk.enti
 /**
  * A document uploaded to the AI agent's knowledge base (PDF, DOCX, TXT, MD).
  * The extracted text is split into {@link KnowledgeDocumentChunk} rows that
- * back full-text retrieval; this row only holds metadata.
+ * back hybrid (full-text + vector) retrieval. The original file is kept so
+ * users can open and download it: in Cloudflare R2 when configured
+ * (`storageKey`), otherwise inline in Postgres (`fileData`).
  */
 @Entity('knowledge_documents')
 export class KnowledgeDocument {
@@ -40,6 +42,30 @@ export class KnowledgeDocument {
 
     @Column({ type: 'integer', default: 0 })
     chunkCount: number;
+
+    /** Number of chunks that have a stored embedding vector. */
+    @Column({ type: 'integer', default: 0 })
+    embeddedChunkCount: number;
+
+    /** Page count for paginated formats (PDF); 0 when unknown. */
+    @Column({ type: 'integer', default: 0 })
+    pageCount: number;
+
+    /** Embedding model the chunk vectors were produced with; null if none. */
+    @Column({ type: 'varchar', length: 100, nullable: true })
+    embeddingModel: string | null;
+
+    /** LLM-generated starter questions this document can answer. */
+    @Column({ type: 'text', array: true, default: '{}' })
+    suggestedQuestions: string[];
+
+    /** Object key in R2 when the original file lives there. */
+    @Column({ type: 'varchar', length: 512, nullable: true })
+    storageKey: string | null;
+
+    /** Original file bytes when R2 is not configured. Never loaded by default. */
+    @Column({ type: 'bytea', nullable: true, select: false })
+    fileData: Buffer | null;
 
     @Column({ type: 'text', nullable: true })
     errorMessage: string | null;

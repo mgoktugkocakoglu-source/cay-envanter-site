@@ -11,6 +11,7 @@ import { usePaymentsStore } from '@/stores/paymentsStore';
 import { useNotificationsStore } from '@/stores/notificationsStore';
 import { usePruningRequestsStore } from '@/stores/pruningRequestsStore';
 import { useMeasurementRequestsStore } from '@/stores/measurementRequestsStore';
+import { installKnowledgePreviewMocks } from '@/dev/knowledgePreviewMocks';
 
 type StoreLike = Record<string, unknown>;
 
@@ -207,4 +208,5 @@ export function installPreviewMocks() {
     fieldsStore.$patch({ fields: mockFields, currentField: mockFields[0], isLoading: false, error: null });
     harvestsStore.$patch({ harvests: mockHarvests, availableHarvests: mockHarvests, isLoading: false, error: null });
     paymentsStore.$patch({ payments: mockPayments, isLoading: false, error: null });
+    installKnowledgePreviewMocks();
 }

@@ -53,6 +53,10 @@ import { SeedModule } from '@/seed/seed.module';
                     .optional()
                     .allow('')
                     .default('gemini-3.1-flash-lite'),
+                GEMINI_EMBEDDING_MODEL: Joi.string()
+                    .optional()
+                    .allow('')
+                    .default('gemini-embedding-001'),
                 R2_ACCOUNT_ID: Joi.string().optional().allow('').default(''),
                 R2_ENDPOINT: Joi.string().optional().allow('').default(''),
                 R2_ACCESS_KEY_ID: Joi.string().optional().allow('').default(''),

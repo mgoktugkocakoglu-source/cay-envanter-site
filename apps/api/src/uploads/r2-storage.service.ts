@@ -1,10 +1,16 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+    DeleteObjectCommand,
+    GetObjectCommand,
+    PutObjectCommand,
+    S3Client,
+} from '@aws-sdk/client-s3';
+import type { Readable } from 'stream';
 import { extname } from 'path';
 import { v4 as uuid } from 'uuid';
 
-export type UploadFolder = 'avatars' | 'images' | 'videos';
+export type UploadFolder = 'avatars' | 'images' | 'videos' | 'documents';
 
 export interface StoredFile {
     key: string;
@@ -41,6 +47,63 @@ export class R2StorageService {
             },
             forcePathStyle: true,
         });
+    }
+
+    /** True when every setting needed to talk to the bucket is present. */
+    get isConfigured(): boolean {
+        try {
+            this.assertConfigured();
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Stores a raw buffer under a generated key. Unlike {@link upload}, the
+     * object is not meant to be served from the public CDN URL; callers
+     * read it back with {@link getObject}.
+     */
+    async putBuffer(
+        buffer: Buffer,
+        folder: UploadFolder,
+        originalName: string,
+        mimetype: string,
+    ): Promise<string> {
+        this.assertConfigured();
+
+        const extension = extname(originalName).toLowerCase();
+        const key = this.buildKey(folder, `${uuid()}${extension}`);
+
+        await this.client.send(new PutObjectCommand({
+            Bucket: this.bucket,
+            Key: key,
+            Body: buffer,
+            ContentType: mimetype,
+            ContentLength: buffer.length,
+        }));
+
+        return key;
+    }
+
+    /** Streams an object back from the bucket. */
+    async getObject(key: string): Promise<{ stream: Readable; contentLength?: number }> {
+        this.assertConfigured();
+
+        const result = await this.client.send(new GetObjectCommand({
+            Bucket: this.bucket,
+            Key: key,
+        }));
+
+        return {
+            stream: result.Body as Readable,
+            contentLength: result.ContentLength,
+        };
+    }
+
+    async deleteObject(key: string): Promise<void> {
+        this.assertConfigured();
+        await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
     }
 
     async upload(file: Express.Multer.File, folder: UploadFolder): Promise<StoredFile> {

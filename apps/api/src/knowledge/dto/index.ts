@@ -7,6 +7,7 @@ import {
     MaxLength,
     MinLength,
     ArrayMaxSize,
+    IsBooleanString,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -57,6 +58,16 @@ export class ChatDto {
     history?: ChatHistoryMessageDto[];
 }
 
+export class DocumentFileQueryDto {
+    @ApiPropertyOptional({
+        description: 'Send as attachment (download) instead of inline',
+        example: 'true',
+    })
+    @IsOptional()
+    @IsBooleanString()
+    download?: string;
+}
+
 // ─── Response shapes ───
 
 export interface DocumentSummary {
@@ -68,27 +79,54 @@ export interface DocumentSummary {
     status: DocumentStatus;
     charCount: number;
     chunkCount: number;
+    embeddedChunkCount: number;
+    pageCount: number;
+    /** Whether the original file is stored and can be opened/downloaded. */
+    hasFile: boolean;
+    suggestedQuestions: string[];
     errorMessage: string | null;
     createdAt: Date;
 }
 
+/** One cited passage. `index` matches the `[n]` markers in the answer. */
 export interface ChatSource {
+    index: number;
+    chunkId: string;
     documentId: string;
     title: string;
+    fileName: string;
+    pageNumber: number | null;
     snippet: string;
+    /** Fused relevance score in [0, 1]; higher is more relevant. */
+    score: number;
 }
+
+export type RetrievalMode = 'hybrid' | 'keyword' | 'none';
 
 export interface ChatResponse {
     answer: string;
     sources: ChatSource[];
     /** True when the answer came from the LLM; false for the retrieval-only fallback. */
     usedAi: boolean;
+    retrievalMode: RetrievalMode;
+    followUps: string[];
 }
+
+/** Events emitted on the `chat/stream` SSE endpoint, in order. */
+export type ChatStreamEvent =
+    | { type: 'meta'; sources: ChatSource[]; retrievalMode: RetrievalMode; usedAi: boolean }
+    | { type: 'delta'; text: string }
+    | { type: 'done'; answer: string; followUps: string[] }
+    | { type: 'error'; message: string };
 
 export interface KnowledgeStatus {
     aiConfigured: boolean;
     model: string;
+    embeddingModel: string;
+    fileStorage: 'r2' | 'database';
     documentCount: number;
     readyDocumentCount: number;
     chunkCount: number;
+    embeddedChunkCount: number;
+    pageCount: number;
 }
