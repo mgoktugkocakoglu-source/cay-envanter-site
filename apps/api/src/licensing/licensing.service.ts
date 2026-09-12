@@ -203,8 +203,11 @@ export class LicensingService {
         if (query.status) {
             qb.andWhere('a.status = :status', { status: query.status });
         }
-        // Pending decisions first, newest first within each group.
-        qb.orderBy(`CASE WHEN a.status = 'pending' THEN 0 ELSE 1 END`, 'ASC')
+        // Pending decisions first, newest first within each group. The CASE
+        // must be selected under an alias: TypeORM treats a raw expression in
+        // orderBy as an entity alias and throws "alias was not found".
+        qb.addSelect(`CASE WHEN "a"."status" = 'pending' THEN 0 ELSE 1 END`, 'pending_first')
+            .orderBy('pending_first', 'ASC')
             .addOrderBy('a.createdAt', 'DESC')
             .skip((page - 1) * limit)
             .take(limit);
