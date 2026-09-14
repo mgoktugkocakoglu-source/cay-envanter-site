@@ -35,6 +35,7 @@ export interface AuthUser {
     role: string;
     caykurRole: string | null;
     caykurScope: string | null;
+    ruhsatNo: string | null;
     cuzdanNo: string | null;
     quotaPerDekarKg: number | null;
     appointmentDays: string[] | null;
@@ -224,6 +225,7 @@ export class AuthService {
             avatarUrl: user.avatarUrl,
             caykurRole: user.caykurRole,
             caykurScope: user.caykurScope,
+            ruhsatNo: user.ruhsatNo,
             cuzdanNo: user.cuzdanNo,
             quotaPerDekarKg: user.quotaPerDekarKg,
             appointmentDays: user.appointmentDays,

@@ -137,6 +137,7 @@ const appointmentDays = computed(() =>
 const weeklyCapacityKg = computed(() =>
     Math.round(totalArea.value * caykurQuota.value * appointmentDays.value.length),
 );
+const CAYKUR_PURCHASE_POINT = 'Çataldere';
 
 const formattedClock = computed(() =>
     currentTime.value.toLocaleTimeString('tr-TR', {
@@ -399,7 +400,7 @@ onUnmounted(stopClock);
                         <CardDescription>Güncel kontenjan ve randevu bilgileriniz</CardDescription>
                     </CardHeader>
                     <CardContent class="flex flex-col gap-4">
-                        <dl class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <dl class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                             <div class="rounded-lg border p-4">
                                 <dt class="text-xs font-medium text-muted-foreground">Toplam Arazi</dt>
                                 <dd class="mt-1 text-xl font-bold text-foreground tabular-nums">
@@ -421,6 +422,10 @@ onUnmounted(stopClock);
                             <div class="rounded-lg border p-4">
                                 <dt class="text-xs font-medium text-muted-foreground">Randevu Günleri</dt>
                                 <dd class="mt-1 text-base font-semibold text-foreground">{{ appointmentDays.join(', ') }}</dd>
+                            </div>
+                            <div class="rounded-lg border p-4">
+                                <dt class="text-xs font-medium text-muted-foreground">Alım Yeri</dt>
+                                <dd class="mt-1 text-base font-semibold text-foreground">{{ CAYKUR_PURCHASE_POINT }}</dd>
                             </div>
                         </dl>
                     </CardContent>

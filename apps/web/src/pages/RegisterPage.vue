@@ -384,7 +384,7 @@ async function resendVerification() {
                     :aria-invalid="!!errors.farmerIdNumber"
                     @blur="validateField('farmerIdNumber')"
                 />
-                <p class="text-xs text-muted-foreground">TC kimlik numaranız, diger kullanıcılarla baglantı kurmak icin kullanılacaktır.</p>
+                <p class="text-xs text-muted-foreground">TC kimlik numaranız, diğer kullanıcılarla bağlantı kurmak için kullanılacaktır.</p>
                 <p v-if="errors.farmerIdNumber" class="text-xs text-destructive">{{ errors.farmerIdNumber }}</p>
             </div>
 

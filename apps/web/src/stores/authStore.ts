@@ -25,6 +25,7 @@ interface User {
     // Çaykur staff identity; null/undefined ⇒ producer (müstahsil).
     caykurRole?: CaykurRole | null;
     caykurScope?: string | null;
+    ruhsatNo?: string | null;
     cuzdanNo?: string | null;
     quotaPerDekarKg?: number | null;
     appointmentDays?: string[] | null;

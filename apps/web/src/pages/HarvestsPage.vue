@@ -143,7 +143,9 @@ const analysisMonthRows = computed(() => {
                 changePercent,
             };
         });
-    });
+    // A field's first harvest month has nothing to compare against; only
+    // months with a previous month are shown as comparison cards.
+    }).filter(row => row.changePercent !== null);
 });
 
 const analysisYearRows = computed(() => {
@@ -284,10 +286,10 @@ function formatPercent(value: number | null) {
 }
 
 function getTrendLabel(value: number | null) {
-    if (value === null) return 'Onceki veri yok';
-    if (value > 0) return 'Verim artisi';
-    if (value < 0) return 'Verim dususu';
-    return 'Degisim yok';
+    if (value === null) return 'Önceki veri yok';
+    if (value > 0) return 'Verim artışı';
+    if (value < 0) return 'Verim düşüşü';
+    return 'Değişim yok';
 }
 
 function trendVariant(value: number | null): 'success' | 'warning' | 'muted' {
@@ -406,7 +408,7 @@ function statusLabel(status: string) {
                     <EmptyState
                         v-else-if="analysisMonthRows.length === 0 && analysisYearRows.length === 0"
                         :icon="BarChart3"
-                        title="Analiz icin hasat verisi yok"
+                        title="Analiz için hasat verisi yok"
                         description="Hasat Verilerim sekmesinden teslimatlarınızı bir araziye atadığınızda verim değişimleri burada görünür."
                     />
 
@@ -421,8 +423,8 @@ function statusLabel(status: string) {
                                 <TrendingUp v-else aria-hidden="true" />
                                 <AlertTitle>{{ item.fieldName }}</AlertTitle>
                                 <AlertDescription>
-                                    {{ item.previousMonthName }} ayina gore {{ item.monthName }} ayinda
-                                    {{ formatPercent(item.changePercent) }} {{ item.changePercent !== null && item.changePercent >= 0 ? 'verim artisi' : 'verim dususu' }} gozlemlendi.
+                                    {{ item.previousMonthName }} ayına göre {{ item.monthName }} ayında
+                                    {{ formatPercent(item.changePercent) }} {{ item.changePercent !== null && item.changePercent >= 0 ? 'verim artışı' : 'verim düşüşü' }} gözlemlendi.
                                 </AlertDescription>
                             </Alert>
                         </div>
@@ -430,7 +432,7 @@ function statusLabel(status: string) {
                         <Card>
                             <CardHeader>
                                 <CardTitle>Aylık Karşılaştırma</CardTitle>
-                                <CardDescription>Ayni arazide bir onceki hasat ayina gore degisim.</CardDescription>
+                                <CardDescription>Aynı arazide bir önceki hasat ayına göre değişim.</CardDescription>
                             </CardHeader>
                             <CardContent class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                                 <article
@@ -450,12 +452,7 @@ function statusLabel(status: string) {
                                         <span class="font-semibold text-foreground tabular-nums">{{ formatKg(row.kg) }}</span>
                                     </div>
                                     <p class="text-xs text-muted-foreground">
-                                        <template v-if="row.previousKg !== null">
-                                            {{ row.previousMonthName }}: {{ formatKg(row.previousKg) }} - {{ getTrendLabel(row.changePercent) }}
-                                        </template>
-                                        <template v-else>
-                                            Bu yil icin ilk hasat ayi.
-                                        </template>
+                                        {{ row.previousMonthName }}: {{ formatKg(row.previousKg) }} - {{ getTrendLabel(row.changePercent) }}
                                     </p>
                                 </article>
                             </CardContent>
@@ -464,7 +461,7 @@ function statusLabel(status: string) {
                         <Card>
                             <CardHeader>
                                 <CardTitle>Yıllık Karşılaştırma</CardTitle>
-                                <CardDescription>{{ Number(yearFilter) - 1 }} yilina gore {{ yearFilter }} toplam verim degisimi.</CardDescription>
+                                <CardDescription>{{ Number(yearFilter) - 1 }} yılına göre {{ yearFilter }} toplam verim değişimi.</CardDescription>
                             </CardHeader>
                             <CardContent class="flex flex-col gap-3">
                                 <div class="hidden overflow-hidden rounded-lg border md:block">
@@ -474,7 +471,7 @@ function statusLabel(status: string) {
                                                 <TableHead class="pl-4">Arazi</TableHead>
                                                 <TableHead class="text-right">{{ Number(yearFilter) - 1 }}</TableHead>
                                                 <TableHead class="text-right">{{ yearFilter }}</TableHead>
-                                                <TableHead class="pr-4 text-right">Degisim</TableHead>
+                                                <TableHead class="pr-4 text-right">Değişim</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>

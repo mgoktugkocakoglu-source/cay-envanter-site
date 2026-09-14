@@ -406,7 +406,7 @@ async function handleMapClick(e: L.LeafletMouseEvent) {
             clickedParcel.value = response.data;
             displayClickedParcel(response.data);
         } else {
-            formError.value = 'Bu koordinatta parsel bulunamadi';
+            formError.value = 'Bu koordinatta parsel bulunamadı';
             clickedParcel.value = null;
             clearClickedParcelLayer();
         }
@@ -673,7 +673,7 @@ function goBack() {
                     </template>
                     <template v-else>
                         <Map class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                        <span class="text-muted-foreground">Konum secimi icin adimlari takip edin</span>
+                        <span class="text-muted-foreground">Konum seçimi için adımları takip edin</span>
                     </template>
                 </div>
             </Card>

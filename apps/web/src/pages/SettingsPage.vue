@@ -39,6 +39,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { resolveCuzdanNo, resolveRuhsatNo } from '@/utils/caykurIdentity';
 
 const router = useRouter();
 
@@ -403,6 +404,10 @@ const userTypeLabel = computed(() => {
 
 const userInitial = computed(() => authStore.user?.fullName?.charAt(0)?.toUpperCase() || 'U');
 
+// Çaykur identifiers are maintained by Çaykur, never edited here.
+const ruhsatNo = computed(() => resolveRuhsatNo(authStore.user));
+const cuzdanNo = computed(() => resolveCuzdanNo(authStore.user));
+
 // Tab change handler
 function switchTab(tab: SettingsTab) {
     activeTab.value = tab;
@@ -550,6 +555,16 @@ function onThemeChange(value: AcceptableValue) {
                                     <Label for="profileUserType">Kullanıcı Tipi</Label>
                                     <Input id="profileUserType" type="text" class="h-11 md:h-9" :model-value="userTypeLabel" disabled />
                                     <p class="text-xs text-muted-foreground">Kullanıcı tipi değiştirilemez</p>
+                                </div>
+                                <div class="space-y-2">
+                                    <Label for="profileRuhsatNo">Ruhsat No.</Label>
+                                    <Input id="profileRuhsatNo" type="text" class="h-11 md:h-9 tabular-nums" :model-value="ruhsatNo" disabled />
+                                    <p class="text-xs text-muted-foreground">Ruhsat numarası Çaykur tarafından belirlenir, değiştirilemez</p>
+                                </div>
+                                <div class="space-y-2">
+                                    <Label for="profileCuzdanNo">Cüzdan No.</Label>
+                                    <Input id="profileCuzdanNo" type="text" class="h-11 md:h-9 tabular-nums" :model-value="cuzdanNo" disabled />
+                                    <p class="text-xs text-muted-foreground">Cüzdan numarası Çaykur tarafından belirlenir, değiştirilemez</p>
                                 </div>
                             </form>
                         </CardContent>
@@ -743,7 +758,7 @@ function onThemeChange(value: AcceptableValue) {
                                 </Table>
                             </div>
 
-                            <EmptyState v-else :icon="MonitorSmartphone" title="Aktif oturum bulunamadi" />
+                            <EmptyState v-else :icon="MonitorSmartphone" title="Aktif oturum bulunamadı" />
                         </CardContent>
                     </Card>
                 </TabsContent>
