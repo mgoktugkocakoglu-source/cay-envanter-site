@@ -180,6 +180,12 @@ const router = createRouter({
             meta: { requiresAuth: true, module: 'fields' },
         },
         {
+            path: '/caykur/tea-inventory',
+            name: 'caykur-tea-inventory',
+            component: () => import('@/pages/caykur/CaykurTeaInventoryPage.vue'),
+            meta: { requiresAuth: true, module: 'tea_inventory' },
+        },
+        {
             path: '/caykur/pruning-requests',
             name: 'caykur-pruning-requests',
             component: () => import('@/pages/caykur/CaykurPruningRequestsPage.vue'),

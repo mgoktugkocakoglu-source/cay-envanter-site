@@ -520,6 +520,106 @@ export interface CaykurFieldsQuery {
     sortOrder?: 'ASC' | 'DESC';
 }
 
+// Çaykur tea inventory (TKGM parcels × satellite tea detection × license register)
+export type InventoryClass =
+    | 'compliant'
+    | 'over_quota'
+    | 'ghost_license'
+    | 'expanded'
+    | 'unlicensed'
+    | 'public_land'
+    | 'uncertain'
+    | 'no_tea';
+
+export interface InventoryLicense {
+    licenseNo: string;
+    walletNo: string;
+    holderName: string;
+    holderDeceased: boolean;
+    licensedAreaM2: number;
+    issuedYear: number;
+    recordedParcelRef: string;
+}
+
+export interface InventoryAreaSummary {
+    id: string;
+    code: string;
+    province: string;
+    district: string;
+    neighborhood: string;
+    parcelCount: number;
+    flaggedCount: number;
+    detectedTeaAreaM2: number;
+    coveredRatio: number;
+    demoLicenses: boolean;
+    updatedAt: string;
+}
+
+export interface InventoryClassStat {
+    count: number;
+    teaAreaM2: number;
+    licensedAreaM2: number;
+}
+
+export interface InventoryModelReport {
+    type?: string;
+    heldOutAccuracy?: number;
+    kappa?: number;
+    teaRecall?: number;
+    teaPrecision?: number;
+    threshold?: number;
+}
+
+export interface InventoryAreaDetail extends InventoryAreaSummary {
+    neighborhoodId: number | null;
+    boundary: GeoJSON.Geometry;
+    boundaryAreaM2: number;
+    period: { start?: string; end?: string };
+    model: InventoryModelReport;
+    teaPatches: Array<{ areaM2: number; geometry: GeoJSON.Geometry }>;
+    teaPatchAreaM2: number;
+    licensedAreaM2: number;
+    unmatchedLicenses: InventoryLicense[];
+    classStats: Record<InventoryClass, InventoryClassStat>;
+}
+
+export interface InventoryParcelRow {
+    id: string;
+    parcelKey: string;
+    block: string;
+    parcel: string;
+    nature: string;
+    locality: string;
+    deedAreaM2: number | null;
+    geometryAreaM2: number;
+    teaShare: number | null;
+    teaAreaM2: number | null;
+    inventoryClass: InventoryClass;
+    license: InventoryLicense | null;
+}
+
+export interface InventoryParcelDetail extends InventoryParcelRow {
+    areaId: string;
+    teaProbability: number | null;
+    geometry: GeoJSON.Geometry;
+}
+
+export type InventoryMap = GeoJSON.FeatureCollection<
+    GeoJSON.Geometry,
+    { id: string; block: string; parcel: string; nature: string; teaShare: number | null; inventoryClass: InventoryClass }
+>;
+
+export type InventoryParcelSortKey = 'parcel' | 'teaArea' | 'licensedArea' | 'gap';
+
+export interface InventoryParcelQuery {
+    page?: number;
+    limit?: number;
+    inventoryClass?: InventoryClass;
+    search?: string;
+    sortBy?: InventoryParcelSortKey;
+    sortOrder?: 'ASC' | 'DESC';
+}
+
 // Çaykur panel master dataset (müstahsil registry) — DB-backed.
 export interface CaykurPanelProducer {
     id: string;
@@ -1142,6 +1242,19 @@ export const api = {
         return request<Paginated<CaykurFieldRow>>(`/caykur/fields${query ? `?${query}` : ''}`);
     },
     getCaykurFieldsOverview: () => request<CaykurFieldsOverview>('/caykur/fields/overview'),
+
+    // Çaykur tea inventory
+    getInventoryAreas: () => request<Paginated<InventoryAreaSummary>>('/caykur/tea-inventory/areas?limit=100'),
+    getInventoryArea: (id: string) => request<InventoryAreaDetail>(`/caykur/tea-inventory/areas/${id}`),
+    getInventoryAreaMap: (id: string) => request<InventoryMap>(`/caykur/tea-inventory/areas/${id}/map`),
+    getInventoryParcels: (areaId: string, params?: InventoryParcelQuery) => {
+        const entries = Object.entries(params ?? {}).filter(
+            ([, v]) => v !== undefined && v !== null && v !== '',
+        ) as Array<[string, string | number]>;
+        const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        return request<Paginated<InventoryParcelRow>>(`/caykur/tea-inventory/areas/${areaId}/parcels${query ? `?${query}` : ''}`);
+    },
+    getInventoryParcel: (id: string) => request<InventoryParcelDetail>(`/caykur/tea-inventory/parcels/${id}`),
 
     // Harvests endpoints
     getHarvests: (params?: { fieldId?: string; year?: number; status?: string }) => {

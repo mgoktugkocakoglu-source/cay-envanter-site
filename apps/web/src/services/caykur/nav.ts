@@ -5,7 +5,7 @@
  * filtered groups can be handed straight to `ShellLayout`.
  */
 
-import { ClipboardCheck, Ruler } from '@lucide/vue';
+import { ClipboardCheck, Leaf, Ruler } from '@lucide/vue';
 import type { NavGroup, NavItem } from '@/config/navigation';
 import { Icons } from '@/lib/icons';
 import type { ModuleKey } from '@/services/caykur/roles';
@@ -24,6 +24,7 @@ export const NAV_GROUPS: CaykurNavGroup[] = [
         label: 'Kayıtlar',
         items: [
             { label: 'Araziler', to: '/caykur/fields', module: 'fields', icon: Icons.fields },
+            { label: 'Çay Envanteri', to: '/caykur/tea-inventory', module: 'tea_inventory', icon: Leaf },
         ],
     },
     {

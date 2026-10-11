@@ -7,7 +7,7 @@
  */
 
 /** Every navigable area of the Kurum panel — the unit of access control. */
-export type ModuleKey = 'fields' | 'pruning' | 'pruning_requests' | 'measurement_requests';
+export type ModuleKey = 'fields' | 'pruning' | 'pruning_requests' | 'measurement_requests' | 'tea_inventory';
 
 export type CaykurRole =
     | 'kurum_admin'
@@ -39,7 +39,7 @@ export const ROLE_DEFS: RoleDef[] = [
         label: 'Fabrika Sorumlusu',
         short: 'Fabrika',
         description: 'Bağlı fabrika ve alım yerlerinin operasyonunu yönetir.',
-        access: ['fields', 'pruning', 'pruning_requests', 'measurement_requests'],
+        access: ['fields', 'pruning', 'pruning_requests', 'measurement_requests', 'tea_inventory'],
     },
     {
         id: 'alim_yeri_personeli',
@@ -53,14 +53,14 @@ export const ROLE_DEFS: RoleDef[] = [
         label: 'Saha Personeli',
         short: 'Saha',
         description: 'Parsel doğrulama ve budama ölçüm görevlerini yürütür.',
-        access: ['fields', 'pruning', 'pruning_requests', 'measurement_requests'],
+        access: ['fields', 'pruning', 'pruning_requests', 'measurement_requests', 'tea_inventory'],
     },
     {
         id: 'denetci',
         label: 'Denetçi',
         short: 'Denetçi',
         description: 'Uygunluk, ödeme ve işlem kayıtlarını denetler (salt-izleme).',
-        access: ['fields', 'pruning'],
+        access: ['fields', 'pruning', 'tea_inventory'],
     },
     {
         id: 'finans',
@@ -76,6 +76,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
     pruning: 'Budama Denetimi',
     pruning_requests: 'Budama Talepleri',
     measurement_requests: 'Ölçüm Talepleri',
+    tea_inventory: 'Çay Envanteri',
 };
 
 export const ALL_MODULES: ModuleKey[] = Object.keys(MODULE_LABELS) as ModuleKey[];

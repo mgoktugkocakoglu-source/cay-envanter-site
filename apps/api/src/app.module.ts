@@ -20,6 +20,7 @@ import { PruningModule } from '@/pruning/pruning.module';
 import { CaykurModule } from '@/caykur/caykur.module';
 import { LicensingModule } from '@/licensing/licensing.module';
 import { MeasurementRequestsModule } from '@/measurement-requests/measurement-requests.module';
+import { TeaInventoryModule } from '@/tea-inventory/tea-inventory.module';
 import { SeedModule } from '@/seed/seed.module';
 
 @Module({
@@ -104,6 +105,7 @@ import { SeedModule } from '@/seed/seed.module';
         CaykurModule,
         LicensingModule,
         MeasurementRequestsModule,
+        TeaInventoryModule,
         SeedModule,
     ],
     providers: [
