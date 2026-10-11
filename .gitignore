@@ -49,3 +49,6 @@ docker-compose.override.yml
 .gemini/
 gha-creds-*.json
 backup.dump
+.vercel
+.env*
+!.env.example
