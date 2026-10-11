@@ -44,6 +44,7 @@ import { SeedModule } from '@/seed/seed.module';
                 DB_USERNAME: Joi.string().required(),
                 DB_PASSWORD: Joi.string().required(),
                 DB_DATABASE: Joi.string().required(),
+                DB_SSL: Joi.string().valid('true', 'false').optional().default('false'),
                 JWT_SECRET: Joi.string().required(),
                 JWT_EXPIRES_IN: Joi.string().default('30m'),
                 JWT_REFRESH_SECRET: Joi.string().required(),
@@ -82,6 +83,8 @@ import { SeedModule } from '@/seed/seed.module';
                 username: configService.get<string>('DB_USERNAME'),
                 password: configService.get<string>('DB_PASSWORD'),
                 database: configService.get<string>('DB_DATABASE'),
+                // Managed Postgres (Neon, Supabase…) requires TLS; local Docker does not.
+                ssl: configService.get<string>('DB_SSL') === 'true' ? { rejectUnauthorized: false } : false,
                 autoLoadEntities: true,
                 synchronize: true,
                 logging: configService.get<string>('NODE_ENV') === 'development',
