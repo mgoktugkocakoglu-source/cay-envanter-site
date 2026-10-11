@@ -1,0 +1,21 @@
+# Upload only what the Vercel build needs (web + api sources, lockfile, configs).
+node_modules
+**/node_modules
+**/dist
+.env*
+!.env.example
+apps/web/android
+apps/web/ios
+apps/api/Cadastre.md
+hardware
+n8n-workflows
+cloudflare
+.agent
+.agents
+.ai
+.claude
+.gemini
+.impeccable
+.Jules
+MEMORY
+*.dump
