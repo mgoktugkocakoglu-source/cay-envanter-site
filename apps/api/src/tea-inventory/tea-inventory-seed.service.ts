@@ -3,17 +3,35 @@ import { join } from 'node:path';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource, EntityManager } from 'typeorm';
-import { TeaInventoryArea, InventoryLicense, TeaPatch, ProducerScanBlock, ProducerSeasonSchedule } from '@/tea-inventory/entities/tea-inventory-area.entity';
+import { TeaInventoryArea, InventoryLicense, LicensingBlock, TeaPatch, ProducerScanBlock, ProducerSeasonSchedule } from '@/tea-inventory/entities/tea-inventory-area.entity';
 import { TeaInventoryParcel } from '@/tea-inventory/entities/tea-inventory-parcel.entity';
 import { InventoryClass } from '@/tea-inventory/enums/inventory-class.enum';
 import { TeaInventoryProducer, ProducerScan, ProducerAutoStatus } from '@/tea-inventory/entities/tea-inventory-producer.entity';
 import { TeaInventoryGarden, GardenSeason, GardenPruningEvent } from '@/tea-inventory/entities/tea-inventory-garden.entity';
+import { TeaInventoryLicense } from '@/tea-inventory/entities/tea-inventory-license.entity';
+import { ParcelLineage } from '@/tea-inventory/entities/parcel-lineage.entity';
+import { LicensingApplication } from '@/tea-inventory/entities/licensing-application.entity';
 
 /** Bundles exported by the cay-envanter engine (`npm run export-site`); copied to dist by nest-cli assets. */
 const SEED_DIR = join(__dirname, 'seed-data');
-/** v1 inventory; v2 pruning; v3 single-season producers (no longer imported); v4 multi-season producers. */
-const SUPPORTED_BUNDLE_VERSIONS = [1, 2, 4];
+/** v1 inventory; v2 pruning; v3 single-season producers (no longer imported); v4 multi-season producers; v5 licence register. */
+const SUPPORTED_BUNDLE_VERSIONS = [1, 2, 4, 5];
 const INSERT_CHUNK = 200;
+
+type LicenseRow = Omit<TeaInventoryLicense, 'id' | 'areaId' | 'area'>;
+type LineageRow = Omit<ParcelLineage, 'id' | 'areaId' | 'area'>;
+type ApplicationRow = Omit<LicensingApplication, 'id' | 'areaId' | 'area'>;
+type GardenLicensingFields = Pick<
+    TeaInventoryGarden,
+    'code' | 'licenseCode' | 'approvalStatus' | 'licensedAreaM2' | 'planimetricAreaM2' | 'surfaceAreaM2' | 'meanSlopeDeg' | 'measuredTeaAreaM2' | 'discrepancies' | 'versions' | 'proposal'
+>;
+
+interface BundleLicensing extends LicensingBlock {
+    lineage: LineageRow[];
+    licenses: LicenseRow[];
+    gardens: GardenLicensingFields[];
+    applications: ApplicationRow[];
+}
 
 interface InventoryBundle {
     version: number;
@@ -51,6 +69,7 @@ interface InventoryBundle {
     unmatchedLicenses: InventoryLicense[];
     pruning?: Record<string, unknown> | null;
     producers?: BundleProducers | null;
+    licensing?: BundleLicensing | null;
 }
 
 interface BundleProducers {
@@ -144,6 +163,15 @@ export class TeaInventorySeedService implements OnModuleInit {
                     producerScan: bundle.producers
                         ? { rules: bundle.producers.rules, seasons: bundle.producers.seasons.map(({ producers: _p, gardens: _g, events: _e, ...schedule }) => schedule), scenes: bundle.producers.scenes }
                         : null,
+                    licensing: bundle.licensing
+                        ? {
+                            demo: bundle.licensing.demo,
+                            generatedAt: bundle.licensing.generatedAt,
+                            rules: bundle.licensing.rules,
+                            conflicts: bundle.licensing.conflicts,
+                            unlicensedTea: bundle.licensing.unlicensedTea,
+                        }
+                        : null,
                     bundleGeneratedAt: generatedAt,
                 }),
             );
@@ -152,17 +180,30 @@ export class TeaInventorySeedService implements OnModuleInit {
             );
             await manager.save(parcels, { chunk: INSERT_CHUNK });
             if (bundle.producers) {
-                await this.importProducers(manager, area.id, bundle.producers);
+                await this.importProducers(manager, area.id, bundle.producers, bundle.licensing ?? null);
+            }
+            if (bundle.licensing) {
+                await this.importLicensing(manager, area.id, bundle.licensing);
             }
             this.logger.log(`Imported tea inventory ${bundle.area.code}: ${parcels.length} parcels`);
         });
     }
 
+    /** Licences, old→new parcel links and application files of the register. */
+    private async importLicensing(manager: EntityManager, areaId: string, block: BundleLicensing): Promise<void> {
+        await manager.save(block.licenses.map((l) => manager.create(TeaInventoryLicense, { ...l, areaId })), { chunk: INSERT_CHUNK });
+        await manager.save(block.lineage.map((l) => manager.create(ParcelLineage, { ...l, areaId })), { chunk: INSERT_CHUNK });
+        await manager.save(block.applications.map((a) => manager.create(LicensingApplication, { ...a, areaId })), { chunk: INSERT_CHUNK });
+        this.logger.log(`Imported ${block.licenses.length} licences, ${block.lineage.length} lineage records, ${block.applications.length} applications`);
+    }
+
     /**
      * One producer row per scanned season (same code across seasons); one garden row per
-     * ground record with its per-season results and event polygons.
+     * ground record with its per-season results and event polygons (and, from bundle v5, its
+     * licence register fields).
      */
-    private async importProducers(manager: EntityManager, areaId: string, block: BundleProducers): Promise<void> {
+    private async importProducers(manager: EntityManager, areaId: string, block: BundleProducers, licensing: BundleLicensing | null): Promise<void> {
+        const licensingByGarden = new Map((licensing?.gardens ?? []).map((g) => [g.code, g]));
         const names = new Map(block.producers.map((p) => [p.code, p]));
         const gardenCount = new Map<string, number>();
         for (const g of block.gardens) gardenCount.set(g.producerCode, (gardenCount.get(g.producerCode) ?? 0) + 1);
@@ -213,9 +254,10 @@ export class TeaInventorySeedService implements OnModuleInit {
                 seasonsByGarden.set(code, entry);
             }
         }
-        const gardens = block.gardens.map((g) =>
-            manager.create(TeaInventoryGarden, { ...g, areaId, seasons: seasonsByGarden.get(g.code) ?? {} }),
-        );
+        const gardens = block.gardens.map((g) => {
+            const { code: _c, ...licensingFields } = licensingByGarden.get(g.code) ?? { code: g.code };
+            return manager.create(TeaInventoryGarden, { ...g, ...licensingFields, areaId, seasons: seasonsByGarden.get(g.code) ?? {} });
+        });
         await manager.save(gardens, { chunk: INSERT_CHUNK });
         this.logger.log(`Imported ${block.producers.length} producers × ${block.seasons.length} seasons and ${gardens.length} gardens`);
     }

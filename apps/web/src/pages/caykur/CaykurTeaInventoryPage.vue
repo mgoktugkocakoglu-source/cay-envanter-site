@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, Info, Leaf, MapPinned, Scissors, X } from '@lucide/vue';
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, Info, Leaf, MapPinned, Scissors, ScrollText, X } from '@lucide/vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import CaykurLayout from '@/layouts/CaykurLayout.vue';
@@ -17,6 +17,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import CaykurPruningMonitor from '@/components/caykur/CaykurPruningMonitor.vue';
 import CaykurProducerPruning from '@/components/caykur/CaykurProducerPruning.vue';
+import CaykurLicensing from '@/components/caykur/CaykurLicensing.vue';
 import { toneVariant } from '@/components/caykur/tone';
 import {
     api,
@@ -68,7 +69,7 @@ const totalPages = ref(0);
 const isLoadingRows = ref(false);
 
 // ── Tabs: the inventory map stays mounted (v-show) and is resized when shown again ──
-const activeTab = ref<'inventory' | 'pruning'>('inventory');
+const activeTab = ref<'inventory' | 'pruning' | 'licensing'>('inventory');
 // Pruning is judged per producer (1/7 of all their gardens); the parcel view stays for inspection.
 const pruningView = ref<'producers' | 'parcels'>('producers');
 function onPruningView(v: unknown): void {
@@ -306,7 +307,8 @@ function sortDirOf(key: InventoryParcelSortKey): 'asc' | 'desc' | undefined {
 }
 
 function gapOf(r: InventoryParcelRow): number | null {
-    if (!r.license) return null;
+    // No gap can be judged while the licence's parcel match is still pending.
+    if (!r.license || r.license.licensedAreaM2 === null) return null;
     return Math.round((r.teaAreaM2 ?? 0) - r.license.licensedAreaM2);
 }
 function formatGap(value: number | null): string {
@@ -364,6 +366,7 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                     <TabsList variant="line" class="w-full">
                         <TabsTrigger value="inventory"><Leaf aria-hidden="true" />Envanter</TabsTrigger>
                         <TabsTrigger value="pruning"><Scissors aria-hidden="true" />Budama Takibi</TabsTrigger>
+                        <TabsTrigger value="licensing"><ScrollText aria-hidden="true" />Ruhsatlandırma</TabsTrigger>
                     </TabsList>
                 </Tabs>
 
@@ -456,6 +459,10 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                                         Ruhsat {{ selected.license.licenseNo }} · Cüzdan {{ selected.license.walletNo }} · {{ selected.license.issuedYear }}
                                     </p>
                                     <p class="text-muted-foreground">Kayıttaki parsel: {{ selected.license.recordedParcelRef }}</p>
+                                    <p v-if="(selected.license.licenseCount ?? 1) > 1 || (selected.license.producerCount ?? 1) > 1" class="text-muted-foreground">
+                                        Parselde {{ selected.license.producerCount ?? 1 }} müstahsil, {{ selected.license.licenseCount ?? 1 }} ruhsat (müstahsil bazlı kayıt için Ruhsatlandırma sekmesi)
+                                    </p>
+                                    <Badge v-if="selected.license.pendingMatch" variant="warning">Ruhsat var, parsel eşleşmesi bekliyor — alan tahsis edilmedi</Badge>
                                     <Badge v-if="selected.license.holderDeceased" variant="warning">Ruhsat sahibi vefat etmiş görünüyor</Badge>
                                 </div>
                                 <p v-else class="text-sm text-muted-foreground">Bu parsele bağlı ruhsat kaydı yok.</p>
@@ -602,6 +609,8 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                     <CaykurProducerPruning v-if="pruningView === 'producers'" :area-id="area.id" :map-data="mapData" />
                     <CaykurPruningMonitor v-else :area-id="area.id" :boundary="area.boundary" :map-data="mapData" />
                 </template>
+
+                <CaykurLicensing v-if="activeTab === 'licensing' && mapData" :area-id="area.id" :map-data="mapData" :tea-patches="area.teaPatches" />
             </template>
         </PageContainer>
     </CaykurLayout>

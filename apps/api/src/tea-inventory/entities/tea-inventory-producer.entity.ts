@@ -9,7 +9,8 @@ export type ProducerAutoStatus =
     | 'boundary_unresolved'
     | 'partial'
     | 'no_trace'
-    | 'awaiting_observation';
+    | 'awaiting_observation'
+    | 'no_license';
 
 /** One scan of the season for this producer: cumulative pruned area against the 1/7 target. */
 export interface ProducerScan {

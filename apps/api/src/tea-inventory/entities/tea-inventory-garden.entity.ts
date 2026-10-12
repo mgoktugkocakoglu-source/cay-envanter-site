@@ -25,10 +25,39 @@ export interface GardenSeason {
     events: GardenPruningEvent[];
 }
 
+/** Boundary approval state of the garden's geometry (the licensed sub-polygon). */
+export type GardenApprovalStatus = 'approved' | 'proposed' | 'boundary_conflict' | 'field_check_required' | 'unresolved';
+
+/** Record problems found between the licence, the geometry and the satellite. */
+export type GardenDiscrepancy = 'area_over' | 'area_under' | 'no_tea' | 'no_license' | 'lineage_unresolved' | 'overlap' | 'outside_parcel';
+
+/** One dated version of the garden geometry (older versions stay for the audit trail). */
+export interface GardenGeometryVersion {
+    version: number;
+    geometry: Record<string, unknown>;
+    planimetricAreaM2: number;
+    reason: string;
+    source: string;
+    validFrom: string;
+    validTo: string | null;
+}
+
+/** A boundary proposed inside a shared parcel, not yet approved. */
+export interface GardenBoundaryProposal {
+    geometry: Record<string, unknown>;
+    planimetricAreaM2: number;
+    proposedBy: 'producer' | 'staff';
+    proposedAt: string;
+    overlapM2: number;
+    overlapsGardenCode: string | null;
+}
+
 /**
  * One tea garden of a producer: a whole TKGM parcel, or the producer's slice of a shared
  * (hisseli) parcel. Static across seasons (the ground record); per-season results and event
- * polygons hang off it so the same ground can be compared year over year.
+ * polygons hang off it so the same ground can be compared year over year. With the licence
+ * register (bundle v5) the garden is also the licensed sub-polygon: it carries its licence,
+ * the three area measures and its boundary approval state.
  */
 @Entity('tea_inventory_gardens')
 @Index(['areaId', 'code'], { unique: true })
@@ -76,6 +105,41 @@ export class TeaInventoryGarden {
 
     @Column({ type: 'double precision', name: 'geometry_area_m2' })
     geometryAreaM2: number;
+
+    // ── Licence register (bundle v5) ──
+    @Column({ type: 'varchar', length: 40, name: 'license_code', nullable: true })
+    licenseCode: string | null;
+
+    @Column({ type: 'varchar', length: 30, name: 'approval_status', default: 'approved' })
+    approvalStatus: GardenApprovalStatus;
+
+    // Licence area allocated to this garden; null when no licence or the match is unresolved.
+    @Column({ type: 'double precision', name: 'licensed_area_m2', nullable: true })
+    licensedAreaM2: number | null;
+
+    // Horizontal (map) area of the current geometry.
+    @Column({ type: 'double precision', name: 'planimetric_area_m2', default: 0 })
+    planimetricAreaM2: number;
+
+    // DEM slope-corrected surface area: a technical estimate, never a legal area.
+    @Column({ type: 'double precision', name: 'surface_area_m2', default: 0 })
+    surfaceAreaM2: number;
+
+    @Column({ type: 'double precision', name: 'mean_slope_deg', default: 0 })
+    meanSlopeDeg: number;
+
+    // Satellite tea area inside the garden.
+    @Column({ type: 'double precision', name: 'measured_tea_area_m2', default: 0 })
+    measuredTeaAreaM2: number;
+
+    @Column({ type: 'jsonb', default: () => "'[]'" })
+    discrepancies: GardenDiscrepancy[];
+
+    @Column({ type: 'jsonb', default: () => "'[]'" })
+    versions: GardenGeometryVersion[];
+
+    @Column({ type: 'jsonb', nullable: true })
+    proposal: GardenBoundaryProposal | null;
 
     // Season → results and events ("2025-26" → …).
     @Column({ type: 'jsonb', default: () => "'{}'" })

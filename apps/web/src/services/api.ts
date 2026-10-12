@@ -536,9 +536,268 @@ export interface InventoryLicense {
     walletNo: string;
     holderName: string;
     holderDeceased: boolean;
-    licensedAreaM2: number;
+    licensedAreaM2: number | null;
     issuedYear: number;
     recordedParcelRef: string;
+    licenseCount?: number;
+    producerCount?: number;
+    matchLevel?: LicenseMatchLevel | null;
+    /** Licences exist on the parcel but none is tied to a garden yet (no area allocated). */
+    pendingMatch?: boolean;
+}
+
+// Digital licence register (producer → licence → licensed garden sub-polygon → parcel)
+export type LicenseMatchLevel = 'exact' | 'historical' | 'probable' | 'unmatched';
+export type GardenApprovalStatus = 'approved' | 'proposed' | 'boundary_conflict' | 'field_check_required' | 'unresolved';
+export type GardenDiscrepancy = 'area_over' | 'area_under' | 'no_tea' | 'no_license' | 'lineage_unresolved' | 'overlap' | 'outside_parcel';
+export type ApplicationType = 'new_license' | 'area_correction' | 'transfer' | 'boundary_determination' | 'parcel_update';
+export type ApplicationStatus =
+    | 'DRAFT'
+    | 'DOCUMENTS_PENDING'
+    | 'MATCHING_REQUIRED'
+    | 'GEOMETRY_PROPOSED'
+    | 'BOUNDARY_CONFLICT'
+    | 'UNDER_REVIEW'
+    | 'FIELD_CHECK_REQUIRED'
+    | 'DEMO_APPROVED'
+    | 'RETURNED_FOR_CORRECTION'
+    | 'REJECTED'
+    | 'SUPERSEDED';
+
+export interface LicensingSummary {
+    demo: boolean;
+    generatedAt: string | null;
+    rules: { areaTolerance: number; minLicenseM2: number; overlapToleranceM2: number } | null;
+    producers: { total: number; licensed: number; unlicensed: number; withIssues: number; deceasedHolders: number };
+    licenses: { total: number; byMatchLevel: Record<LicenseMatchLevel, number>; byStatus: Record<string, number> };
+    gardens: {
+        total: number;
+        byApprovalStatus: Record<GardenApprovalStatus, number>;
+        discrepancies: Record<GardenDiscrepancy, number>;
+        licensedAreaM2: number;
+        planimetricAreaM2: number;
+        surfaceAreaM2: number;
+        measuredTeaAreaM2: number;
+        meanSlopeDeg: number;
+    };
+    applications: { total: number; open: number; byStatus: Record<ApplicationStatus, number> };
+    conflicts: { open: number; overlapM2: number };
+    unlicensedTea: { count: number; areaM2: number };
+    lineage: number;
+}
+
+export interface LicensingProducerRow {
+    code: string;
+    name: string;
+    walletNo: string;
+    licenseCodes: string[];
+    licenseCount: number;
+    holderDeceased: boolean;
+    gardenCount: number;
+    approvedGardens: number;
+    matchLevel: LicenseMatchLevel | null;
+    approvalStatus: GardenApprovalStatus;
+    licensedAreaM2: number;
+    planimetricAreaM2: number;
+    surfaceAreaM2: number;
+    measuredTeaAreaM2: number;
+    discrepancies: GardenDiscrepancy[];
+    openApplications: number;
+    issueCount: number;
+    pruningStatus: ProducerPruningStatus | null;
+    pruningSeason: string | null;
+}
+
+export interface ParcelLineageView {
+    code: string;
+    oldRef: string;
+    newParcelKey: string;
+    changeType: string;
+    source: string;
+    changedAt: string;
+}
+
+export interface LicenseView {
+    code: string;
+    producerCode: string;
+    walletNo: string;
+    status: 'active' | 'transfer_pending' | 'inactive';
+    issuedYear: number;
+    recordedAreaM2: number;
+    allocatedAreaM2: number;
+    recordedParcelRefs: string[];
+    matchLevel: LicenseMatchLevel;
+    matchedParcelKeys: string[];
+    lineage: ParcelLineageView[];
+    candidateParcelKeys: string[];
+    holderDeceased: boolean;
+    validFrom: string;
+    validTo: string | null;
+    gardenCodes: string[];
+}
+
+export interface GardenGeometryVersion {
+    version: number;
+    geometry: GeoJSON.Geometry;
+    planimetricAreaM2: number;
+    reason: string;
+    source: string;
+    validFrom: string;
+    validTo: string | null;
+}
+
+export interface GardenBoundaryProposal {
+    geometry: GeoJSON.Geometry;
+    planimetricAreaM2: number;
+    proposedBy: 'producer' | 'staff';
+    proposedAt: string;
+    overlapM2: number;
+    overlapsGardenCode: string | null;
+}
+
+export interface LicensedGarden {
+    id: string;
+    code: string;
+    producerCode: string;
+    parcelKey: string;
+    block: string;
+    parcel: string;
+    holderIndex: number;
+    holderCount: number;
+    boundaryResolved: boolean;
+    licenseCode: string | null;
+    approvalStatus: GardenApprovalStatus;
+    licensedAreaM2: number | null;
+    planimetricAreaM2: number;
+    surfaceAreaM2: number;
+    meanSlopeDeg: number;
+    measuredTeaAreaM2: number;
+    discrepancies: GardenDiscrepancy[];
+    versions: GardenGeometryVersion[];
+    proposal: GardenBoundaryProposal | null;
+    geometry: GeoJSON.Geometry;
+}
+
+export interface ApplicationDocument {
+    type: string;
+    name: string;
+    status: 'provided' | 'missing';
+}
+
+export interface ApplicationHistoryEntry {
+    at: string;
+    from: ApplicationStatus | null;
+    to: ApplicationStatus;
+    by: string;
+    note: string;
+}
+
+export interface ApplicationDecisionView {
+    fromStatus: ApplicationStatus;
+    toStatus: ApplicationStatus;
+    note: string | null;
+    decidedByName: string;
+    decidedAt: string;
+}
+
+export interface ApplicationRow {
+    id: string;
+    code: string;
+    producerCode: string;
+    producerName: string;
+    licenseCode: string | null;
+    gardenCode: string | null;
+    parcelRef: string | null;
+    type: ApplicationType;
+    seededStatus: ApplicationStatus;
+    status: ApplicationStatus;
+    open: boolean;
+    submittedAt: string;
+    summary: string;
+    missingDocuments: number;
+    lastActivityAt: string;
+    allowedTransitions: ApplicationStatus[];
+}
+
+export interface ApplicationDetail extends ApplicationRow {
+    documents: ApplicationDocument[];
+    history: ApplicationHistoryEntry[];
+    decisions: ApplicationDecisionView[];
+    garden: LicensedGarden | null;
+    license: LicenseView | null;
+}
+
+export interface BoundaryConflict {
+    code: string;
+    parcelKey: string;
+    gardenCodes: [string, string];
+    overlapM2: number;
+    geometry: GeoJSON.Geometry;
+    status: 'open' | 'resolved';
+    openedAt: string;
+}
+
+export interface LicensingProducerProfile extends LicensingProducerRow {
+    licenses: LicenseView[];
+    gardens: LicensedGarden[];
+    applications: ApplicationRow[];
+    conflicts: BoundaryConflict[];
+    pruningHistory: Array<{ season: string; status: ProducerPruningStatus; licensedAreaM2: number; requiredM2: number; newPrunedM2: number }>;
+}
+
+export interface LicensingLayers {
+    gardens: GeoJSON.FeatureCollection<GeoJSON.Geometry, {
+        code: string;
+        producerCode: string;
+        producerName: string;
+        parcelKey: string;
+        block: string;
+        parcel: string;
+        licenseCode: string | null;
+        approvalStatus: GardenApprovalStatus;
+        licensedAreaM2: number | null;
+        planimetricAreaM2: number;
+        surfaceAreaM2: number;
+        measuredTeaAreaM2: number;
+        discrepancies: GardenDiscrepancy[];
+    }>;
+    proposals: GeoJSON.FeatureCollection<GeoJSON.Geometry, {
+        gardenCode: string;
+        producerCode: string;
+        producerName: string;
+        block: string;
+        parcel: string;
+        planimetricAreaM2: number;
+        proposedBy: 'producer' | 'staff';
+        proposedAt: string;
+        overlapM2: number;
+        overlapsGardenCode: string | null;
+    }>;
+    conflicts: GeoJSON.FeatureCollection<GeoJSON.Geometry, { code: string; parcelKey: string; gardenCodes: [string, string]; overlapM2: number; status: string; openedAt: string }>;
+    unlicensedTea: GeoJSON.FeatureCollection<GeoJSON.Geometry, { areaM2: number }>;
+}
+
+export type LicensingProducerSortKey = 'name' | 'licensedArea' | 'measuredTea' | 'issues';
+
+export interface LicensingProducerQuery {
+    page?: number;
+    limit?: number;
+    search?: string;
+    matchLevel?: LicenseMatchLevel;
+    approvalStatus?: GardenApprovalStatus;
+    discrepancy?: GardenDiscrepancy;
+    issues?: 'true' | 'false';
+    sortBy?: LicensingProducerSortKey;
+    sortOrder?: 'ASC' | 'DESC';
+}
+
+export interface ApplicationQuery {
+    page?: number;
+    limit?: number;
+    status?: ApplicationStatus;
+    type?: ApplicationType;
+    open?: 'true' | 'false';
+    search?: string;
 }
 
 export interface InventoryAreaSummary {
@@ -667,7 +926,8 @@ export type ProducerPruningStatus =
     | 'boundary_unresolved'
     | 'partial'
     | 'no_trace'
-    | 'awaiting_observation';
+    | 'awaiting_observation'
+    | 'no_license';
 
 export interface ProducerDecision {
     decision: 'approved' | 'rejected';
@@ -1502,6 +1762,32 @@ export const api = {
     /** Purchase list as a CSV blob (Excel-compatible), or an error message. */
     downloadInventoryPurchaseCsv: async (areaId: string, season: string): Promise<{ blob?: Blob; error?: string }> => {
         const response = await authorizedFetch(`/caykur/tea-inventory/areas/${areaId}/purchase-list.csv?season=${encodeURIComponent(season)}`);
+        if (!response.ok) return { error: await readErrorMessage(response, 'Liste indirilemedi') };
+        return { blob: await response.blob() };
+    },
+
+    // Çaykur digital licence register
+    getLicensingSummary: (areaId: string) => request<LicensingSummary>(`/caykur/tea-inventory/areas/${areaId}/licensing/summary`),
+    getLicensingProducers: (areaId: string, params?: LicensingProducerQuery) => {
+        const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
+        const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        return request<Paginated<LicensingProducerRow>>(`/caykur/tea-inventory/areas/${areaId}/licensing/producers${query ? `?${query}` : ''}`);
+    },
+    getLicensingProducer: (areaId: string, code: string) =>
+        request<LicensingProducerProfile>(`/caykur/tea-inventory/areas/${areaId}/licensing/producers/${encodeURIComponent(code)}`),
+    getLicensingApplications: (areaId: string, params?: ApplicationQuery) => {
+        const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
+        const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        return request<Paginated<ApplicationRow>>(`/caykur/tea-inventory/areas/${areaId}/licensing/applications${query ? `?${query}` : ''}`);
+    },
+    getLicensingApplication: (areaId: string, code: string) =>
+        request<ApplicationDetail>(`/caykur/tea-inventory/areas/${areaId}/licensing/applications/${encodeURIComponent(code)}`),
+    decideLicensingApplication: (areaId: string, code: string, body: { status: ApplicationStatus; note?: string }) =>
+        request<ApplicationDetail>(`/caykur/tea-inventory/areas/${areaId}/licensing/applications/${encodeURIComponent(code)}/decision`, { method: 'POST', body: JSON.stringify(body) }),
+    getLicensingLayers: (areaId: string) => request<LicensingLayers>(`/caykur/tea-inventory/areas/${areaId}/licensing/layers`),
+    /** Producer register as a CSV blob (Excel-compatible), or an error message. */
+    downloadLicensingCsv: async (areaId: string): Promise<{ blob?: Blob; error?: string }> => {
+        const response = await authorizedFetch(`/caykur/tea-inventory/areas/${areaId}/licensing/producers.csv`);
         if (!response.ok) return { error: await readErrorMessage(response, 'Liste indirilemedi') };
         return { blob: await response.blob() };
     },

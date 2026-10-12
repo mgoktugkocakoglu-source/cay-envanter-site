@@ -13,6 +13,7 @@ export const PRODUCER_STATUSES = [
     'partial',
     'no_trace',
     'awaiting_observation',
+    'no_license',
 ] as const;
 export type ProducerStatus = (typeof PRODUCER_STATUSES)[number];
 

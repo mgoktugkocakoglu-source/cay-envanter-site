@@ -39,15 +39,40 @@ export interface ProducerScanBlock {
     } | null;
 }
 
-/** A license whose recorded parcel reference no longer resolves to a TKGM parcel. */
+/** Parcel-level licence view (derived from the producer-centred register) or an unmatched licence. */
 export interface InventoryLicense {
     licenseNo: string;
     walletNo: string;
     holderName: string;
     holderDeceased: boolean;
-    licensedAreaM2: number;
+    licensedAreaM2: number | null;
     issuedYear: number;
     recordedParcelRef: string;
+    licenseCount?: number;
+    producerCount?: number;
+    matchLevel?: 'exact' | 'historical' | 'probable' | 'unmatched' | null;
+    // True when licences exist on the parcel but none is tied to a garden yet (no area allocated).
+    pendingMatch?: boolean;
+}
+
+/** Overlap of two boundary proposals / gardens inside a shared parcel. */
+export interface BoundaryConflict {
+    code: string;
+    parcelKey: string;
+    gardenCodes: [string, string];
+    overlapM2: number;
+    geometry: Record<string, unknown>;
+    status: 'open' | 'resolved';
+    openedAt: string;
+}
+
+/** Licence register block (bundle v5): rules, conflicts and the unlicensed-tea difference layer. */
+export interface LicensingBlock {
+    demo: boolean;
+    generatedAt: string;
+    rules: { areaTolerance: number; minLicenseM2: number; overlapToleranceM2: number };
+    conflicts: BoundaryConflict[];
+    unlicensedTea: TeaPatch[];
 }
 
 /**
@@ -115,6 +140,10 @@ export class TeaInventoryArea {
     // producer scanning has not run for this area.
     @Column({ type: 'jsonb', name: 'producer_scan', nullable: true })
     producerScan: ProducerScanBlock | null;
+
+    // Licence register (bundle v5): rules, boundary conflicts, unlicensed tea. Null before v5.
+    @Column({ type: 'jsonb', nullable: true })
+    licensing: LicensingBlock | null;
 
     // Bundle timestamp; a re-import is skipped when it has not changed.
     @Column({ type: 'timestamp', name: 'bundle_generated_at' })

@@ -4,7 +4,17 @@
  * (read at render time) so the layer follows light/dark mode.
  */
 
-import type { InventoryClass, ProducerPruningStatus, SatellitePruningStatus } from '@/services/api';
+import type {
+    ApplicationStatus,
+    ApplicationType,
+    GardenApprovalStatus,
+    GardenDiscrepancy,
+    InventoryClass,
+    LicenseMatchLevel,
+    LicenseView,
+    ProducerPruningStatus,
+    SatellitePruningStatus,
+} from '@/services/api';
 import type { Tone } from '@/components/caykur/tone';
 
 export interface InventoryClassMeta {
@@ -203,6 +213,11 @@ export const PRODUCER_STATUS_META: Record<ProducerPruningStatus, ProducerStatusM
         description: 'Bulut veya kar bahçelerin yarısından fazlasını gizledi; yeni temiz görüntü bekleniyor.',
         tone: 'muted',
     },
+    no_license: {
+        label: 'Ruhsat yok',
+        description: 'Müstahsile bağlı ruhsatlı alan yok (ruhsat yok ya da parsel eşleşmesi tamamlanmadı); 1/7 hesabı yapılamaz, alım kapalı.',
+        tone: 'muted',
+    },
 };
 
 export const PRODUCER_STATUS_ORDER: ProducerPruningStatus[] = [
@@ -212,7 +227,79 @@ export const PRODUCER_STATUS_ORDER: ProducerPruningStatus[] = [
     'no_trace',
     'partial',
     'awaiting_observation',
+    'no_license',
     'auto_approved',
     'approved',
     'rejected',
 ];
+
+// ── Digital licence register ──
+
+export const MATCH_LEVEL_META: Record<LicenseMatchLevel, ProducerStatusMeta> = {
+    exact: { label: 'Kesin eşleşme', description: 'Ruhsattaki ada/parsel güncel TKGM kaydıyla birebir eşleşti.', tone: 'success' },
+    historical: { label: 'Tarihsel eşleşme', description: 'Eski pafta/parsel kaydı, eski–yeni parsel tablosu (22-a yenileme, ifraz, tevhit) üzerinden güncel parsele bağlandı.', tone: 'info' },
+    probable: { label: 'Olası eşleşme', description: 'Ruhsatta yalnızca mevki/zilyetlik tarifi var; aday parseller üretildi, eksper teyidi bekliyor.', tone: 'warning' },
+    unmatched: { label: 'Eşleşmeyen', description: 'Ruhsattaki parsel kaydı güncel kadastroda bulunamadı; alan tahsis edilemiyor.', tone: 'danger' },
+};
+export const MATCH_LEVEL_ORDER: LicenseMatchLevel[] = ['exact', 'historical', 'probable', 'unmatched'];
+
+export const APPROVAL_STATUS_META: Record<GardenApprovalStatus, ProducerStatusMeta> = {
+    approved: { label: 'Onaylı sınır', description: 'Bahçe sınırı kayda alınmış; müstahsilin dijital ruhsat geometrisi.', tone: 'success' },
+    proposed: { label: 'Öneri', description: 'Hisseli parselde müstahsil ya da personel sınır önerdi; eksper onayı bekliyor.', tone: 'info' },
+    boundary_conflict: { label: 'Sınır ihtilafı', description: 'Sınır önerisi komşu hissedarın alanıyla çakışıyor; uzlaşma veya saha ölçümü gerekir.', tone: 'danger' },
+    field_check_required: { label: 'Saha kontrolü', description: 'Ortofoto yeterli değil; sahada GNSS ölçümü istendi.', tone: 'warning' },
+    unresolved: { label: 'Belirsiz', description: 'Hisseli parselde bu hissedarın payı henüz çizilmedi.', tone: 'muted' },
+};
+export const APPROVAL_STATUS_ORDER: GardenApprovalStatus[] = ['boundary_conflict', 'unresolved', 'proposed', 'field_check_required', 'approved'];
+
+export const DISCREPANCY_META: Record<GardenDiscrepancy, ProducerStatusMeta> = {
+    area_over: { label: 'Ruhsat alanı fazla', description: 'Ruhsattaki alan, çizilen sınırın veya ölçülen çaylığın %15’ten fazla üzerinde.', tone: 'warning' },
+    area_under: { label: 'Ruhsat alanı eksik', description: 'Ölçülen çaylık ruhsattaki alandan %15’ten fazla büyük (genişleme olabilir).', tone: 'warning' },
+    no_tea: { label: 'Çay yok', description: 'Ruhsatlı alanda uydu çay görmüyor (hayalet ruhsat ya da sökülmüş bahçe).', tone: 'danger' },
+    no_license: { label: 'Ruhsat yok', description: 'Fiili çay bahçesi var, bağlı ruhsat yok.', tone: 'danger' },
+    lineage_unresolved: { label: 'Eşleşme bekliyor', description: 'Ruhsat var ama parsel kaydı bu bahçeye bağlanamadı; alan tahsis edilmedi.', tone: 'warning' },
+    overlap: { label: 'Çakışma', description: 'Sınır komşu hissedarın alanıyla çakışıyor.', tone: 'danger' },
+    outside_parcel: { label: 'Parsel dışı', description: 'Çizilen sınır TKGM parselinin dışına taşıyor.', tone: 'danger' },
+};
+export const DISCREPANCY_ORDER: GardenDiscrepancy[] = ['no_license', 'no_tea', 'overlap', 'outside_parcel', 'lineage_unresolved', 'area_over', 'area_under'];
+
+export const APPLICATION_STATUS_META: Record<ApplicationStatus, ProducerStatusMeta> = {
+    DRAFT: { label: 'Taslak', description: 'Müstahsil başvuruyu oluşturdu, henüz göndermedi.', tone: 'muted' },
+    DOCUMENTS_PENDING: { label: 'Belge bekliyor', description: 'Zorunlu belgeler eksik.', tone: 'warning' },
+    MATCHING_REQUIRED: { label: 'Eşleştirme gerekli', description: 'Eski parsel kaydı güncel kadastroya bağlanmalı.', tone: 'warning' },
+    GEOMETRY_PROPOSED: { label: 'Sınır önerildi', description: 'Sınır çizildi; otomatik kontroller ve eksper incelemesi bekliyor.', tone: 'info' },
+    BOUNDARY_CONFLICT: { label: 'Sınır ihtilafı', description: 'Öneri komşu hissedarla çakışıyor.', tone: 'danger' },
+    UNDER_REVIEW: { label: 'İncelemede', description: 'Eksper dosyayı inceliyor.', tone: 'info' },
+    FIELD_CHECK_REQUIRED: { label: 'Saha kontrolü', description: 'Sahada ölçüm/doğrulama istendi.', tone: 'warning' },
+    DEMO_APPROVED: { label: 'Demo onay', description: 'Demo ortamında onaylandı; resmî ÇAYKUR onayı değildir.', tone: 'success' },
+    RETURNED_FOR_CORRECTION: { label: 'Düzeltmeye iade', description: 'Müstahsilden düzeltme istendi.', tone: 'warning' },
+    REJECTED: { label: 'Reddedildi', description: 'Başvuru reddedildi; itiraz yolu açık.', tone: 'danger' },
+    SUPERSEDED: { label: 'Yenisiyle değişti', description: 'Daha yeni bir sürüm bu dosyanın yerini aldı.', tone: 'muted' },
+};
+export const APPLICATION_STATUS_ORDER: ApplicationStatus[] = [
+    'BOUNDARY_CONFLICT',
+    'MATCHING_REQUIRED',
+    'UNDER_REVIEW',
+    'FIELD_CHECK_REQUIRED',
+    'GEOMETRY_PROPOSED',
+    'DOCUMENTS_PENDING',
+    'RETURNED_FOR_CORRECTION',
+    'DRAFT',
+    'DEMO_APPROVED',
+    'REJECTED',
+    'SUPERSEDED',
+];
+
+export const APPLICATION_TYPE_LABEL: Record<ApplicationType, string> = {
+    new_license: 'Yeni ruhsat',
+    area_correction: 'Alan düzeltme',
+    transfer: 'İntikal / devir',
+    boundary_determination: 'Sınır belirleme',
+    parcel_update: 'Parsel güncelleme',
+};
+
+export const LICENSE_STATUS_LABEL: Record<LicenseView['status'], string> = {
+    active: 'Aktif',
+    transfer_pending: 'İntikal bekliyor',
+    inactive: 'Pasif',
+};
