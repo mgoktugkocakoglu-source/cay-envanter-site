@@ -26,13 +26,16 @@ const MONTHS = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl',
 const times = computed(() => props.scans.map((s) => Date.parse(s.date)));
 const t0 = computed(() => Math.min(...times.value));
 const t1 = computed(() => Math.max(...times.value));
-const yMax = computed(() => Math.max(props.requiredM2 * props.autoRatio * 1.25, ...props.scans.map((s) => s.prunedM2), 1));
+const yMax = computed(() => Math.max(props.requiredM2 * props.autoRatio * 1.25, ...props.scans.map((s) => s.grossPrunedM2), 1));
 const x = (t: number) => left + ((t - t0.value) / Math.max(t1.value - t0.value, 1)) * (W - left - right);
 const y = (v: number) => padTop + (1 - v / yMax.value) * (H - padTop - bottom);
 
-const line = computed(() => props.scans.map((s, i) => `${x(times.value[i] as number).toFixed(1)},${y(s.prunedM2).toFixed(1)}`).join(' '));
+const line = computed(() => props.scans.map((s, i) => `${x(times.value[i] as number).toFixed(1)},${y(s.newPrunedM2).toFixed(1)}`).join(' '));
+/** Gross (before removing ground already credited in the cycle); drawn faint when it differs. */
+const grossLine = computed(() => props.scans.map((s, i) => `${x(times.value[i] as number).toFixed(1)},${y(s.grossPrunedM2).toFixed(1)}`).join(' '));
+const hasReuse = computed(() => props.scans.some((s) => s.grossPrunedM2 - s.newPrunedM2 >= 1));
 const points = computed(() =>
-    props.scans.map((s, i) => ({ s, cx: x(times.value[i] as number), cy: y(s.prunedM2), fresh: props.newObservation[i] ?? false })),
+    props.scans.map((s, i) => ({ s, cx: x(times.value[i] as number), cy: y(s.newPrunedM2), fresh: props.newObservation[i] ?? false })),
 );
 const autoX = computed(() => (props.autoApprovedAt ? x(Date.parse(props.autoApprovedAt)) : null));
 const monthTicks = computed(() => {
@@ -70,6 +73,7 @@ const fmtDate = (d: string) => `${Number(d.slice(8))} ${MONTHS.at(Number(d.slice
                 <line :x1="autoX" :x2="autoX" :y1="padTop" :y2="H - bottom" class="stroke-success" stroke-width="1.5" />
                 <text :x="autoX + 4" :y="padTop + 10" class="fill-success" font-weight="600">alım açıldı</text>
             </g>
+            <polyline v-if="hasReuse" :points="grossLine" fill="none" class="stroke-warning" stroke-width="1.25" stroke-dasharray="3 3" />
             <polyline :points="line" fill="none" class="stroke-primary" stroke-width="2" />
             <circle
                 v-for="p in points"
@@ -79,11 +83,12 @@ const fmtDate = (d: string) => `${Number(d.slice(8))} ${MONTHS.at(Number(d.slice
                 r="3"
                 :class="p.fresh ? 'fill-primary' : 'fill-background stroke-muted-foreground'"
             >
-                <title>{{ fmtDate(p.s.date) }}: {{ fmtM2(p.s.prunedM2) }} budama · çayın %{{ Math.round(p.s.observedShare * 100) }}'i gözlendi{{ p.fresh ? '' : ' · yeni bulutsuz sahne yok' }}</title>
+                <title>{{ fmtDate(p.s.date) }}: yeni budama {{ fmtM2(p.s.newPrunedM2) }} (brüt {{ fmtM2(p.s.grossPrunedM2) }}) · çayın %{{ Math.round(p.s.observedShare * 100) }}'i gözlendi{{ p.fresh ? '' : ' · yeni bulutsuz sahne yok' }}</title>
             </circle>
         </svg>
         <figcaption class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span class="flex items-center gap-1.5"><span class="inline-block h-0.5 w-4 bg-primary" aria-hidden="true" />Biriken budama ({{ fmtM2(scans.at(-1)?.prunedM2 ?? 0) }})</span>
+            <span class="flex items-center gap-1.5"><span class="inline-block h-0.5 w-4 bg-primary" aria-hidden="true" />Yeni budama ({{ fmtM2(scans.at(-1)?.newPrunedM2 ?? 0) }})</span>
+            <span v-if="hasReuse" class="flex items-center gap-1.5"><span class="inline-block w-4 border-t border-dotted border-warning" aria-hidden="true" />Brüt, çakışan dahil ({{ fmtM2(scans.at(-1)?.grossPrunedM2 ?? 0) }})</span>
             <span class="flex items-center gap-1.5"><span class="inline-block w-4 border-t border-dashed border-foreground" aria-hidden="true" />1/7 hedefi ({{ fmtM2(requiredM2) }})</span>
             <span class="flex items-center gap-1.5"><span class="inline-block w-4 border-t border-dotted border-success" aria-hidden="true" />Otomatik onay eşiği (×{{ autoRatio.toLocaleString('tr-TR') }})</span>
             <span class="flex items-center gap-1.5"><span class="inline-block size-2 rounded-full border border-muted-foreground" aria-hidden="true" />Yeni gözlem yok</span>

@@ -1,13 +1,38 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { TeaInventoryArea } from '@/tea-inventory/entities/tea-inventory-area.entity';
-import { TeaInventoryProducer } from '@/tea-inventory/entities/tea-inventory-producer.entity';
+
+/** A pruning event inside a garden: where (polygon) and when (an observation interval, never a day). */
+export interface GardenPruningEvent {
+    areaM2: number;
+    reusedM2: number;
+    lastNoChangeAt: string | null;
+    firstChangeAt: string | null;
+    detectedAt: string | null;
+    geometry: Record<string, unknown>;
+}
+
+/** One season of a garden: tea area, cumulative pruned series per scan, and its events. */
+export interface GardenSeason {
+    teaAreaM2: number;
+    observedM2: number[];
+    prunedM2: number[];
+    reusedM2: number[];
+    eventAreaM2: number;
+    eventReusedM2: number;
+    lastNoChangeAt: string | null;
+    firstChangeAt: string | null;
+    detectedAt: string | null;
+    events: GardenPruningEvent[];
+}
 
 /**
  * One tea garden of a producer: a whole TKGM parcel, or the producer's slice of a shared
- * (hisseli) parcel. Carries its satellite tea area and cumulative pruned area per scan.
+ * (hisseli) parcel. Static across seasons (the ground record); per-season results and event
+ * polygons hang off it so the same ground can be compared year over year.
  */
 @Entity('tea_inventory_gardens')
-@Index(['producerId'])
+@Index(['areaId', 'code'], { unique: true })
+@Index(['areaId', 'producerCode'])
 @Index(['areaId', 'parcelKey'])
 export class TeaInventoryGarden {
     @PrimaryGeneratedColumn('uuid')
@@ -20,16 +45,13 @@ export class TeaInventoryGarden {
     @JoinColumn({ name: 'area_id' })
     area: TeaInventoryArea;
 
-    @Column({ type: 'uuid', name: 'producer_id' })
-    producerId: string;
-
-    @ManyToOne(() => TeaInventoryProducer, (producer) => producer.gardens, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'producer_id' })
-    producer: TeaInventoryProducer;
-
     // Engine code, e.g. "DEMO-B-0001".
     @Column({ type: 'varchar', length: 40 })
     code: string;
+
+    // Holder's engine code, e.g. "DEMO-M-0001".
+    @Column({ type: 'varchar', length: 40, name: 'producer_code', default: '' })
+    producerCode: string;
 
     // TKGM "mahalleId/ada/parsel" of the parcel the garden lies in.
     @Column({ type: 'varchar', length: 60, name: 'parcel_key' })
@@ -48,15 +70,16 @@ export class TeaInventoryGarden {
     @Column({ type: 'int', name: 'holder_count', default: 1 })
     holderCount: number;
 
+    // False: the holder's slice is not surveyed; pruning here cannot be attributed to them.
+    @Column({ type: 'boolean', name: 'boundary_resolved', default: true })
+    boundaryResolved: boolean;
+
     @Column({ type: 'double precision', name: 'geometry_area_m2' })
     geometryAreaM2: number;
 
-    @Column({ type: 'double precision', name: 'tea_area_m2' })
-    teaAreaM2: number;
-
-    // Cumulative pruned m² at each scan date of the area's scan schedule.
-    @Column({ type: 'jsonb', name: 'pruned_series' })
-    prunedSeries: number[];
+    // Season → results and events ("2025-26" → …).
+    @Column({ type: 'jsonb', default: () => "'{}'" })
+    seasons: Record<string, GardenSeason>;
 
     @Column({ type: 'jsonb' })
     geometry: Record<string, unknown>;

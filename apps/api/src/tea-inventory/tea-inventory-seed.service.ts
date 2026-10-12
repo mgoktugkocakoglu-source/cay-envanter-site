@@ -3,16 +3,16 @@ import { join } from 'node:path';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource, EntityManager } from 'typeorm';
-import { TeaInventoryArea, InventoryLicense, TeaPatch } from '@/tea-inventory/entities/tea-inventory-area.entity';
+import { TeaInventoryArea, InventoryLicense, TeaPatch, ProducerScanBlock, ProducerSeasonSchedule } from '@/tea-inventory/entities/tea-inventory-area.entity';
 import { TeaInventoryParcel } from '@/tea-inventory/entities/tea-inventory-parcel.entity';
 import { InventoryClass } from '@/tea-inventory/enums/inventory-class.enum';
 import { TeaInventoryProducer, ProducerScan, ProducerAutoStatus } from '@/tea-inventory/entities/tea-inventory-producer.entity';
-import { TeaInventoryGarden } from '@/tea-inventory/entities/tea-inventory-garden.entity';
+import { TeaInventoryGarden, GardenSeason, GardenPruningEvent } from '@/tea-inventory/entities/tea-inventory-garden.entity';
 
 /** Bundles exported by the cay-envanter engine (`npm run export-site`); copied to dist by nest-cli assets. */
 const SEED_DIR = join(__dirname, 'seed-data');
-/** v1 = inventory; v2 adds the pruning block; v3 adds producers + gardens with 5-day scans. */
-const SUPPORTED_BUNDLE_VERSIONS = [1, 2, 3];
+/** v1 inventory; v2 pruning; v3 single-season producers (no longer imported); v4 multi-season producers. */
+const SUPPORTED_BUNDLE_VERSIONS = [1, 2, 4];
 const INSERT_CHUNK = 200;
 
 interface InventoryBundle {
@@ -54,20 +54,8 @@ interface InventoryBundle {
 }
 
 interface BundleProducers {
-    schedule: Record<string, unknown> & { season: string };
-    producers: Array<{
-        code: string;
-        name: string;
-        walletNo: string;
-        licenseNo: string;
-        licensedAreaM2: number;
-        teaAreaM2: number;
-        requiredM2: number;
-        prunedM2: number;
-        status: ProducerAutoStatus;
-        autoApprovedAt: string | null;
-        scans: ProducerScan[];
-    }>;
+    rules: Record<string, unknown>;
+    producers: Array<{ code: string; name: string; walletNo: string; licenseNo: string; gardenCodes: string[] }>;
     gardens: Array<{
         code: string;
         producerCode: string;
@@ -76,11 +64,33 @@ interface BundleProducers {
         parcel: string;
         holderIndex: number;
         holderCount: number;
+        boundaryResolved: boolean;
         geometryAreaM2: number;
-        teaAreaM2: number;
-        prunedSeries: number[];
         geometry: Record<string, unknown>;
     }>;
+    seasons: Array<
+        ProducerSeasonSchedule & {
+            producers: Array<{
+                code: string;
+                licensedAreaM2: number;
+                teaAreaM2: number;
+                requiredM2: number;
+                grossPrunedM2: number;
+                reusedM2: number;
+                newPrunedM2: number;
+                unattributedM2: number;
+                unobservedM2: number;
+                remainingM2: number;
+                unresolvedGardens: number;
+                status: ProducerAutoStatus;
+                autoApprovedAt: string | null;
+                scans: ProducerScan[];
+            }>;
+            gardens: Array<Omit<GardenSeason, 'events'> & { code: string }>;
+            events: Array<GardenPruningEvent & { gardenCode: string }>;
+        }
+    >;
+    scenes: ProducerScanBlock['scenes'];
 }
 
 /**
@@ -131,7 +141,9 @@ export class TeaInventorySeedService implements OnModuleInit {
                     teaPatches: bundle.teaPatches,
                     unmatchedLicenses: bundle.unmatchedLicenses,
                     pruning: bundle.pruning ?? null,
-                    producerScan: bundle.producers?.schedule ?? null,
+                    producerScan: bundle.producers
+                        ? { rules: bundle.producers.rules, seasons: bundle.producers.seasons.map(({ producers: _p, gardens: _g, events: _e, ...schedule }) => schedule), scenes: bundle.producers.scenes }
+                        : null,
                     bundleGeneratedAt: generatedAt,
                 }),
             );
@@ -146,37 +158,65 @@ export class TeaInventorySeedService implements OnModuleInit {
         });
     }
 
-    /** Producers first (they own the gardens), then gardens linked by the producer's new id. */
+    /**
+     * One producer row per scanned season (same code across seasons); one garden row per
+     * ground record with its per-season results and event polygons.
+     */
     private async importProducers(manager: EntityManager, areaId: string, block: BundleProducers): Promise<void> {
-        const counts = new Map<string, number>();
-        for (const g of block.gardens) counts.set(g.producerCode, (counts.get(g.producerCode) ?? 0) + 1);
-        const producers = await manager.save(
-            block.producers.map((p) =>
-                manager.create(TeaInventoryProducer, {
-                    areaId,
-                    code: p.code,
-                    name: p.name,
-                    walletNo: p.walletNo,
-                    licenseNo: p.licenseNo,
-                    licensedAreaM2: p.licensedAreaM2,
-                    teaAreaM2: p.teaAreaM2,
-                    requiredM2: p.requiredM2,
-                    prunedM2: p.prunedM2,
-                    gardenCount: counts.get(p.code) ?? 0,
-                    season: block.schedule.season,
-                    autoStatus: p.status,
-                    autoApprovedAt: p.autoApprovedAt,
-                    scans: p.scans,
-                    demo: true,
-                }),
-            ),
-            { chunk: INSERT_CHUNK },
+        const names = new Map(block.producers.map((p) => [p.code, p]));
+        const gardenCount = new Map<string, number>();
+        for (const g of block.gardens) gardenCount.set(g.producerCode, (gardenCount.get(g.producerCode) ?? 0) + 1);
+
+        const rows: TeaInventoryProducer[] = [];
+        for (const season of block.seasons) {
+            for (const p of season.producers) {
+                const who = names.get(p.code);
+                if (!who) continue;
+                rows.push(
+                    manager.create(TeaInventoryProducer, {
+                        areaId,
+                        code: p.code,
+                        season: season.season,
+                        name: who.name,
+                        walletNo: who.walletNo,
+                        licenseNo: who.licenseNo,
+                        licensedAreaM2: p.licensedAreaM2,
+                        teaAreaM2: p.teaAreaM2,
+                        requiredM2: p.requiredM2,
+                        grossPrunedM2: p.grossPrunedM2,
+                        reusedM2: p.reusedM2,
+                        newPrunedM2: p.newPrunedM2,
+                        unattributedM2: p.unattributedM2,
+                        unobservedM2: p.unobservedM2,
+                        remainingM2: p.remainingM2,
+                        gardenCount: gardenCount.get(p.code) ?? 0,
+                        unresolvedGardens: p.unresolvedGardens,
+                        autoStatus: p.status,
+                        autoApprovedAt: p.autoApprovedAt,
+                        scans: p.scans,
+                        demo: true,
+                    }),
+                );
+            }
+        }
+        await manager.save(rows, { chunk: INSERT_CHUNK });
+
+        const seasonsByGarden = new Map<string, Record<string, GardenSeason>>();
+        for (const season of block.seasons) {
+            const events = new Map<string, GardenPruningEvent[]>();
+            for (const { gardenCode, ...event } of season.events) {
+                events.set(gardenCode, [...(events.get(gardenCode) ?? []), event]);
+            }
+            for (const { code, ...rest } of season.gardens) {
+                const entry = seasonsByGarden.get(code) ?? {};
+                entry[season.season] = { ...rest, events: events.get(code) ?? [] };
+                seasonsByGarden.set(code, entry);
+            }
+        }
+        const gardens = block.gardens.map((g) =>
+            manager.create(TeaInventoryGarden, { ...g, areaId, seasons: seasonsByGarden.get(g.code) ?? {} }),
         );
-        const idByCode = new Map(producers.map((p) => [p.code, p.id]));
-        const gardens = block.gardens
-            .filter((g) => idByCode.has(g.producerCode))
-            .map(({ producerCode, ...g }) => manager.create(TeaInventoryGarden, { ...g, areaId, producerId: idByCode.get(producerCode) as string }));
         await manager.save(gardens, { chunk: INSERT_CHUNK });
-        this.logger.log(`Imported ${producers.length} producers and ${gardens.length} gardens`);
+        this.logger.log(`Imported ${block.producers.length} producers × ${block.seasons.length} seasons and ${gardens.length} gardens`);
     }
 }

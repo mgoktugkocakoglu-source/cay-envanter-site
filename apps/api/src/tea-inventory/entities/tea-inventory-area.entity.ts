@@ -15,6 +15,30 @@ export interface TeaPatch {
     geometry: Record<string, unknown>;
 }
 
+/** One scanned season's schedule (producer scans every ≤ 5 days). */
+export interface ProducerSeasonSchedule {
+    season: string;
+    calibrated: boolean;
+    demo: boolean;
+    everyDays: number;
+    lookbackDays: number;
+    reference: [string, string];
+    previousSeasons: string[];
+    scanDates: string[];
+    newObservation: boolean[];
+    sceneDates: string[][];
+}
+
+export interface ProducerScanBlock {
+    rules: Record<string, unknown>;
+    seasons: ProducerSeasonSchedule[];
+    scenes: {
+        baseUrl: string;
+        bounds: { west: number; south: number; east: number; north: number };
+        seasons: Record<string, Array<{ date: string; file: string; teaVisible: number; teaMedianNdvi: number }>>;
+    } | null;
+}
+
 /** A license whose recorded parcel reference no longer resolves to a TKGM parcel. */
 export interface InventoryLicense {
     licenseNo: string;
@@ -86,10 +110,11 @@ export class TeaInventoryArea {
     @Column({ type: 'jsonb', nullable: true })
     pruning: Record<string, unknown> | null;
 
-    // Producer scan schedule (bundle v3): season, scan dates every ≤ 5 days, which scans had new
-    // clear scenes, auto-approval rules. Null when producer scanning has not run for this area.
+    // Producer scanning (bundle v4): rules, one schedule per scanned season (scan dates every
+    // ≤ 5 days, which scans had new clear scenes) and the per-scene imagery timeline. Null when
+    // producer scanning has not run for this area.
     @Column({ type: 'jsonb', name: 'producer_scan', nullable: true })
-    producerScan: Record<string, unknown> | null;
+    producerScan: ProducerScanBlock | null;
 
     // Bundle timestamp; a re-import is skipped when it has not changed.
     @Column({ type: 'timestamp', name: 'bundle_generated_at' })

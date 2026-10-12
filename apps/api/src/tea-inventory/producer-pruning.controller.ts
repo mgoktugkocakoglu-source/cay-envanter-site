@@ -5,7 +5,7 @@ import { CaykurRoles, CurrentUser } from '@/auth/decorators';
 import { CaykurRole } from '@/auth/enums';
 import type { AuthenticatedUser } from '@/auth/decorators/current-user.decorator';
 import { ProducerPruningService, ProducerRow, ProducerDetail, ProducerSummary } from '@/tea-inventory/producer-pruning.service';
-import { ProducerQueryDto, PruningDecisionDto, PurchaseListQueryDto } from '@/tea-inventory/dto';
+import { ProducerQueryDto, PruningDecisionDto, PurchaseListQueryDto, SeasonQueryDto } from '@/tea-inventory/dto';
 import { Paginated } from '@/common/dto/paginated.dto';
 
 // Same audience as the tea inventory.
@@ -39,11 +39,11 @@ export class ProducerPruningController {
     }
 
     @Get('areas/:id/producers/summary')
-    @ApiOperation({ summary: 'Producer counts by status, purchase-open count, scan schedule' })
+    @ApiOperation({ summary: 'Producer counts by status for a season, purchase-open count, scan schedule, seasons' })
     @ApiParam({ name: 'id', description: 'Inventory area id' })
     @ApiResponse({ status: 200, description: 'Producer summary' })
-    async summary(@Param('id', ParseUUIDPipe) id: string): Promise<ProducerSummary> {
-        return this.service.summary(id);
+    async summary(@Param('id', ParseUUIDPipe) id: string, @Query() query: SeasonQueryDto): Promise<ProducerSummary> {
+        return this.service.summary(id, query.season);
     }
 
     @Get('areas/:id/purchase-list')
@@ -60,12 +60,12 @@ export class ProducerPruningController {
     @ApiOperation({ summary: 'Purchase list as CSV (Excel-compatible)' })
     @ApiParam({ name: 'id', description: 'Inventory area id' })
     @ApiResponse({ status: 200, description: 'CSV file' })
-    async purchaseListCsv(@Param('id', ParseUUIDPipe) id: string): Promise<string> {
-        return this.service.purchaseListCsv(id);
+    async purchaseListCsv(@Param('id', ParseUUIDPipe) id: string, @Query() query: SeasonQueryDto): Promise<string> {
+        return this.service.purchaseListCsv(id, query.season);
     }
 
     @Get('producers/:id')
-    @ApiOperation({ summary: 'Producer detail: gardens, scan history, decisions' })
+    @ApiOperation({ summary: 'Producer detail: gardens with event polygons, scan history, other seasons, decisions, scene timeline' })
     @ApiParam({ name: 'id', description: 'Producer id' })
     @ApiResponse({ status: 200, description: 'Producer detail' })
     async detail(@Param('id', ParseUUIDPipe) id: string): Promise<ProducerDetail> {

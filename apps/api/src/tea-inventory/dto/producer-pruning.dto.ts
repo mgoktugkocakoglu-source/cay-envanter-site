@@ -8,6 +8,8 @@ export const PRODUCER_STATUSES = [
     'approved',
     'rejected',
     'expert_review',
+    'repeat_pruning_review',
+    'boundary_unresolved',
     'partial',
     'no_trace',
     'awaiting_observation',
@@ -34,6 +36,12 @@ export class ProducerQueryDto {
     @Max(100)
     limit?: number = 20;
 
+    @ApiPropertyOptional({ description: 'Pruning season, e.g. 2025-26 (default: latest scanned)' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(10)
+    season?: string;
+
     @ApiPropertyOptional({ enum: PRODUCER_STATUSES })
     @IsOptional()
     @IsIn(PRODUCER_STATUSES)
@@ -56,8 +64,17 @@ export class ProducerQueryDto {
     sortOrder?: 'ASC' | 'DESC' = 'ASC';
 }
 
+/** Season selector for summary / CSV endpoints. */
+export class SeasonQueryDto {
+    @ApiPropertyOptional({ description: 'Pruning season, e.g. 2025-26 (default: latest scanned)' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(10)
+    season?: string;
+}
+
 /** Query params for the purchase list (producers ÇAYKUR may buy from this season). */
-export class PurchaseListQueryDto {
+export class PurchaseListQueryDto extends SeasonQueryDto {
     @ApiPropertyOptional({ default: 1, minimum: 1 })
     @IsOptional()
     @Type(() => Number)

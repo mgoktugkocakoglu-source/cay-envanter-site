@@ -173,6 +173,16 @@ export const PRODUCER_STATUS_META: Record<ProducerPruningStatus, ProducerStatusM
         description: 'Eksper budamayı yetersiz buldu; bu sezon alım kapalı.',
         tone: 'danger',
     },
+    repeat_pruning_review: {
+        label: 'Tekrar budama kontrolü',
+        description: 'Görülen budamanın önemli kısmı, aynı 7 yıllık döngüde daha önce hesaba alınmış alanla çakışıyor; eksper kontrolü gerekir.',
+        tone: 'warning',
+    },
+    boundary_unresolved: {
+        label: 'Sınır belirsiz',
+        description: 'Hisseli parseldeki bahçe sınırı ölçülmemiş; buradaki budama müstahsile atanamaz. Önce sınır belirleme (ruhsatlandırma ölçümü) gerekir.',
+        tone: 'muted',
+    },
     expert_review: {
         label: 'Eksper onayı bekliyor',
         description: 'Budama hedefe yakın ya da üzerinde görünüyor ama otomatik onay için güven yeterli değil.',
@@ -197,6 +207,8 @@ export const PRODUCER_STATUS_META: Record<ProducerPruningStatus, ProducerStatusM
 
 export const PRODUCER_STATUS_ORDER: ProducerPruningStatus[] = [
     'expert_review',
+    'repeat_pruning_review',
+    'boundary_unresolved',
     'no_trace',
     'partial',
     'awaiting_observation',
