@@ -92,6 +92,10 @@ export class TeaInventoryGarden {
     @Column({ type: 'varchar', length: 20 })
     parcel: string;
 
+    // TKGM locality (mevkii) of the parcel, e.g. "Terzili": the level below the neighbourhood.
+    @Column({ type: 'varchar', length: 120, default: '' })
+    locality: string;
+
     // Shared parcel: this holder's index and the number of holders.
     @Column({ type: 'int', name: 'holder_index', default: 1 })
     holderIndex: number;

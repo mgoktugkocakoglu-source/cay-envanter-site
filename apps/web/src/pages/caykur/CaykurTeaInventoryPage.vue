@@ -18,6 +18,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import CaykurPruningMonitor from '@/components/caykur/CaykurPruningMonitor.vue';
 import CaykurProducerPruning from '@/components/caykur/CaykurProducerPruning.vue';
 import CaykurLicensing from '@/components/caykur/CaykurLicensing.vue';
+import CaykurPruningRecords from '@/components/caykur/CaykurPruningRecords.vue';
 import { toneVariant } from '@/components/caykur/tone';
 import {
     api,
@@ -71,9 +72,9 @@ const isLoadingRows = ref(false);
 // ── Tabs: the inventory map stays mounted (v-show) and is resized when shown again ──
 const activeTab = ref<'inventory' | 'pruning' | 'licensing'>('inventory');
 // Pruning is judged per producer (1/7 of all their gardens); the parcel view stays for inspection.
-const pruningView = ref<'producers' | 'parcels'>('producers');
+const pruningView = ref<'records' | 'producers' | 'parcels'>('records');
 function onPruningView(v: unknown): void {
-    if (v === 'producers' || v === 'parcels') pruningView.value = v;
+    if (v === 'records' || v === 'producers' || v === 'parcels') pruningView.value = v;
 }
 watch(activeTab, async (tab) => {
     if (tab !== 'inventory') return;
@@ -602,11 +603,13 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                     <div class="flex flex-wrap items-center gap-3">
                         <span class="text-sm text-muted-foreground">Değerlendirme</span>
                         <ToggleGroup :model-value="pruningView" type="single" aria-label="Budama değerlendirme birimi" @update:model-value="onPruningView">
+                            <ToggleGroupItem value="records" class="h-11 px-3 md:h-9">Tarama kayıtları (önce / sonra)</ToggleGroupItem>
                             <ToggleGroupItem value="producers" class="h-11 px-3 md:h-9">Müstahsil (ruhsat sahibi)</ToggleGroupItem>
                             <ToggleGroupItem value="parcels" class="h-11 px-3 md:h-9">Parsel ve uydu görüntüleri</ToggleGroupItem>
                         </ToggleGroup>
                     </div>
-                    <CaykurProducerPruning v-if="pruningView === 'producers'" :area-id="area.id" :map-data="mapData" />
+                    <CaykurPruningRecords v-if="pruningView === 'records'" :area-id="area.id" :map-data="mapData" />
+                    <CaykurProducerPruning v-else-if="pruningView === 'producers'" :area-id="area.id" :map-data="mapData" />
                     <CaykurPruningMonitor v-else :area-id="area.id" :boundary="area.boundary" :map-data="mapData" />
                 </template>
 

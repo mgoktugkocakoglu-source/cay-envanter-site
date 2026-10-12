@@ -1072,6 +1072,63 @@ export interface ProducerSummary {
     rules: ProducerRules | null;
 }
 
+// Scan-centred satellite pruning records (event polygon × TKGM parcel × licence holder)
+export type PruningRegistration = 'auto' | 'expert' | 'pending' | 'rejected' | 'unattributed' | 'no_license';
+
+export interface PruningRecordRow {
+    id: string;
+    season: string;
+    gardenCode: string;
+    parcelKey: string;
+    block: string;
+    parcel: string;
+    locality: string;
+    holderIndex: number;
+    holderCount: number;
+    boundaryResolved: boolean;
+    producerId: string | null;
+    producerCode: string;
+    producerName: string;
+    walletNo: string;
+    licenseCode: string | null;
+    areaM2: number;
+    reusedM2: number;
+    newM2: number;
+    lastNoChangeAt: string | null;
+    firstChangeAt: string | null;
+    detectedAt: string | null;
+    producerStatus: ProducerPruningStatus | null;
+    producerRatio: number;
+    purchaseOpen: boolean;
+    registration: PruningRegistration;
+    geometry: GeoJSON.Geometry;
+}
+
+export interface PruningRecordSummary {
+    season: string;
+    seasons: string[];
+    total: number;
+    areaM2: number;
+    newAreaM2: number;
+    gardens: number;
+    producers: number;
+    byRegistration: Record<PruningRegistration, number>;
+    byScan: Array<{ date: string; newObservation: boolean; records: number; areaM2: number }>;
+    localities: Array<{ name: string; records: number }>;
+    schedule: ProducerScanSchedule | null;
+    scenes: { baseUrl: string; bounds: { west: number; south: number; east: number; north: number }; items: ProducerSceneItem[] } | null;
+}
+
+export interface PruningRecordQuery {
+    page?: number;
+    limit?: number;
+    season?: string;
+    scanDate?: string;
+    locality?: string;
+    registration?: PruningRegistration;
+    search?: string;
+}
+
 export interface ProducerQuery {
     page?: number;
     limit?: number;
@@ -1762,6 +1819,21 @@ export const api = {
     /** Purchase list as a CSV blob (Excel-compatible), or an error message. */
     downloadInventoryPurchaseCsv: async (areaId: string, season: string): Promise<{ blob?: Blob; error?: string }> => {
         const response = await authorizedFetch(`/caykur/tea-inventory/areas/${areaId}/purchase-list.csv?season=${encodeURIComponent(season)}`);
+        if (!response.ok) return { error: await readErrorMessage(response, 'Liste indirilemedi') };
+        return { blob: await response.blob() };
+    },
+
+    // Çaykur satellite pruning records (scan-centred feed)
+    getPruningRecords: (areaId: string, params?: PruningRecordQuery) => {
+        const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
+        const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        return request<Paginated<PruningRecordRow>>(`/caykur/tea-inventory/areas/${areaId}/pruning-records${query ? `?${query}` : ''}`);
+    },
+    getPruningRecordSummary: (areaId: string, season?: string) =>
+        request<PruningRecordSummary>(`/caykur/tea-inventory/areas/${areaId}/pruning-records/summary${season ? `?season=${encodeURIComponent(season)}` : ''}`),
+    /** Pruning records as a CSV blob (Excel-compatible), or an error message. */
+    downloadPruningRecordsCsv: async (areaId: string, season: string): Promise<{ blob?: Blob; error?: string }> => {
+        const response = await authorizedFetch(`/caykur/tea-inventory/areas/${areaId}/pruning-records.csv?season=${encodeURIComponent(season)}`);
         if (!response.ok) return { error: await readErrorMessage(response, 'Liste indirilemedi') };
         return { blob: await response.blob() };
     },

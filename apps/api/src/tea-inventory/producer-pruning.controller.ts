@@ -4,8 +4,8 @@ import { JwtAuthGuard, CaykurRolesGuard } from '@/auth/guards';
 import { CaykurRoles, CurrentUser } from '@/auth/decorators';
 import { CaykurRole } from '@/auth/enums';
 import type { AuthenticatedUser } from '@/auth/decorators/current-user.decorator';
-import { ProducerPruningService, ProducerRow, ProducerDetail, ProducerSummary } from '@/tea-inventory/producer-pruning.service';
-import { ProducerQueryDto, PruningDecisionDto, PurchaseListQueryDto, SeasonQueryDto } from '@/tea-inventory/dto';
+import { ProducerPruningService, ProducerRow, ProducerDetail, ProducerSummary, PruningRecordRow, PruningRecordSummary } from '@/tea-inventory/producer-pruning.service';
+import { ProducerQueryDto, PruningDecisionDto, PruningRecordQueryDto, PurchaseListQueryDto, SeasonQueryDto } from '@/tea-inventory/dto';
 import { Paginated } from '@/common/dto/paginated.dto';
 
 // Same audience as the tea inventory.
@@ -62,6 +62,32 @@ export class ProducerPruningController {
     @ApiResponse({ status: 200, description: 'CSV file' })
     async purchaseListCsv(@Param('id', ParseUUIDPipe) id: string, @Query() query: SeasonQueryDto): Promise<string> {
         return this.service.purchaseListCsv(id, query.season);
+    }
+
+    @Get('areas/:id/pruning-records')
+    @ApiOperation({ summary: 'Satellite pruning records of a season (event polygons split by parcel, matched to the licence holder), paginated' })
+    @ApiParam({ name: 'id', description: 'Inventory area id' })
+    @ApiResponse({ status: 200, description: 'Paginated pruning records' })
+    async records(@Param('id', ParseUUIDPipe) id: string, @Query() query: PruningRecordQueryDto): Promise<Paginated<PruningRecordRow>> {
+        return this.service.records(id, query);
+    }
+
+    @Get('areas/:id/pruning-records/summary')
+    @ApiOperation({ summary: 'Record counts per scan date, registration path and locality; scan schedule and scene timeline' })
+    @ApiParam({ name: 'id', description: 'Inventory area id' })
+    @ApiResponse({ status: 200, description: 'Pruning record summary' })
+    async recordsSummary(@Param('id', ParseUUIDPipe) id: string, @Query() query: SeasonQueryDto): Promise<PruningRecordSummary> {
+        return this.service.recordsSummary(id, query.season);
+    }
+
+    @Get('areas/:id/pruning-records.csv')
+    @Header('Content-Type', 'text/csv; charset=utf-8')
+    @Header('Content-Disposition', 'attachment; filename="uydu-budama-kayitlari.csv"')
+    @ApiOperation({ summary: 'Pruning records as CSV (Excel-compatible)' })
+    @ApiParam({ name: 'id', description: 'Inventory area id' })
+    @ApiResponse({ status: 200, description: 'CSV file' })
+    async recordsCsv(@Param('id', ParseUUIDPipe) id: string, @Query() query: SeasonQueryDto): Promise<string> {
+        return this.service.recordsCsv(id, query.season);
     }
 
     @Get('producers/:id')

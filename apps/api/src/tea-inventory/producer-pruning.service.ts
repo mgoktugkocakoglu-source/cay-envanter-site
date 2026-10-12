@@ -6,11 +6,30 @@ import { TeaInventoryProducer, ProducerAutoStatus, ProducerScan } from '@/tea-in
 import { TeaInventoryGarden, GardenPruningEvent, GardenSeason } from '@/tea-inventory/entities/tea-inventory-garden.entity';
 import { PruningDecision, PruningDecisionValue } from '@/tea-inventory/entities/pruning-decision.entity';
 import { User } from '@/users/entities/user.entity';
-import { PRODUCER_STATUSES, ProducerQueryDto, ProducerSortKey, ProducerStatus, PruningDecisionDto, PurchaseListQueryDto } from '@/tea-inventory/dto';
+import {
+    PRODUCER_STATUSES,
+    PRUNING_REGISTRATIONS,
+    ProducerQueryDto,
+    ProducerSortKey,
+    ProducerStatus,
+    PruningDecisionDto,
+    PruningRecordQueryDto,
+    PruningRegistration,
+    PurchaseListQueryDto,
+} from '@/tea-inventory/dto';
 import { Paginated, paginate } from '@/common/dto/paginated.dto';
 
 /** Statuses under which ÇAYKUR may buy green leaf from the producer this season. */
 const PURCHASE_OPEN: ProducerStatus[] = ['auto_approved', 'approved'];
+
+const REGISTRATION_LABEL: Record<PruningRegistration, string> = {
+    auto: 'Otomatik düştü (uydu, yüksek güven)',
+    expert: 'Eksper onayıyla düştü',
+    pending: 'Eksper onayı bekliyor',
+    rejected: 'Eksper reddetti',
+    unattributed: 'Hisse sınırı belirsiz — müstahsile atanamadı',
+    no_license: 'Ruhsat yok / eşleşme bekliyor',
+};
 
 // Latest expert decision per producer/season; effective status = that decision, else the satellite one.
 const LATEST_DECISION_JOIN = `
@@ -119,6 +138,57 @@ export interface ProducerSummary {
     counts: Record<ProducerStatus, number>;
     schedule: ProducerSeasonSchedule | null;
     rules: Record<string, unknown> | null;
+}
+
+/**
+ * One satellite pruning record: a pruning event polygon inside a garden, split by the TKGM parcel
+ * (the garden), matched to the licence holder, with the observation interval that brackets the
+ * change and how the record reached ÇAYKUR's purchase system.
+ */
+export interface PruningRecordRow {
+    id: string;
+    season: string;
+    gardenCode: string;
+    parcelKey: string;
+    block: string;
+    parcel: string;
+    locality: string;
+    holderIndex: number;
+    holderCount: number;
+    boundaryResolved: boolean;
+    producerId: string | null;
+    producerCode: string;
+    producerName: string;
+    walletNo: string;
+    licenseCode: string | null;
+    areaM2: number;
+    reusedM2: number;
+    newM2: number;
+    /** Last clear scene with no change, first clear scene showing it, and the scan that flagged it. */
+    lastNoChangeAt: string | null;
+    firstChangeAt: string | null;
+    detectedAt: string | null;
+    producerStatus: ProducerStatus | null;
+    producerRatio: number;
+    purchaseOpen: boolean;
+    registration: PruningRegistration;
+    geometry: Record<string, unknown>;
+}
+
+export interface PruningRecordSummary {
+    season: string;
+    seasons: string[];
+    total: number;
+    areaM2: number;
+    newAreaM2: number;
+    gardens: number;
+    producers: number;
+    byRegistration: Record<PruningRegistration, number>;
+    /** Records per scan date (the scan that flagged them), in scan order. */
+    byScan: Array<{ date: string; newObservation: boolean; records: number; areaM2: number }>;
+    localities: Array<{ name: string; records: number }>;
+    schedule: ProducerSeasonSchedule | null;
+    scenes: { baseUrl: string; bounds: ProducerScanBlock['scenes'] extends infer S ? (S extends { bounds: infer B } ? B : never) : never; items: Array<{ date: string; file: string; teaVisible: number; teaMedianNdvi: number }> } | null;
 }
 
 interface RawProducerRow {
@@ -339,6 +409,138 @@ export class ProducerPruningService {
             }),
         );
         return this.detail(id);
+    }
+
+    // ── Scan-centred record feed ──
+
+    async records(areaId: string, query: PruningRecordQueryDto): Promise<Paginated<PruningRecordRow>> {
+        const area = await this.findArea(areaId);
+        const season = this.resolveSeason(area, query.season);
+        const search = query.search?.trim().toLocaleLowerCase('tr-TR');
+        const rows = (await this.recordRows(area, season)).filter((r) => {
+            if (query.scanDate && r.detectedAt !== query.scanDate) return false;
+            if (query.locality && r.locality !== query.locality) return false;
+            if (query.registration && r.registration !== query.registration) return false;
+            if (search) {
+                const haystack = [r.producerName, r.producerCode, r.walletNo, r.licenseCode ?? '', r.gardenCode, `${r.block}/${r.parcel}`, r.locality].join(' ').toLocaleLowerCase('tr-TR');
+                if (!haystack.includes(search)) return false;
+            }
+            return true;
+        });
+        const page = query.page ?? 1;
+        const limit = query.limit ?? 20;
+        return paginate(rows.slice((page - 1) * limit, page * limit), rows.length, page, limit);
+    }
+
+    async recordsSummary(areaId: string, requested?: string): Promise<PruningRecordSummary> {
+        const area = await this.findArea(areaId);
+        const season = this.resolveSeason(area, requested);
+        const rows = await this.recordRows(area, season);
+        const schedule = this.scheduleOf(area, season);
+        const byRegistration = Object.fromEntries(PRUNING_REGISTRATIONS.map((k) => [k, 0])) as Record<PruningRegistration, number>;
+        const localities = new Map<string, number>();
+        const byScanMap = new Map<string, { records: number; areaM2: number }>();
+        for (const r of rows) {
+            byRegistration[r.registration]++;
+            localities.set(r.locality, (localities.get(r.locality) ?? 0) + 1);
+            if (r.detectedAt) {
+                const entry = byScanMap.get(r.detectedAt) ?? { records: 0, areaM2: 0 };
+                entry.records++;
+                entry.areaM2 += r.areaM2;
+                byScanMap.set(r.detectedAt, entry);
+            }
+        }
+        const scenes = area.producerScan?.scenes ?? null;
+        return {
+            season,
+            seasons: this.seasonsOf(area),
+            total: rows.length,
+            areaM2: Math.round(rows.reduce((s, r) => s + r.areaM2, 0)),
+            newAreaM2: Math.round(rows.reduce((s, r) => s + r.newM2, 0)),
+            gardens: new Set(rows.map((r) => r.gardenCode)).size,
+            producers: new Set(rows.map((r) => r.producerCode)).size,
+            byRegistration,
+            byScan: (schedule?.scanDates ?? []).map((date, i) => ({
+                date,
+                newObservation: schedule?.newObservation[i] ?? false,
+                records: byScanMap.get(date)?.records ?? 0,
+                areaM2: Math.round(byScanMap.get(date)?.areaM2 ?? 0),
+            })),
+            localities: [...localities.entries()].map(([name, records]) => ({ name, records })).sort((a, b) => b.records - a.records),
+            schedule,
+            scenes: scenes ? { baseUrl: scenes.baseUrl, bounds: scenes.bounds, items: scenes.seasons[season] ?? [] } : null,
+        };
+    }
+
+    /** The record feed as CSV (UTF-8 with BOM, Excel-compatible). */
+    async recordsCsv(areaId: string, requested?: string): Promise<string> {
+        const area = await this.findArea(areaId);
+        const season = this.resolveSeason(area, requested);
+        const rows = await this.recordRows(area, season);
+        const header = ['Kayıt', 'Mevki', 'Ada/Parsel', 'Bahçe', 'Hisse', 'Müstahsil no', 'Ad soyad', 'Cüzdan no', 'Ruhsat no', 'Budanan alan (m²)', 'Çakışan (m²)', 'Yeni alan (m²)', 'Son değişimsiz gözlem', 'İlk değişimli gözlem', 'Tespit taraması', 'Müstahsil durumu', '1/7 oranı', 'ÇAYKUR kaydı', 'Demo'];
+        const cell = (v: string | number | null) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+        const lines = rows.map((r) =>
+            [
+                r.id, r.locality, `${r.block}/${r.parcel}`, r.gardenCode, r.holderCount > 1 ? `${r.holderIndex}/${r.holderCount}` : '', r.producerCode, r.producerName, r.walletNo, r.licenseCode ?? '',
+                r.areaM2, r.reusedM2, r.newM2, r.lastNoChangeAt ?? 'sezon başı', r.firstChangeAt ?? '', r.detectedAt ?? '', r.producerStatus ?? '', r.producerRatio, REGISTRATION_LABEL[r.registration], 'Evet',
+            ].map(cell).join(';'),
+        );
+        const title = `${area.province} / ${area.district} / ${area.neighborhood} · ${season} budama sezonu`;
+        return `﻿${cell(`Uydu budama kayıtları — ${title}`)}\n${header.map(cell).join(';')}\n${lines.join('\n')}\n`;
+    }
+
+    /** Every event polygon of the season as a record, joined to its garden, producer and licence. */
+    private async recordRows(area: TeaInventoryArea, season: string): Promise<PruningRecordRow[]> {
+        const [gardens, producers] = await Promise.all([
+            this.gardenRepo.find({ where: { areaId: area.id }, order: { parcelKey: 'ASC', holderIndex: 'ASC' } }),
+            this.rawRows('WHERE p.area_id = $1 AND p.season = $2', [area.id, season]),
+        ]);
+        const producerByCode = new Map(producers.map((p) => [p.code, this.toRow(p)]));
+        const rows: PruningRecordRow[] = [];
+        for (const g of gardens) {
+            const events = g.seasons[season]?.events ?? [];
+            const producer = producerByCode.get(g.producerCode) ?? null;
+            events.forEach((e, i) => {
+                const status = producer?.status ?? null;
+                let registration: PruningRegistration;
+                if (!g.boundaryResolved) registration = 'unattributed';
+                else if (status === 'auto_approved') registration = 'auto';
+                else if (status === 'approved') registration = 'expert';
+                else if (status === 'rejected') registration = 'rejected';
+                else if (status === 'no_license' || !g.licenseCode) registration = 'no_license';
+                else registration = 'pending';
+                rows.push({
+                    id: `${g.code}:${season}:${i + 1}`,
+                    season,
+                    gardenCode: g.code,
+                    parcelKey: g.parcelKey,
+                    block: g.block,
+                    parcel: g.parcel,
+                    locality: g.locality || '—',
+                    holderIndex: g.holderIndex,
+                    holderCount: g.holderCount,
+                    boundaryResolved: g.boundaryResolved,
+                    producerId: producer?.id ?? null,
+                    producerCode: g.producerCode,
+                    producerName: producer?.name ?? '',
+                    walletNo: producer?.walletNo ?? '',
+                    licenseCode: g.licenseCode,
+                    areaM2: Math.round(e.areaM2),
+                    reusedM2: Math.round(e.reusedM2),
+                    newM2: Math.round(Math.max(0, e.areaM2 - e.reusedM2)),
+                    lastNoChangeAt: e.lastNoChangeAt,
+                    firstChangeAt: e.firstChangeAt,
+                    detectedAt: e.detectedAt,
+                    producerStatus: status,
+                    producerRatio: producer?.ratio ?? 0,
+                    purchaseOpen: producer?.purchaseOpen ?? false,
+                    registration,
+                    geometry: e.geometry,
+                });
+            });
+        }
+        // Newest detections first; inside a scan the larger pruning first.
+        return rows.sort((a, b) => (b.detectedAt ?? '').localeCompare(a.detectedAt ?? '') || b.areaM2 - a.areaM2);
     }
 
     private async findArea(id: string): Promise<TeaInventoryArea> {

@@ -13,6 +13,7 @@ import type {
     LicenseMatchLevel,
     LicenseView,
     ProducerPruningStatus,
+    PruningRegistration,
     SatellitePruningStatus,
 } from '@/services/api';
 import type { Tone } from '@/components/caykur/tone';
@@ -232,6 +233,18 @@ export const PRODUCER_STATUS_ORDER: ProducerPruningStatus[] = [
     'approved',
     'rejected',
 ];
+
+// ── Satellite pruning records: how a record reached ÇAYKUR's purchase system ──
+
+export const REGISTRATION_META: Record<PruningRegistration, ProducerStatusMeta> = {
+    auto: { label: 'Otomatik düştü', description: 'Uydu çok yüksek güvenle 1/7 hedefini gördü; kayıt müstahsil haber vermeden ÇAYKUR alım sistemine düştü.', tone: 'success' },
+    expert: { label: 'Eksper onayıyla düştü', description: 'Kayıt eksper onayından sonra alım sistemine düştü.', tone: 'success' },
+    pending: { label: 'Eksper onayı bekliyor', description: 'Budama tespit edildi ve müstahsile yazıldı; alımı açmak için eksper onayı gerekiyor.', tone: 'warning' },
+    rejected: { label: 'Eksper reddetti', description: 'Eksper bu sezon budamayı yetersiz buldu.', tone: 'danger' },
+    unattributed: { label: 'Müstahsile atanamadı', description: 'Hisseli parselde bu bahçenin sınırı ölçülmedi; budama hangi hissedarın, bilinmiyor.', tone: 'muted' },
+    no_license: { label: 'Ruhsat yok / eşleşme bekliyor', description: 'Budama görüldü ama bahçeye bağlı ruhsat yok ya da ruhsat–parsel eşleşmesi tamamlanmadı.', tone: 'danger' },
+};
+export const REGISTRATION_ORDER: PruningRegistration[] = ['auto', 'expert', 'pending', 'no_license', 'unattributed', 'rejected'];
 
 // ── Digital licence register ──
 

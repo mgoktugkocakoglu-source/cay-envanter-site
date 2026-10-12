@@ -81,6 +81,7 @@ interface BundleProducers {
         parcelKey: string;
         block: string;
         parcel: string;
+        locality?: string;
         holderIndex: number;
         holderCount: number;
         boundaryResolved: boolean;
@@ -256,7 +257,7 @@ export class TeaInventorySeedService implements OnModuleInit {
         }
         const gardens = block.gardens.map((g) => {
             const { code: _c, ...licensingFields } = licensingByGarden.get(g.code) ?? { code: g.code };
-            return manager.create(TeaInventoryGarden, { ...g, ...licensingFields, areaId, seasons: seasonsByGarden.get(g.code) ?? {} });
+            return manager.create(TeaInventoryGarden, { ...g, locality: g.locality ?? '', ...licensingFields, areaId, seasons: seasonsByGarden.get(g.code) ?? {} });
         });
         await manager.save(gardens, { chunk: INSERT_CHUNK });
         this.logger.log(`Imported ${block.producers.length} producers × ${block.seasons.length} seasons and ${gardens.length} gardens`);
