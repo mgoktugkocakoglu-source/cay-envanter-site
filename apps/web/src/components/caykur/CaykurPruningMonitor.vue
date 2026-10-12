@@ -19,6 +19,7 @@ import {
     type AreaPruning,
     type InventoryMap,
     type InventoryParcelDetail,
+    type PruningImageryLayer,
     type PruningSeasonResult,
     type SatellitePruningStatus,
 } from '@/services/api';
@@ -47,6 +48,15 @@ const statusFilter = ref<SatellitePruningStatus | typeof ALL>(ALL);
 const page = ref(1);
 const selected = ref<InventoryParcelDetail | null>(null);
 const showPatches = ref(true);
+const imageryLayer = ref<PruningImageryLayer | 'none'>('change');
+
+const IMAGERY_OPTIONS: Array<{ value: PruningImageryLayer | 'none'; label: string; hint: string }> = [
+    { value: 'none', label: 'Kapalı', hint: 'Yalnızca altlık harita' },
+    { value: 'reference', label: 'Ekim', hint: 'Budama öncesi referans görüntüsü' },
+    { value: 'winter', label: 'Aralık–Ocak', hint: 'Kasım–Aralık budaması sonrası' },
+    { value: 'spring', label: 'Mart', hint: 'Mart budaması sonrası' },
+    { value: 'change', label: 'Değişim', hint: 'Çay piksellerinde mahalleye göre yeşillik düşüşü (budama sinyali)' },
+];
 
 const mapContainer = ref<HTMLElement | null>(null);
 let map: L.Map | null = null;
@@ -54,6 +64,7 @@ let parcelLayer: L.GeoJSON | null = null;
 let patchLayer: L.GeoJSON | null = null;
 let boundaryLayer: L.GeoJSON | null = null;
 let selectedLayer: L.GeoJSON | null = null;
+let imageOverlay: L.ImageOverlay | null = null;
 
 const summary = computed(() => data.value?.summary ?? null);
 const seasons = computed(() => summary.value?.seasons ?? []);
@@ -77,6 +88,11 @@ const totalPages = computed(() => Math.max(1, Math.ceil(rows.value.length / PAGE
 const pageRows = computed(() => rows.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE));
 const selectedResult = computed(() => (selected.value?.pruning?.seasons[season.value] as PruningSeasonResult | undefined) ?? null);
 const selectedWindows = computed(() => current.value?.windows ?? null);
+const imageryInfo = computed(() => {
+    const layer = imageryLayer.value;
+    const imagery = summary.value?.imagery;
+    return layer === 'none' || !imagery ? null : (imagery.seasons[season.value]?.[layer] ?? null);
+});
 
 function ratio(r: PruningSeasonResult): number {
     return r.requiredM2 > 0 ? r.prunedM2 / r.requiredM2 : 0;
@@ -161,7 +177,23 @@ function renderMap(): void {
         }).addTo(map);
         map.fitBounds(boundaryLayer.getBounds(), { padding: [16, 16] });
     }
+    renderImagery();
     renderPatches();
+}
+
+/** Sentinel-2 overlay of the chosen season window, drawn between the base map and the parcels. */
+function renderImagery(): void {
+    imageOverlay?.remove();
+    imageOverlay = null;
+    const imagery = summary.value?.imagery;
+    if (!map || !imagery || !imageryInfo.value) return;
+    const { west, south, east, north } = imagery.bounds;
+    imageOverlay = L.imageOverlay(`${imagery.baseUrl}${imageryInfo.value.file}`, [[south, west], [north, east]], {
+        opacity: imageryLayer.value === 'change' ? 0.9 : 1,
+        interactive: false,
+    }).addTo(map);
+    // Below the parcel outlines (same pane), above the base map (tile pane).
+    imageOverlay.bringToBack();
 }
 
 function renderPatches(): void {
@@ -194,9 +226,11 @@ function clearSelection(): void {
 watch([season, statusFilter], () => {
     page.value = 1;
     parcelLayer?.setStyle((f) => parcelStyle(f?.properties.id as string));
+    renderImagery();
     renderPatches();
 });
 watch(showPatches, renderPatches);
+watch(imageryLayer, renderImagery);
 
 onMounted(() => void load());
 onBeforeUnmount(() => {
@@ -206,6 +240,9 @@ onBeforeUnmount(() => {
 
 function onSeason(v: unknown): void {
     if (typeof v === 'string' && v !== '') season.value = v;
+}
+function onImagery(v: unknown): void {
+    if (typeof v === 'string' && v !== '') imageryLayer.value = v as PruningImageryLayer | 'none';
 }
 function onStatus(v: unknown): void {
     statusFilter.value = typeof v === 'string' && v !== '' ? (v as SatellitePruningStatus | typeof ALL) : ALL;
@@ -298,6 +335,19 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                         <Label for="pruning-patches" class="text-xs">Budanan alanlar</Label>
                     </CardAction>
                 </CardHeader>
+                <div v-if="summary.imagery" class="flex flex-wrap items-center gap-3 border-b px-4 py-3">
+                    <span class="text-xs text-muted-foreground">Uydu görüntüsü (Sentinel-2)</span>
+                    <ToggleGroup :model-value="imageryLayer" type="single" size="sm" aria-label="Uydu görüntüsü katmanı" @update:model-value="onImagery">
+                        <ToggleGroupItem v-for="o in IMAGERY_OPTIONS" :key="o.value" :value="o.value" :title="o.hint" class="h-11 px-3 md:h-8">{{ o.label }}</ToggleGroupItem>
+                    </ToggleGroup>
+                    <span v-if="imageryInfo?.window" class="text-xs text-muted-foreground tabular-nums">
+                        {{ imageryInfo.window[0] }} – {{ imageryInfo.window[1] }} · {{ imageryInfo.scenes }} bulutsuz sahne
+                    </span>
+                    <span v-else-if="imageryLayer === 'change'" class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <span class="inline-block h-2 w-16 rounded-sm bg-linear-to-r from-amber-200 via-orange-500 to-red-700" aria-hidden="true" />
+                        hafif → güçlü yeşillik düşüşü
+                    </span>
+                </div>
                 <div ref="mapContainer" class="h-105 w-full md:h-140" role="region" aria-label="Budama haritası" />
             </Card>
 

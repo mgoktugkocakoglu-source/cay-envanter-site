@@ -653,6 +653,16 @@ export interface AreaPruningSummary {
     minSceneTeaMedian: number;
     seasons: PruningSeasonSummary[];
     series: { dates: string[]; neighborhoodMedian: number[]; validTeaShare: number[] } | null;
+    /** Sentinel-2 overlays per season window (static PNGs under baseUrl). */
+    imagery: PruningImagery | null;
+}
+
+export type PruningImageryLayer = 'reference' | 'winter' | 'spring' | 'change';
+
+export interface PruningImagery {
+    baseUrl: string;
+    bounds: { west: number; south: number; east: number; north: number };
+    seasons: Record<string, Partial<Record<PruningImageryLayer, { file: string; scenes?: number; window?: [string, string] }>>>;
 }
 
 export interface AreaPruning {
