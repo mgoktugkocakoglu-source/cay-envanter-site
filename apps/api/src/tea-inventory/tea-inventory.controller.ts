@@ -10,6 +10,7 @@ import {
     InventoryMap,
     InventoryParcelRow,
     InventoryParcelDetail,
+    AreaPruning,
 } from '@/tea-inventory/tea-inventory.service';
 import { InventoryAreaQueryDto, InventoryParcelQueryDto } from '@/tea-inventory/dto';
 import { Paginated } from '@/common/dto/paginated.dto';
@@ -55,6 +56,14 @@ export class TeaInventoryController {
     @ApiResponse({ status: 200, description: 'GeoJSON FeatureCollection' })
     async getAreaMap(@Param('id', ParseUUIDPipe) id: string): Promise<InventoryMap> {
         return this.inventoryService.getAreaMap(id);
+    }
+
+    @Get('areas/:id/pruning')
+    @ApiOperation({ summary: 'Pruning monitoring: season summaries, pruned patches, per-parcel 1/7 status (uncalibrated)' })
+    @ApiParam({ name: 'id', description: 'Inventory area id' })
+    @ApiResponse({ status: 200, description: 'Area pruning block and per-parcel season results' })
+    async getAreaPruning(@Param('id', ParseUUIDPipe) id: string): Promise<AreaPruning> {
+        return this.inventoryService.getAreaPruning(id);
     }
 
     @Get('areas/:id/parcels')

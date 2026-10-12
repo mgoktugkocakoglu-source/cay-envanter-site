@@ -4,7 +4,7 @@
  * (read at render time) so the layer follows light/dark mode.
  */
 
-import type { InventoryClass } from '@/services/api';
+import type { InventoryClass, SatellitePruningStatus } from '@/services/api';
 import type { Tone } from '@/components/caykur/tone';
 
 export interface InventoryClassMeta {
@@ -103,4 +103,48 @@ export function formatHectare(m2: number): string {
 /** 0.873 → "%87". */
 export function formatShare(share: number | null | undefined): string {
     return share === null || share === undefined ? '—' : `%${nf0.format(share * 100)}`;
+}
+
+// ── Pruning monitoring (satellite, uncalibrated) ──
+
+export const PRUNING_STATUS_META: Record<SatellitePruningStatus, InventoryClassMeta> = {
+    pruned: {
+        label: '1/7 karşılanıyor',
+        description: 'Uydu, çay alanının yaklaşık yedide biri kadar budama izi gördü.',
+        tone: 'success',
+        colorVar: '--success',
+    },
+    partial: {
+        label: 'Kısmi budama',
+        description: 'Budama izi var ama 1/7 hedefinin belirgin biçimde altında.',
+        tone: 'warning',
+        colorVar: '--warning',
+    },
+    no_trace: {
+        label: 'Budama izi yok',
+        description: 'Çay iyi gözlendi ama bu sezon budamaya özgü düşüş görülmedi.',
+        tone: 'danger',
+        colorVar: '--destructive',
+    },
+    insufficient_observation: {
+        label: 'Gözlem yetersiz',
+        description: 'Bulut veya kar çayın yarısından fazlasını gizledi; karar verilemez.',
+        tone: 'muted',
+        colorVar: '--muted-foreground',
+        hollow: true,
+    },
+    too_small: {
+        label: '10 m için küçük',
+        description: 'Çay alanının 1/7\'si tek bir 10 m pikselden küçük; parsel bazında karar için yüksek çözünürlük gerekir.',
+        tone: 'muted',
+        colorVar: '--muted-foreground',
+        hollow: true,
+    },
+};
+
+export const PRUNING_STATUS_ORDER: SatellitePruningStatus[] = ['no_trace', 'partial', 'pruned', 'insufficient_observation', 'too_small'];
+
+/** 12345 m² → "12,3 da". */
+export function formatDekar(m2: number | null | undefined): string {
+    return m2 === null || m2 === undefined ? '—' : `${nf1.format(m2 / 1000)} da`;
 }

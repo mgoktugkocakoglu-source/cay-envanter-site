@@ -76,7 +76,25 @@ export interface InventoryParcelRow {
 export interface InventoryParcelDetail extends InventoryParcelRow {
     areaId: string;
     teaProbability: number | null;
+    /** Per-season pruning result + NDVI curve (dates live on the area's pruning block). */
+    pruning: Record<string, unknown> | null;
     geometry: Record<string, unknown>;
+}
+
+export interface PruningParcelRow {
+    id: string;
+    parcelKey: string;
+    block: string;
+    parcel: string;
+    nature: string;
+    /** Season → { status, teaAreaM2, requiredM2, prunedM2, … } — no NDVI curve (that is per parcel). */
+    seasons: Record<string, unknown>;
+}
+
+export interface AreaPruning {
+    /** Season summaries, pruned patches, NDVI date axis and neighbourhood median; null when not run. */
+    summary: Record<string, unknown> | null;
+    parcels: PruningParcelRow[];
 }
 
 export interface InventoryMapFeature {
@@ -233,7 +251,30 @@ export class TeaInventoryService {
             ...this.toRow(parcel),
             areaId: parcel.areaId,
             teaProbability: parcel.teaProbability,
+            pruning: parcel.pruning,
             geometry: parcel.geometry,
+        };
+    }
+
+    /** Pruning monitoring of an area: the season summaries + every parcel's per-season status (not paginated: a map layer). */
+    async getAreaPruning(id: string): Promise<AreaPruning> {
+        const area = await this.findArea(id);
+        const parcels = await this.parcelRepo.find({
+            where: { areaId: id },
+            select: ['id', 'parcelKey', 'block', 'parcel', 'nature', 'pruning'],
+        });
+        return {
+            summary: area.pruning,
+            parcels: parcels
+                .filter((p) => p.pruning)
+                .map((p) => ({
+                    id: p.id,
+                    parcelKey: p.parcelKey,
+                    block: p.block,
+                    parcel: p.parcel,
+                    nature: p.nature,
+                    seasons: (p.pruning?.seasons as Record<string, unknown>) ?? {},
+                })),
         };
     }
 

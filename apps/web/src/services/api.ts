@@ -601,7 +601,63 @@ export interface InventoryParcelRow {
 export interface InventoryParcelDetail extends InventoryParcelRow {
     areaId: string;
     teaProbability: number | null;
+    pruning: ParcelPruning | null;
     geometry: GeoJSON.Geometry;
+}
+
+// Pruning monitoring (Sentinel-2 same-season comparison; uncalibrated until field labels exist)
+export type SatellitePruningStatus = 'pruned' | 'partial' | 'no_trace' | 'insufficient_observation' | 'too_small';
+
+export interface PruningSeasonResult {
+    teaAreaM2: number;
+    observedTeaAreaM2: number;
+    requiredM2: number;
+    winterPrunedM2: number;
+    springPrunedM2: number;
+    prunedM2: number;
+    vhChangeDb: number | null;
+    status: SatellitePruningStatus;
+}
+
+export interface ParcelPruning {
+    seasons: Record<string, PruningSeasonResult>;
+    /** NDVI of the parcel's tea pixels on each date of the area's series (null = not observed). */
+    ndvi: Array<number | null>;
+}
+
+export interface PruningWindows {
+    season: string;
+    reference: [string, string];
+    winter: [string, string];
+    spring: [string, string];
+}
+
+export interface PruningSeasonSummary {
+    season: string;
+    windows: PruningWindows;
+    teaAreaM2: number;
+    observedShare: number;
+    winterPrunedM2: number;
+    springPrunedM2: number;
+    prunedM2: number;
+    prunedShareOfTea: number;
+    expectedShare: number;
+    statusCounts: Record<SatellitePruningStatus, number>;
+    patches: Array<{ areaM2: number; geometry: GeoJSON.Geometry }>;
+}
+
+export interface AreaPruningSummary {
+    calibrated: boolean;
+    method: string;
+    requiredFraction: number;
+    minSceneTeaMedian: number;
+    seasons: PruningSeasonSummary[];
+    series: { dates: string[]; neighborhoodMedian: number[]; validTeaShare: number[] } | null;
+}
+
+export interface AreaPruning {
+    summary: AreaPruningSummary | null;
+    parcels: Array<{ id: string; parcelKey: string; block: string; parcel: string; nature: string; seasons: Record<string, PruningSeasonResult> }>;
 }
 
 export type InventoryMap = GeoJSON.FeatureCollection<
@@ -1255,6 +1311,7 @@ export const api = {
         return request<Paginated<InventoryParcelRow>>(`/caykur/tea-inventory/areas/${areaId}/parcels${query ? `?${query}` : ''}`);
     },
     getInventoryParcel: (id: string) => request<InventoryParcelDetail>(`/caykur/tea-inventory/parcels/${id}`),
+    getInventoryPruning: (areaId: string) => request<AreaPruning>(`/caykur/tea-inventory/areas/${areaId}/pruning`),
 
     // Harvests endpoints
     getHarvests: (params?: { fieldId?: string; year?: number; status?: string }) => {

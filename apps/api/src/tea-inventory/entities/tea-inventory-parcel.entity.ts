@@ -60,6 +60,10 @@ export class TeaInventoryParcel {
     @Column({ type: 'jsonb', nullable: true })
     license: InventoryLicense | null;
 
+    // Per-season pruning result + NDVI curve of the parcel's tea pixels (bundle v2).
+    @Column({ type: 'jsonb', nullable: true })
+    pruning: Record<string, unknown> | null;
+
     @Column({ type: 'jsonb' })
     geometry: Record<string, unknown>;
 }

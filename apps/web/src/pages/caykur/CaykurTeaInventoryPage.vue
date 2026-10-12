@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, Info, Leaf, MapPinned, X } from '@lucide/vue';
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, Info, Leaf, MapPinned, Scissors, X } from '@lucide/vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import CaykurLayout from '@/layouts/CaykurLayout.vue';
@@ -14,6 +14,8 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import CaykurPruningMonitor from '@/components/caykur/CaykurPruningMonitor.vue';
 import { toneVariant } from '@/components/caykur/tone';
 import {
     api,
@@ -63,6 +65,14 @@ const rows = ref<InventoryParcelRow[]>([]);
 const total = ref(0);
 const totalPages = ref(0);
 const isLoadingRows = ref(false);
+
+// ── Tabs: the inventory map stays mounted (v-show) and is resized when shown again ──
+const activeTab = ref<'inventory' | 'pruning'>('inventory');
+watch(activeTab, async (tab) => {
+    if (tab !== 'inventory') return;
+    await nextTick();
+    map?.invalidateSize();
+});
 
 // ── Selection / map ──
 const selected = ref<InventoryParcelDetail | null>(null);
@@ -344,227 +354,238 @@ function onRowKey(e: KeyboardEvent, id: string): void {
             />
 
             <template v-else>
-                <Alert variant="info">
-                    <Info aria-hidden="true" />
-                    <AlertTitle>Sınıflar denetim önceliği içindir, hukuki karar değildir</AlertTitle>
-                    <AlertDescription>{{ disclaimer }}</AlertDescription>
-                </Alert>
+                <Tabs v-model="activeTab">
+                    <TabsList variant="line" class="w-full">
+                        <TabsTrigger value="inventory"><Leaf aria-hidden="true" />Envanter</TabsTrigger>
+                        <TabsTrigger value="pruning"><Scissors aria-hidden="true" />Budama Takibi</TabsTrigger>
+                    </TabsList>
+                </Tabs>
 
-                <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Özet">
-                    <StatCard
-                        label="İncelenen parsel"
-                        :value="formatNumber(area.parcelCount)"
-                        :hint="`mahalle alanının ${formatShare(area.coveredRatio)}'i`"
-                    />
-                    <StatCard
-                        label="Uyduda tespit edilen çay"
-                        :value="formatHectare(area.teaPatchAreaM2)"
-                        :hint="`mahalle geneli; kütüphanedeki parsellerde ${formatHectare(area.detectedTeaAreaM2)}`"
-                    />
-                    <StatCard
-                        label="Denetim gerektiren"
-                        :value="formatNumber(flaggedCount)"
-                        :hint="`${formatNumber(area.classStats.ghost_license.count)} hayalet ruhsat · ${formatNumber(area.classStats.unlicensed.count)} ruhsatsız aday`"
-                    />
-                    <StatCard
-                        label="Eşleşmeyen ruhsat"
-                        :value="formatNumber(area.unmatchedLicenses.length)"
-                        hint="eski pafta/parsel kaydı TKGM'de yok"
-                    />
-                </section>
-
-                <div class="-mx-1 overflow-x-auto px-1 pb-1">
-                    <ToggleGroup :model-value="classFilter" type="single" aria-label="Sınıf filtresi" class="w-max" @update:model-value="onClassFilter">
-                        <ToggleGroupItem :value="ALL" class="h-11 px-3 md:h-9">
-                            Tümü
-                            <Badge variant="muted" class="tabular-nums">{{ formatNumber(area.parcelCount) }}</Badge>
-                        </ToggleGroupItem>
-                        <ToggleGroupItem
-                            v-for="cls in classOptions"
-                            :key="cls"
-                            :value="cls"
-                            :title="INVENTORY_CLASS_META[cls].description"
-                            class="h-11 px-3 md:h-9"
-                        >
-                            {{ INVENTORY_CLASS_META[cls].label }}
-                            <Badge :variant="toneVariant(INVENTORY_CLASS_META[cls].tone)" class="tabular-nums">{{ formatNumber(area.classStats[cls].count) }}</Badge>
-                        </ToggleGroupItem>
-                    </ToggleGroup>
-                </div>
-
-                <div class="grid gap-4 lg:grid-cols-3">
-                    <Card class="gap-0 overflow-hidden py-0 lg:col-span-2">
+                <div v-show="activeTab === 'inventory'" class="flex flex-col gap-6">
+                    <Alert variant="info">
+                        <Info aria-hidden="true" />
+                        <AlertTitle>Sınıflar denetim önceliği içindir, hukuki karar değildir</AlertTitle>
+                        <AlertDescription>{{ disclaimer }}</AlertDescription>
+                    </Alert>
+    
+                    <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Özet">
+                        <StatCard
+                            label="İncelenen parsel"
+                            :value="formatNumber(area.parcelCount)"
+                            :hint="`mahalle alanının ${formatShare(area.coveredRatio)}'i`"
+                        />
+                        <StatCard
+                            label="Uyduda tespit edilen çay"
+                            :value="formatHectare(area.teaPatchAreaM2)"
+                            :hint="`mahalle geneli; kütüphanedeki parsellerde ${formatHectare(area.detectedTeaAreaM2)}`"
+                        />
+                        <StatCard
+                            label="Denetim gerektiren"
+                            :value="formatNumber(flaggedCount)"
+                            :hint="`${formatNumber(area.classStats.ghost_license.count)} hayalet ruhsat · ${formatNumber(area.classStats.unlicensed.count)} ruhsatsız aday`"
+                        />
+                        <StatCard
+                            label="Eşleşmeyen ruhsat"
+                            :value="formatNumber(area.unmatchedLicenses.length)"
+                            hint="eski pafta/parsel kaydı TKGM'de yok"
+                        />
+                    </section>
+    
+                    <div class="-mx-1 overflow-x-auto px-1 pb-1">
+                        <ToggleGroup :model-value="classFilter" type="single" aria-label="Sınıf filtresi" class="w-max" @update:model-value="onClassFilter">
+                            <ToggleGroupItem :value="ALL" class="h-11 px-3 md:h-9">
+                                Tümü
+                                <Badge variant="muted" class="tabular-nums">{{ formatNumber(area.parcelCount) }}</Badge>
+                            </ToggleGroupItem>
+                            <ToggleGroupItem
+                                v-for="cls in classOptions"
+                                :key="cls"
+                                :value="cls"
+                                :title="INVENTORY_CLASS_META[cls].description"
+                                class="h-11 px-3 md:h-9"
+                            >
+                                {{ INVENTORY_CLASS_META[cls].label }}
+                                <Badge :variant="toneVariant(INVENTORY_CLASS_META[cls].tone)" class="tabular-nums">{{ formatNumber(area.classStats[cls].count) }}</Badge>
+                            </ToggleGroupItem>
+                        </ToggleGroup>
+                    </div>
+    
+                    <div class="grid gap-4 lg:grid-cols-3">
+                        <Card class="gap-0 overflow-hidden py-0 lg:col-span-2">
+                            <CardHeader class="border-b py-4">
+                                <CardTitle>Harita</CardTitle>
+                                <CardDescription>Parseller sınıfına göre renkli; yeşil çizgi uydunun bulduğu çay alanları.</CardDescription>
+                                <CardAction class="flex items-center gap-2">
+                                    <Switch id="inv-patches" v-model="showPatches" />
+                                    <Label for="inv-patches" class="text-xs">Çay alanları</Label>
+                                </CardAction>
+                            </CardHeader>
+                            <div ref="mapContainer" class="h-105 w-full md:h-140" role="region" aria-label="Envanter haritası" />
+                        </Card>
+    
+                        <Card v-if="selected" class="gap-4">
+                            <CardHeader>
+                                <CardTitle>Ada {{ selected.block }} / Parsel {{ selected.parcel }}</CardTitle>
+                                <CardDescription>{{ selected.nature }}<template v-if="selected.locality"> · {{ selected.locality }}</template></CardDescription>
+                                <CardAction>
+                                    <Button variant="ghost" size="icon" class="size-11 md:size-9" aria-label="Seçimi kapat" @click="clearSelection">
+                                        <X aria-hidden="true" />
+                                    </Button>
+                                </CardAction>
+                            </CardHeader>
+                            <CardContent class="space-y-4">
+                                <div class="space-y-1">
+                                    <Badge :variant="toneVariant(INVENTORY_CLASS_META[selected.inventoryClass].tone)">{{ INVENTORY_CLASS_META[selected.inventoryClass].label }}</Badge>
+                                    <p class="text-sm text-muted-foreground">{{ INVENTORY_CLASS_META[selected.inventoryClass].description }}</p>
+                                </div>
+                                <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                                    <div><dt class="text-muted-foreground">Tapu alanı</dt><dd class="font-semibold text-foreground tabular-nums">{{ formatM2(selected.deedAreaM2) }}</dd></div>
+                                    <div><dt class="text-muted-foreground">Uydu çay alanı</dt><dd class="font-semibold text-foreground tabular-nums">{{ formatM2(selected.teaAreaM2) }}</dd></div>
+                                    <div><dt class="text-muted-foreground">Çay oranı</dt><dd class="text-foreground tabular-nums">{{ formatShare(selected.teaShare) }}</dd></div>
+                                    <div><dt class="text-muted-foreground">Ruhsat alanı</dt><dd class="font-semibold text-foreground tabular-nums">{{ formatM2(selected.license?.licensedAreaM2) }}</dd></div>
+                                </dl>
+                                <div v-if="selected.license" class="space-y-2 rounded-lg border p-3 text-sm">
+                                    <p class="font-medium text-foreground">{{ selected.license.holderName }}</p>
+                                    <p class="text-muted-foreground">
+                                        Ruhsat {{ selected.license.licenseNo }} · Cüzdan {{ selected.license.walletNo }} · {{ selected.license.issuedYear }}
+                                    </p>
+                                    <p class="text-muted-foreground">Kayıttaki parsel: {{ selected.license.recordedParcelRef }}</p>
+                                    <Badge v-if="selected.license.holderDeceased" variant="warning">Ruhsat sahibi vefat etmiş görünüyor</Badge>
+                                </div>
+                                <p v-else class="text-sm text-muted-foreground">Bu parsele bağlı ruhsat kaydı yok.</p>
+                            </CardContent>
+                        </Card>
+    
+                        <Card v-else class="gap-4">
+                            <CardHeader>
+                                <CardTitle>Sınıflar</CardTitle>
+                                <CardDescription>Haritada bir parsele tıklayın veya listeden seçin.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ul class="flex flex-col gap-3">
+                                    <li v-for="cls in classOptions" :key="cls" class="flex flex-col gap-1">
+                                        <div class="flex items-center justify-between gap-2">
+                                            <Badge :variant="toneVariant(INVENTORY_CLASS_META[cls].tone)">{{ INVENTORY_CLASS_META[cls].label }}</Badge>
+                                            <span class="text-sm font-semibold text-foreground tabular-nums">{{ formatNumber(area.classStats[cls].count) }}</span>
+                                        </div>
+                                        <p class="text-xs text-muted-foreground">{{ INVENTORY_CLASS_META[cls].description }}</p>
+                                    </li>
+                                </ul>
+                            </CardContent>
+                        </Card>
+                    </div>
+    
+                    <Card class="gap-0 py-0">
                         <CardHeader class="border-b py-4">
-                            <CardTitle>Harita</CardTitle>
-                            <CardDescription>Parseller sınıfına göre renkli; yeşil çizgi uydunun bulduğu çay alanları.</CardDescription>
-                            <CardAction class="flex items-center gap-2">
-                                <Switch id="inv-patches" v-model="showPatches" />
-                                <Label for="inv-patches" class="text-xs">Çay alanları</Label>
-                            </CardAction>
+                            <CardTitle>Parseller</CardTitle>
+                            <CardDescription aria-live="polite">
+                                {{ formatNumber(total) }} parsel<template v-if="classFilter !== ALL"> · {{ INVENTORY_CLASS_META[classFilter].label }}</template> · ruhsat–uydu farkı büyükten küçüğe
+                            </CardDescription>
                         </CardHeader>
-                        <div ref="mapContainer" class="h-105 w-full md:h-140" role="region" aria-label="Envanter haritası" />
-                    </Card>
-
-                    <Card v-if="selected" class="gap-4">
-                        <CardHeader>
-                            <CardTitle>Ada {{ selected.block }} / Parsel {{ selected.parcel }}</CardTitle>
-                            <CardDescription>{{ selected.nature }}<template v-if="selected.locality"> · {{ selected.locality }}</template></CardDescription>
-                            <CardAction>
-                                <Button variant="ghost" size="icon" class="size-11 md:size-9" aria-label="Seçimi kapat" @click="clearSelection">
-                                    <X aria-hidden="true" />
-                                </Button>
-                            </CardAction>
-                        </CardHeader>
-                        <CardContent class="space-y-4">
-                            <div class="space-y-1">
-                                <Badge :variant="toneVariant(INVENTORY_CLASS_META[selected.inventoryClass].tone)">{{ INVENTORY_CLASS_META[selected.inventoryClass].label }}</Badge>
-                                <p class="text-sm text-muted-foreground">{{ INVENTORY_CLASS_META[selected.inventoryClass].description }}</p>
+                        <CardContent class="px-0">
+                            <div class="p-4">
+                                <ListToolbar>
+                                    <SearchInput v-model="search" placeholder="Ada/parsel, nitelik, ruhsat no veya ruhsat sahibi ara…" aria-label="Parsel ara" />
+                                </ListToolbar>
                             </div>
-                            <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                                <div><dt class="text-muted-foreground">Tapu alanı</dt><dd class="font-semibold text-foreground tabular-nums">{{ formatM2(selected.deedAreaM2) }}</dd></div>
-                                <div><dt class="text-muted-foreground">Uydu çay alanı</dt><dd class="font-semibold text-foreground tabular-nums">{{ formatM2(selected.teaAreaM2) }}</dd></div>
-                                <div><dt class="text-muted-foreground">Çay oranı</dt><dd class="text-foreground tabular-nums">{{ formatShare(selected.teaShare) }}</dd></div>
-                                <div><dt class="text-muted-foreground">Ruhsat alanı</dt><dd class="font-semibold text-foreground tabular-nums">{{ formatM2(selected.license?.licensedAreaM2) }}</dd></div>
-                            </dl>
-                            <div v-if="selected.license" class="space-y-2 rounded-lg border p-3 text-sm">
-                                <p class="font-medium text-foreground">{{ selected.license.holderName }}</p>
-                                <p class="text-muted-foreground">
-                                    Ruhsat {{ selected.license.licenseNo }} · Cüzdan {{ selected.license.walletNo }} · {{ selected.license.issuedYear }}
-                                </p>
-                                <p class="text-muted-foreground">Kayıttaki parsel: {{ selected.license.recordedParcelRef }}</p>
-                                <Badge v-if="selected.license.holderDeceased" variant="warning">Ruhsat sahibi vefat etmiş görünüyor</Badge>
+    
+                            <div v-if="rows.length" class="overflow-x-auto" :aria-busy="isLoadingRows">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow class="hover:bg-transparent">
+                                            <TableHead v-for="col in SORT_COLUMNS" :key="col.key" :class="col.class">
+                                                <Button variant="ghost" size="sm" class="-ml-2 h-8 gap-1 px-2" @click="toggleSort(col.key)">
+                                                    {{ col.label }}
+                                                    <ArrowUp v-if="sortDirOf(col.key) === 'asc'" class="size-3.5" aria-hidden="true" />
+                                                    <ArrowDown v-else-if="sortDirOf(col.key) === 'desc'" class="size-3.5" aria-hidden="true" />
+                                                    <ChevronsUpDown v-else class="size-3.5 text-muted-foreground" aria-hidden="true" />
+                                                </Button>
+                                            </TableHead>
+                                            <TableHead class="pr-4">Sınıf</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        <TableRow
+                                            v-for="r in rows"
+                                            :key="r.id"
+                                            class="cursor-pointer"
+                                            :class="selected?.id === r.id && 'bg-muted/50'"
+                                            tabindex="0"
+                                            @click="selectParcel(r.id)"
+                                            @keydown="onRowKey($event, r.id)"
+                                        >
+                                            <TableCell class="pl-4">
+                                                <span class="block font-medium text-foreground">{{ r.block }} / {{ r.parcel }}</span>
+                                                <span class="block text-xs text-muted-foreground">{{ r.nature }}</span>
+                                                <span v-if="r.license" class="block text-xs text-muted-foreground">{{ r.license.holderName }} · {{ r.license.licenseNo }}</span>
+                                            </TableCell>
+                                            <TableCell class="text-right">
+                                                <span class="block font-semibold text-foreground tabular-nums">{{ formatM2(r.teaAreaM2) }}</span>
+                                                <span class="block text-xs text-muted-foreground tabular-nums">{{ formatShare(r.teaShare) }} çay</span>
+                                            </TableCell>
+                                            <TableCell class="hidden text-right font-semibold text-foreground tabular-nums md:table-cell">{{ formatM2(r.license?.licensedAreaM2) }}</TableCell>
+                                            <TableCell class="hidden text-right text-foreground tabular-nums lg:table-cell">{{ formatGap(gapOf(r)) }}</TableCell>
+                                            <TableCell class="pr-4">
+                                                <Badge :variant="toneVariant(INVENTORY_CLASS_META[r.inventoryClass].tone)">{{ INVENTORY_CLASS_META[r.inventoryClass].label }}</Badge>
+                                            </TableCell>
+                                        </TableRow>
+                                    </TableBody>
+                                </Table>
                             </div>
-                            <p v-else class="text-sm text-muted-foreground">Bu parsele bağlı ruhsat kaydı yok.</p>
+    
+                            <LoadingState v-else-if="isLoadingRows" text="Parseller yükleniyor…" />
+    
+                            <EmptyState v-else :icon="MapPinned" title="Eşleşen parsel yok" description="Arama veya sınıf filtresini değiştirmeyi deneyin." class="rounded-none border-0" />
+    
+                            <div v-if="totalPages > 1" class="flex items-center justify-between gap-3 border-t p-4">
+                                <span class="text-xs text-muted-foreground tabular-nums">Sayfa {{ page }} / {{ totalPages }}</span>
+                                <div class="flex gap-1">
+                                    <Button variant="outline" size="icon" class="size-11 md:size-9" :disabled="page === 1" aria-label="Önceki sayfa" @click="page--">
+                                        <ChevronLeft aria-hidden="true" />
+                                    </Button>
+                                    <Button variant="outline" size="icon" class="size-11 md:size-9" :disabled="page === totalPages" aria-label="Sonraki sayfa" @click="page++">
+                                        <ChevronRight aria-hidden="true" />
+                                    </Button>
+                                </div>
+                            </div>
                         </CardContent>
                     </Card>
-
-                    <Card v-else class="gap-4">
-                        <CardHeader>
-                            <CardTitle>Sınıflar</CardTitle>
-                            <CardDescription>Haritada bir parsele tıklayın veya listeden seçin.</CardDescription>
+    
+                    <Card v-if="area.unmatchedLicenses.length" class="gap-0 py-0">
+                        <CardHeader class="border-b py-4">
+                            <CardTitle>TKGM'de karşılığı bulunmayan ruhsatlar</CardTitle>
+                            <CardDescription>Ruhsatta yazan eski pafta/parsel numarası güncel kadastroda yok; ada/parsel güncellemesi gerekir.</CardDescription>
                         </CardHeader>
-                        <CardContent>
-                            <ul class="flex flex-col gap-3">
-                                <li v-for="cls in classOptions" :key="cls" class="flex flex-col gap-1">
-                                    <div class="flex items-center justify-between gap-2">
-                                        <Badge :variant="toneVariant(INVENTORY_CLASS_META[cls].tone)">{{ INVENTORY_CLASS_META[cls].label }}</Badge>
-                                        <span class="text-sm font-semibold text-foreground tabular-nums">{{ formatNumber(area.classStats[cls].count) }}</span>
-                                    </div>
-                                    <p class="text-xs text-muted-foreground">{{ INVENTORY_CLASS_META[cls].description }}</p>
-                                </li>
-                            </ul>
+                        <CardContent class="px-0">
+                            <div class="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow class="hover:bg-transparent">
+                                            <TableHead class="pl-4">Ruhsat sahibi</TableHead>
+                                            <TableHead>Kayıttaki parsel</TableHead>
+                                            <TableHead class="hidden md:table-cell">Veriliş</TableHead>
+                                            <TableHead class="pr-4 text-right">Ruhsat alanı</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        <TableRow v-for="l in area.unmatchedLicenses" :key="l.licenseNo">
+                                            <TableCell class="pl-4">
+                                                <span class="block font-medium text-foreground">{{ l.holderName }}</span>
+                                                <span class="block text-xs text-muted-foreground">{{ l.licenseNo }} · {{ l.walletNo }}</span>
+                                                <Badge v-if="l.holderDeceased" variant="warning" class="mt-1">Vefat etmiş görünüyor</Badge>
+                                            </TableCell>
+                                            <TableCell>{{ l.recordedParcelRef }}</TableCell>
+                                            <TableCell class="hidden tabular-nums md:table-cell">{{ l.issuedYear }}</TableCell>
+                                            <TableCell class="pr-4 text-right font-semibold text-foreground tabular-nums">{{ formatM2(l.licensedAreaM2) }}</TableCell>
+                                        </TableRow>
+                                    </TableBody>
+                                </Table>
+                            </div>
                         </CardContent>
                     </Card>
                 </div>
 
-                <Card class="gap-0 py-0">
-                    <CardHeader class="border-b py-4">
-                        <CardTitle>Parseller</CardTitle>
-                        <CardDescription aria-live="polite">
-                            {{ formatNumber(total) }} parsel<template v-if="classFilter !== ALL"> · {{ INVENTORY_CLASS_META[classFilter].label }}</template> · ruhsat–uydu farkı büyükten küçüğe
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent class="px-0">
-                        <div class="p-4">
-                            <ListToolbar>
-                                <SearchInput v-model="search" placeholder="Ada/parsel, nitelik, ruhsat no veya ruhsat sahibi ara…" aria-label="Parsel ara" />
-                            </ListToolbar>
-                        </div>
-
-                        <div v-if="rows.length" class="overflow-x-auto" :aria-busy="isLoadingRows">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow class="hover:bg-transparent">
-                                        <TableHead v-for="col in SORT_COLUMNS" :key="col.key" :class="col.class">
-                                            <Button variant="ghost" size="sm" class="-ml-2 h-8 gap-1 px-2" @click="toggleSort(col.key)">
-                                                {{ col.label }}
-                                                <ArrowUp v-if="sortDirOf(col.key) === 'asc'" class="size-3.5" aria-hidden="true" />
-                                                <ArrowDown v-else-if="sortDirOf(col.key) === 'desc'" class="size-3.5" aria-hidden="true" />
-                                                <ChevronsUpDown v-else class="size-3.5 text-muted-foreground" aria-hidden="true" />
-                                            </Button>
-                                        </TableHead>
-                                        <TableHead class="pr-4">Sınıf</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    <TableRow
-                                        v-for="r in rows"
-                                        :key="r.id"
-                                        class="cursor-pointer"
-                                        :class="selected?.id === r.id && 'bg-muted/50'"
-                                        tabindex="0"
-                                        @click="selectParcel(r.id)"
-                                        @keydown="onRowKey($event, r.id)"
-                                    >
-                                        <TableCell class="pl-4">
-                                            <span class="block font-medium text-foreground">{{ r.block }} / {{ r.parcel }}</span>
-                                            <span class="block text-xs text-muted-foreground">{{ r.nature }}</span>
-                                            <span v-if="r.license" class="block text-xs text-muted-foreground">{{ r.license.holderName }} · {{ r.license.licenseNo }}</span>
-                                        </TableCell>
-                                        <TableCell class="text-right">
-                                            <span class="block font-semibold text-foreground tabular-nums">{{ formatM2(r.teaAreaM2) }}</span>
-                                            <span class="block text-xs text-muted-foreground tabular-nums">{{ formatShare(r.teaShare) }} çay</span>
-                                        </TableCell>
-                                        <TableCell class="hidden text-right font-semibold text-foreground tabular-nums md:table-cell">{{ formatM2(r.license?.licensedAreaM2) }}</TableCell>
-                                        <TableCell class="hidden text-right text-foreground tabular-nums lg:table-cell">{{ formatGap(gapOf(r)) }}</TableCell>
-                                        <TableCell class="pr-4">
-                                            <Badge :variant="toneVariant(INVENTORY_CLASS_META[r.inventoryClass].tone)">{{ INVENTORY_CLASS_META[r.inventoryClass].label }}</Badge>
-                                        </TableCell>
-                                    </TableRow>
-                                </TableBody>
-                            </Table>
-                        </div>
-
-                        <LoadingState v-else-if="isLoadingRows" text="Parseller yükleniyor…" />
-
-                        <EmptyState v-else :icon="MapPinned" title="Eşleşen parsel yok" description="Arama veya sınıf filtresini değiştirmeyi deneyin." class="rounded-none border-0" />
-
-                        <div v-if="totalPages > 1" class="flex items-center justify-between gap-3 border-t p-4">
-                            <span class="text-xs text-muted-foreground tabular-nums">Sayfa {{ page }} / {{ totalPages }}</span>
-                            <div class="flex gap-1">
-                                <Button variant="outline" size="icon" class="size-11 md:size-9" :disabled="page === 1" aria-label="Önceki sayfa" @click="page--">
-                                    <ChevronLeft aria-hidden="true" />
-                                </Button>
-                                <Button variant="outline" size="icon" class="size-11 md:size-9" :disabled="page === totalPages" aria-label="Sonraki sayfa" @click="page++">
-                                    <ChevronRight aria-hidden="true" />
-                                </Button>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card v-if="area.unmatchedLicenses.length" class="gap-0 py-0">
-                    <CardHeader class="border-b py-4">
-                        <CardTitle>TKGM'de karşılığı bulunmayan ruhsatlar</CardTitle>
-                        <CardDescription>Ruhsatta yazan eski pafta/parsel numarası güncel kadastroda yok; ada/parsel güncellemesi gerekir.</CardDescription>
-                    </CardHeader>
-                    <CardContent class="px-0">
-                        <div class="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow class="hover:bg-transparent">
-                                        <TableHead class="pl-4">Ruhsat sahibi</TableHead>
-                                        <TableHead>Kayıttaki parsel</TableHead>
-                                        <TableHead class="hidden md:table-cell">Veriliş</TableHead>
-                                        <TableHead class="pr-4 text-right">Ruhsat alanı</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    <TableRow v-for="l in area.unmatchedLicenses" :key="l.licenseNo">
-                                        <TableCell class="pl-4">
-                                            <span class="block font-medium text-foreground">{{ l.holderName }}</span>
-                                            <span class="block text-xs text-muted-foreground">{{ l.licenseNo }} · {{ l.walletNo }}</span>
-                                            <Badge v-if="l.holderDeceased" variant="warning" class="mt-1">Vefat etmiş görünüyor</Badge>
-                                        </TableCell>
-                                        <TableCell>{{ l.recordedParcelRef }}</TableCell>
-                                        <TableCell class="hidden tabular-nums md:table-cell">{{ l.issuedYear }}</TableCell>
-                                        <TableCell class="pr-4 text-right font-semibold text-foreground tabular-nums">{{ formatM2(l.licensedAreaM2) }}</TableCell>
-                                    </TableRow>
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
-                </Card>
+                <CaykurPruningMonitor v-if="activeTab === 'pruning' && mapData" :area-id="area.id" :boundary="area.boundary" :map-data="mapData" />
             </template>
         </PageContainer>
     </CaykurLayout>

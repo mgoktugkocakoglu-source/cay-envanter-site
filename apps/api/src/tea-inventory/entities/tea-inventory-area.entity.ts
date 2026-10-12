@@ -82,6 +82,10 @@ export class TeaInventoryArea {
     @Column({ type: 'jsonb', name: 'unmatched_licenses', default: () => "'[]'" })
     unmatchedLicenses: InventoryLicense[];
 
+    // Pruning monitoring (bundle v2): season summaries, pruned patches, NDVI date axis. Null when not run.
+    @Column({ type: 'jsonb', nullable: true })
+    pruning: Record<string, unknown> | null;
+
     // Bundle timestamp; a re-import is skipped when it has not changed.
     @Column({ type: 'timestamp', name: 'bundle_generated_at' })
     bundleGeneratedAt: Date;

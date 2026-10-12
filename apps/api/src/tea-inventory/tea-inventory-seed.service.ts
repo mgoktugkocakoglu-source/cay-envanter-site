@@ -9,7 +9,8 @@ import { InventoryClass } from '@/tea-inventory/enums/inventory-class.enum';
 
 /** Bundles exported by the cay-envanter engine (`npm run export-site`); copied to dist by nest-cli assets. */
 const SEED_DIR = join(__dirname, 'seed-data');
-const BUNDLE_VERSION = 1;
+/** v1 = inventory; v2 adds the optional pruning block. */
+const SUPPORTED_BUNDLE_VERSIONS = [1, 2];
 const INSERT_CHUNK = 200;
 
 interface InventoryBundle {
@@ -41,10 +42,12 @@ interface InventoryBundle {
         teaAreaM2: number | null;
         inventoryClass: InventoryClass;
         license: InventoryLicense | null;
+        pruning?: Record<string, unknown> | null;
         geometry: Record<string, unknown>;
     }>;
     teaPatches: TeaPatch[];
     unmatchedLicenses: InventoryLicense[];
+    pruning?: Record<string, unknown> | null;
 }
 
 /**
@@ -76,7 +79,7 @@ export class TeaInventorySeedService implements OnModuleInit {
     }
 
     private async importBundle(bundle: InventoryBundle): Promise<void> {
-        if (bundle.version !== BUNDLE_VERSION) {
+        if (!SUPPORTED_BUNDLE_VERSIONS.includes(bundle.version)) {
             throw new Error(`unsupported bundle version ${bundle.version}`);
         }
         const generatedAt = new Date(bundle.generatedAt);
@@ -94,11 +97,12 @@ export class TeaInventorySeedService implements OnModuleInit {
                     demoLicenses: bundle.demoLicenses,
                     teaPatches: bundle.teaPatches,
                     unmatchedLicenses: bundle.unmatchedLicenses,
+                    pruning: bundle.pruning ?? null,
                     bundleGeneratedAt: generatedAt,
                 }),
             );
             const parcels = bundle.parcels.map(({ key, ...parcel }) =>
-                manager.create(TeaInventoryParcel, { ...parcel, parcelKey: key, areaId: area.id }),
+                manager.create(TeaInventoryParcel, { ...parcel, pruning: parcel.pruning ?? null, parcelKey: key, areaId: area.id }),
             );
             await manager.save(parcels, { chunk: INSERT_CHUNK });
             this.logger.log(`Imported tea inventory ${bundle.area.code}: ${parcels.length} parcels`);
