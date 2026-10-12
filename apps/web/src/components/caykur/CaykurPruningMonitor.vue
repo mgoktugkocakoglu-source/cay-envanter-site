@@ -65,6 +65,7 @@ let patchLayer: L.GeoJSON | null = null;
 let boundaryLayer: L.GeoJSON | null = null;
 let selectedLayer: L.GeoJSON | null = null;
 let imageOverlay: L.ImageOverlay | null = null;
+let baseLayer: L.TileLayer | null = null;
 
 const summary = computed(() => data.value?.summary ?? null);
 const seasons = computed(() => summary.value?.seasons ?? []);
@@ -93,6 +94,11 @@ const imageryInfo = computed(() => {
     const imagery = summary.value?.imagery;
     return layer === 'none' || !imagery ? null : (imagery.seasons[season.value]?.[layer] ?? null);
 });
+
+const MONTHS_TR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+function formatSceneDate(d: string): string {
+    return `${Number(d.slice(8))} ${MONTHS_TR.at(Number(d.slice(5, 7)) - 1)} ${d.slice(0, 4)}`;
+}
 
 function ratio(r: PruningSeasonResult): number {
     return r.requiredM2 > 0 ? r.prunedM2 / r.requiredM2 : 0;
@@ -152,7 +158,7 @@ function renderMap(): void {
     if (!mapContainer.value || !summary.value) return;
     if (!map) {
         map = L.map(mapContainer.value, { zoomControl: false, attributionControl: false, scrollWheelZoom: false });
-        L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+        baseLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
             maxZoom: 20,
             maxNativeZoom: 20,
             subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
@@ -186,10 +192,14 @@ function renderImagery(): void {
     imageOverlay?.remove();
     imageOverlay = null;
     const imagery = summary.value?.imagery;
+    // A Sentinel photo over the sharp (undated) base map is easy to mistake for the base map;
+    // fade the base map whenever a dated scene is shown.
+    baseLayer?.setOpacity(imageryLayer.value === 'none' || imageryLayer.value === 'change' ? 1 : 0.25);
     if (!map || !imagery || !imageryInfo.value) return;
     const { west, south, east, north } = imagery.bounds;
     imageOverlay = L.imageOverlay(`${imagery.baseUrl}${imageryInfo.value.file}`, [[south, west], [north, east]], {
         opacity: imageryLayer.value === 'change' ? 0.9 : 1,
+        alt: imageryInfo.value.sceneDate ? `Sentinel-2, ${imageryInfo.value.sceneDate}` : 'Sentinel-2 değişim katmanı',
         interactive: false,
     }).addTo(map);
     // Below the parcel outlines (same pane), above the base map (tile pane).
@@ -340,8 +350,9 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                     <ToggleGroup :model-value="imageryLayer" type="single" size="sm" aria-label="Uydu görüntüsü katmanı" @update:model-value="onImagery">
                         <ToggleGroupItem v-for="o in IMAGERY_OPTIONS" :key="o.value" :value="o.value" :title="o.hint" class="h-11 px-3 md:h-8">{{ o.label }}</ToggleGroupItem>
                     </ToggleGroup>
-                    <span v-if="imageryInfo?.window" class="text-xs text-muted-foreground tabular-nums">
-                        {{ imageryInfo.window[0] }} – {{ imageryInfo.window[1] }} · {{ imageryInfo.scenes }} bulutsuz sahne
+                    <span v-if="imageryInfo?.sceneDate" class="text-xs text-muted-foreground">
+                        <span class="font-semibold text-foreground tabular-nums">{{ formatSceneDate(imageryInfo.sceneDate) }}</span> tarihli tek sahne
+                        · dönemde {{ imageryInfo.scenes }} bulutsuz sahne · siyah: bulut/kar maskesi
                     </span>
                     <span v-else-if="imageryLayer === 'change'" class="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <span class="inline-block h-2 w-16 rounded-sm bg-linear-to-r from-amber-200 via-orange-500 to-red-700" aria-hidden="true" />

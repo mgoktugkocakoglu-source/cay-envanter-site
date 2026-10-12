@@ -662,7 +662,7 @@ export type PruningImageryLayer = 'reference' | 'winter' | 'spring' | 'change';
 export interface PruningImagery {
     baseUrl: string;
     bounds: { west: number; south: number; east: number; north: number };
-    seasons: Record<string, Partial<Record<PruningImageryLayer, { file: string; scenes?: number; window?: [string, string] }>>>;
+    seasons: Record<string, Partial<Record<PruningImageryLayer, { file: string; scenes?: number; window?: [string, string]; sceneDate?: string; teaVisible?: number }>>>;
 }
 
 export interface AreaPruning {
