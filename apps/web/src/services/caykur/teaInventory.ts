@@ -4,7 +4,7 @@
  * (read at render time) so the layer follows light/dark mode.
  */
 
-import type { InventoryClass, SatellitePruningStatus } from '@/services/api';
+import type { InventoryClass, ProducerPruningStatus, SatellitePruningStatus } from '@/services/api';
 import type { Tone } from '@/components/caykur/tone';
 
 export interface InventoryClassMeta {
@@ -148,3 +148,59 @@ export const PRUNING_STATUS_ORDER: SatellitePruningStatus[] = ['no_trace', 'part
 export function formatDekar(m2: number | null | undefined): string {
     return m2 === null || m2 === undefined ? '—' : `${nf1.format(m2 / 1000)} da`;
 }
+
+// ── Producer-level pruning (1/7 over all of a producer's gardens) ──
+
+export interface ProducerStatusMeta {
+    label: string;
+    description: string;
+    tone: Tone;
+}
+
+export const PRODUCER_STATUS_META: Record<ProducerPruningStatus, ProducerStatusMeta> = {
+    auto_approved: {
+        label: 'Otomatik onay',
+        description: 'Uydu, çok yüksek güvenle 1/7 hedefinin üzerinde budama gördü; alım eksper beklemeden açıldı.',
+        tone: 'success',
+    },
+    approved: {
+        label: 'Eksper onayı',
+        description: 'Eksper budamayı onayladı; alım açık.',
+        tone: 'success',
+    },
+    rejected: {
+        label: 'Reddedildi',
+        description: 'Eksper budamayı yetersiz buldu; bu sezon alım kapalı.',
+        tone: 'danger',
+    },
+    expert_review: {
+        label: 'Eksper onayı bekliyor',
+        description: 'Budama hedefe yakın ya da üzerinde görünüyor ama otomatik onay için güven yeterli değil.',
+        tone: 'warning',
+    },
+    partial: {
+        label: 'Kısmi budama',
+        description: 'Budama izi var ama 1/7 hedefinin belirgin biçimde altında.',
+        tone: 'warning',
+    },
+    no_trace: {
+        label: 'Budama izi yok',
+        description: 'Bahçeler iyi gözlendi ama budamaya özgü düşüş görülmedi. Alımı kapatmak için eksper kontrolü gerekir.',
+        tone: 'danger',
+    },
+    awaiting_observation: {
+        label: 'Gözlem bekleniyor',
+        description: 'Bulut veya kar bahçelerin yarısından fazlasını gizledi; yeni temiz görüntü bekleniyor.',
+        tone: 'muted',
+    },
+};
+
+export const PRODUCER_STATUS_ORDER: ProducerPruningStatus[] = [
+    'expert_review',
+    'no_trace',
+    'partial',
+    'awaiting_observation',
+    'auto_approved',
+    'approved',
+    'rejected',
+];

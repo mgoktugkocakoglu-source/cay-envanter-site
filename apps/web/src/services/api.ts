@@ -657,6 +657,108 @@ export interface AreaPruningSummary {
     imagery: PruningImagery | null;
 }
 
+// Producer-level pruning compliance (1/7 over all of a producer's gardens)
+export type ProducerPruningStatus =
+    | 'auto_approved'
+    | 'approved'
+    | 'rejected'
+    | 'expert_review'
+    | 'partial'
+    | 'no_trace'
+    | 'awaiting_observation';
+
+export interface ProducerDecision {
+    decision: 'approved' | 'rejected';
+    note: string | null;
+    decidedByName: string;
+    decidedAt: string;
+}
+
+export interface ProducerRow {
+    id: string;
+    code: string;
+    name: string;
+    walletNo: string;
+    licenseNo: string;
+    gardenCount: number;
+    licensedAreaM2: number;
+    teaAreaM2: number;
+    requiredM2: number;
+    prunedM2: number;
+    ratio: number;
+    autoStatus: Exclude<ProducerPruningStatus, 'approved' | 'rejected'>;
+    autoApprovedAt: string | null;
+    decision: ProducerDecision | null;
+    status: ProducerPruningStatus;
+    purchaseOpen: boolean;
+    demo: boolean;
+}
+
+export interface ProducerScanPoint {
+    date: string;
+    prunedM2: number;
+    observedShare: number;
+    ratio: number;
+    status: ProducerPruningStatus;
+}
+
+export interface ProducerScanSchedule {
+    season: string;
+    calibrated: boolean;
+    demo: boolean;
+    everyDays: number;
+    lookbackDays: number;
+    reference: [string, string];
+    scanDates: string[];
+    newObservation: boolean[];
+    sceneDates: string[][];
+    rules: {
+        requiredFraction: number;
+        autoApproval: { minRatio: number; minObservedShare: number; consecutiveScans: number; minTeaAreaM2: number };
+        expertReviewRatio: number;
+        partialRatio: number;
+    };
+}
+
+export interface ProducerGarden {
+    id: string;
+    code: string;
+    parcelKey: string;
+    block: string;
+    parcel: string;
+    holderIndex: number;
+    holderCount: number;
+    geometryAreaM2: number;
+    teaAreaM2: number;
+    prunedM2: number;
+    prunedSeries: number[];
+    geometry: GeoJSON.Geometry;
+}
+
+export interface ProducerDetail extends ProducerRow {
+    season: string;
+    scans: ProducerScanPoint[];
+    gardens: ProducerGarden[];
+    decisions: ProducerDecision[];
+    schedule: ProducerScanSchedule | null;
+}
+
+export interface ProducerSummary {
+    total: number;
+    purchaseOpen: number;
+    counts: Record<ProducerPruningStatus, number>;
+    schedule: ProducerScanSchedule | null;
+}
+
+export interface ProducerQuery {
+    page?: number;
+    limit?: number;
+    status?: ProducerPruningStatus;
+    search?: string;
+    sortBy?: 'ratio' | 'name' | 'teaArea' | 'gardens';
+    sortOrder?: 'ASC' | 'DESC';
+}
+
 export type PruningImageryLayer = 'reference' | 'winter' | 'spring' | 'change';
 
 export interface PruningImagery {
@@ -1322,6 +1424,23 @@ export const api = {
     },
     getInventoryParcel: (id: string) => request<InventoryParcelDetail>(`/caykur/tea-inventory/parcels/${id}`),
     getInventoryPruning: (areaId: string) => request<AreaPruning>(`/caykur/tea-inventory/areas/${areaId}/pruning`),
+    getInventoryProducers: (areaId: string, params?: ProducerQuery) => {
+        const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
+        const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        return request<Paginated<ProducerRow>>(`/caykur/tea-inventory/areas/${areaId}/producers${query ? `?${query}` : ''}`);
+    },
+    getInventoryProducerSummary: (areaId: string) => request<ProducerSummary>(`/caykur/tea-inventory/areas/${areaId}/producers/summary`),
+    getInventoryPurchaseList: (areaId: string, page = 1, limit = 20) =>
+        request<Paginated<ProducerRow>>(`/caykur/tea-inventory/areas/${areaId}/purchase-list?page=${page}&limit=${limit}`),
+    getInventoryProducer: (id: string) => request<ProducerDetail>(`/caykur/tea-inventory/producers/${id}`),
+    decideInventoryProducer: (id: string, body: { decision: 'approved' | 'rejected'; note?: string }) =>
+        request<ProducerDetail>(`/caykur/tea-inventory/producers/${id}/decision`, { method: 'POST', body: JSON.stringify(body) }),
+    /** Purchase list as a CSV blob (Excel-compatible), or an error message. */
+    downloadInventoryPurchaseCsv: async (areaId: string): Promise<{ blob?: Blob; error?: string }> => {
+        const response = await authorizedFetch(`/caykur/tea-inventory/areas/${areaId}/purchase-list.csv`);
+        if (!response.ok) return { error: await readErrorMessage(response, 'Liste indirilemedi') };
+        return { blob: await response.blob() };
+    },
 
     // Harvests endpoints
     getHarvests: (params?: { fieldId?: string; year?: number; status?: string }) => {

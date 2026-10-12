@@ -86,6 +86,11 @@ export class TeaInventoryArea {
     @Column({ type: 'jsonb', nullable: true })
     pruning: Record<string, unknown> | null;
 
+    // Producer scan schedule (bundle v3): season, scan dates every ≤ 5 days, which scans had new
+    // clear scenes, auto-approval rules. Null when producer scanning has not run for this area.
+    @Column({ type: 'jsonb', name: 'producer_scan', nullable: true })
+    producerScan: Record<string, unknown> | null;
+
     // Bundle timestamp; a re-import is skipped when it has not changed.
     @Column({ type: 'timestamp', name: 'bundle_generated_at' })
     bundleGeneratedAt: Date;
