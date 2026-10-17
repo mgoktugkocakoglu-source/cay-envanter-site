@@ -12,6 +12,12 @@ export interface RadarPassResult {
     ratioDropDb: number | null;
     persistence: number | null;
     noiseDb: number | null;
+    zVh?: number | null;
+    // Interferometric coherence channel (present once the SNAP burst-pair step has run).
+    cohBeforeObs?: number;
+    cohAfterObs?: number;
+    cohRise?: number | null;
+    zCoh?: number | null;
     z: number | null;
 }
 
@@ -20,6 +26,7 @@ export interface RadarResult {
     score: number;
     vhDropDb: number | null;
     ratioDropDb: number | null;
+    cohRise?: number | null;
     persistence: number | null;
     z: number | null;
     passes: RadarPassResult[];
@@ -31,6 +38,9 @@ export interface RadarSeries {
     dates: string[];
     vhRel: Array<number | null>;
     ratioRel: Array<number | null>;
+    // Coherence pairs, dated by the pair's second scene (unitless, neighbourhood-relative).
+    cohDates?: string[];
+    cohRel?: Array<number | null>;
 }
 
 /** A pruning event inside a garden: where (polygon) and when (an observation interval, never a day). */

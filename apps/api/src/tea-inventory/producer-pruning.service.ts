@@ -195,7 +195,15 @@ export interface PruningRecordSummary {
     producers: number;
     byRegistration: Record<PruningRegistration, number>;
     /** Radar module: verdict counts over the season's records, radar-only candidates, rules. Null when it has not run. */
-    radar: { byClass: Record<RadarClass, number>; radarOnly: number; calibrated: boolean; method: string; rules: Record<string, unknown>; passes: Array<{ pass: string; relativeOrbit: number; dates: string[] }> } | null;
+    radar: {
+        byClass: Record<RadarClass, number>;
+        radarOnly: number;
+        calibrated: boolean;
+        method: string;
+        rules: Record<string, unknown>;
+        passes: Array<{ pass: string; relativeOrbit: number; dates: string[]; cohDates?: string[] }>;
+        coherence: { cohWin: [number, number]; pairs: Record<string, number> } | null;
+    } | null;
     /** Records per scan date (the scan that flagged them), in scan order. */
     byScan: Array<{ date: string; newObservation: boolean; records: number; areaM2: number }>;
     localities: Array<{ name: string; records: number }>;
@@ -475,7 +483,7 @@ export class ProducerPruningService {
                 .where('g.area_id = :areaId', { areaId: area.id })
                 .andWhere(`g.seasons -> :season -> 'radarOnly' IS NOT NULL AND jsonb_typeof(g.seasons -> :season -> 'radarOnly') = 'object'`, { season })
                 .getCount();
-            radar = { byClass, radarOnly, calibrated: radarHeader.calibrated, method: radarHeader.method, rules: radarHeader.rules, passes: radarSeason.passes };
+            radar = { byClass, radarOnly, calibrated: radarHeader.calibrated, method: radarHeader.method, rules: radarHeader.rules, passes: radarSeason.passes, coherence: radarSeason.coherence ?? null };
         }
         return {
             season,

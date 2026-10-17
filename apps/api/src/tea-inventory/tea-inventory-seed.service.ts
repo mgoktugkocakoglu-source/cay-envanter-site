@@ -41,8 +41,9 @@ interface BundleRadar {
     seasons: Array<{
         season: string;
         window: [string, string];
-        passes: Array<{ pass: 'ASCENDING' | 'DESCENDING'; relativeOrbit: number; dates: string[] }>;
-        series: Record<string, Array<{ pass: 'ASCENDING' | 'DESCENDING'; vhRel: Array<number | null>; ratioRel: Array<number | null> }>>;
+        passes: Array<{ pass: 'ASCENDING' | 'DESCENDING'; relativeOrbit: number; dates: string[]; cohDates?: string[] }>;
+        coherence?: { cohWin: [number, number]; pairs: Record<string, number> } | null;
+        series: Record<string, Array<{ pass: 'ASCENDING' | 'DESCENDING'; vhRel: Array<number | null>; ratioRel: Array<number | null>; cohRel?: Array<number | null> }>>;
         records: Array<{ recordId: string; gardenCode: string; radar: RadarResult }>;
         radarOnly: Array<{ gardenCode: string; date: string; vhDropDb: number; persistence: number; z: number }>;
     }>;
@@ -187,7 +188,7 @@ export class TeaInventorySeedService implements OnModuleInit {
                                     calibrated: bundle.radar.calibrated,
                                     method: bundle.radar.method,
                                     rules: bundle.radar.rules,
-                                    seasons: bundle.radar.seasons.map((s) => ({ season: s.season, window: s.window, passes: s.passes })),
+                                    seasons: bundle.radar.seasons.map((s) => ({ season: s.season, window: s.window, passes: s.passes, coherence: s.coherence ?? null })),
                                 }
                                 : null,
                         }
@@ -240,7 +241,13 @@ export class TeaInventorySeedService implements OnModuleInit {
         for (const s of radar?.seasons ?? []) {
             for (const r of s.records) radarByRecord.set(r.recordId, r.radar);
             for (const [code, passes] of Object.entries(s.series)) {
-                radarSeries.set(`${code}:${s.season}`, passes.map((p) => ({ pass: p.pass, dates: s.passes.find((x) => x.pass === p.pass)?.dates ?? [], vhRel: p.vhRel, ratioRel: p.ratioRel })));
+                radarSeries.set(
+                    `${code}:${s.season}`,
+                    passes.map((p) => {
+                        const header = s.passes.find((x) => x.pass === p.pass);
+                        return { pass: p.pass, dates: header?.dates ?? [], vhRel: p.vhRel, ratioRel: p.ratioRel, cohDates: header?.cohDates, cohRel: p.cohRel };
+                    }),
+                );
             }
             for (const c of s.radarOnly) radarOnly.set(`${c.gardenCode}:${s.season}`, { date: c.date, vhDropDb: c.vhDropDb, persistence: c.persistence, z: c.z });
         }

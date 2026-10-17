@@ -1086,6 +1086,11 @@ export interface RadarPassResult {
     ratioDropDb: number | null;
     persistence: number | null;
     noiseDb: number | null;
+    zVh?: number | null;
+    cohBeforeObs?: number;
+    cohAfterObs?: number;
+    cohRise?: number | null;
+    zCoh?: number | null;
     z: number | null;
 }
 
@@ -1094,6 +1099,7 @@ export interface RadarResult {
     score: number;
     vhDropDb: number | null;
     ratioDropDb: number | null;
+    cohRise?: number | null;
     persistence: number | null;
     z: number | null;
     passes: RadarPassResult[];
@@ -1104,6 +1110,8 @@ export interface RadarSeries {
     dates: string[];
     vhRel: Array<number | null>;
     ratioRel: Array<number | null>;
+    cohDates?: string[];
+    cohRel?: Array<number | null>;
 }
 
 export interface PruningRecordRow {
@@ -1146,7 +1154,15 @@ export interface PruningRecordSummary {
     gardens: number;
     producers: number;
     byRegistration: Record<PruningRegistration, number>;
-    radar: { byClass: Record<RadarClass, number>; radarOnly: number; calibrated: boolean; method: string; rules: Record<string, unknown>; passes: Array<{ pass: string; relativeOrbit: number; dates: string[] }> } | null;
+    radar: {
+        byClass: Record<RadarClass, number>;
+        radarOnly: number;
+        calibrated: boolean;
+        method: string;
+        rules: Record<string, unknown>;
+        passes: Array<{ pass: string; relativeOrbit: number; dates: string[]; cohDates?: string[] }>;
+        coherence: { cohWin: [number, number]; pairs: Record<string, number> } | null;
+    } | null;
     byScan: Array<{ date: string; newObservation: boolean; records: number; areaM2: number }>;
     localities: Array<{ name: string; records: number }>;
     schedule: ProducerScanSchedule | null;

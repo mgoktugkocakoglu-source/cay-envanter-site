@@ -34,7 +34,12 @@ export interface RadarBlock {
     calibrated: boolean;
     method: string;
     rules: Record<string, unknown>;
-    seasons: Array<{ season: string; window: [string, string]; passes: Array<{ pass: string; relativeOrbit: number; dates: string[] }> }>;
+    seasons: Array<{
+        season: string;
+        window: [string, string];
+        passes: Array<{ pass: string; relativeOrbit: number; dates: string[]; cohDates?: string[] }>;
+        coherence?: { cohWin: [number, number]; pairs: Record<string, number> } | null;
+    }>;
 }
 
 export interface ProducerScanBlock {

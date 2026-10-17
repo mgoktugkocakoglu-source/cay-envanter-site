@@ -189,31 +189,47 @@ watch([scanDate, locality, registration, radarFilter], () => {
  * Drawn as a small inline SVG — the honest 6-day Sentinel-1 cadence with its speckle.
  */
 interface Spark {
-    pass: string;
+    key: string;
+    label: string;
+    unit: string;
     points: string;
     zero: number;
     windowX: [number, number] | null;
     min: number;
     max: number;
+    tone: 'info' | 'success';
 }
 const SPARK_W = 260;
 const SPARK_H = 64;
+function sparkOf(key: string, label: string, unit: string, dates: string[], values: Array<number | null>, floor: number, r: PruningRecordRow, tone: Spark['tone']): Spark | null {
+    const vals = values.filter((v): v is number => v !== null);
+    if (vals.length < 3) return null;
+    const min = Math.min(-floor, ...vals);
+    const max = Math.max(floor, ...vals);
+    const t0 = Date.parse(dates[0] ?? '');
+    const t1 = Date.parse(dates.at(-1) ?? '');
+    const x = (d: string) => (t1 > t0 ? ((Date.parse(d) - t0) / (t1 - t0)) * SPARK_W : 0);
+    const y = (v: number) => SPARK_H - ((v - min) / (max - min)) * SPARK_H;
+    const points = dates.map((d, i) => (values[i] === null || values[i] === undefined ? null : `${x(d).toFixed(1)},${y(values[i] as number).toFixed(1)}`)).filter((p): p is string => !!p).join(' ');
+    const from = r.lastNoChangeAt ?? r.firstChangeAt;
+    const windowX: [number, number] | null = from && r.firstChangeAt ? [x(from), x(r.firstChangeAt)] : null;
+    return { key, label, unit, points, zero: y(0), windowX, min, max, tone };
+}
+/** Backscatter (VH, dB) and, when processed, coherence sparklines per orbit pass. */
 const sparks = computed<Spark[]>(() => {
     const r = selected.value;
     if (!r?.radarSeries?.length) return [];
-    return r.radarSeries.map((s: RadarSeries) => {
-        const vals = s.vhRel.filter((v): v is number => v !== null);
-        const min = Math.min(-3, ...vals);
-        const max = Math.max(3, ...vals);
-        const t0 = Date.parse(s.dates[0] ?? '');
-        const t1 = Date.parse(s.dates.at(-1) ?? '');
-        const x = (d: string) => (t1 > t0 ? ((Date.parse(d) - t0) / (t1 - t0)) * SPARK_W : 0);
-        const y = (v: number) => SPARK_H - ((v - min) / (max - min)) * SPARK_H;
-        const points = s.dates.map((d, i) => (s.vhRel[i] === null ? null : `${x(d).toFixed(1)},${y(s.vhRel[i] as number).toFixed(1)}`)).filter((p): p is string => !!p).join(' ');
-        const from = r.lastNoChangeAt ?? r.firstChangeAt;
-        const windowX: [number, number] | null = from && r.firstChangeAt ? [x(from), x(r.firstChangeAt)] : null;
-        return { pass: s.pass === 'ASCENDING' ? 'Çıkış yörüngesi' : 'İniş yörüngesi', points, zero: y(0), windowX, min, max };
-    });
+    const out: Spark[] = [];
+    for (const s of r.radarSeries as RadarSeries[]) {
+        const name = s.pass === 'ASCENDING' ? 'Çıkış yörüngesi' : 'İniş yörüngesi';
+        const vh = sparkOf(`${s.pass}-vh`, `${name} · göreli VH`, 'dB', s.dates, s.vhRel, 3, r, 'info');
+        if (vh) out.push(vh);
+        if (s.cohDates && s.cohRel) {
+            const coh = sparkOf(`${s.pass}-coh`, `${name} · göreli koherans (6/12 gün)`, '', s.cohDates, s.cohRel, 0.2, r, 'success');
+            if (coh) out.push(coh);
+        }
+    }
+    return out;
 });
 watch(page, () => void loadRows());
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -470,16 +486,20 @@ function onRowKey(e: KeyboardEvent, r: PruningRecordRow): void {
                             </div>
                             <p class="text-xs text-muted-foreground">{{ RADAR_META[selected.radar?.class ?? 'no_data'].description }}</p>
                             <div v-if="selected.radar && selected.radar.z !== null" class="grid gap-1 text-xs sm:grid-cols-2">
-                                <span>VH düşüşü: <strong class="tabular-nums">{{ selected.radar.vhDropDb }} dB</strong> · VH/VV: {{ selected.radar.ratioDropDb ?? '—' }} dB</span>
+                                <span>VH düşüşü: <strong class="tabular-nums">{{ selected.radar.vhDropDb ?? '—' }} dB</strong> · VH/VV: {{ selected.radar.ratioDropDb ?? '—' }} dB</span>
                                 <span>z-skoru: <strong class="tabular-nums">{{ selected.radar.z }}</strong> · kalıcılık {{ selected.radar.persistence === null ? '—' : formatShare(selected.radar.persistence) }}</span>
-                                <span v-for="p in selected.radar.passes" :key="p.pass">{{ p.pass === 'ASCENDING' ? 'Çıkış' : 'İniş' }}: {{ p.beforeObs }} önce / {{ p.afterObs }} sonra gözlem · gürültü ±{{ p.noiseDb ?? '—' }} dB</span>
+                                <span v-if="selected.radar.cohRise !== null && selected.radar.cohRise !== undefined">Koherans artışı: <strong class="tabular-nums">{{ selected.radar.cohRise > 0 ? '+' : '' }}{{ selected.radar.cohRise }}</strong> (örtü kalkınca yükselir)</span>
+                                <span v-for="p in selected.radar.passes" :key="p.pass">
+                                    {{ p.pass === 'ASCENDING' ? 'Çıkış' : 'İniş' }}: {{ p.beforeObs }} önce / {{ p.afterObs }} sonra gözlem · gürültü ±{{ p.noiseDb ?? '—' }} dB
+                                    <template v-if="p.zCoh !== null && p.zCoh !== undefined"> · koherans z {{ p.zCoh }} ({{ p.cohBeforeObs }}/{{ p.cohAfterObs }} çift)</template>
+                                </span>
                             </div>
-                            <div v-for="s in sparks" :key="s.pass" class="flex flex-col gap-1">
-                                <span class="text-[11px] text-muted-foreground">{{ s.pass }} · göreli VH (dB), {{ s.min.toFixed(0) }}…{{ s.max.toFixed(0) }}</span>
-                                <svg :viewBox="`0 0 ${SPARK_W} ${SPARK_H}`" class="h-16 w-full" role="img" :aria-label="`${s.pass} göreli VH serisi`">
+                            <div v-for="s in sparks" :key="s.key" class="flex flex-col gap-1">
+                                <span class="text-[11px] text-muted-foreground">{{ s.label }}{{ s.unit ? ` (${s.unit})` : '' }}, {{ s.min.toFixed(s.unit ? 0 : 2) }}…{{ s.max.toFixed(s.unit ? 0 : 2) }}</span>
+                                <svg :viewBox="`0 0 ${SPARK_W} ${SPARK_H}`" class="h-16 w-full" role="img" :aria-label="`${s.label} serisi`">
                                     <rect v-if="s.windowX" :x="s.windowX[0]" y="0" :width="Math.max(2, s.windowX[1] - s.windowX[0])" :height="SPARK_H" class="fill-destructive/15" />
                                     <line x1="0" :y1="s.zero" :x2="SPARK_W" :y2="s.zero" class="stroke-muted-foreground/40" stroke-width="1" stroke-dasharray="3 3" />
-                                    <polyline :points="s.points" fill="none" class="stroke-info" stroke-width="1.5" stroke-linejoin="round" />
+                                    <polyline :points="s.points" fill="none" :class="s.tone === 'success' ? 'stroke-success' : 'stroke-info'" stroke-width="1.5" stroke-linejoin="round" />
                                 </svg>
                             </div>
                         </div>
