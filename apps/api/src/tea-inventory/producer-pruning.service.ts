@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TeaInventoryArea, ProducerScanBlock, ProducerSeasonSchedule } from '@/tea-inventory/entities/tea-inventory-area.entity';
 import { TeaInventoryProducer, ProducerAutoStatus, ProducerScan } from '@/tea-inventory/entities/tea-inventory-producer.entity';
-import { TeaInventoryGarden, GardenPruningEvent, GardenSeason } from '@/tea-inventory/entities/tea-inventory-garden.entity';
+import { TeaInventoryGarden, GardenPruningEvent, GardenSeason, RadarClass, RadarResult, RadarSeries } from '@/tea-inventory/entities/tea-inventory-garden.entity';
 import { PruningDecision, PruningDecisionValue } from '@/tea-inventory/entities/pruning-decision.entity';
 import { User } from '@/users/entities/user.entity';
 import {
@@ -22,6 +22,13 @@ import { Paginated, paginate } from '@/common/dto/paginated.dto';
 /** Statuses under which ÇAYKUR may buy green leaf from the producer this season. */
 const PURCHASE_OPEN: ProducerStatus[] = ['auto_approved', 'approved'];
 
+const RADAR_LABEL: Record<RadarClass, string> = {
+    confirmed: 'Radar teyit etti',
+    weak: 'Zayıf radar sinyali',
+    neutral: 'Radar nötr',
+    contradicted: 'Radar çelişiyor',
+    no_data: 'Radar verisi yetersiz',
+};
 const REGISTRATION_LABEL: Record<PruningRegistration, string> = {
     auto: 'Otomatik düştü (uydu, yüksek güven)',
     expert: 'Eksper onayıyla düştü',
@@ -173,6 +180,9 @@ export interface PruningRecordRow {
     purchaseOpen: boolean;
     registration: PruningRegistration;
     geometry: Record<string, unknown>;
+    /** Sentinel-1 verdict and the garden's relative backscatter series (null before the radar module ran). */
+    radar: RadarResult | null;
+    radarSeries: RadarSeries[] | null;
 }
 
 export interface PruningRecordSummary {
@@ -184,6 +194,8 @@ export interface PruningRecordSummary {
     gardens: number;
     producers: number;
     byRegistration: Record<PruningRegistration, number>;
+    /** Radar module: verdict counts over the season's records, radar-only candidates, rules. Null when it has not run. */
+    radar: { byClass: Record<RadarClass, number>; radarOnly: number; calibrated: boolean; method: string; rules: Record<string, unknown>; passes: Array<{ pass: string; relativeOrbit: number; dates: string[] }> } | null;
     /** Records per scan date (the scan that flagged them), in scan order. */
     byScan: Array<{ date: string; newObservation: boolean; records: number; areaM2: number }>;
     localities: Array<{ name: string; records: number }>;
@@ -421,6 +433,7 @@ export class ProducerPruningService {
             if (query.scanDate && r.detectedAt !== query.scanDate) return false;
             if (query.locality && r.locality !== query.locality) return false;
             if (query.registration && r.registration !== query.registration) return false;
+            if (query.radar && (r.radar?.class ?? 'no_data') !== query.radar) return false;
             if (search) {
                 const haystack = [r.producerName, r.producerCode, r.walletNo, r.licenseCode ?? '', r.gardenCode, `${r.block}/${r.parcel}`, r.locality].join(' ').toLocaleLowerCase('tr-TR');
                 if (!haystack.includes(search)) return false;
@@ -451,6 +464,19 @@ export class ProducerPruningService {
             }
         }
         const scenes = area.producerScan?.scenes ?? null;
+        const radarHeader = area.producerScan?.radar ?? null;
+        const radarSeason = radarHeader?.seasons.find((s) => s.season === season) ?? null;
+        let radar: PruningRecordSummary['radar'] = null;
+        if (radarHeader && radarSeason) {
+            const byClass: Record<RadarClass, number> = { confirmed: 0, weak: 0, neutral: 0, contradicted: 0, no_data: 0 };
+            for (const r of rows) byClass[r.radar?.class ?? 'no_data']++;
+            const radarOnly = await this.gardenRepo
+                .createQueryBuilder('g')
+                .where('g.area_id = :areaId', { areaId: area.id })
+                .andWhere(`g.seasons -> :season -> 'radarOnly' IS NOT NULL AND jsonb_typeof(g.seasons -> :season -> 'radarOnly') = 'object'`, { season })
+                .getCount();
+            radar = { byClass, radarOnly, calibrated: radarHeader.calibrated, method: radarHeader.method, rules: radarHeader.rules, passes: radarSeason.passes };
+        }
         return {
             season,
             seasons: this.seasonsOf(area),
@@ -460,6 +486,7 @@ export class ProducerPruningService {
             gardens: new Set(rows.map((r) => r.gardenCode)).size,
             producers: new Set(rows.map((r) => r.producerCode)).size,
             byRegistration,
+            radar,
             byScan: (schedule?.scanDates ?? []).map((date, i) => ({
                 date,
                 newObservation: schedule?.newObservation[i] ?? false,
@@ -477,12 +504,13 @@ export class ProducerPruningService {
         const area = await this.findArea(areaId);
         const season = this.resolveSeason(area, requested);
         const rows = await this.recordRows(area, season);
-        const header = ['Kayıt', 'Mevki', 'Ada/Parsel', 'Bahçe', 'Hisse', 'Müstahsil no', 'Ad soyad', 'Cüzdan no', 'Ruhsat no', 'Budanan alan (m²)', 'Çakışan (m²)', 'Yeni alan (m²)', 'Son değişimsiz gözlem', 'İlk değişimli gözlem', 'Tespit taraması', 'Müstahsil durumu', '1/7 oranı', 'ÇAYKUR kaydı', 'Demo'];
+        const header = ['Kayıt', 'Mevki', 'Ada/Parsel', 'Bahçe', 'Hisse', 'Müstahsil no', 'Ad soyad', 'Cüzdan no', 'Ruhsat no', 'Budanan alan (m²)', 'Çakışan (m²)', 'Yeni alan (m²)', 'Son değişimsiz gözlem', 'İlk değişimli gözlem', 'Tespit taraması', 'Müstahsil durumu', '1/7 oranı', 'ÇAYKUR kaydı', 'Radar teyidi', 'Radar z', 'Radar VH düşüşü (dB)', 'Demo'];
         const cell = (v: string | number | null) => `"${String(v ?? '').replace(/"/g, '""')}"`;
         const lines = rows.map((r) =>
             [
                 r.id, r.locality, `${r.block}/${r.parcel}`, r.gardenCode, r.holderCount > 1 ? `${r.holderIndex}/${r.holderCount}` : '', r.producerCode, r.producerName, r.walletNo, r.licenseCode ?? '',
-                r.areaM2, r.reusedM2, r.newM2, r.lastNoChangeAt ?? 'sezon başı', r.firstChangeAt ?? '', r.detectedAt ?? '', r.producerStatus ?? '', r.producerRatio, REGISTRATION_LABEL[r.registration], 'Evet',
+                r.areaM2, r.reusedM2, r.newM2, r.lastNoChangeAt ?? 'sezon başı', r.firstChangeAt ?? '', r.detectedAt ?? '', r.producerStatus ?? '', r.producerRatio, REGISTRATION_LABEL[r.registration],
+                r.radar ? RADAR_LABEL[r.radar.class] : '', r.radar?.z ?? '', r.radar?.vhDropDb ?? '', 'Evet',
             ].map(cell).join(';'),
         );
         const title = `${area.province} / ${area.district} / ${area.neighborhood} · ${season} budama sezonu`;
@@ -536,6 +564,8 @@ export class ProducerPruningService {
                     purchaseOpen: producer?.purchaseOpen ?? false,
                     registration,
                     geometry: e.geometry,
+                    radar: e.radar ?? null,
+                    radarSeries: g.seasons[season]?.radarSeries ?? null,
                 });
             });
         }

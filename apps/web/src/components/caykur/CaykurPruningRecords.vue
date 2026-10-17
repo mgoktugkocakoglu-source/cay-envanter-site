@@ -13,8 +13,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { toneVariant } from '@/components/caykur/tone';
 import { useToast } from '@/composables/useToast';
-import { api, type InventoryMap, type PruningRecordRow, type PruningRecordSummary, type PruningRegistration } from '@/services/api';
-import { PRODUCER_STATUS_META, REGISTRATION_META, REGISTRATION_ORDER, formatM2, formatShare } from '@/services/caykur/teaInventory';
+import { api, type InventoryMap, type PruningRecordRow, type PruningRecordSummary, type PruningRegistration, type RadarClass, type RadarSeries } from '@/services/api';
+import { PRODUCER_STATUS_META, RADAR_META, RADAR_ORDER, REGISTRATION_META, REGISTRATION_ORDER, formatM2, formatShare } from '@/services/caykur/teaInventory';
 import { formatNumber } from '@/services/caykur';
 
 /**
@@ -42,6 +42,7 @@ const error = ref<string | null>(null);
 const scanDate = ref<string | typeof ALL>(ALL);
 const locality = ref<string | typeof ALL>(ALL);
 const registration = ref<PruningRegistration | typeof ALL>(ALL);
+const radarFilter = ref<RadarClass | typeof ALL>(ALL);
 const search = ref('');
 const page = ref(1);
 const rows = ref<PruningRecordRow[]>([]);
@@ -101,6 +102,7 @@ async function loadRows(): Promise<void> {
         scanDate: scanDate.value === ALL ? undefined : scanDate.value,
         locality: locality.value === ALL ? undefined : locality.value,
         registration: registration.value === ALL ? undefined : registration.value,
+        radar: radarFilter.value === ALL ? undefined : radarFilter.value,
         search: search.value.trim() || undefined,
     });
     if (res.data) {
@@ -177,9 +179,41 @@ watch(season, async () => {
     await loadSummary();
     await loadRows();
 });
-watch([scanDate, locality, registration], () => {
+watch([scanDate, locality, registration, radarFilter], () => {
     page.value = 1;
     void loadRows();
+});
+
+/**
+ * Sparkline of one orbit pass: relative VH (dB) over the season, the change window shaded.
+ * Drawn as a small inline SVG — the honest 6-day Sentinel-1 cadence with its speckle.
+ */
+interface Spark {
+    pass: string;
+    points: string;
+    zero: number;
+    windowX: [number, number] | null;
+    min: number;
+    max: number;
+}
+const SPARK_W = 260;
+const SPARK_H = 64;
+const sparks = computed<Spark[]>(() => {
+    const r = selected.value;
+    if (!r?.radarSeries?.length) return [];
+    return r.radarSeries.map((s: RadarSeries) => {
+        const vals = s.vhRel.filter((v): v is number => v !== null);
+        const min = Math.min(-3, ...vals);
+        const max = Math.max(3, ...vals);
+        const t0 = Date.parse(s.dates[0] ?? '');
+        const t1 = Date.parse(s.dates.at(-1) ?? '');
+        const x = (d: string) => (t1 > t0 ? ((Date.parse(d) - t0) / (t1 - t0)) * SPARK_W : 0);
+        const y = (v: number) => SPARK_H - ((v - min) / (max - min)) * SPARK_H;
+        const points = s.dates.map((d, i) => (s.vhRel[i] === null ? null : `${x(d).toFixed(1)},${y(s.vhRel[i] as number).toFixed(1)}`)).filter((p): p is string => !!p).join(' ');
+        const from = r.lastNoChangeAt ?? r.firstChangeAt;
+        const windowX: [number, number] | null = from && r.firstChangeAt ? [x(from), x(r.firstChangeAt)] : null;
+        return { pass: s.pass === 'ASCENDING' ? 'Çıkış yörüngesi' : 'İniş yörüngesi', points, zero: y(0), windowX, min, max };
+    });
 });
 watch(page, () => void loadRows());
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -213,6 +247,9 @@ function onLocality(v: unknown): void {
 }
 function onRegistration(v: unknown): void {
     registration.value = typeof v === 'string' && v !== '' ? (v as PruningRegistration | typeof ALL) : ALL;
+}
+function onRadar(v: unknown): void {
+    radarFilter.value = typeof v === 'string' && v !== '' ? (v as RadarClass | typeof ALL) : ALL;
 }
 function onRowKey(e: KeyboardEvent, r: PruningRecordRow): void {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -266,6 +303,21 @@ function onRowKey(e: KeyboardEvent, r: PruningRecordRow): void {
             <StatCard label="Eksper onayı bekleyen" :value="formatNumber(summary.byRegistration.pending)" :hint="`${summary.byRegistration.no_license} ruhsatsız/eşleşmemiş · ${summary.byRegistration.unattributed} sınırı belirsiz`" />
         </div>
 
+        <Card v-if="summary.radar">
+            <CardHeader>
+                <CardTitle class="flex flex-wrap items-center gap-2">Radar teyidi (Sentinel-1) <Badge variant="warning">Ayrı modül · kalibre edilmedi</Badge></CardTitle>
+                <CardDescription>
+                    Çayır biçme tespiti yöntemi çaya uyarlandı: her optik kayıt için bahçenin komşuluğa göreli VH geri saçılımı, değişim penceresinin öncesi ve sonrası
+                    karşılaştırılır; düşüş bahçenin kendi benek gürültüsüne göre (z-skoru) ve kalıcılığına göre sınıflanır. {{ summary.radar.passes.map((p) => `${p.pass === 'ASCENDING' ? 'çıkış' : 'iniş'} yörüngesi ${p.relativeOrbit} (${p.dates.length} geçiş)`).join(' · ') }}.
+                    Radar yalnızca teyit katmanıdır; optik kaydı tek başına açmaz ya da kapatmaz. 10 m GRD küçük bahçelerde çoğu budamayı ayırt edemez — bu, 2. fazdaki koherans (SLC) hattının gerekçesidir.
+                </CardDescription>
+            </CardHeader>
+            <CardContent class="flex flex-wrap gap-2">
+                <Badge v-for="k in RADAR_ORDER" :key="k" :variant="toneVariant(RADAR_META[k].tone)" :title="RADAR_META[k].description">{{ RADAR_META[k].label }} · {{ summary.radar.byClass[k] }}</Badge>
+                <Badge variant="outline" title="Optik kaydı olmayan bahçede kalıcı radar düşüşü: optiğin bulut altında kaçırmış olabileceği aday">Yalnız-radar aday · {{ summary.radar.radarOnly }}</Badge>
+            </CardContent>
+        </Card>
+
         <Card>
             <CardHeader>
                 <CardTitle>Tarama zaman çizelgesi</CardTitle>
@@ -311,6 +363,13 @@ function onRowKey(e: KeyboardEvent, r: PruningRecordRow): void {
                                     <SelectItem v-for="k in REGISTRATION_ORDER" :key="k" :value="k">{{ REGISTRATION_META[k].label }} ({{ summary.byRegistration[k] }})</SelectItem>
                                 </SelectContent>
                             </Select>
+                            <Select v-if="summary.radar" :model-value="radarFilter" @update:model-value="onRadar">
+                                <SelectTrigger class="h-11 w-full md:h-9 md:w-48" aria-label="Radar teyidi"><SelectValue placeholder="Radar teyidi" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem :value="ALL">Tüm radar sınıfları</SelectItem>
+                                    <SelectItem v-for="k in RADAR_ORDER" :key="k" :value="k">{{ RADAR_META[k].label }} ({{ summary.radar.byClass[k] }})</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </template>
                     </ListToolbar>
 
@@ -325,6 +384,7 @@ function onRowKey(e: KeyboardEvent, r: PruningRecordRow): void {
                                     <TableHead class="text-right">Budama</TableHead>
                                     <TableHead class="hidden lg:table-cell">Gözlem aralığı</TableHead>
                                     <TableHead>ÇAYKUR kaydı</TableHead>
+                                    <TableHead v-if="summary.radar" class="hidden md:table-cell">Radar</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -355,6 +415,10 @@ function onRowKey(e: KeyboardEvent, r: PruningRecordRow): void {
                                     <TableCell class="hidden text-xs lg:table-cell">{{ r.lastNoChangeAt ? fmtDate(r.lastNoChangeAt) : 'sezon başı' }} → {{ fmtDate(r.firstChangeAt) }}<div class="text-muted-foreground">tarama {{ fmtDate(r.detectedAt) }}</div></TableCell>
                                     <TableCell>
                                         <Badge :variant="toneVariant(REGISTRATION_META[r.registration].tone)" :title="REGISTRATION_META[r.registration].description">{{ REGISTRATION_META[r.registration].label }}</Badge>
+                                    </TableCell>
+                                    <TableCell v-if="summary.radar" class="hidden md:table-cell">
+                                        <Badge :variant="toneVariant(RADAR_META[r.radar?.class ?? 'no_data'].tone)" :title="RADAR_META[r.radar?.class ?? 'no_data'].description">{{ RADAR_META[r.radar?.class ?? 'no_data'].label }}</Badge>
+                                        <div v-if="r.radar?.z !== null && r.radar?.z !== undefined" class="text-xs text-muted-foreground">z {{ r.radar.z }} · {{ r.radar.vhDropDb }} dB</div>
                                     </TableCell>
                                 </TableRow>
                             </TableBody>
@@ -398,6 +462,27 @@ function onRowKey(e: KeyboardEvent, r: PruningRecordRow): void {
                             <AlertTitle>{{ REGISTRATION_META[selected.registration].label }}</AlertTitle>
                             <AlertDescription>{{ REGISTRATION_META[selected.registration].description }}</AlertDescription>
                         </Alert>
+
+                        <div v-if="summary.radar" class="flex flex-col gap-2 rounded-lg border p-3">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <span class="text-sm font-medium">Radar teyidi (Sentinel-1 VH, komşuluğa göreli)</span>
+                                <Badge :variant="toneVariant(RADAR_META[selected.radar?.class ?? 'no_data'].tone)">{{ RADAR_META[selected.radar?.class ?? 'no_data'].label }}</Badge>
+                            </div>
+                            <p class="text-xs text-muted-foreground">{{ RADAR_META[selected.radar?.class ?? 'no_data'].description }}</p>
+                            <div v-if="selected.radar && selected.radar.z !== null" class="grid gap-1 text-xs sm:grid-cols-2">
+                                <span>VH düşüşü: <strong class="tabular-nums">{{ selected.radar.vhDropDb }} dB</strong> · VH/VV: {{ selected.radar.ratioDropDb ?? '—' }} dB</span>
+                                <span>z-skoru: <strong class="tabular-nums">{{ selected.radar.z }}</strong> · kalıcılık {{ selected.radar.persistence === null ? '—' : formatShare(selected.radar.persistence) }}</span>
+                                <span v-for="p in selected.radar.passes" :key="p.pass">{{ p.pass === 'ASCENDING' ? 'Çıkış' : 'İniş' }}: {{ p.beforeObs }} önce / {{ p.afterObs }} sonra gözlem · gürültü ±{{ p.noiseDb ?? '—' }} dB</span>
+                            </div>
+                            <div v-for="s in sparks" :key="s.pass" class="flex flex-col gap-1">
+                                <span class="text-[11px] text-muted-foreground">{{ s.pass }} · göreli VH (dB), {{ s.min.toFixed(0) }}…{{ s.max.toFixed(0) }}</span>
+                                <svg :viewBox="`0 0 ${SPARK_W} ${SPARK_H}`" class="h-16 w-full" role="img" :aria-label="`${s.pass} göreli VH serisi`">
+                                    <rect v-if="s.windowX" :x="s.windowX[0]" y="0" :width="Math.max(2, s.windowX[1] - s.windowX[0])" :height="SPARK_H" class="fill-destructive/15" />
+                                    <line x1="0" :y1="s.zero" :x2="SPARK_W" :y2="s.zero" class="stroke-muted-foreground/40" stroke-width="1" stroke-dasharray="3 3" />
+                                    <polyline :points="s.points" fill="none" class="stroke-info" stroke-width="1.5" stroke-linejoin="round" />
+                                </svg>
+                            </div>
+                        </div>
                         <p class="text-xs text-muted-foreground">Sahne görüntüleri 10 m Sentinel-2 piksellerinde, gerçek çözünürlükte gösterilir (büyütülmüş, yumuşatılmamış). Değişim poligonu sonra karesinde dolu, önce karesinde kesikli çizilir.</p>
                     </template>
                 </CardContent>

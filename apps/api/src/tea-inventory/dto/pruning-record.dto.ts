@@ -5,6 +5,7 @@ import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 
 /** How a satellite pruning record reached ÇAYKUR's purchase system. */
 export const PRUNING_REGISTRATIONS = ['auto', 'expert', 'pending', 'rejected', 'unattributed', 'no_license'] as const;
 export type PruningRegistration = (typeof PRUNING_REGISTRATIONS)[number];
+export const RADAR_CLASSES = ['confirmed', 'weak', 'neutral', 'contradicted', 'no_data'] as const;
 
 /** Query params for the scan-centred pruning record feed. */
 export class PruningRecordQueryDto {
@@ -44,6 +45,11 @@ export class PruningRecordQueryDto {
     @IsOptional()
     @IsIn(PRUNING_REGISTRATIONS)
     registration?: PruningRegistration;
+
+    @ApiPropertyOptional({ enum: RADAR_CLASSES, description: 'Sentinel-1 verdict on the record (radar module)' })
+    @IsOptional()
+    @IsIn(RADAR_CLASSES)
+    radar?: (typeof RADAR_CLASSES)[number];
 
     @ApiPropertyOptional({ description: 'Producer name, producer / wallet / licence code, garden code or "ada/parsel"' })
     @IsOptional()

@@ -29,9 +29,18 @@ export interface ProducerSeasonSchedule {
     sceneDates: string[][];
 }
 
+/** Radar module header (bundle `radar` block): rules and, per season, the orbit passes scanned. */
+export interface RadarBlock {
+    calibrated: boolean;
+    method: string;
+    rules: Record<string, unknown>;
+    seasons: Array<{ season: string; window: [string, string]; passes: Array<{ pass: string; relativeOrbit: number; dates: string[] }> }>;
+}
+
 export interface ProducerScanBlock {
     rules: Record<string, unknown>;
     seasons: ProducerSeasonSchedule[];
+    radar?: RadarBlock | null;
     scenes: {
         baseUrl: string;
         bounds: { west: number; south: number; east: number; north: number };

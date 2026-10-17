@@ -1,6 +1,38 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { TeaInventoryArea } from '@/tea-inventory/entities/tea-inventory-area.entity';
 
+/** Sentinel-1 verdict on an optical pruning event (separate radar module, mowing-detection recipe). */
+export type RadarClass = 'confirmed' | 'weak' | 'neutral' | 'contradicted' | 'no_data';
+
+export interface RadarPassResult {
+    pass: 'ASCENDING' | 'DESCENDING';
+    beforeObs: number;
+    afterObs: number;
+    vhDropDb: number | null;
+    ratioDropDb: number | null;
+    persistence: number | null;
+    noiseDb: number | null;
+    z: number | null;
+}
+
+export interface RadarResult {
+    class: RadarClass;
+    score: number;
+    vhDropDb: number | null;
+    ratioDropDb: number | null;
+    persistence: number | null;
+    z: number | null;
+    passes: RadarPassResult[];
+}
+
+/** Neighbourhood-relative VH / VH-VV series of one orbit pass (dB), for the sparkline. */
+export interface RadarSeries {
+    pass: 'ASCENDING' | 'DESCENDING';
+    dates: string[];
+    vhRel: Array<number | null>;
+    ratioRel: Array<number | null>;
+}
+
 /** A pruning event inside a garden: where (polygon) and when (an observation interval, never a day). */
 export interface GardenPruningEvent {
     areaM2: number;
@@ -9,6 +41,8 @@ export interface GardenPruningEvent {
     firstChangeAt: string | null;
     detectedAt: string | null;
     geometry: Record<string, unknown>;
+    // Present when the radar module has run for the season.
+    radar?: RadarResult | null;
 }
 
 /** One season of a garden: tea area, cumulative pruned series per scan, and its events. */
@@ -23,6 +57,10 @@ export interface GardenSeason {
     firstChangeAt: string | null;
     detectedAt: string | null;
     events: GardenPruningEvent[];
+    // Present when the radar module has run for the season.
+    radarSeries?: RadarSeries[];
+    // A sustained radar drop with no optical event (candidate the optics may have missed).
+    radarOnly?: { date: string; vhDropDb: number; persistence: number; z: number } | null;
 }
 
 /** Boundary approval state of the garden's geometry (the licensed sub-polygon). */

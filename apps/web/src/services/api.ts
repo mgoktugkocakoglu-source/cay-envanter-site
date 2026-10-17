@@ -1075,6 +1075,37 @@ export interface ProducerSummary {
 // Scan-centred satellite pruning records (event polygon × TKGM parcel × licence holder)
 export type PruningRegistration = 'auto' | 'expert' | 'pending' | 'rejected' | 'unattributed' | 'no_license';
 
+// Radar module: Sentinel-1 verdict on an optical record (mowing-detection recipe, uncalibrated)
+export type RadarClass = 'confirmed' | 'weak' | 'neutral' | 'contradicted' | 'no_data';
+
+export interface RadarPassResult {
+    pass: 'ASCENDING' | 'DESCENDING';
+    beforeObs: number;
+    afterObs: number;
+    vhDropDb: number | null;
+    ratioDropDb: number | null;
+    persistence: number | null;
+    noiseDb: number | null;
+    z: number | null;
+}
+
+export interface RadarResult {
+    class: RadarClass;
+    score: number;
+    vhDropDb: number | null;
+    ratioDropDb: number | null;
+    persistence: number | null;
+    z: number | null;
+    passes: RadarPassResult[];
+}
+
+export interface RadarSeries {
+    pass: 'ASCENDING' | 'DESCENDING';
+    dates: string[];
+    vhRel: Array<number | null>;
+    ratioRel: Array<number | null>;
+}
+
 export interface PruningRecordRow {
     id: string;
     season: string;
@@ -1102,6 +1133,8 @@ export interface PruningRecordRow {
     purchaseOpen: boolean;
     registration: PruningRegistration;
     geometry: GeoJSON.Geometry;
+    radar: RadarResult | null;
+    radarSeries: RadarSeries[] | null;
 }
 
 export interface PruningRecordSummary {
@@ -1113,6 +1146,7 @@ export interface PruningRecordSummary {
     gardens: number;
     producers: number;
     byRegistration: Record<PruningRegistration, number>;
+    radar: { byClass: Record<RadarClass, number>; radarOnly: number; calibrated: boolean; method: string; rules: Record<string, unknown>; passes: Array<{ pass: string; relativeOrbit: number; dates: string[] }> } | null;
     byScan: Array<{ date: string; newObservation: boolean; records: number; areaM2: number }>;
     localities: Array<{ name: string; records: number }>;
     schedule: ProducerScanSchedule | null;
@@ -1126,6 +1160,7 @@ export interface PruningRecordQuery {
     scanDate?: string;
     locality?: string;
     registration?: PruningRegistration;
+    radar?: RadarClass;
     search?: string;
 }
 

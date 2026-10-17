@@ -7,7 +7,7 @@ import { TeaInventoryArea, InventoryLicense, LicensingBlock, TeaPatch, ProducerS
 import { TeaInventoryParcel } from '@/tea-inventory/entities/tea-inventory-parcel.entity';
 import { InventoryClass } from '@/tea-inventory/enums/inventory-class.enum';
 import { TeaInventoryProducer, ProducerScan, ProducerAutoStatus } from '@/tea-inventory/entities/tea-inventory-producer.entity';
-import { TeaInventoryGarden, GardenSeason, GardenPruningEvent } from '@/tea-inventory/entities/tea-inventory-garden.entity';
+import { TeaInventoryGarden, GardenSeason, GardenPruningEvent, RadarResult, RadarSeries } from '@/tea-inventory/entities/tea-inventory-garden.entity';
 import { TeaInventoryLicense } from '@/tea-inventory/entities/tea-inventory-license.entity';
 import { ParcelLineage } from '@/tea-inventory/entities/parcel-lineage.entity';
 import { LicensingApplication } from '@/tea-inventory/entities/licensing-application.entity';
@@ -31,6 +31,21 @@ interface BundleLicensing extends LicensingBlock {
     licenses: LicenseRow[];
     gardens: GardenLicensingFields[];
     applications: ApplicationRow[];
+}
+
+/** Optional radar block: Sentinel-1 confirmation per optical record, relative series per garden. */
+interface BundleRadar {
+    calibrated: boolean;
+    method: string;
+    rules: Record<string, unknown>;
+    seasons: Array<{
+        season: string;
+        window: [string, string];
+        passes: Array<{ pass: 'ASCENDING' | 'DESCENDING'; relativeOrbit: number; dates: string[] }>;
+        series: Record<string, Array<{ pass: 'ASCENDING' | 'DESCENDING'; vhRel: Array<number | null>; ratioRel: Array<number | null> }>>;
+        records: Array<{ recordId: string; gardenCode: string; radar: RadarResult }>;
+        radarOnly: Array<{ gardenCode: string; date: string; vhDropDb: number; persistence: number; z: number }>;
+    }>;
 }
 
 interface InventoryBundle {
@@ -70,6 +85,7 @@ interface InventoryBundle {
     pruning?: Record<string, unknown> | null;
     producers?: BundleProducers | null;
     licensing?: BundleLicensing | null;
+    radar?: BundleRadar | null;
 }
 
 interface BundleProducers {
@@ -162,7 +178,19 @@ export class TeaInventorySeedService implements OnModuleInit {
                     unmatchedLicenses: bundle.unmatchedLicenses,
                     pruning: bundle.pruning ?? null,
                     producerScan: bundle.producers
-                        ? { rules: bundle.producers.rules, seasons: bundle.producers.seasons.map(({ producers: _p, gardens: _g, events: _e, ...schedule }) => schedule), scenes: bundle.producers.scenes }
+                        ? {
+                            rules: bundle.producers.rules,
+                            seasons: bundle.producers.seasons.map(({ producers: _p, gardens: _g, events: _e, ...schedule }) => schedule),
+                            scenes: bundle.producers.scenes,
+                            radar: bundle.radar
+                                ? {
+                                    calibrated: bundle.radar.calibrated,
+                                    method: bundle.radar.method,
+                                    rules: bundle.radar.rules,
+                                    seasons: bundle.radar.seasons.map((s) => ({ season: s.season, window: s.window, passes: s.passes })),
+                                }
+                                : null,
+                        }
                         : null,
                     licensing: bundle.licensing
                         ? {
@@ -181,7 +209,7 @@ export class TeaInventorySeedService implements OnModuleInit {
             );
             await manager.save(parcels, { chunk: INSERT_CHUNK });
             if (bundle.producers) {
-                await this.importProducers(manager, area.id, bundle.producers, bundle.licensing ?? null);
+                await this.importProducers(manager, area.id, bundle.producers, bundle.licensing ?? null, bundle.radar ?? null);
             }
             if (bundle.licensing) {
                 await this.importLicensing(manager, area.id, bundle.licensing);
@@ -203,8 +231,19 @@ export class TeaInventorySeedService implements OnModuleInit {
      * ground record with its per-season results and event polygons (and, from bundle v5, its
      * licence register fields).
      */
-    private async importProducers(manager: EntityManager, areaId: string, block: BundleProducers, licensing: BundleLicensing | null): Promise<void> {
+    private async importProducers(manager: EntityManager, areaId: string, block: BundleProducers, licensing: BundleLicensing | null, radar: BundleRadar | null): Promise<void> {
         const licensingByGarden = new Map((licensing?.gardens ?? []).map((g) => [g.code, g]));
+        // Radar verdicts keyed by "<garden>:<season>:<n>" and relative series per garden+season.
+        const radarByRecord = new Map<string, RadarResult>();
+        const radarSeries = new Map<string, RadarSeries[]>();
+        const radarOnly = new Map<string, { date: string; vhDropDb: number; persistence: number; z: number }>();
+        for (const s of radar?.seasons ?? []) {
+            for (const r of s.records) radarByRecord.set(r.recordId, r.radar);
+            for (const [code, passes] of Object.entries(s.series)) {
+                radarSeries.set(`${code}:${s.season}`, passes.map((p) => ({ pass: p.pass, dates: s.passes.find((x) => x.pass === p.pass)?.dates ?? [], vhRel: p.vhRel, ratioRel: p.ratioRel })));
+            }
+            for (const c of s.radarOnly) radarOnly.set(`${c.gardenCode}:${s.season}`, { date: c.date, vhDropDb: c.vhDropDb, persistence: c.persistence, z: c.z });
+        }
         const names = new Map(block.producers.map((p) => [p.code, p]));
         const gardenCount = new Map<string, number>();
         for (const g of block.gardens) gardenCount.set(g.producerCode, (gardenCount.get(g.producerCode) ?? 0) + 1);
@@ -251,7 +290,13 @@ export class TeaInventorySeedService implements OnModuleInit {
             }
             for (const { code, ...rest } of season.gardens) {
                 const entry = seasonsByGarden.get(code) ?? {};
-                entry[season.season] = { ...rest, events: events.get(code) ?? [] };
+                const key = `${code}:${season.season}`;
+                entry[season.season] = {
+                    ...rest,
+                    events: (events.get(code) ?? []).map((e, i) => ({ ...e, radar: radarByRecord.get(`${key}:${i + 1}`) ?? null })),
+                    radarSeries: radarSeries.get(key),
+                    radarOnly: radarOnly.get(key) ?? null,
+                };
                 seasonsByGarden.set(code, entry);
             }
         }

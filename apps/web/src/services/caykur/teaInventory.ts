@@ -14,6 +14,7 @@ import type {
     LicenseView,
     ProducerPruningStatus,
     PruningRegistration,
+    RadarClass,
     SatellitePruningStatus,
 } from '@/services/api';
 import type { Tone } from '@/components/caykur/tone';
@@ -245,6 +246,17 @@ export const REGISTRATION_META: Record<PruningRegistration, ProducerStatusMeta> 
     no_license: { label: 'Ruhsat yok / eşleşme bekliyor', description: 'Budama görüldü ama bahçeye bağlı ruhsat yok ya da ruhsat–parsel eşleşmesi tamamlanmadı.', tone: 'danger' },
 };
 export const REGISTRATION_ORDER: PruningRegistration[] = ['auto', 'expert', 'pending', 'no_license', 'unattributed', 'rejected'];
+
+// ── Radar module: Sentinel-1 verdict on an optical record ──
+
+export const RADAR_META: Record<RadarClass, ProducerStatusMeta> = {
+    confirmed: { label: 'Radar teyit etti', description: 'Komşuluğa göreli VH geri saçılımı değişim penceresinden sonra anlamlı (z ≥ 2,5) ve kalıcı şekilde düştü: örtü kalkmış.', tone: 'success' },
+    weak: { label: 'Zayıf radar sinyali', description: 'Düşüş var ama bahçenin kendi benek gürültüsüne göre kesin değil (z 1,5–2,5).', tone: 'info' },
+    neutral: { label: 'Radar nötr', description: 'Radar belirgin bir değişim görmedi; 10 m GRD küçük bahçede her budamayı göremez.', tone: 'muted' },
+    contradicted: { label: 'Radar çelişiyor', description: 'Geri saçılım anlamlı şekilde YÜKSELDİ; optik düşüş kar/gölge olabilir, eksper baksın.', tone: 'danger' },
+    no_data: { label: 'Radar verisi yetersiz', description: 'Değişim penceresinin iki yanında yeterli Sentinel-1 geçişi yok.', tone: 'muted' },
+};
+export const RADAR_ORDER: RadarClass[] = ['confirmed', 'weak', 'neutral', 'contradicted', 'no_data'];
 
 // ── Digital licence register ──
 
