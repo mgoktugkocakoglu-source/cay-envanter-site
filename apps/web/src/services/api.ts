@@ -1102,6 +1102,8 @@ export interface RadarResult {
     cohRise?: number | null;
     persistence: number | null;
     z: number | null;
+    zCoh?: number | null;
+    cohClass?: RadarClass;
     passes: RadarPassResult[];
 }
 

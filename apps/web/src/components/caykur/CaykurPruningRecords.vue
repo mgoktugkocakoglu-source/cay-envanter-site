@@ -488,7 +488,10 @@ function onRowKey(e: KeyboardEvent, r: PruningRecordRow): void {
                             <div v-if="selected.radar && selected.radar.z !== null" class="grid gap-1 text-xs sm:grid-cols-2">
                                 <span>VH düşüşü: <strong class="tabular-nums">{{ selected.radar.vhDropDb ?? '—' }} dB</strong> · VH/VV: {{ selected.radar.ratioDropDb ?? '—' }} dB</span>
                                 <span>z-skoru: <strong class="tabular-nums">{{ selected.radar.z }}</strong> · kalıcılık {{ selected.radar.persistence === null ? '—' : formatShare(selected.radar.persistence) }}</span>
-                                <span v-if="selected.radar.cohRise !== null && selected.radar.cohRise !== undefined">Koherans artışı: <strong class="tabular-nums">{{ selected.radar.cohRise > 0 ? '+' : '' }}{{ selected.radar.cohRise }}</strong> (örtü kalkınca yükselir)</span>
+                                <span v-if="selected.radar.cohRise !== null && selected.radar.cohRise !== undefined">
+                                    Koherans kanalı: <Badge :variant="toneVariant(RADAR_META[selected.radar.cohClass ?? 'no_data'].tone)" class="align-middle">{{ RADAR_META[selected.radar.cohClass ?? 'no_data'].label }}</Badge>
+                                    artış <strong class="tabular-nums">{{ selected.radar.cohRise > 0 ? '+' : '' }}{{ selected.radar.cohRise }}</strong> · z {{ selected.radar.zCoh ?? '—' }}
+                                </span>
                                 <span v-for="p in selected.radar.passes" :key="p.pass">
                                     {{ p.pass === 'ASCENDING' ? 'Çıkış' : 'İniş' }}: {{ p.beforeObs }} önce / {{ p.afterObs }} sonra gözlem · gürültü ±{{ p.noiseDb ?? '—' }} dB
                                     <template v-if="p.zCoh !== null && p.zCoh !== undefined"> · koherans z {{ p.zCoh }} ({{ p.cohBeforeObs }}/{{ p.cohAfterObs }} çift)</template>

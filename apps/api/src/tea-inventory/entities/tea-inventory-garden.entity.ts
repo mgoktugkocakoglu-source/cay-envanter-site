@@ -29,6 +29,9 @@ export interface RadarResult {
     cohRise?: number | null;
     persistence: number | null;
     z: number | null;
+    // Coherence channel judged on its own (never pooled with backscatter).
+    zCoh?: number | null;
+    cohClass?: RadarClass;
     passes: RadarPassResult[];
 }
 
