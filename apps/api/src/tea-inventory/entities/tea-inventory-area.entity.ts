@@ -42,10 +42,30 @@ export interface RadarBlock {
     }>;
 }
 
+/** Fusion module header (bundle `fusion` block): rules, channel settings, per-season scan cadence and sensors. */
+export interface FusionBlock {
+    calibrated: boolean;
+    method: string;
+    rules: Record<string, unknown>;
+    channels: Record<string, { sign: 1 | -1; minEffect: number; noiseFloor: number }>;
+    seasons: Array<{
+        season: string;
+        everyDays: number;
+        scanFrom: string;
+        scanTo: string;
+        sensors: {
+            optical: { dates: string[] };
+            backscatter: Array<{ pass: string; relativeOrbit: number; dates: string[] }>;
+            coherence: Array<{ pass: string; dates: string[] }>;
+        };
+    }>;
+}
+
 export interface ProducerScanBlock {
     rules: Record<string, unknown>;
     seasons: ProducerSeasonSchedule[];
     radar?: RadarBlock | null;
+    fusion?: FusionBlock | null;
     scenes: {
         baseUrl: string;
         bounds: { west: number; south: number; east: number; north: number };

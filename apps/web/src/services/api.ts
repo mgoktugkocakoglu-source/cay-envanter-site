@@ -1171,6 +1171,124 @@ export interface PruningRecordSummary {
     scenes: { baseUrl: string; bounds: { west: number; south: number; east: number; north: number }; items: ProducerSceneItem[] } | null;
 }
 
+// Multi-sensor step-change pruning verdicts (fusion module, uncalibrated)
+export type FusionClass = 'pruned' | 'likely' | 'unclear' | 'not_pruned' | 'no_data';
+export type FusionChannelKey = 'ndvi' | 'nbr' | 'vh_asc' | 'vh_desc' | 'coh_asc' | 'coh_desc';
+export type FusionGroup = 'optical' | 'backscatter' | 'coherence';
+export type ProducerFusionStatus = 'pruned_full' | 'pruned_partial' | 'none' | 'unclear' | 'no_license' | 'no_data';
+
+export interface FusionChannelEvidence {
+    key: FusionChannelKey;
+    before: number;
+    after: number;
+    late: number;
+    delta: number | null;
+    noise: number;
+    z: number | null;
+    persistence: number | null;
+    magnitudeOk: boolean;
+}
+
+export interface FusionGroupEvidence {
+    group: FusionGroup;
+    z: number | null;
+    channels: FusionChannelEvidence[];
+}
+
+export interface FusionGardenRow {
+    id: string;
+    code: string;
+    producerCode: string;
+    producerName: string;
+    walletNo: string;
+    licenseCode: string | null;
+    parcelKey: string;
+    block: string;
+    parcel: string;
+    locality: string;
+    holderIndex: number;
+    holderCount: number;
+    areaM2: number;
+    licensedAreaM2: number | null;
+    unit: 'garden' | 'patch';
+    unitAreaM2: number;
+    class: FusionClass;
+    z: number | null;
+    p: number;
+    opticalOk: boolean;
+    backscatterOk: boolean;
+    changeDate: string | null;
+    lastBeforeAt: string | null;
+    firstAfterAt: string | null;
+    detectedAt: string | null;
+    likelyAt: string | null;
+    agreeing: number;
+    reason: string;
+    groups: FusionGroupEvidence[];
+    geometry: GeoJSON.Geometry;
+}
+
+export interface FusionGardenDetail extends FusionGardenRow {
+    scans: Array<{ date: string; z: number | null; class: FusionClass }>;
+    series: Array<{ key: FusionChannelKey; dates: string[]; values: Array<number | null> }>;
+}
+
+export interface FusionProducerRow {
+    id: string;
+    code: string;
+    name: string;
+    walletNo: string;
+    licenseNo: string;
+    licensedAreaM2: number;
+    requiredM2: number;
+    prunedAreaM2: number;
+    likelyAreaM2: number;
+    gardens: number;
+    prunedGardens: string[];
+    likelyGardens: string[];
+    status: ProducerFusionStatus;
+    firstDetectedAt: string | null;
+    ratio: number;
+}
+
+export interface FusionSummary {
+    season: string;
+    seasons: string[];
+    calibrated: boolean;
+    method: string;
+    rules: Record<string, unknown>;
+    channels: Record<string, { sign: 1 | -1; minEffect: number; noiseFloor: number }>;
+    everyDays: number;
+    scanFrom: string;
+    scanTo: string;
+    sensors: {
+        optical: { dates: string[] };
+        backscatter: Array<{ pass: string; relativeOrbit: number; dates: string[] }>;
+        coherence: Array<{ pass: string; dates: string[] }>;
+    };
+    gardens: { total: number; byClass: Record<FusionClass, number>; prunedAreaM2: number; likelyAreaM2: number };
+    producers: { total: number; byStatus: Record<ProducerFusionStatus, number> };
+    timeline: Array<{ date: string; pruned: number; likely: number }>;
+    localities: Array<{ name: string; pruned: number; total: number }>;
+}
+
+export interface FusionGardenQuery {
+    page?: number;
+    limit?: number;
+    season?: string;
+    search?: string;
+    class?: FusionClass;
+    locality?: string;
+}
+
+export interface FusionProducerQuery {
+    page?: number;
+    limit?: number;
+    season?: string;
+    search?: string;
+    status?: ProducerFusionStatus;
+}
+
 export interface PruningRecordQuery {
     page?: number;
     limit?: number;
@@ -1887,6 +2005,27 @@ export const api = {
     /** Pruning records as a CSV blob (Excel-compatible), or an error message. */
     downloadPruningRecordsCsv: async (areaId: string, season: string): Promise<{ blob?: Blob; error?: string }> => {
         const response = await authorizedFetch(`/caykur/tea-inventory/areas/${areaId}/pruning-records.csv?season=${encodeURIComponent(season)}`);
+        if (!response.ok) return { error: await readErrorMessage(response, 'Liste indirilemedi') };
+        return { blob: await response.blob() };
+    },
+
+    // Çaykur multi-sensor pruning verdicts (fusion module)
+    getFusionSummary: (areaId: string, season?: string) =>
+        request<FusionSummary>(`/caykur/tea-inventory/areas/${areaId}/pruning-fusion/summary${season ? `?season=${encodeURIComponent(season)}` : ''}`),
+    getFusionGardens: (areaId: string, params?: FusionGardenQuery) => {
+        const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
+        const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        return request<Paginated<FusionGardenRow>>(`/caykur/tea-inventory/areas/${areaId}/pruning-fusion/gardens${query ? `?${query}` : ''}`);
+    },
+    getFusionGarden: (id: string) => request<FusionGardenDetail>(`/caykur/tea-inventory/pruning-fusion/gardens/${id}`),
+    getFusionProducers: (areaId: string, params?: FusionProducerQuery) => {
+        const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
+        const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        return request<Paginated<FusionProducerRow>>(`/caykur/tea-inventory/areas/${areaId}/pruning-fusion/producers${query ? `?${query}` : ''}`);
+    },
+    /** "Who pruned" as a CSV blob (Excel-compatible), or an error message. */
+    downloadFusionProducersCsv: async (areaId: string, season: string): Promise<{ blob?: Blob; error?: string }> => {
+        const response = await authorizedFetch(`/caykur/tea-inventory/areas/${areaId}/pruning-fusion/producers.csv?season=${encodeURIComponent(season)}`);
         if (!response.ok) return { error: await readErrorMessage(response, 'Liste indirilemedi') };
         return { blob: await response.blob() };
     },

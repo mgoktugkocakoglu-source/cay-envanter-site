@@ -6,8 +6,8 @@ import { DataSource, EntityManager } from 'typeorm';
 import { TeaInventoryArea, InventoryLicense, LicensingBlock, TeaPatch, ProducerScanBlock, ProducerSeasonSchedule } from '@/tea-inventory/entities/tea-inventory-area.entity';
 import { TeaInventoryParcel } from '@/tea-inventory/entities/tea-inventory-parcel.entity';
 import { InventoryClass } from '@/tea-inventory/enums/inventory-class.enum';
-import { TeaInventoryProducer, ProducerScan, ProducerAutoStatus } from '@/tea-inventory/entities/tea-inventory-producer.entity';
-import { TeaInventoryGarden, GardenSeason, GardenPruningEvent, RadarResult, RadarSeries } from '@/tea-inventory/entities/tea-inventory-garden.entity';
+import { TeaInventoryProducer, ProducerScan, ProducerAutoStatus, ProducerFusion } from '@/tea-inventory/entities/tea-inventory-producer.entity';
+import { TeaInventoryGarden, GardenSeason, GardenPruningEvent, GardenFusion, RadarResult, RadarSeries } from '@/tea-inventory/entities/tea-inventory-garden.entity';
 import { TeaInventoryLicense } from '@/tea-inventory/entities/tea-inventory-license.entity';
 import { ParcelLineage } from '@/tea-inventory/entities/parcel-lineage.entity';
 import { LicensingApplication } from '@/tea-inventory/entities/licensing-application.entity';
@@ -87,6 +87,24 @@ interface InventoryBundle {
     producers?: BundleProducers | null;
     licensing?: BundleLicensing | null;
     radar?: BundleRadar | null;
+    fusion?: BundleFusion | null;
+}
+
+/** Optional fusion block: multi-sensor verdicts per garden and producer per season. */
+interface BundleFusion {
+    calibrated: boolean;
+    method: string;
+    rules: Record<string, unknown>;
+    channels: Record<string, { sign: 1 | -1; minEffect: number; noiseFloor: number }>;
+    seasons: Array<{
+        season: string;
+        everyDays: number;
+        scanFrom: string;
+        scanTo: string;
+        sensors: { optical: { dates: string[] }; backscatter: Array<{ pass: string; relativeOrbit: number; dates: string[] }>; coherence: Array<{ pass: string; dates: string[] }> };
+        gardens: Array<GardenFusion & { code: string; producerCode: string }>;
+        producers: Array<ProducerFusion & { code: string }>;
+    }>;
 }
 
 interface BundleProducers {
@@ -191,6 +209,15 @@ export class TeaInventorySeedService implements OnModuleInit {
                                     seasons: bundle.radar.seasons.map((s) => ({ season: s.season, window: s.window, passes: s.passes, coherence: s.coherence ?? null })),
                                 }
                                 : null,
+                            fusion: bundle.fusion
+                                ? {
+                                    calibrated: bundle.fusion.calibrated,
+                                    method: bundle.fusion.method,
+                                    rules: bundle.fusion.rules,
+                                    channels: bundle.fusion.channels,
+                                    seasons: bundle.fusion.seasons.map((s) => ({ season: s.season, everyDays: s.everyDays, scanFrom: s.scanFrom, scanTo: s.scanTo, sensors: s.sensors })),
+                                }
+                                : null,
                         }
                         : null,
                     licensing: bundle.licensing
@@ -210,7 +237,7 @@ export class TeaInventorySeedService implements OnModuleInit {
             );
             await manager.save(parcels, { chunk: INSERT_CHUNK });
             if (bundle.producers) {
-                await this.importProducers(manager, area.id, bundle.producers, bundle.licensing ?? null, bundle.radar ?? null);
+                await this.importProducers(manager, area.id, bundle.producers, bundle.licensing ?? null, bundle.radar ?? null, bundle.fusion ?? null);
             }
             if (bundle.licensing) {
                 await this.importLicensing(manager, area.id, bundle.licensing);
@@ -232,8 +259,22 @@ export class TeaInventorySeedService implements OnModuleInit {
      * ground record with its per-season results and event polygons (and, from bundle v5, its
      * licence register fields).
      */
-    private async importProducers(manager: EntityManager, areaId: string, block: BundleProducers, licensing: BundleLicensing | null, radar: BundleRadar | null): Promise<void> {
+    private async importProducers(
+        manager: EntityManager,
+        areaId: string,
+        block: BundleProducers,
+        licensing: BundleLicensing | null,
+        radar: BundleRadar | null,
+        fusion: BundleFusion | null,
+    ): Promise<void> {
         const licensingByGarden = new Map((licensing?.gardens ?? []).map((g) => [g.code, g]));
+        // Fusion verdicts keyed by "<garden>:<season>" and "<producer>:<season>".
+        const fusionByGarden = new Map<string, GardenFusion>();
+        const fusionByProducer = new Map<string, ProducerFusion>();
+        for (const s of fusion?.seasons ?? []) {
+            for (const { code, producerCode: _p, ...rest } of s.gardens) fusionByGarden.set(`${code}:${s.season}`, rest);
+            for (const { code, ...rest } of s.producers) fusionByProducer.set(`${code}:${s.season}`, rest);
+        }
         // Radar verdicts keyed by "<garden>:<season>:<n>" and relative series per garden+season.
         const radarByRecord = new Map<string, RadarResult>();
         const radarSeries = new Map<string, RadarSeries[]>();
@@ -282,6 +323,7 @@ export class TeaInventorySeedService implements OnModuleInit {
                         autoStatus: p.status,
                         autoApprovedAt: p.autoApprovedAt,
                         scans: p.scans,
+                        fusion: fusionByProducer.get(`${p.code}:${season.season}`) ?? null,
                         demo: true,
                     }),
                 );
@@ -303,6 +345,7 @@ export class TeaInventorySeedService implements OnModuleInit {
                     events: (events.get(code) ?? []).map((e, i) => ({ ...e, radar: radarByRecord.get(`${key}:${i + 1}`) ?? null })),
                     radarSeries: radarSeries.get(key),
                     radarOnly: radarOnly.get(key) ?? null,
+                    fusion: fusionByGarden.get(key) ?? null,
                 };
                 seasonsByGarden.set(code, entry);
             }

@@ -14,6 +14,8 @@ import { ProducerPruningService } from '@/tea-inventory/producer-pruning.service
 import { ProducerPruningController } from '@/tea-inventory/producer-pruning.controller';
 import { LicensingService } from '@/tea-inventory/licensing.service';
 import { LicensingController } from '@/tea-inventory/licensing.controller';
+import { PruningFusionService } from '@/tea-inventory/pruning-fusion.service';
+import { PruningFusionController } from '@/tea-inventory/pruning-fusion.controller';
 import { TeaInventoryController } from '@/tea-inventory/tea-inventory.controller';
 import { TeaInventoryService } from '@/tea-inventory/tea-inventory.service';
 import { TeaInventorySeedService } from '@/tea-inventory/tea-inventory-seed.service';
@@ -33,7 +35,7 @@ import { TeaInventorySeedService } from '@/tea-inventory/tea-inventory-seed.serv
             LicensingDecision,
         ]),
     ],
-    controllers: [TeaInventoryController, ProducerPruningController, LicensingController],
-    providers: [TeaInventoryService, TeaInventorySeedService, ProducerPruningService, LicensingService],
+    controllers: [TeaInventoryController, ProducerPruningController, LicensingController, PruningFusionController],
+    providers: [TeaInventoryService, TeaInventorySeedService, ProducerPruningService, LicensingService, PruningFusionService],
 })
 export class TeaInventoryModule { }

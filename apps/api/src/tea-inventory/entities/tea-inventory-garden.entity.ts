@@ -46,6 +46,48 @@ export interface RadarSeries {
     cohRel?: Array<number | null>;
 }
 
+/** Multi-sensor step-change verdict of a garden for a season (fusion module, uncalibrated). */
+export type FusionClass = 'pruned' | 'likely' | 'unclear' | 'not_pruned' | 'no_data';
+export type FusionChannelKey = 'ndvi' | 'nbr' | 'vh_asc' | 'vh_desc' | 'coh_asc' | 'coh_desc';
+export type FusionGroup = 'optical' | 'backscatter' | 'coherence';
+
+export interface FusionChannelEvidence {
+    key: FusionChannelKey;
+    before: number;
+    after: number;
+    late: number;
+    delta: number | null;
+    noise: number;
+    z: number | null;
+    persistence: number | null;
+    magnitudeOk: boolean;
+}
+
+export interface FusionVerdict {
+    class: FusionClass;
+    z: number | null;
+    p: number;
+    changeDate: string | null;
+    lastBeforeAt: string | null;
+    firstAfterAt: string | null;
+    agreeing: number;
+    opticalOk: boolean;
+    backscatterOk: boolean;
+    groups: Array<{ group: FusionGroup; z: number | null; channels: FusionChannelEvidence[] }>;
+    reason: string;
+}
+
+export interface GardenFusion {
+    // The unit that carried the verdict: the whole garden or the optical change patch inside it.
+    unit: 'garden' | 'patch';
+    unitAreaM2: number;
+    verdict: FusionVerdict;
+    detectedAt: string | null;
+    likelyAt: string | null;
+    scans: Array<{ date: string; z: number | null; class: FusionClass }>;
+    series: Array<{ key: FusionChannelKey; dates: string[]; values: Array<number | null> }>;
+}
+
 /** A pruning event inside a garden: where (polygon) and when (an observation interval, never a day). */
 export interface GardenPruningEvent {
     areaM2: number;
@@ -74,6 +116,8 @@ export interface GardenSeason {
     radarSeries?: RadarSeries[];
     // A sustained radar drop with no optical event (candidate the optics may have missed).
     radarOnly?: { date: string; vhDropDb: number; persistence: number; z: number } | null;
+    // Multi-sensor step-change verdict (fusion module), present when it has run for the season.
+    fusion?: GardenFusion | null;
 }
 
 /** Boundary approval state of the garden's geometry (the licensed sub-polygon). */

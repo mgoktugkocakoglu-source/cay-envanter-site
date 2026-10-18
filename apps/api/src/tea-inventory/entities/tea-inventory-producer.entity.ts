@@ -12,6 +12,21 @@ export type ProducerAutoStatus =
     | 'awaiting_observation'
     | 'no_license';
 
+/** Producer verdict of the fusion module: pruned garden area against the 1/7 of the licensed area. */
+export type ProducerFusionStatus = 'pruned_full' | 'pruned_partial' | 'none' | 'unclear' | 'no_license' | 'no_data';
+
+export interface ProducerFusion {
+    licensedAreaM2: number;
+    requiredM2: number;
+    prunedAreaM2: number;
+    likelyAreaM2: number;
+    gardens: number;
+    prunedGardens: string[];
+    likelyGardens: string[];
+    status: ProducerFusionStatus;
+    firstDetectedAt: string | null;
+}
+
 /** One scan of the season for this producer: cumulative pruned area against the 1/7 target. */
 export interface ProducerScan {
     date: string;
@@ -109,6 +124,10 @@ export class TeaInventoryProducer {
 
     @Column({ type: 'jsonb' })
     scans: ProducerScan[];
+
+    // Multi-sensor step-change verdict for the season (fusion module); null when it has not run.
+    @Column({ type: 'jsonb', nullable: true })
+    fusion: ProducerFusion | null;
 
     @Column({ type: 'boolean', default: true })
     demo: boolean;
