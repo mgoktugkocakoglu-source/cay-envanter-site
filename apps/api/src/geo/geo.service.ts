@@ -2,6 +2,23 @@ import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ProvinceDto, DistrictDto, NeighborhoodDto, RoadDto, ParcelDto, ParcelDetailDto } from '@/geo/dto';
 
+const PARCEL_CACHE_SIZE = 500;
+
+/** Ray casting on a polygon's rings ([lng, lat] pairs): inside the outer ring and outside every hole. */
+function pointInRings(x: number, y: number, rings: number[][][]): boolean {
+    const inRing = (ring: number[][]): boolean => {
+        let inside = false;
+        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+            const [xi, yi] = ring[i] as [number, number];
+            const [xj, yj] = ring[j] as [number, number];
+            if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+        }
+        return inside;
+    };
+    if (!rings.length || !inRing(rings[0] as number[][])) return false;
+    return rings.slice(1).every((hole) => !inRing(hole));
+}
+
 interface TkgmFeature {
     type: string;
     geometry: {
@@ -23,6 +40,8 @@ interface TkgmResponse {
 export class GeoService {
     private readonly logger = new Logger(GeoService.name);
     private readonly TKGM_BASE_URL = 'https://cbsapi.tkgm.gov.tr/megsiswebapi.v3.1/api';
+    // Parcels fetched by point lookup, newest last (bounded; per process).
+    private readonly parcelCache: ParcelDetailDto[] = [];
 
     // Tea region provinces (Rize, Trabzon, Artvin, Giresun, Ordu)
     private readonly TEA_REGION_PROVINCES = [
@@ -214,6 +233,10 @@ export class GeoService {
     }
 
     async getParcelByCoordinates(lat: number, lng: number): Promise<ParcelDetailDto | null> {
+        // A click inside a parcel already fetched this process answers from memory: the public
+        // TKGM service has a small daily quota per client, every call to it must count.
+        const cached = this.parcelCache.find((p) => pointInRings(lng, lat, p.polygon));
+        if (cached) return cached;
         try {
             const response = await fetch(
                 `${this.TKGM_BASE_URL}/parsel/${lat}/${lng}/`,
@@ -222,6 +245,12 @@ export class GeoService {
             if (!response.ok) {
                 if (response.status === 404) {
                     return null;
+                }
+                if (response.status === 403) {
+                    throw new HttpException(
+                        'TKGM günlük sorgu kotası doldu; parsel sorgusu yarın yeniden açılır',
+                        HttpStatus.TOO_MANY_REQUESTS,
+                    );
                 }
                 throw new HttpException(
                     'Failed to fetch parcel from TKGM API',
@@ -259,6 +288,8 @@ export class GeoService {
             };
 
             this.logger.log(`Fetched parcel at coordinates ${lat}, ${lng}`);
+            this.parcelCache.push(result);
+            if (this.parcelCache.length > PARCEL_CACHE_SIZE) this.parcelCache.shift();
             return result;
         } catch (error) {
             this.logger.error(`Error fetching parcel at coordinates ${lat}, ${lng}`, error);

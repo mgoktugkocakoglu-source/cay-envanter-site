@@ -15,23 +15,30 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { PROGRESS_TONE_CLASS, toneVariant } from '@/components/caykur/tone';
 import { useToast } from '@/composables/useToast';
+import { useTkgmParcelLookup } from '@/composables/useTkgmParcelLookup';
 import {
     api,
     type FusionClass,
+    type FusionDecision,
     type FusionGardenDetail,
     type FusionGardenRow,
     type FusionProducerRow,
     type FusionSummary,
+    type FusionUnassignedPatch,
     type InventoryMap,
     type ProducerFusionStatus,
 } from '@/services/api';
 import {
+    FUSION_ANOMALY_LABEL,
     FUSION_CHANNEL_LABEL,
     FUSION_CLASS_META,
     FUSION_CLASS_ORDER,
+    FUSION_DECISION_META,
+    FUSION_DECISION_ORDER,
     FUSION_GROUP_LABEL,
     PRODUCER_FUSION_META,
     PRODUCER_FUSION_ORDER,
+    formatDekar,
     formatM2,
     formatShare,
 } from '@/services/caykur/teaInventory';
@@ -53,6 +60,7 @@ const PAGE_SIZE = 15;
 const MONTHS_TR = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
 
 const toast = useToast();
+const tkgm = useTkgmParcelLookup();
 
 const summary = ref<FusionSummary | null>(null);
 const season = ref('');
@@ -63,6 +71,7 @@ const view = ref<'producers' | 'gardens' | 'map'>('producers');
 // ── Producers ("who pruned") ──
 const pSearch = ref('');
 const pStatus = ref<ProducerFusionStatus | typeof ALL>(ALL);
+const pDecision = ref<FusionDecision | typeof ALL>(ALL);
 const pPage = ref(1);
 const pRows = ref<FusionProducerRow[]>([]);
 const pTotal = ref(0);
@@ -125,7 +134,14 @@ async function loadSummary(): Promise<void> {
 async function loadProducers(): Promise<void> {
     if (!season.value) return;
     isLoadingProducers.value = true;
-    const res = await api.getFusionProducers(props.areaId, { page: pPage.value, limit: PAGE_SIZE, season: season.value, search: pSearch.value.trim() || undefined, status: pStatus.value === ALL ? undefined : pStatus.value });
+    const res = await api.getFusionProducers(props.areaId, {
+        page: pPage.value,
+        limit: PAGE_SIZE,
+        season: season.value,
+        search: pSearch.value.trim() || undefined,
+        status: pStatus.value === ALL ? undefined : pStatus.value,
+        decision: pDecision.value === ALL ? undefined : pDecision.value,
+    });
     if (res.data) {
         pRows.value = res.data.data;
         pTotal.value = res.data.meta.total;
@@ -223,6 +239,25 @@ async function renderMap(): Promise<void> {
     L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, maxNativeZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
     L.control.zoom({ position: 'topright' }).addTo(map);
     L.geoJSON(props.mapData, { style: { color: cssVar('--background', '#ffffff'), weight: 0.7, opacity: 0.6, fill: false }, interactive: false }).addTo(map);
+    // Tea outside the harvested parcels: judged on its own, dashed until its parcel arrives.
+    const free = summary.value?.unassigned.patches ?? [];
+    if (free.length) {
+        L.geoJSON(
+            { type: 'FeatureCollection', features: free.map((u) => ({ type: 'Feature', geometry: u.geometry, properties: { u } })) } as GeoJSON.FeatureCollection,
+            {
+                style: (f) => {
+                    const u = (f?.properties as { u: FusionUnassignedPatch }).u;
+                    const color = classColor(u.verdict.class);
+                    return { color, weight: 1.5, dashArray: '5 4', fillColor: color, fillOpacity: u.verdict.class === 'pruned' ? 0.35 : u.verdict.class === 'likely' ? 0.2 : 0.05 };
+                },
+                onEachFeature: (f, l) => {
+                    const u = (f.properties as { u: FusionUnassignedPatch }).u;
+                    l.bindTooltip(`Parseli henüz çekilmemiş çaylık · ${formatM2(u.areaM2)} · ${FUSION_CLASS_META[u.verdict.class].label}${u.verdict.z !== null ? ` (z ${u.verdict.z})` : ''}${u.verdict.changeDate ? ` · ${fmtDate(u.verdict.changeDate)}` : ''} — tıklayınca TKGM parseli sorgulanır`, { sticky: true });
+                },
+                interactive: true,
+            },
+        ).addTo(map);
+    }
     const layer = L.geoJSON(
         { type: 'FeatureCollection', features: rows.map((r) => ({ type: 'Feature', geometry: r.geometry, properties: { r } })) } as GeoJSON.FeatureCollection,
         {
@@ -234,10 +269,15 @@ async function renderMap(): Promise<void> {
             onEachFeature: (f, l) => {
                 const r = (f.properties as { r: FusionGardenRow }).r;
                 l.bindTooltip(`${r.producerName || r.producerCode} · ${r.block}/${r.parcel} · ${FUSION_CLASS_META[r.class].label}${r.z !== null ? ` (z ${r.z})` : ''}${r.changeDate ? ` · ${fmtDate(r.changeDate)}` : ''}`, { sticky: true });
-                l.on('click', () => void openGarden(r.id));
+                l.on('click', (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    void openGarden(r.id);
+                });
             },
         },
     ).addTo(map);
+    // Anywhere else: live TKGM parcel lookup (ada/parsel, nitelik, alan).
+    tkgm.attach(map);
     const b = layer.getBounds();
     if (b.isValid()) map.fitBounds(b, { padding: [16, 16] });
 }
@@ -325,7 +365,7 @@ watch(view, async (v) => {
         map = null;
     }
 });
-watch([pStatus], () => {
+watch([pStatus, pDecision], () => {
     pPage.value = 1;
     void loadProducers();
 });
@@ -378,6 +418,14 @@ function onView(v: unknown): void {
 }
 function onPStatus(v: unknown): void {
     pStatus.value = typeof v === 'string' && v !== '' ? (v as ProducerFusionStatus | typeof ALL) : ALL;
+}
+function onPDecision(v: unknown): void {
+    pDecision.value = typeof v === 'string' && v !== '' ? (v as FusionDecision | typeof ALL) : ALL;
+}
+/** The expert queue is exactly the anomaly bucket; everything else decided itself. */
+function showExpertQueue(): void {
+    view.value = 'producers';
+    pDecision.value = 'expert_anomaly';
 }
 function onGClass(v: unknown): void {
     gClass.value = typeof v === 'string' && v !== '' ? (v as FusionClass | typeof ALL) : ALL;
@@ -432,9 +480,18 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard label="Budandı (kesin)" :value="formatNumber(summary.gardens.byClass.pruned)" :hint="`bahçe · ${formatM2(summary.gardens.prunedAreaM2)} · optik + radar birlikte`" :icon="Scissors" />
             <StatCard label="Olası budama" :value="formatNumber(summary.gardens.byClass.likely)" :hint="`bahçe · ${formatM2(summary.gardens.likelyAreaM2)} · tek sensör ya da kalıcılık bekleniyor`" />
-            <StatCard label="1/7 hedefini dolduran" :value="formatNumber(summary.producers.byStatus.pruned_full)" :hint="`müstahsil · ${summary.producers.byStatus.pruned_partial} kısmen · ${summary.producers.byStatus.none} budama görülmedi`" :icon="Users" />
-            <StatCard label="Tarama sıklığı" :value="`${summary.everyDays} gün`" :hint="`${fmtDate(summary.scanFrom)} → ${fmtDate(summary.scanTo)} · ${summary.timeline.length} tarama`" :icon="Radar" />
+            <StatCard label="Alım otomatik açıldı" :value="formatNumber(summary.producers.byDecision.auto_open)" :hint="`müstahsil · ${summary.producers.byDecision.auto_pending} bekliyor · ${summary.producers.byDecision.auto_none} görülmedi`" :icon="Users" />
+            <StatCard label="Eksper kuyruğu (anomali)" :value="formatNumber(summary.producers.byDecision.expert_anomaly)" :hint="`yalnız çelişki / tekrar / sınır / ruhsat dosyaları · tarama her ${summary.everyDays} gün, ${summary.timeline.length} tarama`" :icon="Radar" />
         </div>
+
+        <Alert v-if="summary.parcelCoverage !== null && summary.parcelCoverage < 0.95" variant="info">
+            <AlertTitle>TKGM parsel kapsaması %{{ Math.round(summary.parcelCoverage * 100) }} · parseli çekilmemiş çaylık {{ formatDekar(summary.unassigned.areaM2) }} ({{ summary.unassigned.count }} alan)</AlertTitle>
+            <AlertDescription>
+                TKGM'nin halka açık servisi günde ~250 sorguya izin verdiği için mahallenin parselleri gün gün çekiliyor; parseli henüz gelmeyen çaylıklar yine de taranıyor
+                ({{ summary.unassigned.byClass.pruned }} budandı · {{ summary.unassigned.byClass.likely }} olası · {{ summary.unassigned.byClass.unclear }} belirsiz · {{ summary.unassigned.byClass.not_pruned }} budama yok) ve parseli/ruhsatı gelince sahibine bağlanacak.
+                Haritada kesikli çizgiyle gösterilir; herhangi bir noktaya tıklayınca TKGM'den ada/parsel canlı sorgulanır.
+            </AlertDescription>
+        </Alert>
 
         <Card v-if="curve">
             <CardHeader>
@@ -461,9 +518,10 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
         <!-- ── Producers ── -->
         <Card v-if="view === 'producers'">
             <CardHeader>
-                <CardTitle>Budama yapan müstahsiller</CardTitle>
-                <CardDescription>{{ formatNumber(pTotal) }} müstahsil · budandığı kesinleşen bahçe alanı, ruhsat alanının 1/7'siyle karşılaştırılır</CardDescription>
-                <CardAction>
+                <CardTitle>Budama yapan müstahsiller ve alım kararı</CardTitle>
+                <CardDescription>{{ formatNumber(pTotal) }} müstahsil · karar politikası: kanıt temizse uydu kendi karar verir, eksper yalnız anomalileri görür</CardDescription>
+                <CardAction class="flex gap-2">
+                    <Button variant="outline" size="sm" class="h-11 md:h-9" @click="showExpertQueue">Eksper kuyruğu ({{ summary.producers.byDecision.expert_anomaly }})</Button>
                     <Button variant="outline" size="sm" class="h-11 md:h-9" :disabled="isDownloading" @click="downloadCsv"><Download aria-hidden="true" />CSV</Button>
                 </CardAction>
             </CardHeader>
@@ -471,6 +529,13 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                 <ListToolbar>
                     <SearchInput v-model="pSearch" placeholder="Ad, müstahsil / cüzdan / ruhsat no…" />
                     <template #filters>
+                        <Select :model-value="pDecision" @update:model-value="onPDecision">
+                            <SelectTrigger class="h-11 w-full md:h-9 md:w-56" aria-label="Alım kararı"><SelectValue placeholder="Alım kararı" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem :value="ALL">Tüm kararlar</SelectItem>
+                                <SelectItem v-for="d in FUSION_DECISION_ORDER" :key="d" :value="d">{{ FUSION_DECISION_META[d].label }} ({{ summary.producers.byDecision[d] }})</SelectItem>
+                            </SelectContent>
+                        </Select>
                         <Select :model-value="pStatus" @update:model-value="onPStatus">
                             <SelectTrigger class="h-11 w-full md:h-9 md:w-52" aria-label="Durum"><SelectValue placeholder="Durum" /></SelectTrigger>
                             <SelectContent>
@@ -489,7 +554,7 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                                 <TableHead>Müstahsil</TableHead>
                                 <TableHead class="hidden md:table-cell">Bahçe</TableHead>
                                 <TableHead>1/7 hedefi</TableHead>
-                                <TableHead>Durum</TableHead>
+                                <TableHead>Alım kararı</TableHead>
                                 <TableHead class="hidden lg:table-cell">İlk kesin tespit</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -498,6 +563,7 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                                 <TableCell>
                                     <div class="font-medium text-foreground">{{ r.name }}</div>
                                     <div class="text-xs text-muted-foreground">{{ r.code }} · {{ r.licenseNo || 'ruhsat yok' }}</div>
+                                    <Badge :variant="toneVariant(PRODUCER_FUSION_META[r.status].tone)" class="mt-1" :title="PRODUCER_FUSION_META[r.status].description">{{ PRODUCER_FUSION_META[r.status].label }}</Badge>
                                 </TableCell>
                                 <TableCell class="hidden md:table-cell">{{ r.gardens }}<span class="text-xs text-muted-foreground"> · {{ r.prunedGardens.length }} kesin, {{ r.likelyGardens.length }} olası</span></TableCell>
                                 <TableCell>
@@ -507,7 +573,12 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                                     </div>
                                     <div class="text-xs text-muted-foreground">{{ formatM2(r.prunedAreaM2) }} / hedef {{ r.requiredM2 ? formatM2(r.requiredM2) : '—' }}<span v-if="r.likelyAreaM2"> (+{{ formatM2(r.likelyAreaM2) }} olası)</span></div>
                                 </TableCell>
-                                <TableCell><Badge :variant="toneVariant(PRODUCER_FUSION_META[r.status].tone)" :title="PRODUCER_FUSION_META[r.status].description">{{ PRODUCER_FUSION_META[r.status].label }}</Badge></TableCell>
+                                <TableCell>
+                                    <Badge :variant="toneVariant(FUSION_DECISION_META[r.decision ?? 'no_data'].tone)" :title="r.decisionReason ?? FUSION_DECISION_META[r.decision ?? 'no_data'].description">{{ FUSION_DECISION_META[r.decision ?? 'no_data'].label }}</Badge>
+                                    <div v-if="r.anomalies?.length" class="mt-1 flex flex-wrap gap-1">
+                                        <Badge v-for="a in r.anomalies" :key="a" variant="outline" class="text-[10px]">{{ FUSION_ANOMALY_LABEL[a] }}</Badge>
+                                    </div>
+                                </TableCell>
                                 <TableCell class="hidden lg:table-cell">{{ fmtDate(r.firstDetectedAt) }}</TableCell>
                             </TableRow>
                         </TableBody>

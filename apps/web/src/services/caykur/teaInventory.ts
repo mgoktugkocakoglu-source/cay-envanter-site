@@ -7,8 +7,10 @@
 import type {
     ApplicationStatus,
     ApplicationType,
+    FusionAnomaly,
     FusionChannelKey,
     FusionClass,
+    FusionDecision,
     FusionGroup,
     ProducerFusionStatus,
     GardenApprovalStatus,
@@ -282,6 +284,27 @@ export const PRODUCER_FUSION_META: Record<ProducerFusionStatus, ProducerStatusMe
     no_data: { label: 'Veri yetersiz', description: 'Bahçelerinde yeterli gözlem yok.', tone: 'muted' },
 };
 export const PRODUCER_FUSION_ORDER: ProducerFusionStatus[] = ['pruned_full', 'pruned_partial', 'unclear', 'none', 'no_data', 'no_license'];
+
+export const FUSION_DECISION_META: Record<FusionDecision, ProducerStatusMeta> = {
+    auto_open: { label: 'Otomatik açık', description: 'Teyitli budama 1/7 hedefini karşılıyor ve anomali yok: alım eksper beklemeden açıldı.', tone: 'success' },
+    auto_pending: { label: 'Otomatik · bekliyor', description: 'Budama izi var, hedef henüz dolmadı; taramalar sürdükçe karar kendiliğinden güncellenir.', tone: 'info' },
+    auto_short: { label: 'Otomatik · eksik', description: 'Sezon sonunda hedef dolmadı.', tone: 'warning' },
+    auto_none: { label: 'Otomatik · budama görülmedi', description: 'Bütün bahçeler iyi gözlendi, hiçbir sensör budama görmedi. Uydu alımı tek başına kapatmaz; itiraz edilirse eksper bakar.', tone: 'danger' },
+    expert_anomaly: { label: 'Eksper (anomali)', description: 'Sensörler çelişiyor, tekrar budama, sınır ihtilafı, ruhsat uyuşmazlığı ya da aşırı budama: yalnız bu dosyalar eksperin önüne düşer.', tone: 'warning' },
+    no_license: { label: 'Ruhsat yok', description: 'Ruhsatlı alan tahsis edilmediği için 1/7 hesaplanamıyor.', tone: 'muted' },
+    no_data: { label: 'Veri yetersiz', description: 'Bahçelerde yeterli gözlem yok.', tone: 'muted' },
+};
+export const FUSION_DECISION_ORDER: FusionDecision[] = ['auto_open', 'auto_pending', 'expert_anomaly', 'auto_none', 'auto_short', 'no_data', 'no_license'];
+
+export const FUSION_ANOMALY_LABEL: Record<FusionAnomaly, string> = {
+    sensors_contradict: 'Sensörler çelişiyor',
+    repeat_pruning: 'Tekrar budama (7 yıl içinde)',
+    boundary_conflict: 'Sınır ihtilafı',
+    boundary_unresolved: 'Hisse sınırı belirsiz',
+    license_mismatch: 'Ruhsat–alan uyuşmazlığı',
+    over_pruned: 'Aşırı budama (1/7’nin 3 katı)',
+    unlicensed_pruning: 'Ruhsatsız/eşleşmemiş alanda budama',
+};
 
 export const FUSION_CHANNEL_LABEL: Record<FusionChannelKey, string> = {
     ndvi: 'NDVI (S2)',

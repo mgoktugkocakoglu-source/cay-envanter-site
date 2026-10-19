@@ -47,7 +47,9 @@ const LATEST_DECISION_JOIN = `
         ORDER BY d."createdAt" DESC
         LIMIT 1
     ) ld ON true`;
-const EFFECTIVE_STATUS_SQL = `CASE ld.decision WHEN 'approved' THEN 'approved' WHEN 'rejected' THEN 'rejected' ELSE p.auto_status END`;
+// Effective status: an expert decision first; else the multi-sensor policy's automatic opening
+// (fusion decision auto_open) counts as auto-approval; else the optical scan's own status.
+const EFFECTIVE_STATUS_SQL = `CASE ld.decision WHEN 'approved' THEN 'approved' WHEN 'rejected' THEN 'rejected' ELSE CASE WHEN p.fusion->>'decision' = 'auto_open' THEN 'auto_approved' ELSE p.auto_status END END`;
 const RATIO_SQL = 'CASE WHEN p.required_m2 > 0 THEN p.new_pruned_m2 / p.required_m2 ELSE 0 END';
 const SORT_SQL: Record<ProducerSortKey, string> = {
     ratio: RATIO_SQL,

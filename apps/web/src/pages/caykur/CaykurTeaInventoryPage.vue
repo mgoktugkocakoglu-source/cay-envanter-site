@@ -20,6 +20,7 @@ import CaykurProducerPruning from '@/components/caykur/CaykurProducerPruning.vue
 import CaykurLicensing from '@/components/caykur/CaykurLicensing.vue';
 import CaykurPruningRecords from '@/components/caykur/CaykurPruningRecords.vue';
 import CaykurPruningFusion from '@/components/caykur/CaykurPruningFusion.vue';
+import { useTkgmParcelLookup } from '@/composables/useTkgmParcelLookup';
 import { toneVariant } from '@/components/caykur/tone';
 import {
     api,
@@ -53,6 +54,7 @@ const ALL = 'all';
 // ── Area selection ──
 const areas = ref<InventoryAreaSummary[]>([]);
 const areaId = ref<string>('');
+const tkgmLookup = useTkgmParcelLookup();
 const area = ref<InventoryAreaDetail | null>(null);
 const mapData = ref<InventoryMap | null>(null);
 const isLoadingArea = ref(true);
@@ -205,6 +207,8 @@ function initMap(): void {
         subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
     }).addTo(map);
     L.control.zoom({ position: 'topright' }).addTo(map);
+    // A click outside the harvested parcels asks TKGM live for the parcel under the point.
+    tkgmLookup.attach(map);
 }
 
 function renderMap(): void {
@@ -230,7 +234,11 @@ function renderMap(): void {
         onEachFeature: (feature, layer) => {
             const p = feature.properties as InventoryMap['features'][number]['properties'];
             layer.bindTooltip(`${p.block}/${p.parcel} · ${INVENTORY_CLASS_META[p.inventoryClass].label}`, { sticky: true });
-            layer.on('click', () => void selectParcel(p.id));
+            // A harvested parcel opens its inventory card; the map-level TKGM lookup must not fire too.
+            layer.on('click', (e) => {
+                L.DomEvent.stopPropagation(e);
+                void selectParcel(p.id);
+            });
         },
     }).addTo(map);
 

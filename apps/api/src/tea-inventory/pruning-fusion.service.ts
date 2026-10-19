@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { FusionBlock, TeaInventoryArea } from '@/tea-inventory/entities/tea-inventory-area.entity';
-import { ProducerFusion, ProducerFusionStatus, TeaInventoryProducer } from '@/tea-inventory/entities/tea-inventory-producer.entity';
+import { FusionBlock, FusionUnassignedPatch, TeaInventoryArea } from '@/tea-inventory/entities/tea-inventory-area.entity';
+import { FusionDecision, ProducerFusion, ProducerFusionStatus, TeaInventoryProducer } from '@/tea-inventory/entities/tea-inventory-producer.entity';
 import { FusionClass, GardenFusion, TeaInventoryGarden } from '@/tea-inventory/entities/tea-inventory-garden.entity';
-import { FUSION_CLASSES, FusionGardenQueryDto, FusionProducerQueryDto, PRODUCER_FUSION_STATUSES } from '@/tea-inventory/dto';
+import { FUSION_CLASSES, FUSION_DECISIONS, FusionGardenQueryDto, FusionProducerQueryDto, PRODUCER_FUSION_STATUSES } from '@/tea-inventory/dto';
 import { Paginated, paginate } from '@/common/dto/paginated.dto';
 
 export interface FusionGardenRow {
@@ -67,10 +67,14 @@ export interface FusionSummary {
     scanTo: string;
     sensors: FusionBlock['seasons'][number]['sensors'];
     gardens: { total: number; byClass: Record<FusionClass, number>; prunedAreaM2: number; likelyAreaM2: number };
-    producers: { total: number; byStatus: Record<ProducerFusionStatus, number> };
+    producers: { total: number; byStatus: Record<ProducerFusionStatus, number>; byDecision: Record<FusionDecision, number> };
     /** Gardens confirmed pruned as of each emulated scan date (the season's pruning curve). */
     timeline: Array<{ date: string; pruned: number; likely: number }>;
     localities: Array<{ name: string; pruned: number; total: number }>;
+    /** Share of the neighbourhood covered by harvested TKGM parcels; tea outside them is judged as free patches. */
+    parcelCoverage: number | null;
+    unassigned: { count: number; areaM2: number; byClass: Record<FusionClass, number>; prunedAreaM2: number; patches: FusionUnassignedPatch[] };
+    policy: Record<string, unknown> | null;
 }
 
 /**
@@ -125,7 +129,15 @@ export class PruningFusionService {
                 timeline.set(s.date, t);
             }
         }
-        for (const p of producers) if (p.fusion) byStatus[p.fusion.status]++;
+        const byDecision = Object.fromEntries(FUSION_DECISIONS.map((d) => [d, 0])) as Record<FusionDecision, number>;
+        for (const p of producers) {
+            if (!p.fusion) continue;
+            byStatus[p.fusion.status]++;
+            byDecision[p.fusion.decision ?? 'no_data']++;
+        }
+        const patches = seasonHeader.unassigned ?? [];
+        const uByClass = Object.fromEntries(FUSION_CLASSES.map((c) => [c, 0])) as Record<FusionClass, number>;
+        for (const u of patches) uByClass[u.verdict.class as FusionClass] = (uByClass[u.verdict.class as FusionClass] ?? 0) + 1;
         return {
             season,
             seasons,
@@ -138,9 +150,18 @@ export class PruningFusionService {
             scanTo: seasonHeader.scanTo,
             sensors: seasonHeader.sensors,
             gardens: { total: Object.values(byClass).reduce((a, b) => a + b, 0), byClass, prunedAreaM2: Math.round(prunedArea), likelyAreaM2: Math.round(likelyArea) },
-            producers: { total: producers.filter((p) => p.fusion).length, byStatus },
+            producers: { total: producers.filter((p) => p.fusion).length, byStatus, byDecision },
             timeline: [...timeline.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, t]) => ({ date, ...t })),
             localities: [...localities.entries()].map(([name, v]) => ({ name, ...v })).sort((a, b) => b.pruned - a.pruned || b.total - a.total),
+            parcelCoverage: seasonHeader.parcelCoverage ?? null,
+            unassigned: {
+                count: patches.length,
+                areaM2: Math.round(patches.reduce((s, u) => s + u.areaM2, 0)),
+                byClass: uByClass,
+                prunedAreaM2: Math.round(patches.filter((u) => u.verdict.class === 'pruned').reduce((s, u) => s + u.areaM2, 0)),
+                patches,
+            },
+            policy: header.policy ?? null,
         };
     }
 
@@ -179,6 +200,7 @@ export class PruningFusionService {
         const search = query.search?.trim().toLocaleLowerCase('tr-TR');
         const filtered = rows.filter((r) => {
             if (query.status && r.status !== query.status) return false;
+            if (query.decision && (r.decision ?? 'no_data') !== query.decision) return false;
             if (search && ![r.name, r.code, r.walletNo, r.licenseNo].join(' ').toLocaleLowerCase('tr-TR').includes(search)) return false;
             return true;
         });
@@ -190,7 +212,7 @@ export class PruningFusionService {
     /** "Budama yapanlar" as CSV (UTF-8 BOM, Excel-compatible). */
     async producersCsv(areaId: string, requested?: string): Promise<string> {
         const rows = await this.producerRows(areaId, requested);
-        const header = ['Müstahsil no', 'Ad soyad', 'Cüzdan no', 'Ruhsat no', 'Bahçe', 'Ruhsat alanı (m²)', '1/7 hedefi (m²)', 'Budanan alan (m²)', 'Olası budanan (m²)', 'Hedef oranı', 'Durum', 'İlk tespit', 'Budanan bahçeler', 'Demo'];
+        const header = ['Müstahsil no', 'Ad soyad', 'Cüzdan no', 'Ruhsat no', 'Bahçe', 'Ruhsat alanı (m²)', '1/7 hedefi (m²)', 'Budanan alan (m²)', 'Olası budanan (m²)', 'Hedef oranı', 'Durum', 'Alım kararı', 'Anomaliler', 'İlk tespit', 'Budanan bahçeler', 'Demo'];
         const cell = (v: string | number | null) => `"${String(v ?? '').replace(/"/g, '""')}"`;
         const label: Record<ProducerFusionStatus, string> = {
             pruned_full: '1/7 tamam (çok-sensör)',
@@ -200,8 +222,20 @@ export class PruningFusionService {
             no_license: 'Ruhsat yok',
             no_data: 'Veri yok',
         };
+        const decisionLabel: Record<FusionDecision, string> = {
+            auto_open: 'Otomatik açık',
+            auto_pending: 'Otomatik — bekliyor',
+            auto_short: 'Otomatik — eksik',
+            auto_none: 'Otomatik — budama görülmedi',
+            expert_anomaly: 'Eksper (anomali)',
+            no_license: 'Ruhsat yok',
+            no_data: 'Veri yok',
+        };
         const lines = rows.map((r) =>
-            [r.code, r.name, r.walletNo, r.licenseNo, r.gardens, r.licensedAreaM2, r.requiredM2, r.prunedAreaM2, r.likelyAreaM2, r.ratio, label[r.status], r.firstDetectedAt ?? '', r.prunedGardens.join(' '), 'Evet'].map(cell).join(';'),
+            [
+                r.code, r.name, r.walletNo, r.licenseNo, r.gardens, r.licensedAreaM2, r.requiredM2, r.prunedAreaM2, r.likelyAreaM2, r.ratio, label[r.status],
+                decisionLabel[r.decision ?? 'no_data'], (r.anomalies ?? []).join(' '), r.firstDetectedAt ?? '', r.prunedGardens.join(' '), 'Evet',
+            ].map(cell).join(';'),
         );
         return `﻿${header.map(cell).join(';')}\n${lines.join('\n')}\n`;
     }

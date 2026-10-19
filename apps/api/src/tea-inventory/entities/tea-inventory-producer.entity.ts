@@ -14,6 +14,9 @@ export type ProducerAutoStatus =
 
 /** Producer verdict of the fusion module: pruned garden area against the 1/7 of the licensed area. */
 export type ProducerFusionStatus = 'pruned_full' | 'pruned_partial' | 'none' | 'unclear' | 'no_license' | 'no_data';
+/** Purchase decision policy: automatic wherever the evidence is clean, an expert only for anomalies. */
+export type FusionDecision = 'auto_open' | 'auto_pending' | 'auto_short' | 'auto_none' | 'expert_anomaly' | 'no_license' | 'no_data';
+export type FusionAnomaly = 'sensors_contradict' | 'repeat_pruning' | 'boundary_conflict' | 'boundary_unresolved' | 'license_mismatch' | 'over_pruned' | 'unlicensed_pruning';
 
 export interface ProducerFusion {
     licensedAreaM2: number;
@@ -25,6 +28,9 @@ export interface ProducerFusion {
     likelyGardens: string[];
     status: ProducerFusionStatus;
     firstDetectedAt: string | null;
+    decision?: FusionDecision;
+    anomalies?: FusionAnomaly[];
+    decisionReason?: string;
 }
 
 /** One scan of the season for this producer: cumulative pruned area against the 1/7 target. */

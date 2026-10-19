@@ -1176,6 +1176,17 @@ export type FusionClass = 'pruned' | 'likely' | 'unclear' | 'not_pruned' | 'no_d
 export type FusionChannelKey = 'ndvi' | 'nbr' | 'vh_asc' | 'vh_desc' | 'coh_asc' | 'coh_desc';
 export type FusionGroup = 'optical' | 'backscatter' | 'coherence';
 export type ProducerFusionStatus = 'pruned_full' | 'pruned_partial' | 'none' | 'unclear' | 'no_license' | 'no_data';
+export type FusionDecision = 'auto_open' | 'auto_pending' | 'auto_short' | 'auto_none' | 'expert_anomaly' | 'no_license' | 'no_data';
+export type FusionAnomaly = 'sensors_contradict' | 'repeat_pruning' | 'boundary_conflict' | 'boundary_unresolved' | 'license_mismatch' | 'over_pruned' | 'unlicensed_pruning';
+
+export interface FusionUnassignedPatch {
+    id: string;
+    areaM2: number;
+    geometry: GeoJSON.Geometry;
+    verdict: { class: FusionClass; z: number | null; p: number; changeDate: string | null; lastBeforeAt: string | null; firstAfterAt: string | null; agreeing: number; opticalOk?: boolean; backscatterOk?: boolean; reason: string };
+    detectedAt: string | null;
+    likelyAt: string | null;
+}
 
 export interface FusionChannelEvidence {
     key: FusionChannelKey;
@@ -1248,6 +1259,9 @@ export interface FusionProducerRow {
     likelyGardens: string[];
     status: ProducerFusionStatus;
     firstDetectedAt: string | null;
+    decision?: FusionDecision;
+    anomalies?: FusionAnomaly[];
+    decisionReason?: string;
     ratio: number;
 }
 
@@ -1267,9 +1281,12 @@ export interface FusionSummary {
         coherence: Array<{ pass: string; dates: string[] }>;
     };
     gardens: { total: number; byClass: Record<FusionClass, number>; prunedAreaM2: number; likelyAreaM2: number };
-    producers: { total: number; byStatus: Record<ProducerFusionStatus, number> };
+    producers: { total: number; byStatus: Record<ProducerFusionStatus, number>; byDecision: Record<FusionDecision, number> };
     timeline: Array<{ date: string; pruned: number; likely: number }>;
     localities: Array<{ name: string; pruned: number; total: number }>;
+    parcelCoverage: number | null;
+    unassigned: { count: number; areaM2: number; byClass: Record<FusionClass, number>; prunedAreaM2: number; patches: FusionUnassignedPatch[] };
+    policy: Record<string, unknown> | null;
 }
 
 export interface FusionGardenQuery {
@@ -1287,6 +1304,7 @@ export interface FusionProducerQuery {
     season?: string;
     search?: string;
     status?: ProducerFusionStatus;
+    decision?: FusionDecision;
 }
 
 export interface PruningRecordQuery {

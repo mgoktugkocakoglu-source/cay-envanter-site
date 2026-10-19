@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { toneVariant } from '@/components/caykur/tone';
 import { useToast } from '@/composables/useToast';
+import { useTkgmParcelLookup } from '@/composables/useTkgmParcelLookup';
 import { useAuthStore } from '@/stores/authStore';
 import {
     api,
@@ -72,6 +73,7 @@ const MONTHS_TR = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Ey
 
 const toast = useToast();
 const auth = useAuthStore();
+const tkgm = useTkgmParcelLookup();
 
 const summary = ref<LicensingSummary | null>(null);
 const isLoading = ref(true);
@@ -355,7 +357,7 @@ async function renderMainMap(): Promise<void> {
             onEachFeature: (f, layer) => {
                 const p = f.properties as LicensingLayers['gardens']['features'][number]['properties'];
                 layer.bindTooltip(`${p.producerName} · ${p.block}/${p.parcel} · ${APPROVAL_STATUS_META[p.approvalStatus].label}${p.licenseCode ? ` · ${p.licenseCode}` : ' · ruhsat yok'}`, { sticky: true });
-                layer.on('click', () => void openProducer(p.producerCode));
+                layer.on('click', (e) => { L.DomEvent.stopPropagation(e); void openProducer(p.producerCode); });
             },
         });
     layerGroups.approved = L.layerGroup([gardenLayer((p) => p.approvalStatus === 'approved' && p.licensedAreaM2 !== null)]);
@@ -366,7 +368,7 @@ async function renderMainMap(): Promise<void> {
             onEachFeature: (f, layer) => {
                 const p = f.properties as LicensingLayers['proposals']['features'][number]['properties'];
                 layer.bindTooltip(`Öneri · ${p.producerName} · ${p.block}/${p.parcel} · ${formatM2(p.planimetricAreaM2)}${p.overlapM2 ? ` · çakışma ${formatM2(p.overlapM2)}` : ''}`, { sticky: true });
-                layer.on('click', () => void openProducer(p.producerCode));
+                layer.on('click', (e) => { L.DomEvent.stopPropagation(e); void openProducer(p.producerCode); });
             },
         }),
     ]);
@@ -387,6 +389,8 @@ async function renderMainMap(): Promise<void> {
         }),
     ]);
     applyLayerToggles();
+    // Anywhere not covered by a garden: live TKGM parcel lookup.
+    tkgm.attach(map);
     const bounds = L.geoJSON(props.mapData).getBounds();
     if (bounds.isValid()) map.fitBounds(bounds, { padding: [16, 16] });
 }

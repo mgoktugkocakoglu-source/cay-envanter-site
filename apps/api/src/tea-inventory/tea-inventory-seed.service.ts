@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource, EntityManager } from 'typeorm';
-import { TeaInventoryArea, InventoryLicense, LicensingBlock, TeaPatch, ProducerScanBlock, ProducerSeasonSchedule } from '@/tea-inventory/entities/tea-inventory-area.entity';
+import { TeaInventoryArea, InventoryLicense, LicensingBlock, TeaPatch, ProducerScanBlock, ProducerSeasonSchedule, FusionUnassignedPatch } from '@/tea-inventory/entities/tea-inventory-area.entity';
 import { TeaInventoryParcel } from '@/tea-inventory/entities/tea-inventory-parcel.entity';
 import { InventoryClass } from '@/tea-inventory/enums/inventory-class.enum';
 import { TeaInventoryProducer, ProducerScan, ProducerAutoStatus, ProducerFusion } from '@/tea-inventory/entities/tea-inventory-producer.entity';
@@ -104,7 +104,10 @@ interface BundleFusion {
         sensors: { optical: { dates: string[] }; backscatter: Array<{ pass: string; relativeOrbit: number; dates: string[] }>; coherence: Array<{ pass: string; dates: string[] }> };
         gardens: Array<GardenFusion & { code: string; producerCode: string }>;
         producers: Array<ProducerFusion & { code: string }>;
+        unassigned?: FusionUnassignedPatch[];
+        parcelCoverage?: number;
     }>;
+    policy?: Record<string, unknown>;
 }
 
 interface BundleProducers {
@@ -215,7 +218,16 @@ export class TeaInventorySeedService implements OnModuleInit {
                                     method: bundle.fusion.method,
                                     rules: bundle.fusion.rules,
                                     channels: bundle.fusion.channels,
-                                    seasons: bundle.fusion.seasons.map((s) => ({ season: s.season, everyDays: s.everyDays, scanFrom: s.scanFrom, scanTo: s.scanTo, sensors: s.sensors })),
+                                    policy: bundle.fusion.policy,
+                                    seasons: bundle.fusion.seasons.map((s) => ({
+                                        season: s.season,
+                                        everyDays: s.everyDays,
+                                        scanFrom: s.scanFrom,
+                                        scanTo: s.scanTo,
+                                        sensors: s.sensors,
+                                        parcelCoverage: s.parcelCoverage,
+                                        unassigned: s.unassigned ?? [],
+                                    })),
                                 }
                                 : null,
                         }

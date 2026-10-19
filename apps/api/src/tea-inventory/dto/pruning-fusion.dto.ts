@@ -4,6 +4,7 @@ import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-va
 
 export const FUSION_CLASSES = ['pruned', 'likely', 'unclear', 'not_pruned', 'no_data'] as const;
 export const PRODUCER_FUSION_STATUSES = ['pruned_full', 'pruned_partial', 'none', 'unclear', 'no_license', 'no_data'] as const;
+export const FUSION_DECISIONS = ['auto_open', 'auto_pending', 'auto_short', 'auto_none', 'expert_anomaly', 'no_license', 'no_data'] as const;
 
 class FusionPageDto {
     @ApiPropertyOptional({ default: 1, minimum: 1 })
@@ -54,4 +55,9 @@ export class FusionProducerQueryDto extends FusionPageDto {
     @IsOptional()
     @IsIn(PRODUCER_FUSION_STATUSES)
     status?: (typeof PRODUCER_FUSION_STATUSES)[number];
+
+    @ApiPropertyOptional({ enum: FUSION_DECISIONS, description: 'Purchase decision of the policy (auto / expert anomaly)' })
+    @IsOptional()
+    @IsIn(FUSION_DECISIONS)
+    decision?: (typeof FUSION_DECISIONS)[number];
 }

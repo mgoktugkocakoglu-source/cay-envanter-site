@@ -42,12 +42,23 @@ export interface RadarBlock {
     }>;
 }
 
+/** Tea outside every harvested parcel, judged on its own until its parcel/owner is known. */
+export interface FusionUnassignedPatch {
+    id: string;
+    areaM2: number;
+    geometry: Record<string, unknown>;
+    verdict: { class: string; z: number | null; p: number; changeDate: string | null; lastBeforeAt: string | null; firstAfterAt: string | null; agreeing: number; opticalOk?: boolean; backscatterOk?: boolean; reason: string };
+    detectedAt: string | null;
+    likelyAt: string | null;
+}
+
 /** Fusion module header (bundle `fusion` block): rules, channel settings, per-season scan cadence and sensors. */
 export interface FusionBlock {
     calibrated: boolean;
     method: string;
     rules: Record<string, unknown>;
     channels: Record<string, { sign: 1 | -1; minEffect: number; noiseFloor: number }>;
+    policy?: Record<string, unknown>;
     seasons: Array<{
         season: string;
         everyDays: number;
@@ -58,6 +69,8 @@ export interface FusionBlock {
             backscatter: Array<{ pass: string; relativeOrbit: number; dates: string[] }>;
             coherence: Array<{ pass: string; dates: string[] }>;
         };
+        parcelCoverage?: number;
+        unassigned?: FusionUnassignedPatch[];
     }>;
 }
 
