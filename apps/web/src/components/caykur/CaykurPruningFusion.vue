@@ -218,7 +218,11 @@ function renderChip(): void {
     L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, maxNativeZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(chipMap);
     L.geoJSON(props.mapData, { style: { color: cssVar('--background', '#ffffff'), weight: 0.8, opacity: 0.6, fill: false }, interactive: false }).addTo(chipMap);
     const color = classColor(d.class);
-    const layer = L.geoJSON({ type: 'Feature', geometry: d.geometry, properties: {} } as GeoJSON.Feature, { style: { color, weight: 2.5, fillColor: color, fillOpacity: 0.2 }, interactive: false }).addTo(chipMap);
+    const layer = L.geoJSON({ type: 'Feature', geometry: d.geometry, properties: {} } as GeoJSON.Feature, { style: { color, weight: 2.5, fillColor: color, fillOpacity: 0.12 }, interactive: false }).addTo(chipMap);
+    // The unit that carried the verdict (a patch inside the garden when only part was cut).
+    if (d.unitGeometry && d.unit === 'patch') {
+        L.geoJSON({ type: 'Feature', geometry: d.unitGeometry, properties: {} } as GeoJSON.Feature, { style: { color, weight: 2, fillColor: color, fillOpacity: 0.45 }, interactive: false }).addTo(chipMap);
+    }
     chipMap.fitBounds(layer.getBounds().pad(0.8), { maxZoom: 18 });
 }
 
@@ -571,7 +575,12 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                                         <Progress :model-value="Math.min(100, Math.round(r.ratio * 100))" class="h-2 w-24" :class="PROGRESS_TONE_CLASS[ratioTone(r)]" />
                                         <span class="text-xs tabular-nums">{{ r.requiredM2 ? formatShare(r.ratio) : '—' }}</span>
                                     </div>
-                                    <div class="text-xs text-muted-foreground">{{ formatM2(r.prunedAreaM2) }} / hedef {{ r.requiredM2 ? formatM2(r.requiredM2) : '—' }}<span v-if="r.likelyAreaM2"> (+{{ formatM2(r.likelyAreaM2) }} olası)</span></div>
+                                    <div class="text-xs text-muted-foreground">
+                                        sayılan {{ formatM2(r.countedM2 ?? r.prunedAreaM2) }} / hedef {{ r.requiredM2 ? formatM2(r.requiredM2) : '—' }}
+                                        · kesin {{ formatM2(r.prunedAreaM2) }}<span v-if="r.likelyAreaM2"> + olası {{ formatM2(r.likelyAreaM2) }}</span>
+                                    </div>
+                                    <div v-if="r.reusedM2" class="text-xs text-warning">tekrar budanan {{ formatM2(r.reusedM2) }} sayılmadı (7 yıl kuralı)</div>
+                                    <div v-if="r.requiredM2 && (r.shortfallM2 ?? 0) > 0" class="text-xs text-destructive">eksik: {{ formatM2(r.shortfallM2 ?? 0) }} daha budanmalı</div>
                                 </TableCell>
                                 <TableCell>
                                     <Badge :variant="toneVariant(FUSION_DECISION_META[r.decision ?? 'no_data'].tone)" :title="r.decisionReason ?? FUSION_DECISION_META[r.decision ?? 'no_data'].description">{{ FUSION_DECISION_META[r.decision ?? 'no_data'].label }}</Badge>
@@ -701,6 +710,14 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                         </div>
 
                         <div ref="chipContainer" class="h-56 w-full overflow-hidden rounded-lg border" />
+
+                        <Alert v-if="detail.repeat && detail.repeat.reusedM2 > 0" :variant="detail.repeat.reusedShare >= 0.2 ? 'warning' : 'info'">
+                            <AlertTitle>7 yıl kuralı: {{ formatM2(detail.repeat.reusedM2) }} ({{ formatShare(detail.repeat.reusedShare) }}) daha önce budanmış alanla çakışıyor</AlertTitle>
+                            <AlertDescription>
+                                Bu kısım 1/7 hedefine sayılmadı; sayılan yeni alan {{ formatM2(detail.repeat.countedM2) }}.
+                                Kanıt: <span v-for="e in detail.repeat.evidence" :key="e.season">{{ e.season }} sezonunda {{ FUSION_CLASS_META[e.class].label.toLocaleLowerCase('tr-TR') }} alanla {{ formatM2(e.overlapM2) }} çakışma; </span>
+                            </AlertDescription>
+                        </Alert>
 
                         <section class="flex flex-col gap-2">
                             <h3 class="text-base font-semibold">Basamak kanıtı (değişim tarihi {{ fmtDate(detail.changeDate) }})</h3>

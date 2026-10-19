@@ -81,6 +81,9 @@ export interface GardenFusion {
     // The unit that carried the verdict: the whole garden or the optical change patch inside it.
     unit: 'garden' | 'patch';
     unitAreaM2: number;
+    unitGeometry?: Record<string, unknown>;
+    // Overlap with ground pruned in earlier seasons of the 7-season cycle (not credited again).
+    repeat?: { reusedM2: number; reusedShare: number; countedM2: number; evidence: Array<{ season: string; overlapM2: number; class: FusionClass }> } | null;
     verdict: FusionVerdict;
     detectedAt: string | null;
     likelyAt: string | null;

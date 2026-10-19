@@ -24,6 +24,8 @@ export interface FusionGardenRow {
     licensedAreaM2: number | null;
     unit: 'garden' | 'patch';
     unitAreaM2: number;
+    unitGeometry: Record<string, unknown> | null;
+    repeat: GardenFusion['repeat'] | null;
     class: FusionClass;
     z: number | null;
     p: number;
@@ -212,7 +214,7 @@ export class PruningFusionService {
     /** "Budama yapanlar" as CSV (UTF-8 BOM, Excel-compatible). */
     async producersCsv(areaId: string, requested?: string): Promise<string> {
         const rows = await this.producerRows(areaId, requested);
-        const header = ['Müstahsil no', 'Ad soyad', 'Cüzdan no', 'Ruhsat no', 'Bahçe', 'Ruhsat alanı (m²)', '1/7 hedefi (m²)', 'Budanan alan (m²)', 'Olası budanan (m²)', 'Hedef oranı', 'Durum', 'Alım kararı', 'Anomaliler', 'İlk tespit', 'Budanan bahçeler', 'Demo'];
+        const header = ['Müstahsil no', 'Ad soyad', 'Cüzdan no', 'Ruhsat no', 'Bahçe', 'Ruhsat alanı (m²)', '1/7 hedefi (m²)', 'Budanan alan (m²)', 'Olası budanan (m²)', 'Tekrar budanan, sayılmadı (m²)', 'Sayılan yeni alan (m²)', 'Eksik (m²)', 'Hedef oranı', 'Durum', 'Alım kararı', 'Anomaliler', 'İlk tespit', 'Budanan bahçeler', 'Demo'];
         const cell = (v: string | number | null) => `"${String(v ?? '').replace(/"/g, '""')}"`;
         const label: Record<ProducerFusionStatus, string> = {
             pruned_full: '1/7 tamam (çok-sensör)',
@@ -233,7 +235,7 @@ export class PruningFusionService {
         };
         const lines = rows.map((r) =>
             [
-                r.code, r.name, r.walletNo, r.licenseNo, r.gardens, r.licensedAreaM2, r.requiredM2, r.prunedAreaM2, r.likelyAreaM2, r.ratio, label[r.status],
+                r.code, r.name, r.walletNo, r.licenseNo, r.gardens, r.licensedAreaM2, r.requiredM2, r.prunedAreaM2, r.likelyAreaM2, r.reusedM2 ?? 0, r.countedM2 ?? r.prunedAreaM2, r.shortfallM2 ?? '', r.ratio, label[r.status],
                 decisionLabel[r.decision ?? 'no_data'], (r.anomalies ?? []).join(' '), r.firstDetectedAt ?? '', r.prunedGardens.join(' '), 'Evet',
             ].map(cell).join(';'),
         );
@@ -275,6 +277,8 @@ export class PruningFusionService {
             licensedAreaM2: g.licensedAreaM2,
             unit: f.unit ?? 'garden',
             unitAreaM2: f.unitAreaM2 ?? Math.round(g.planimetricAreaM2 || g.geometryAreaM2),
+            unitGeometry: f.unitGeometry ?? null,
+            repeat: f.repeat ?? null,
             class: f.verdict.class,
             z: f.verdict.z,
             p: f.verdict.p,
@@ -320,7 +324,9 @@ export class PruningFusionService {
             .filter((p) => p.fusion)
             .map((p) => {
                 const f = p.fusion as ProducerFusion;
-                return { id: p.id, code: p.code, name: p.name, walletNo: p.walletNo, licenseNo: p.licenseNo, ...f, ratio: f.requiredM2 > 0 ? Math.round((f.prunedAreaM2 / f.requiredM2) * 1000) / 1000 : 0 };
+                // The ratio is on the counted area (confirmed + likely minus reused), the figure the policy decides on.
+                const counted = f.countedM2 ?? f.prunedAreaM2;
+                return { id: p.id, code: p.code, name: p.name, walletNo: p.walletNo, licenseNo: p.licenseNo, ...f, ratio: f.requiredM2 > 0 ? Math.round((counted / f.requiredM2) * 1000) / 1000 : 0 };
             })
             .sort((a, b) => order[a.status] - order[b.status] || b.ratio - a.ratio || a.name.localeCompare(b.name, 'tr-TR'));
     }

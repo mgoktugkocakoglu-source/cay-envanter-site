@@ -23,6 +23,10 @@ export interface ProducerFusion {
     requiredM2: number;
     prunedAreaM2: number;
     likelyAreaM2: number;
+    // Area counted toward the 1/7 (confirmed + likely, minus ground reused within the cycle), and what is still missing.
+    countedM2?: number;
+    reusedM2?: number;
+    shortfallM2?: number;
     gardens: number;
     prunedGardens: string[];
     likelyGardens: string[];

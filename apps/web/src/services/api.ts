@@ -1223,6 +1223,8 @@ export interface FusionGardenRow {
     licensedAreaM2: number | null;
     unit: 'garden' | 'patch';
     unitAreaM2: number;
+    unitGeometry: GeoJSON.Geometry | null;
+    repeat: { reusedM2: number; reusedShare: number; countedM2: number; evidence: Array<{ season: string; overlapM2: number; class: FusionClass }> } | null;
     class: FusionClass;
     z: number | null;
     p: number;
@@ -1254,6 +1256,9 @@ export interface FusionProducerRow {
     requiredM2: number;
     prunedAreaM2: number;
     likelyAreaM2: number;
+    countedM2?: number;
+    reusedM2?: number;
+    shortfallM2?: number;
     gardens: number;
     prunedGardens: string[];
     likelyGardens: string[];
