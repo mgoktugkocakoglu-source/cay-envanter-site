@@ -3,3 +3,6 @@ export * from './producer-pruning.dto';
 export * from './licensing.dto';
 export * from './pruning-record.dto';
 export * from './pruning-fusion.dto';
+export * from './report.dto';
+export * from './calibration.dto';
+export * from './ministry-request.dto';

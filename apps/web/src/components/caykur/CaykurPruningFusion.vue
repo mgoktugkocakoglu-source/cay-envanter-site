@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
-import { ChevronLeft, ChevronRight, Download, Layers, Radar, Scissors, TriangleAlert, Users } from '@lucide/vue';
+import { ChevronLeft, ChevronRight, Download, FileText, Layers, Radar, Scissors, TriangleAlert, Users } from '@lucide/vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { EmptyState, ListToolbar, LoadingState, SearchInput, StatCard } from '@/components/shared';
@@ -18,6 +18,7 @@ import { useToast } from '@/composables/useToast';
 import { useTkgmParcelLookup } from '@/composables/useTkgmParcelLookup';
 import {
     api,
+    saveBlob,
     type FusionClass,
     type FusionDecision,
     type FusionGardenDetail,
@@ -427,6 +428,35 @@ function onPDecision(v: unknown): void {
     pDecision.value = typeof v === 'string' && v !== '' ? (v as FusionDecision | typeof ALL) : ALL;
 }
 /** The expert queue is exactly the anomaly bucket; everything else decided itself. */
+// ── Evidence packs (PDF) ──
+const pdfBusy = ref<string | null>(null);
+async function downloadProducerPdf(code: string): Promise<void> {
+    pdfBusy.value = code;
+    try {
+        const res = await api.downloadProducerEvidencePdf(props.areaId, code, season.value);
+        if (!res.blob) {
+            toast.error(res.error ?? 'Kanıt dosyası üretilemedi');
+            return;
+        }
+        saveBlob(res.blob, res.filename ?? `kanit-${code}-${season.value}.pdf`);
+    } finally {
+        pdfBusy.value = null;
+    }
+}
+async function downloadGardenPdf(): Promise<void> {
+    if (!detail.value) return;
+    pdfBusy.value = detail.value.id;
+    try {
+        const res = await api.downloadGardenEvidencePdf(detail.value.id);
+        if (!res.blob) {
+            toast.error(res.error ?? 'Kanıt dosyası üretilemedi');
+            return;
+        }
+        saveBlob(res.blob, res.filename ?? `kanit-bahce-${detail.value.block}-${detail.value.parcel}.pdf`);
+    } finally {
+        pdfBusy.value = null;
+    }
+}
 function showExpertQueue(): void {
     view.value = 'producers';
     pDecision.value = 'expert_anomaly';
@@ -560,6 +590,7 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                                 <TableHead>1/7 hedefi</TableHead>
                                 <TableHead>Alım kararı</TableHead>
                                 <TableHead class="hidden lg:table-cell">İlk kesin tespit</TableHead>
+                                <TableHead class="w-14 text-right"><span class="sr-only">Kanıt dosyası</span></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -589,6 +620,9 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                                     </div>
                                 </TableCell>
                                 <TableCell class="hidden lg:table-cell">{{ fmtDate(r.firstDetectedAt) }}</TableCell>
+                                <TableCell class="text-right">
+                                    <Button variant="outline" size="icon" class="size-11 md:size-9" :disabled="pdfBusy === r.code" :aria-label="`${r.name} kanıt dosyasını indir (PDF)`" title="Kanıt dosyası (PDF)" @click="downloadProducerPdf(r.code)"><FileText aria-hidden="true" /></Button>
+                                </TableCell>
                             </TableRow>
                         </TableBody>
                     </Table>
@@ -700,6 +734,10 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                             <Badge :variant="detail.opticalOk ? 'success' : 'outline'">Optik {{ detail.opticalOk ? '✓' : '—' }}</Badge>
                             <Badge :variant="detail.backscatterOk ? 'success' : 'outline'">Radar {{ detail.backscatterOk ? '✓' : '—' }}</Badge>
                             <span class="text-xs text-muted-foreground">{{ detail.reason }}</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2 pt-1">
+                            <Button variant="outline" size="sm" class="h-11 md:h-9" :disabled="pdfBusy === detail.id" @click="downloadGardenPdf"><FileText aria-hidden="true" />Bahçe kanıtı (PDF)</Button>
+                            <Button variant="outline" size="sm" class="h-11 md:h-9" :disabled="pdfBusy === detail.producerCode" @click="downloadProducerPdf(detail.producerCode)"><FileText aria-hidden="true" />Müstahsil kanıt dosyası (PDF)</Button>
                         </div>
                     </SheetHeader>
                     <div class="flex flex-col gap-6 p-4 md:p-6">

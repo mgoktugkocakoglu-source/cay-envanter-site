@@ -10,12 +10,21 @@ import { TeaInventoryLicense } from '@/tea-inventory/entities/tea-inventory-lice
 import { ParcelLineage } from '@/tea-inventory/entities/parcel-lineage.entity';
 import { LicensingApplication } from '@/tea-inventory/entities/licensing-application.entity';
 import { LicensingDecision } from '@/tea-inventory/entities/licensing-decision.entity';
+import { CalibrationLabel } from '@/tea-inventory/entities/calibration-label.entity';
+import { MinistryRequest } from '@/tea-inventory/entities/ministry-request.entity';
 import { ProducerPruningService } from '@/tea-inventory/producer-pruning.service';
 import { ProducerPruningController } from '@/tea-inventory/producer-pruning.controller';
 import { LicensingService } from '@/tea-inventory/licensing.service';
 import { LicensingController } from '@/tea-inventory/licensing.controller';
 import { PruningFusionService } from '@/tea-inventory/pruning-fusion.service';
 import { PruningFusionController } from '@/tea-inventory/pruning-fusion.controller';
+import { EvidenceService } from '@/tea-inventory/evidence.service';
+import { SeasonReportService } from '@/tea-inventory/season-report.service';
+import { ReportController } from '@/tea-inventory/report.controller';
+import { MinistryRequestService } from '@/tea-inventory/ministry-request.service';
+import { MinistryRequestController } from '@/tea-inventory/ministry-request.controller';
+import { CalibrationService } from '@/tea-inventory/calibration.service';
+import { CalibrationController } from '@/tea-inventory/calibration.controller';
 import { TeaInventoryController } from '@/tea-inventory/tea-inventory.controller';
 import { TeaInventoryService } from '@/tea-inventory/tea-inventory.service';
 import { TeaInventorySeedService } from '@/tea-inventory/tea-inventory-seed.service';
@@ -33,9 +42,11 @@ import { TeaInventorySeedService } from '@/tea-inventory/tea-inventory-seed.serv
             ParcelLineage,
             LicensingApplication,
             LicensingDecision,
+            CalibrationLabel,
+            MinistryRequest,
         ]),
     ],
-    controllers: [TeaInventoryController, ProducerPruningController, LicensingController, PruningFusionController],
-    providers: [TeaInventoryService, TeaInventorySeedService, ProducerPruningService, LicensingService, PruningFusionService],
+    controllers: [TeaInventoryController, ProducerPruningController, LicensingController, PruningFusionController, ReportController, MinistryRequestController, CalibrationController],
+    providers: [TeaInventoryService, TeaInventorySeedService, ProducerPruningService, LicensingService, PruningFusionService, EvidenceService, SeasonReportService, MinistryRequestService, CalibrationService],
 })
 export class TeaInventoryModule { }

@@ -1719,6 +1719,186 @@ async function readErrorMessage(response: Response, fallback: string): Promise<s
     }
 }
 
+
+// ── Evidence packs, season reports, Ministry requests and the calibration campaign (P0) ──
+export type MinistryMatchBy = 'wallet_no' | 'license_no' | 'producer_code' | 'name' | 'none';
+
+export interface MinistryRequestItem {
+    walletNo: string;
+    licenseNo: string;
+    producerCode: string;
+    name: string;
+    matchBy: MinistryMatchBy;
+    matchedCode: string | null;
+    matchedName: string | null;
+    decision: FusionDecision | null;
+    decisionLabel: string;
+    status: ProducerFusionStatus | null;
+    licensedAreaM2: number | null;
+    requiredM2: number | null;
+    countedM2: number | null;
+    reusedM2: number | null;
+    shortfallM2: number | null;
+    anomalies: string[];
+    firstDetectedAt: string | null;
+    gardens: number | null;
+    reason: string;
+}
+
+export interface MinistryRequestRow {
+    id: string;
+    areaCode: string;
+    season: string;
+    title: string;
+    source: string;
+    reference: string;
+    requestedAt: string;
+    note: string | null;
+    itemCount: number;
+    matchedCount: number;
+    unmatchedCount: number;
+    byDecision: Record<string, number>;
+    createdByName: string;
+    answeredAt: string;
+    createdAt: string;
+}
+
+export interface MinistryRequestDetail extends MinistryRequestRow {
+    items: MinistryRequestItem[];
+}
+
+export interface CreateMinistryRequest {
+    title: string;
+    source?: string;
+    reference?: string;
+    requestedAt: string;
+    season?: string;
+    note?: string;
+    text?: string;
+    items?: Array<{ walletNo?: string; licenseNo?: string; producerCode?: string; name?: string }>;
+}
+
+export type CalibrationLabelValue = 'pruned' | 'partial' | 'not_pruned' | 'unsure';
+export type CalibrationMethod = 'field_visit' | 'photo_desk' | 'producer_statement';
+
+export interface CalibrationLabelView {
+    id: string;
+    gardenCode: string;
+    season: string;
+    label: CalibrationLabelValue;
+    method: CalibrationMethod;
+    observedAt: string;
+    lat: number | null;
+    lng: number | null;
+    accuracyM: number | null;
+    prunedShare: number | null;
+    note: string | null;
+    hasPhoto: boolean;
+    systemClassAtLabel: string | null;
+    systemZAtLabel: number | null;
+    createdByName: string;
+    updatedAt: string;
+}
+
+export interface CalibrationPlanRow {
+    gardenId: string;
+    gardenCode: string;
+    block: string;
+    parcel: string;
+    locality: string;
+    holderIndex: number;
+    holderCount: number;
+    producerCode: string;
+    producerName: string;
+    areaM2: number;
+    lat: number;
+    lng: number;
+    systemClass: FusionClass;
+    systemZ: number | null;
+    changeDate: string | null;
+    detectedAt: string | null;
+    geometry: Record<string, unknown>;
+    label: CalibrationLabelView | null;
+}
+
+export interface CalibrationPlan extends Paginated<CalibrationPlanRow> {
+    season: string;
+    planSize: number;
+    localities: string[];
+}
+
+export interface CalibrationMetrics {
+    season: string;
+    planSize: number;
+    labelled: number;
+    pending: number;
+    byLabel: Record<CalibrationLabelValue, number>;
+    bySystemClass: Record<FusionClass, number>;
+    confusion: Record<FusionClass, Record<CalibrationLabelValue, number>>;
+    positives: number;
+    negatives: number;
+    recall: number | null;
+    falseAlarmRate: number | null;
+    precision: number | null;
+    recallStrict: number | null;
+    falseAlarmRateStrict: number | null;
+    sweep: Array<{ z: number; recall: number; falseAlarmRate: number; f1: number; detected: number }>;
+    suggested: { zPruned: number; zLikely: number; f1: number } | null;
+    currentRules: { zPruned: number; zLikely: number; zUnclear: number };
+    calibrated: boolean;
+    requirement: { minPositives: number; minNegatives: number };
+    byLocality: Array<{ name: string; planned: number; labelled: number }>;
+}
+
+export interface CalibrationQuery {
+    season?: string;
+    size?: number;
+    pending?: boolean;
+    locality?: string;
+    page?: number;
+    limit?: number;
+}
+
+export interface SaveCalibrationLabel {
+    season: string;
+    gardenCode: string;
+    label: CalibrationLabelValue;
+    method?: CalibrationMethod;
+    observedAt: string;
+    lat?: number;
+    lng?: number;
+    accuracyM?: number;
+    prunedShare?: number;
+    note?: string;
+}
+
+export interface DownloadedFile {
+    blob?: Blob;
+    filename?: string;
+    error?: string;
+}
+
+/** Authenticated download of a generated file; the server's filename is read from Content-Disposition. */
+async function downloadFile(endpoint: string, fallback: string): Promise<DownloadedFile> {
+    const response = await authorizedFetch(endpoint);
+    if (!response.ok) return { error: await readErrorMessage(response, fallback) };
+    const disposition = response.headers.get('Content-Disposition') ?? '';
+    const star = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+    const plain = /filename="([^"]+)"/i.exec(disposition);
+    const filename = star ? decodeURIComponent(star[1]) : plain?.[1];
+    return { blob: await response.blob(), filename };
+}
+
+/** Saves a downloaded blob through a temporary link (works on Capacitor WebView too). */
+export function saveBlob(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
 export const api = {
     // Auth endpoints
     register: (data: {
@@ -2332,4 +2512,56 @@ export const api = {
             return { error: { message: 'Belge yüklenirken hata oluştu', statusCode: 0 } };
         }
     },
+
+    // ── Evidence packs, season reports, Ministry requests, calibration ──
+    downloadProducerEvidencePdf: (areaId: string, code: string, season?: string) =>
+        downloadFile(`/caykur/tea-inventory/areas/${areaId}/pruning-fusion/producers/${encodeURIComponent(code)}/evidence.pdf${season ? `?season=${encodeURIComponent(season)}` : ''}`, 'Kanıt dosyası üretilemedi'),
+    downloadGardenEvidencePdf: (gardenId: string) =>
+        downloadFile(`/caykur/tea-inventory/pruning-fusion/gardens/${gardenId}/evidence.pdf`, 'Kanıt dosyası üretilemedi'),
+    downloadSeasonReport: (areaId: string, format: 'xlsx' | 'pdf', season?: string) =>
+        downloadFile(`/caykur/tea-inventory/areas/${areaId}/reports/season.${format}${season ? `?season=${encodeURIComponent(season)}` : ''}`, 'Rapor üretilemedi'),
+    getMinistryRequests: (areaId: string, season?: string) =>
+        request<MinistryRequestRow[]>(`/caykur/tea-inventory/areas/${areaId}/ministry-requests${season ? `?season=${encodeURIComponent(season)}` : ''}`),
+    createMinistryRequest: (areaId: string, body: CreateMinistryRequest) =>
+        request<MinistryRequestDetail>(`/caykur/tea-inventory/areas/${areaId}/ministry-requests`, { method: 'POST', body: JSON.stringify(body) }),
+    getMinistryRequest: (areaId: string, id: string) => request<MinistryRequestDetail>(`/caykur/tea-inventory/areas/${areaId}/ministry-requests/${id}`),
+    deleteMinistryRequest: async (areaId: string, id: string): Promise<{ error?: string }> => {
+        const response = await authorizedFetch(`/caykur/tea-inventory/areas/${areaId}/ministry-requests/${id}`, { method: 'DELETE' });
+        return response.ok ? {} : { error: await readErrorMessage(response, 'Talep silinemedi') };
+    },
+    downloadMinistryAnswer: (areaId: string, id: string) =>
+        downloadFile(`/caykur/tea-inventory/areas/${areaId}/ministry-requests/${id}/answer.xlsx`, 'Cevap listesi üretilemedi'),
+    downloadMinistryEvidenceZip: (areaId: string, id: string) =>
+        downloadFile(`/caykur/tea-inventory/areas/${areaId}/ministry-requests/${id}/evidence.zip`, 'Kanıt paketi üretilemedi'),
+    getCalibrationPlan: (areaId: string, params?: CalibrationQuery) => {
+        const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '' && v !== false) as Array<[string, string | number | boolean]>;
+        const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        return request<CalibrationPlan>(`/caykur/tea-inventory/areas/${areaId}/calibration/plan${query ? `?${query}` : ''}`);
+    },
+    getCalibrationLabels: (areaId: string, params?: CalibrationQuery) => {
+        const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '' && v !== false) as Array<[string, string | number | boolean]>;
+        const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        return request<Paginated<CalibrationPlanRow>>(`/caykur/tea-inventory/areas/${areaId}/calibration/labels${query ? `?${query}` : ''}`);
+    },
+    getCalibrationMetrics: (areaId: string, season?: string) =>
+        request<CalibrationMetrics>(`/caykur/tea-inventory/areas/${areaId}/calibration/metrics${season ? `?season=${encodeURIComponent(season)}` : ''}`),
+    saveCalibrationLabel: (areaId: string, body: SaveCalibrationLabel) =>
+        request<CalibrationLabelView>(`/caykur/tea-inventory/areas/${areaId}/calibration/labels`, { method: 'POST', body: JSON.stringify(body) }),
+    uploadCalibrationPhoto: async (areaId: string, labelId: string, file: Blob, name = 'photo.jpg'): Promise<ApiResponse<CalibrationLabelView>> => {
+        const formData = new FormData();
+        formData.append('file', file, name);
+        const response = await authorizedFetch(`/caykur/tea-inventory/areas/${areaId}/calibration/labels/${labelId}/photo`, { method: 'POST', body: formData });
+        if (!response.ok) return { error: { message: await readErrorMessage(response, 'Fotoğraf yüklenemedi'), statusCode: response.status } };
+        return { data: (await response.json()) as CalibrationLabelView };
+    },
+    getCalibrationPhoto: async (areaId: string, labelId: string): Promise<Blob | null> => {
+        const response = await authorizedFetch(`/caykur/tea-inventory/areas/${areaId}/calibration/labels/${labelId}/photo`);
+        return response.ok ? response.blob() : null;
+    },
+    deleteCalibrationLabel: async (areaId: string, labelId: string): Promise<{ error?: string }> => {
+        const response = await authorizedFetch(`/caykur/tea-inventory/areas/${areaId}/calibration/labels/${labelId}`, { method: 'DELETE' });
+        return response.ok ? {} : { error: await readErrorMessage(response, 'Etiket silinemedi') };
+    },
+    downloadCalibrationCsv: (areaId: string, season?: string) =>
+        downloadFile(`/caykur/tea-inventory/areas/${areaId}/calibration/labels.csv${season ? `?season=${encodeURIComponent(season)}` : ''}`, 'Etiketler indirilemedi'),
 };

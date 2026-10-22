@@ -20,6 +20,8 @@ import CaykurProducerPruning from '@/components/caykur/CaykurProducerPruning.vue
 import CaykurLicensing from '@/components/caykur/CaykurLicensing.vue';
 import CaykurPruningRecords from '@/components/caykur/CaykurPruningRecords.vue';
 import CaykurPruningFusion from '@/components/caykur/CaykurPruningFusion.vue';
+import CaykurReports from '@/components/caykur/CaykurReports.vue';
+import CaykurCalibration from '@/components/caykur/CaykurCalibration.vue';
 import { useTkgmParcelLookup } from '@/composables/useTkgmParcelLookup';
 import { toneVariant } from '@/components/caykur/tone';
 import {
@@ -75,9 +77,11 @@ const isLoadingRows = ref(false);
 // ── Tabs: the inventory map stays mounted (v-show) and is resized when shown again ──
 const activeTab = ref<'inventory' | 'pruning' | 'licensing'>('inventory');
 // Pruning is judged per producer (1/7 of all their gardens); the parcel view stays for inspection.
-const pruningView = ref<'fusion' | 'records' | 'producers' | 'parcels'>('fusion');
+type PruningView = 'fusion' | 'records' | 'producers' | 'parcels' | 'reports' | 'calibration';
+const PRUNING_VIEWS: PruningView[] = ['fusion', 'records', 'producers', 'parcels', 'reports', 'calibration'];
+const pruningView = ref<PruningView>('fusion');
 function onPruningView(v: unknown): void {
-    if (v === 'fusion' || v === 'records' || v === 'producers' || v === 'parcels') pruningView.value = v;
+    if (typeof v === 'string' && (PRUNING_VIEWS as string[]).includes(v)) pruningView.value = v as PruningView;
 }
 watch(activeTab, async (tab) => {
     if (tab !== 'inventory') return;
@@ -616,11 +620,15 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                             <ToggleGroupItem value="records" class="h-11 px-3 md:h-9">Tarama kayıtları (önce / sonra)</ToggleGroupItem>
                             <ToggleGroupItem value="producers" class="h-11 px-3 md:h-9">Müstahsil (ruhsat sahibi)</ToggleGroupItem>
                             <ToggleGroupItem value="parcels" class="h-11 px-3 md:h-9">Parsel ve uydu görüntüleri</ToggleGroupItem>
+                            <ToggleGroupItem value="reports" class="h-11 px-3 md:h-9">Raporlar ve Bakanlık talepleri</ToggleGroupItem>
+                            <ToggleGroupItem value="calibration" class="h-11 px-3 md:h-9">Kalibrasyon (saha)</ToggleGroupItem>
                         </ToggleGroup>
                     </div>
                     <CaykurPruningFusion v-if="pruningView === 'fusion'" :area-id="area.id" :map-data="mapData" />
                     <CaykurPruningRecords v-else-if="pruningView === 'records'" :area-id="area.id" :map-data="mapData" />
                     <CaykurProducerPruning v-else-if="pruningView === 'producers'" :area-id="area.id" :map-data="mapData" />
+                    <CaykurReports v-else-if="pruningView === 'reports'" :area-id="area.id" />
+                    <CaykurCalibration v-else-if="pruningView === 'calibration'" :area-id="area.id" />
                     <CaykurPruningMonitor v-else :area-id="area.id" :boundary="area.boundary" :map-data="mapData" />
                 </template>
 

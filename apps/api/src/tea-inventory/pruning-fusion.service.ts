@@ -250,7 +250,7 @@ export class PruningFusionService {
         return area;
     }
 
-    private resolveSeason(area: TeaInventoryArea, requested?: string): string {
+    resolveSeason(area: TeaInventoryArea, requested?: string): string {
         const seasons = (area.producerScan?.fusion?.seasons ?? []).map((s) => s.season).sort();
         if (requested && seasons.includes(requested)) return requested;
         const latest = seasons.at(-1);
@@ -296,7 +296,7 @@ export class PruningFusionService {
         };
     }
 
-    private async gardenRows(areaId: string, requested?: string): Promise<{ season: string; rows: FusionGardenRow[] }> {
+    async gardenRows(areaId: string, requested?: string): Promise<{ season: string; rows: FusionGardenRow[] }> {
         const area = await this.findArea(areaId);
         const season = this.resolveSeason(area, requested);
         const [gardens, producers] = await Promise.all([
@@ -315,7 +315,7 @@ export class PruningFusionService {
         return { season, rows };
     }
 
-    private async producerRows(areaId: string, requested?: string): Promise<FusionProducerRow[]> {
+    async producerRows(areaId: string, requested?: string): Promise<FusionProducerRow[]> {
         const area = await this.findArea(areaId);
         const season = this.resolveSeason(area, requested);
         const producers = await this.producerRepo.find({ where: { areaId, season }, order: { name: 'ASC' } });

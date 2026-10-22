@@ -8,6 +8,10 @@
             {
                 "include": "tea-inventory/seed-data/*.json",
                 "watchAssets": true
+            },
+            {
+                "include": "assets/**/*",
+                "watchAssets": true
             }
         ]
     }
