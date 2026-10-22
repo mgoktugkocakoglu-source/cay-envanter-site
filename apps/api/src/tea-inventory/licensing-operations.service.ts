@@ -93,6 +93,8 @@ export interface GardenEditorContext {
 }
 
 const DEFAULT_RULES = { areaTolerance: 0.15, minLicenseM2: 100, overlapToleranceM2: 25 };
+/** Smallest piece / boundary worth a record of its own (a licence minimum is a different, larger rule). */
+const MIN_PIECE_M2 = 100;
 const CAUSE_LABEL: Record<string, string> = { inheritance: 'intikal (vefat)', sale: 'satış / devir', parcel_split: 'parsel ifrazı', family: 'aile içi paylaşım', other: 'diğer' };
 const DOC_NAME: Record<string, string> = {
     tapu: 'Tapu kaydı / tapu senedi',
@@ -185,7 +187,7 @@ export class LicensingOperationsService {
             const w = this.geometryWarnings(g);
             const planimetric = this.m2(g);
             const inside = planimetric > 0 ? this.safeIntersectArea(g, parentGeom) / planimetric : 0;
-            if (planimetric < rules.minLicenseM2) w.push(`Parça ${rules.minLicenseM2} m²'den küçük (${Math.round(planimetric)} m²).`);
+            if (planimetric < MIN_PIECE_M2) w.push(`Parça ${MIN_PIECE_M2} m²'den küçük (${Math.round(planimetric)} m²).`);
             if (inside < 0.97) w.push(`Parçanın %${Math.round((1 - inside) * 100)}'i bahçe sınırının dışında.`);
             const overlaps = siblings.map((s) => ({ code: s.code, m2: this.safeIntersectArea(g, this.asPoly(s.geometry)) })).filter((o) => o.m2 > rules.overlapToleranceM2);
             if (overlaps.length) w.push(`Komşu bahçeyle çakışma: ${overlaps.map((o) => `${o.code} ${Math.round(o.m2)} m²`).join(', ')}.`);
@@ -289,7 +291,7 @@ export class LicensingOperationsService {
         const g = this.asPoly(p.geometry);
         const warnings = this.geometryWarnings(g);
         const planimetric = this.m2(g);
-        if (planimetric < rules.minLicenseM2) errors.push(`Yeni sınır ${rules.minLicenseM2} m²'den küçük.`);
+        if (planimetric < MIN_PIECE_M2) errors.push(`Yeni sınır ${MIN_PIECE_M2} m²'den küçük.`);
         const parcel = await this.parcelRepo.findOne({ where: { areaId: area.id, parcelKey: garden.parcelKey } });
         const outside = parcel ? Math.max(0, planimetric - this.safeIntersectArea(g, this.asPoly(parcel.geometry))) : 0;
         if (outside > Math.max(rules.overlapToleranceM2, planimetric * 0.03)) warnings.push(`Yeni sınırın ${Math.round(outside)} m²'si parsel dışında.`);
