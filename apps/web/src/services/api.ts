@@ -550,7 +550,7 @@ export interface InventoryLicense {
 export type LicenseMatchLevel = 'exact' | 'historical' | 'probable' | 'unmatched';
 export type GardenApprovalStatus = 'approved' | 'proposed' | 'boundary_conflict' | 'field_check_required' | 'unresolved';
 export type GardenDiscrepancy = 'area_over' | 'area_under' | 'no_tea' | 'no_license' | 'lineage_unresolved' | 'overlap' | 'outside_parcel';
-export type ApplicationType = 'new_license' | 'area_correction' | 'transfer' | 'boundary_determination' | 'parcel_update';
+export type ApplicationType = 'new_license' | 'area_correction' | 'transfer' | 'boundary_determination' | 'parcel_update' | 'garden_subdivision' | 'license_split';
 export type ApplicationStatus =
     | 'DRAFT'
     | 'DOCUMENTS_PENDING'
@@ -621,7 +621,7 @@ export interface LicenseView {
     code: string;
     producerCode: string;
     walletNo: string;
-    status: 'active' | 'transfer_pending' | 'inactive';
+    status: 'active' | 'transfer_pending' | 'inactive' | 'split' | 'transferred';
     issuedYear: number;
     recordedAreaM2: number;
     allocatedAreaM2: number;
@@ -634,6 +634,10 @@ export interface LicenseView {
     validFrom: string;
     validTo: string | null;
     gardenCodes: string[];
+    parentCode: string | null;
+    childCodes: string[];
+    history: RegistryEvent[];
+    source: 'engine' | 'site';
 }
 
 export interface GardenGeometryVersion {
@@ -676,6 +680,12 @@ export interface LicensedGarden {
     versions: GardenGeometryVersion[];
     proposal: GardenBoundaryProposal | null;
     geometry: GeoJSON.Geometry;
+    recordStatus: 'active' | 'superseded';
+    supersededBy: string[];
+    parentCode: string | null;
+    events: RegistryEvent[];
+    source: 'engine' | 'site';
+    locality: string;
 }
 
 export interface ApplicationDocument {
@@ -717,6 +727,10 @@ export interface ApplicationRow {
     missingDocuments: number;
     lastActivityAt: string;
     allowedTransitions: ApplicationStatus[];
+    source: 'engine' | 'site';
+    hasPayload: boolean;
+    appliedAt: string | null;
+    createdByName: string | null;
 }
 
 export interface ApplicationDetail extends ApplicationRow {
@@ -725,6 +739,8 @@ export interface ApplicationDetail extends ApplicationRow {
     decisions: ApplicationDecisionView[];
     garden: LicensedGarden | null;
     license: LicenseView | null;
+    payload: Record<string, unknown> | null;
+    effects: Record<string, unknown> | null;
 }
 
 export interface BoundaryConflict {
@@ -1899,6 +1915,139 @@ export function saveBlob(blob: Blob, filename: string): void {
     setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
+
+// ── Registry operations: subdivision, licence split, transfer, correction, boundary (site-created files) ──
+export interface RegistryEvent {
+    at: string;
+    type: string;
+    note: string;
+    by: string;
+    applicationCode: string | null;
+}
+
+export interface HolderSpec {
+    producerCode?: string;
+    name?: string;
+    walletNo?: string;
+}
+
+export type OperationCause = 'inheritance' | 'sale' | 'parcel_split' | 'family' | 'other';
+
+export interface SubdivisionPayload {
+    gardenCode: string;
+    pieces: Array<{ label: string; geometry: Record<string, unknown>; holder: HolderSpec; licensedAreaM2?: number }>;
+    cause?: OperationCause;
+    reason?: string;
+}
+
+export interface LicenseSplitPayload {
+    licenseCode: string;
+    parts: Array<{ label: string; holder: HolderSpec; gardenCodes: string[]; recordedAreaM2?: number }>;
+    cause: OperationCause;
+    reason?: string;
+}
+
+export interface TransferPayload {
+    licenseCode: string;
+    holder: HolderSpec;
+    cause: 'inheritance' | 'sale' | 'family' | 'other';
+    reason?: string;
+}
+
+export interface AreaCorrectionPayload {
+    gardenCode: string;
+    newLicensedAreaM2: number;
+    reason: string;
+}
+
+export interface BoundaryPayload {
+    gardenCode: string;
+    geometry: Record<string, unknown>;
+    source: 'map' | 'rtk' | 'producer';
+    reason?: string;
+}
+
+export interface CreateLicensingApplication {
+    type: ApplicationType;
+    payload: SubdivisionPayload | LicenseSplitPayload | TransferPayload | AreaCorrectionPayload | BoundaryPayload;
+    providedDocuments?: string[];
+    submit?: 'review' | 'draft';
+}
+
+export interface PieceComputation {
+    label: string;
+    holder: HolderSpec;
+    holderName: string;
+    planimetricAreaM2: number;
+    surfaceAreaM2: number;
+    measuredTeaAreaM2: number;
+    licensedAreaM2: number | null;
+    insideParentShare: number;
+    siblingOverlapM2: number;
+    overlapsGardenCodes: string[];
+    pieceOverlapM2: number;
+    warnings: string[];
+}
+
+export interface SubdivisionPreview {
+    type: 'garden_subdivision';
+    gardenCode: string;
+    parent: { code: string; planimetricAreaM2: number; licensedAreaM2: number | null; measuredTeaAreaM2: number; licenseCode: string | null; producerCode: string };
+    pieces: PieceComputation[];
+    coveredShare: number;
+    uncoveredM2: number;
+    licensedTotalM2: number | null;
+    warnings: string[];
+    errors: string[];
+    ok: boolean;
+}
+
+export interface SplitPartComputation {
+    label: string;
+    holder: HolderSpec;
+    holderName: string;
+    gardenCodes: string[];
+    gardensLicensedM2: number;
+    recordedAreaM2: number;
+    keepsOriginal: boolean;
+}
+
+export interface SplitPreview {
+    type: 'license_split';
+    licenseCode: string;
+    license: { code: string; producerCode: string; recordedAreaM2: number; gardenCodes: string[]; status: string };
+    parts: SplitPartComputation[];
+    unassignedGardenCodes: string[];
+    warnings: string[];
+    errors: string[];
+    ok: boolean;
+}
+
+export interface BoundaryPreview {
+    type: 'boundary_determination';
+    gardenCode: string;
+    before: { planimetricAreaM2: number; surfaceAreaM2: number; measuredTeaAreaM2: number };
+    after: { planimetricAreaM2: number; surfaceAreaM2: number; measuredTeaAreaM2: number };
+    outsideParcelM2: number;
+    siblingOverlapM2: number;
+    overlapsGardenCodes: string[];
+    discrepancies: GardenDiscrepancy[];
+    warnings: string[];
+    errors: string[];
+    ok: boolean;
+}
+
+export type OperationPreview = SubdivisionPreview | SplitPreview | BoundaryPreview;
+
+export interface GardenEditorContext {
+    garden: { code: string; producerCode: string; producerName: string; parcelKey: string; block: string; parcel: string; locality: string; licenseCode: string | null; licensedAreaM2: number | null; planimetricAreaM2: number; surfaceAreaM2: number; measuredTeaAreaM2: number; meanSlopeDeg: number; approvalStatus: GardenApprovalStatus; geometry: Record<string, unknown> };
+    parcel: { geometry: Record<string, unknown>; nature: string; deedAreaM2: number | null } | null;
+    siblings: Array<{ code: string; producerCode: string; producerName: string; approvalStatus: GardenApprovalStatus; licenseCode: string | null; geometry: Record<string, unknown> }>;
+    teaPatches: Array<{ areaM2: number; geometry: Record<string, unknown> }>;
+    license: { code: string; recordedAreaM2: number; gardenCodes: string[]; producerCode: string; status: string } | null;
+    rules: { areaTolerance: number; minLicenseM2: number; overlapToleranceM2: number };
+}
+
 export const api = {
     // Auth endpoints
     register: (data: {
@@ -2564,4 +2713,12 @@ export const api = {
     },
     downloadCalibrationCsv: (areaId: string, season?: string) =>
         downloadFile(`/caykur/tea-inventory/areas/${areaId}/calibration/labels.csv${season ? `?season=${encodeURIComponent(season)}` : ''}`, 'Etiketler indirilemedi'),
+
+    // ── Registry operations (site-created licensing files) ──
+    createLicensingApplication: (areaId: string, body: CreateLicensingApplication) =>
+        request<ApplicationDetail>(`/caykur/tea-inventory/areas/${areaId}/licensing/applications`, { method: 'POST', body: JSON.stringify(body) }),
+    previewLicensingOperation: (areaId: string, body: { type: 'garden_subdivision' | 'license_split' | 'boundary_determination'; payload: SubdivisionPayload | LicenseSplitPayload | BoundaryPayload }) =>
+        request<OperationPreview>(`/caykur/tea-inventory/areas/${areaId}/licensing/preview`, { method: 'POST', body: JSON.stringify(body) }),
+    getLicensingGardenContext: (areaId: string, code: string) =>
+        request<GardenEditorContext>(`/caykur/tea-inventory/areas/${areaId}/licensing/gardens/${encodeURIComponent(code)}/context`),
 };

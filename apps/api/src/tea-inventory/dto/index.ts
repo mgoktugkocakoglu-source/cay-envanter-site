@@ -6,3 +6,4 @@ export * from './pruning-fusion.dto';
 export * from './report.dto';
 export * from './calibration.dto';
 export * from './ministry-request.dto';
+export * from './licensing-operations.dto';

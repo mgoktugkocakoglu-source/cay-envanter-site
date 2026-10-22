@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { TeaInventoryArea } from '@/tea-inventory/entities/tea-inventory-area.entity';
 
-export type ApplicationType = 'new_license' | 'area_correction' | 'transfer' | 'boundary_determination' | 'parcel_update';
+export type ApplicationType = 'new_license' | 'area_correction' | 'transfer' | 'boundary_determination' | 'parcel_update' | 'garden_subdivision' | 'license_split';
 
 export const APPLICATION_STATUSES = [
     'DRAFT',
@@ -81,4 +81,24 @@ export class LicensingApplication {
 
     @Column({ type: 'jsonb', default: () => "'[]'" })
     history: ApplicationHistoryEntry[];
+
+    // Structured request of a site-created file (pieces of a subdivision, parts of a split, new holder…).
+    @Column({ type: 'jsonb', nullable: true })
+    payload: Record<string, unknown> | null;
+
+    // When the approved payload was applied to the register, and what it produced (codes).
+    @Column({ type: 'timestamp', name: 'applied_at', nullable: true })
+    appliedAt: Date | null;
+
+    @Column({ type: 'jsonb', nullable: true })
+    effects: Record<string, unknown> | null;
+
+    @Column({ type: 'uuid', name: 'created_by_id', nullable: true })
+    createdById: string | null;
+
+    @Column({ type: 'varchar', length: 150, name: 'created_by_name', nullable: true })
+    createdByName: string | null;
+
+    @Column({ type: 'varchar', length: 10, default: 'engine' })
+    source: 'engine' | 'site';
 }

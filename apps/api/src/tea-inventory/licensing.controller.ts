@@ -13,7 +13,8 @@ import {
     LicensingService,
     LicensingSummary,
 } from '@/tea-inventory/licensing.service';
-import { ApplicationDecisionDto, ApplicationQueryDto, LicensingProducerQueryDto } from '@/tea-inventory/dto';
+import { ApplicationDecisionDto, ApplicationQueryDto, CreateApplicationDto, LicensingProducerQueryDto, PreviewOperationDto } from '@/tea-inventory/dto';
+import { GardenEditorContext, LicensingOperationsService, OperationPreview } from '@/tea-inventory/licensing-operations.service';
 import { Paginated } from '@/common/dto/paginated.dto';
 
 // Same audience as the tea inventory.
@@ -36,7 +37,37 @@ const DECIDE_ROLES = [CaykurRole.KURUM_ADMIN, CaykurRole.FABRIKA_SORUMLUSU, Cayk
 @CaykurRoles(...READ_ROLES)
 @Controller('caykur/tea-inventory/areas/:id/licensing')
 export class LicensingController {
-    constructor(private readonly service: LicensingService) { }
+    constructor(
+        private readonly service: LicensingService,
+        private readonly operations: LicensingOperationsService,
+    ) { }
+
+    @Post('applications')
+    @CaykurRoles(...DECIDE_ROLES)
+    @ApiOperation({ summary: 'Open a file on the register: garden subdivision, licence split, transfer, area correction or boundary determination (validated payload)' })
+    @ApiParam({ name: 'id', description: 'Inventory area id' })
+    @ApiResponse({ status: 201, description: 'The created application' })
+    async createApplication(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateApplicationDto, @CurrentUser() user: AuthenticatedUser): Promise<ApplicationDetail> {
+        return this.service.createApplication(id, dto, user.id);
+    }
+
+    @Post('preview')
+    @CaykurRoles(...DECIDE_ROLES)
+    @ApiOperation({ summary: 'Dry run of a subdivision / split / boundary: computed areas, tea, licensed shares, overlaps and warnings' })
+    @ApiParam({ name: 'id', description: 'Inventory area id' })
+    @ApiResponse({ status: 201, description: 'Preview' })
+    async preview(@Param('id', ParseUUIDPipe) id: string, @Body() dto: PreviewOperationDto): Promise<OperationPreview> {
+        return this.operations.preview(id, dto);
+    }
+
+    @Get('gardens/:code/context')
+    @ApiOperation({ summary: 'What the boundary editor needs: the garden, its parcel, neighbouring gardens in the parcel, tea patches and rules' })
+    @ApiParam({ name: 'id', description: 'Inventory area id' })
+    @ApiParam({ name: 'code', description: 'Garden code' })
+    @ApiResponse({ status: 200, description: 'Editor context' })
+    async gardenContext(@Param('id', ParseUUIDPipe) id: string, @Param('code') code: string): Promise<GardenEditorContext> {
+        return this.operations.gardenContext(id, code);
+    }
 
     @Get('summary')
     @ApiOperation({ summary: 'Register totals: producers, licences by match level, gardens by boundary status, three area sums, applications, conflicts, unlicensed tea' })

@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource, EntityManager } from 'typeorm';
-import { TeaInventoryArea, InventoryLicense, LicensingBlock, TeaPatch, ProducerScanBlock, ProducerSeasonSchedule, FusionUnassignedPatch } from '@/tea-inventory/entities/tea-inventory-area.entity';
+import { TeaInventoryArea, InventoryLicense, LicensingBlock, TeaPatch, ProducerScanBlock, ProducerSeasonSchedule, FusionUnassignedPatch, BoundaryConflict } from '@/tea-inventory/entities/tea-inventory-area.entity';
 import { TeaInventoryParcel } from '@/tea-inventory/entities/tea-inventory-parcel.entity';
 import { InventoryClass } from '@/tea-inventory/enums/inventory-class.enum';
 import { TeaInventoryProducer, ProducerScan, ProducerAutoStatus, ProducerFusion } from '@/tea-inventory/entities/tea-inventory-producer.entity';
@@ -11,6 +11,14 @@ import { TeaInventoryGarden, GardenSeason, GardenPruningEvent, GardenFusion, Rad
 import { TeaInventoryLicense } from '@/tea-inventory/entities/tea-inventory-license.entity';
 import { ParcelLineage } from '@/tea-inventory/entities/parcel-lineage.entity';
 import { LicensingApplication } from '@/tea-inventory/entities/licensing-application.entity';
+
+interface SiteSnapshot {
+    gardens: TeaInventoryGarden[];
+    licenses: TeaInventoryLicense[];
+    applications: LicensingApplication[];
+    producers: TeaInventoryProducer[];
+    conflicts: BoundaryConflict[];
+}
 
 /** Bundles exported by the cay-envanter engine (`npm run export-site`); copied to dist by nest-cli assets. */
 const SEED_DIR = join(__dirname, 'seed-data');
@@ -189,6 +197,7 @@ export class TeaInventorySeedService implements OnModuleInit {
             if (existing && existing.bundleGeneratedAt.getTime() === generatedAt.getTime()) {
                 return;
             }
+            const snapshot = existing ? await this.snapshotSiteRows(manager, existing) : null;
             if (existing) {
                 await manager.delete(TeaInventoryArea, { id: existing.id });
             }
@@ -253,6 +262,9 @@ export class TeaInventorySeedService implements OnModuleInit {
             }
             if (bundle.licensing) {
                 await this.importLicensing(manager, area.id, bundle.licensing);
+            }
+            if (snapshot) {
+                await this.restoreSiteRows(manager, area, snapshot);
             }
             this.logger.log(`Imported tea inventory ${bundle.area.code}: ${parcels.length} parcels`);
         });
@@ -368,5 +380,77 @@ export class TeaInventorySeedService implements OnModuleInit {
         });
         await manager.save(gardens, { chunk: INSERT_CHUNK });
         this.logger.log(`Imported ${block.producers.length} producers × ${block.seasons.length} seasons and ${gardens.length} gardens`);
+    }
+    // ── Site edits survive a re-import ──
+
+    /**
+     * Rows created or changed by site operations (subdivisions, splits, transfers, new files).
+     * The bundle is re-imported wholesale, then these are put back: registry values on gardens
+     * that still exist, whole rows for gardens / licences / producers / files the engine does not know.
+     */
+    private async snapshotSiteRows(manager: EntityManager, area: TeaInventoryArea): Promise<SiteSnapshot> {
+        const [gardens, licenses, applications, producers] = await Promise.all([
+            manager.find(TeaInventoryGarden, { where: { areaId: area.id, source: 'site' } }),
+            manager.find(TeaInventoryLicense, { where: { areaId: area.id, source: 'site' } }),
+            manager.find(LicensingApplication, { where: { areaId: area.id, source: 'site' } }),
+            manager.find(TeaInventoryProducer, { where: { areaId: area.id, source: 'site' } }),
+        ]);
+        const conflicts = (area.licensing?.conflicts ?? []).filter((c) => c.code.startsWith('SITE-'));
+        return { gardens, licenses, applications, producers, conflicts };
+    }
+
+    private async restoreSiteRows(manager: EntityManager, area: TeaInventoryArea, snap: SiteSnapshot): Promise<void> {
+        const strip = <T extends { id: string; areaId: string }>(row: T): Omit<T, 'id' | 'areaId' | 'area'> => {
+            const { id: _id, areaId: _a, area: _area, ...rest } = row as T & { area?: unknown };
+            return rest;
+        };
+        let restoredGardens = 0;
+        for (const g of snap.gardens) {
+            const current = await manager.findOne(TeaInventoryGarden, { where: { areaId: area.id, code: g.code } });
+            if (current) {
+                // Engine-derived columns (seasons, parcel identity, tea measurement) come from the new bundle; registry values from the site.
+                Object.assign(current, {
+                    producerCode: g.producerCode, licenseCode: g.licenseCode, approvalStatus: g.approvalStatus, licensedAreaM2: g.licensedAreaM2,
+                    planimetricAreaM2: g.planimetricAreaM2, surfaceAreaM2: g.surfaceAreaM2, discrepancies: g.discrepancies, versions: g.versions,
+                    proposal: g.proposal, geometry: g.geometry, recordStatus: g.recordStatus, supersededBy: g.supersededBy, parentCode: g.parentCode,
+                    events: g.events, source: 'site', holderIndex: g.holderIndex, holderCount: g.holderCount,
+                });
+                await manager.save(current);
+            } else {
+                await manager.save(manager.create(TeaInventoryGarden, { ...strip(g), areaId: area.id }));
+            }
+            restoredGardens++;
+        }
+        for (const l of snap.licenses) {
+            const current = await manager.findOne(TeaInventoryLicense, { where: { areaId: area.id, code: l.code } });
+            if (current) {
+                Object.assign(current, strip(l));
+                await manager.save(current);
+            } else {
+                await manager.save(manager.create(TeaInventoryLicense, { ...strip(l), areaId: area.id }));
+            }
+        }
+        for (const a of snap.applications) {
+            const current = await manager.findOne(LicensingApplication, { where: { areaId: area.id, code: a.code } });
+            if (current) {
+                Object.assign(current, { payload: a.payload, appliedAt: a.appliedAt, effects: a.effects, source: 'site', createdById: a.createdById, createdByName: a.createdByName });
+                await manager.save(current);
+            } else {
+                await manager.save(manager.create(LicensingApplication, { ...strip(a), areaId: area.id }));
+            }
+        }
+        for (const p of snap.producers) {
+            const current = await manager.findOne(TeaInventoryProducer, { where: { areaId: area.id, code: p.code, season: p.season } });
+            if (!current) await manager.save(manager.create(TeaInventoryProducer, { ...strip(p), areaId: area.id }));
+        }
+        if (snap.conflicts.length > 0) {
+            const fresh = await manager.findOne(TeaInventoryArea, { where: { id: area.id } });
+            if (fresh?.licensing) {
+                const known = new Set(fresh.licensing.conflicts.map((c) => c.code));
+                fresh.licensing = { ...fresh.licensing, conflicts: [...fresh.licensing.conflicts, ...snap.conflicts.filter((c) => !known.has(c.code))] };
+                await manager.save(fresh);
+            }
+        }
+        this.logger.log(`Restored site edits: ${restoredGardens} gardens, ${snap.licenses.length} licences, ${snap.applications.length} files, ${snap.producers.length} producers, ${snap.conflicts.length} conflicts`);
     }
 }

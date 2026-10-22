@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
-import { ChevronLeft, ChevronRight, Download, FileText, MapPinned, ScrollText, TriangleAlert, Users } from '@lucide/vue';
+import { ChevronLeft, ChevronRight, Download, FileText, MapPinned, MoreHorizontal, ScrollText, TriangleAlert, Users } from '@lucide/vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import CaykurLicensingOperations, { type OperationKind } from '@/components/caykur/CaykurLicensingOperations.vue';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmptyState, ListToolbar, LoadingState, SearchInput, StatCard } from '@/components/shared';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -127,6 +129,51 @@ const layerGroups: Record<string, L.LayerGroup> = {};
 const showLayer = ref({ parcels: true, tea: false, approved: true, pending: true, proposals: true, conflicts: true, unlicensed: true });
 
 const canDecide = computed(() => auth.isAdmin || DECIDE_ROLES.includes(auth.caykurRole ?? ''));
+// ── Register operations (subdivision, split, transfer, correction, boundary) ──
+const opOpen = ref(false);
+const opKind = ref<OperationKind>('garden_subdivision');
+const opGarden = ref<string | null>(null);
+const opLicense = ref<string | null>(null);
+function openOperation(kind: OperationKind, gardenCode: string | null = null, licenseCode: string | null = null): void {
+    opKind.value = kind;
+    opGarden.value = gardenCode;
+    opLicense.value = licenseCode;
+    opOpen.value = true;
+}
+async function onOperationCreated(app: ApplicationDetail): Promise<void> {
+    await Promise.all([loadSummary(), loadApps()]);
+    if (profile.value) {
+        const fresh = await api.getLicensingProducer(props.areaId, profile.value.code);
+        if (fresh.data) profile.value = fresh.data;
+    }
+    application.value = app;
+    note.value = '';
+    dialogOpen.value = true;
+}
+const CAUSE_LABEL: Record<string, string> = { inheritance: 'intikal (vefat)', sale: 'satış / devir', parcel_split: 'parsel ifrazı', family: 'aile içi paylaşım', other: 'diğer' };
+interface PayloadView {
+    pieces?: Array<{ label: string; holderName: string; planimetricAreaM2: number; licensedAreaM2: number | null; measuredTeaAreaM2: number; warnings: string[] }>;
+    parts?: Array<{ label: string; holderName: string; gardenCodes: string[]; recordedAreaM2: number; keepsOriginal: boolean }>;
+    before?: { planimetricAreaM2: number; measuredTeaAreaM2: number };
+    after?: { planimetricAreaM2: number; measuredTeaAreaM2: number };
+    holderName?: string;
+    cause?: string;
+    reason?: string;
+    newLicensedAreaM2?: number;
+    previousLicensedAreaM2?: number | null;
+}
+const payloadView = computed<PayloadView | null>(() => {
+    const p = application.value?.payload as (Record<string, unknown> & { preview?: Record<string, unknown> }) | null | undefined;
+    if (!p) return null;
+    const preview = (p.preview ?? {}) as PayloadView;
+    return { ...preview, holderName: p.holderName as string | undefined, cause: p.cause as string | undefined, reason: p.reason as string | undefined, newLicensedAreaM2: p.newLicensedAreaM2 as number | undefined, previousLicensedAreaM2: p.previousLicensedAreaM2 as number | null | undefined };
+});
+const effectsView = computed(() => {
+    const e = application.value?.effects as Record<string, unknown> | null | undefined;
+    if (!e) return [];
+    const labels: Record<string, string> = { gardens: 'Yeni bahçeler', licenses: 'Yeni ruhsatlar', supersededGarden: 'Kapanan bahçe', producers: 'Güncellenen müstahsiller', conflicts: 'Açılan ihtilaflar', originalLicense: 'Ruhsat', originalStatus: 'Ruhsat durumu', license: 'Ruhsat', from: 'Eski sahip', to: 'Yeni sahip', garden: 'Bahçe', version: 'Geometri sürümü', planimetricAreaM2: 'İzdüşüm (m²)', approvalStatus: 'Sınır durumu', licensedAreaM2: 'Ruhsat alanı (m²)', previousLicensedAreaM2: 'Önceki ruhsat alanı (m²)' };
+    return Object.entries(e).filter(([, v]) => v !== null && !(Array.isArray(v) && v.length === 0)).map(([k, v]) => ({ label: labels[k] ?? k, value: Array.isArray(v) ? v.join(', ') : String(v) }));
+});
 const hasRegistry = computed(() => !!summary.value?.generatedAt);
 const discrepancyBadges = computed(() => DISCREPANCY_ORDER.filter((k) => (summary.value?.gardens.discrepancies[k] ?? 0) > 0));
 const applicationBadges = computed(() => APPLICATION_STATUS_ORDER.filter((k) => (summary.value?.applications.byStatus[k] ?? 0) > 0));
@@ -897,6 +944,17 @@ function toggleGarden(code: string): void {
                                     <div v-if="l.candidateParcelKeys.length" class="sm:col-span-2 text-xs text-muted-foreground">
                                         Aday parseller: {{ l.candidateParcelKeys.map((k) => k.split('/').slice(1).join('/')).join(', ') }} — eksper teyidi bekliyor
                                     </div>
+                                    <div v-if="l.parentCode || l.childCodes.length" class="sm:col-span-2 text-xs text-muted-foreground">
+                                        <span v-if="l.parentCode">{{ l.parentCode }} ruhsatından ayrıldı</span><span v-if="l.parentCode && l.childCodes.length"> · </span><span v-if="l.childCodes.length">ayrılan ruhsatlar: {{ l.childCodes.join(', ') }}</span>
+                                    </div>
+                                    <div v-if="l.history.length" class="sm:col-span-2 rounded-md bg-muted/40 p-2 text-xs">
+                                        <div class="font-medium">Ruhsat geçmişi</div>
+                                        <div v-for="(h, i) in l.history" :key="i">{{ fmtDate(h.at) }} · {{ h.note }} <span class="text-muted-foreground">· {{ h.by }}<template v-if="h.applicationCode"> · {{ h.applicationCode }}</template></span></div>
+                                    </div>
+                                </div>
+                                <div v-if="canDecide && (l.status === 'active' || l.status === 'transfer_pending')" class="mt-3 flex flex-wrap gap-2">
+                                    <Button variant="outline" size="sm" class="h-11 md:h-9" @click="openOperation('license_split', null, l.code)">Ruhsatı ayır</Button>
+                                    <Button variant="outline" size="sm" class="h-11 md:h-9" @click="openOperation('transfer', null, l.code)">Devir / intikal</Button>
                                 </div>
                             </div>
                         </section>
@@ -913,15 +971,18 @@ function toggleGarden(code: string): void {
                                             <TableHead class="hidden text-right sm:table-cell">İzdüşüm</TableHead>
                                             <TableHead class="hidden text-right sm:table-cell">Eğimli</TableHead>
                                             <TableHead class="text-right">Çay</TableHead>
+                                            <TableHead v-if="canDecide" class="w-12 text-right"><span class="sr-only">İşlem</span></TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         <template v-for="g in profile.gardens" :key="g.code">
-                                            <TableRow class="cursor-pointer" tabindex="0" role="button" :aria-expanded="expandedGarden === g.code" @click="toggleGarden(g.code)" @keydown="onRowKey($event, () => toggleGarden(g.code))">
+                                            <TableRow class="cursor-pointer" :class="g.recordStatus === 'superseded' ? 'opacity-60' : ''" tabindex="0" role="button" :aria-expanded="expandedGarden === g.code" @click="toggleGarden(g.code)" @keydown="onRowKey($event, () => toggleGarden(g.code))">
                                                 <TableCell>
                                                     <div class="font-medium text-foreground">{{ g.block }}/{{ g.parcel }}</div>
-                                                    <div class="text-xs text-muted-foreground">{{ g.code }}<template v-if="g.holderCount > 1"> · hisse {{ g.holderIndex }}/{{ g.holderCount }}</template> · {{ g.licenseCode ?? 'ruhsat yok' }} · sürüm {{ g.versions.length }}</div>
+                                                    <div class="text-xs text-muted-foreground">{{ g.code }}<template v-if="g.holderCount > 1"> · hisse {{ g.holderIndex }}/{{ g.holderCount }}</template> · {{ g.licenseCode ?? 'ruhsat yok' }} · sürüm {{ g.versions.length }}<template v-if="g.parentCode"> · {{ g.parentCode }} bahçesinden</template></div>
                                                     <div class="mt-1 flex flex-wrap gap-1">
+                                                        <Badge v-if="g.recordStatus === 'superseded'" variant="muted">Bölündü → {{ g.supersededBy.join(', ') }}</Badge>
+                                                        <Badge v-if="g.source === 'site' && g.recordStatus === 'active'" variant="outline">Site kaydı</Badge>
                                                         <Badge v-for="d in g.discrepancies" :key="d" :variant="toneVariant(DISCREPANCY_META[d].tone)">{{ DISCREPANCY_META[d].label }}</Badge>
                                                     </div>
                                                 </TableCell>
@@ -930,10 +991,26 @@ function toggleGarden(code: string): void {
                                                 <TableCell class="hidden text-right tabular-nums sm:table-cell">{{ formatM2(g.planimetricAreaM2) }}</TableCell>
                                                 <TableCell class="hidden text-right tabular-nums sm:table-cell">{{ formatM2(g.surfaceAreaM2) }} <span class="text-xs text-muted-foreground">{{ g.meanSlopeDeg }}°</span></TableCell>
                                                 <TableCell class="text-right tabular-nums">{{ formatM2(g.measuredTeaAreaM2) }}</TableCell>
+                                                <TableCell v-if="canDecide" class="text-right" @click.stop>
+                                                    <DropdownMenu v-if="g.recordStatus === 'active'">
+                                                        <DropdownMenuTrigger as-child>
+                                                            <Button variant="ghost" size="icon" class="size-11 md:size-9" aria-label="Bahçe işlemleri"><MoreHorizontal aria-hidden="true" /></Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuItem @select="openOperation('garden_subdivision', g.code, g.licenseCode)">Alt bölünme (parçalara ayır)</DropdownMenuItem>
+                                                            <DropdownMenuItem @select="openOperation('boundary_determination', g.code, g.licenseCode)">Sınır tespiti / düzeltme</DropdownMenuItem>
+                                                            <DropdownMenuItem @select="openOperation('area_correction', g.code, g.licenseCode)">Ruhsat alanı düzeltme</DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </TableCell>
                                             </TableRow>
                                             <TableRow v-if="expandedGarden === g.code">
-                                                <TableCell colspan="6" class="bg-muted/30">
+                                                <TableCell :colspan="canDecide ? 7 : 6" class="bg-muted/30">
                                                     <div class="flex flex-col gap-2 text-xs">
+                                                        <div v-if="g.events.length" class="rounded-md border p-2">
+                                                            <div class="font-medium">Kayıt geçmişi</div>
+                                                            <div v-for="(ev, i) in g.events" :key="i">{{ fmtDate(ev.at) }} · {{ ev.note }} <span class="text-muted-foreground">· {{ ev.by }}<template v-if="ev.applicationCode"> · {{ ev.applicationCode }}</template></span></div>
+                                                        </div>
                                                         <div class="font-medium">Geometri sürümleri</div>
                                                         <div v-for="v in g.versions" :key="v.version" class="flex flex-wrap gap-x-3">
                                                             <span class="font-medium">v{{ v.version }}</span>
@@ -999,6 +1076,36 @@ function toggleGarden(code: string): void {
                             <span class="text-muted-foreground">{{ APPLICATION_STATUS_META[application.status].description }}</span>
                         </div>
                         <p>{{ application.summary }}</p>
+                        <p v-if="application.source === 'site'" class="text-xs text-muted-foreground">Site üzerinden açıldı · {{ application.createdByName }}<template v-if="application.appliedAt"> · onayla birlikte {{ fmtDate(application.appliedAt) }} tarihinde sicile işlendi</template></p>
+
+                        <div v-if="payloadView" class="rounded-md border p-3">
+                            <div class="mb-2 font-medium">Talep içeriği</div>
+                            <div v-if="payloadView.pieces" class="overflow-hidden rounded-md border">
+                                <Table>
+                                    <TableHeader><TableRow><TableHead>Parça</TableHead><TableHead>Sahip</TableHead><TableHead class="text-right">İzdüşüm</TableHead><TableHead class="text-right">Ruhsat payı</TableHead><TableHead class="text-right">Çay</TableHead></TableRow></TableHeader>
+                                    <TableBody>
+                                        <TableRow v-for="pc in payloadView.pieces" :key="pc.label">
+                                            <TableCell class="font-medium">{{ pc.label }}</TableCell>
+                                            <TableCell>{{ pc.holderName }}</TableCell>
+                                            <TableCell class="text-right tabular-nums">{{ formatM2(pc.planimetricAreaM2) }}</TableCell>
+                                            <TableCell class="text-right tabular-nums">{{ pc.licensedAreaM2 == null ? '—' : formatM2(pc.licensedAreaM2) }}</TableCell>
+                                            <TableCell class="text-right tabular-nums">{{ formatM2(pc.measuredTeaAreaM2) }}</TableCell>
+                                        </TableRow>
+                                    </TableBody>
+                                </Table>
+                            </div>
+                            <div v-else-if="payloadView.parts" class="flex flex-col gap-1 text-xs">
+                                <div v-for="pt in payloadView.parts" :key="pt.label"><span class="font-medium">{{ pt.label }}</span> · {{ pt.holderName }} · {{ pt.gardenCodes.join(', ') }} · ruhsatta {{ formatM2(pt.recordedAreaM2) }} · {{ pt.keepsOriginal ? 'mevcut ruhsat kalır' : 'yeni ruhsat' }}</div>
+                            </div>
+                            <div v-else-if="payloadView.before && payloadView.after" class="text-xs">İzdüşüm {{ formatM2(payloadView.before.planimetricAreaM2) }} → {{ formatM2(payloadView.after.planimetricAreaM2) }} · çay {{ formatM2(payloadView.before.measuredTeaAreaM2) }} → {{ formatM2(payloadView.after.measuredTeaAreaM2) }}</div>
+                            <div v-else-if="payloadView.holderName" class="text-xs">Devralan: <span class="font-medium">{{ payloadView.holderName }}</span></div>
+                            <div v-else-if="payloadView.newLicensedAreaM2 != null" class="text-xs">Ruhsat alanı {{ payloadView.previousLicensedAreaM2 == null ? '—' : formatM2(payloadView.previousLicensedAreaM2) }} → {{ formatM2(payloadView.newLicensedAreaM2) }}</div>
+                            <div v-if="payloadView.cause || payloadView.reason" class="mt-1 text-xs text-muted-foreground"><template v-if="payloadView.cause">{{ CAUSE_LABEL[payloadView.cause] ?? payloadView.cause }}</template><template v-if="payloadView.cause && payloadView.reason"> · </template>{{ payloadView.reason }}</div>
+                        </div>
+                        <div v-if="effectsView.length" class="rounded-md border border-success/40 bg-success/5 p-3 text-xs">
+                            <div class="mb-1 text-sm font-medium">Sicile işlenen değişiklik</div>
+                            <div v-for="e in effectsView" :key="e.label"><span class="text-muted-foreground">{{ e.label }}:</span> {{ e.value }}</div>
+                        </div>
 
                         <div>
                             <div class="mb-1 font-medium">Belgeler</div>
@@ -1062,5 +1169,16 @@ function toggleGarden(code: string): void {
                 </template>
             </DialogContent>
         </Dialog>
+
+        <CaykurLicensingOperations
+            v-if="profile"
+            v-model:open="opOpen"
+            :area-id="areaId"
+            :kind="opKind"
+            :profile="profile"
+            :garden-code="opGarden"
+            :license-code="opLicense"
+            @created="onOperationCreated"
+        />
     </div>
 </template>

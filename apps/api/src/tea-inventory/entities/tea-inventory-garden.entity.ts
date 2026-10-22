@@ -123,6 +123,21 @@ export interface GardenSeason {
     fusion?: GardenFusion | null;
 }
 
+/** Whether the garden record is current or was replaced by a subdivision / merge on the site. */
+export type GardenRecordStatus = 'active' | 'superseded';
+
+/** Where the record (or its latest registry values) came from: the engine bundle or a site operation. */
+export type RecordSource = 'engine' | 'site';
+
+/** A non-geometry event in the garden's life (subdivision, transfer, area correction…), for the audit trail. */
+export interface GardenEvent {
+    at: string;
+    type: string;
+    note: string;
+    by: string;
+    applicationCode: string | null;
+}
+
 /** Boundary approval state of the garden's geometry (the licensed sub-polygon). */
 export type GardenApprovalStatus = 'approved' | 'proposed' | 'boundary_conflict' | 'field_check_required' | 'unresolved';
 
@@ -242,6 +257,24 @@ export class TeaInventoryGarden {
 
     @Column({ type: 'jsonb', nullable: true })
     proposal: GardenBoundaryProposal | null;
+
+    // 'superseded' once a subdivision replaced this record with its pieces (kept for history and pruning evidence).
+    @Column({ type: 'varchar', length: 20, name: 'record_status', default: 'active' })
+    recordStatus: GardenRecordStatus;
+
+    // Codes of the pieces that replaced this garden / the garden this piece was cut from.
+    @Column({ type: 'jsonb', name: 'superseded_by', default: () => "'[]'" })
+    supersededBy: string[];
+
+    @Column({ type: 'varchar', length: 40, name: 'parent_code', nullable: true })
+    parentCode: string | null;
+
+    @Column({ type: 'jsonb', default: () => "'[]'" })
+    events: GardenEvent[];
+
+    // 'site' when the registry values were created or changed by a site operation (survives re-imports).
+    @Column({ type: 'varchar', length: 10, default: 'engine' })
+    source: RecordSource;
 
     // Season → results and events ("2025-26" → …).
     @Column({ type: 'jsonb', default: () => "'{}'" })

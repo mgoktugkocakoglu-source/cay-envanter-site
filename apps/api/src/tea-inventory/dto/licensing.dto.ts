@@ -6,7 +6,7 @@ import { APPLICATION_STATUSES, ApplicationStatus } from '@/tea-inventory/entitie
 export const LICENSE_MATCH_LEVELS = ['exact', 'historical', 'probable', 'unmatched'] as const;
 export const GARDEN_APPROVAL_STATUSES = ['approved', 'proposed', 'boundary_conflict', 'field_check_required', 'unresolved'] as const;
 export const GARDEN_DISCREPANCIES = ['area_over', 'area_under', 'no_tea', 'no_license', 'lineage_unresolved', 'overlap', 'outside_parcel'] as const;
-export const APPLICATION_TYPES = ['new_license', 'area_correction', 'transfer', 'boundary_determination', 'parcel_update'] as const;
+export const APPLICATION_TYPES = ['new_license', 'area_correction', 'transfer', 'boundary_determination', 'parcel_update', 'garden_subdivision', 'license_split'] as const;
 export const LICENSING_PRODUCER_SORT_KEYS = ['name', 'licensedArea', 'measuredTea', 'issues'] as const;
 export type LicensingProducerSortKey = (typeof LICENSING_PRODUCER_SORT_KEYS)[number];
 

@@ -141,4 +141,8 @@ export class TeaInventoryProducer {
 
     @Column({ type: 'boolean', default: true })
     demo: boolean;
+
+    // 'site' for holders created by a site operation (subdivision / split to a new holder).
+    @Column({ type: 'varchar', length: 10, default: 'engine' })
+    source: 'engine' | 'site';
 }

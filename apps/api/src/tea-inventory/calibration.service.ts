@@ -113,7 +113,7 @@ export class CalibrationService {
         const season = this.fusion.resolveSeason(area, query.season);
         const [labels, gardens, producers] = await Promise.all([
             this.labelRepo.find({ where: { areaCode: area.code, season }, order: { updatedAt: 'DESC' } }),
-            this.gardenRepo.find({ where: { areaId } }),
+            this.gardenRepo.find({ where: { areaId, recordStatus: 'active' } }),
             this.producerRepo.find({ where: { areaId, season } }),
         ]);
         const gardenByCode = new Map(gardens.map((g) => [g.code, g]));
@@ -183,7 +183,7 @@ export class CalibrationService {
     async metrics(areaId: string, requested?: string, size?: number): Promise<CalibrationMetrics> {
         const { area, season, rows } = await this.planRows(areaId, requested, size);
         const labels = await this.labelRepo.find({ where: { areaCode: area.code, season } });
-        const gardens = await this.gardenRepo.find({ where: { areaId } });
+        const gardens = await this.gardenRepo.find({ where: { areaId, recordStatus: 'active' } });
         const gardenByCode = new Map(gardens.map((g) => [g.code, g]));
         const classes: FusionClass[] = ['pruned', 'likely', 'unclear', 'not_pruned', 'no_data'];
         const values: CalibrationLabelValue[] = ['pruned', 'partial', 'not_pruned', 'unsure'];
@@ -277,7 +277,7 @@ export class CalibrationService {
         const area = await this.findArea(areaId);
         const season = this.fusion.resolveSeason(area, requested);
         const [gardens, producers, labels] = await Promise.all([
-            this.gardenRepo.find({ where: { areaId } }),
+            this.gardenRepo.find({ where: { areaId, recordStatus: 'active' } }),
             this.producerRepo.find({ where: { areaId, season } }),
             this.labelRepo.find({ where: { areaCode: area.code, season } }),
         ]);

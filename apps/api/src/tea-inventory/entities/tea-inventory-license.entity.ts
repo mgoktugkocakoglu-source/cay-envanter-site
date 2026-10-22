@@ -3,7 +3,16 @@ import { TeaInventoryArea } from '@/tea-inventory/entities/tea-inventory-area.en
 
 /** How the parcel reference written on the licence was tied to a current TKGM parcel. */
 export type LicenseMatchLevel = 'exact' | 'historical' | 'probable' | 'unmatched';
-export type LicenseStatus = 'active' | 'transfer_pending' | 'inactive';
+export type LicenseStatus = 'active' | 'transfer_pending' | 'inactive' | 'split' | 'transferred';
+
+/** An event in the licence's life (split, transfer, area correction…), for the audit trail. */
+export interface LicenseEvent {
+    at: string;
+    type: string;
+    note: string;
+    by: string;
+    applicationCode: string | null;
+}
 
 /**
  * A tea licence (çay ruhsatnamesi) of a producer. The licence is the production/quota right;
@@ -73,4 +82,18 @@ export class TeaInventoryLicense {
 
     @Column({ type: 'jsonb', name: 'garden_codes', default: () => "'[]'" })
     gardenCodes: string[];
+
+    // Licence this one was split or transferred from, and the licences carved out of this one.
+    @Column({ type: 'varchar', length: 40, name: 'parent_code', nullable: true })
+    parentCode: string | null;
+
+    @Column({ type: 'jsonb', name: 'child_codes', default: () => "'[]'" })
+    childCodes: string[];
+
+    @Column({ type: 'jsonb', default: () => "'[]'" })
+    history: LicenseEvent[];
+
+    // 'site' when created or changed by a site operation (survives re-imports).
+    @Column({ type: 'varchar', length: 10, default: 'engine' })
+    source: 'engine' | 'site';
 }

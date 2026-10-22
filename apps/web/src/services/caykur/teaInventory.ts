@@ -379,10 +379,14 @@ export const APPLICATION_TYPE_LABEL: Record<ApplicationType, string> = {
     transfer: 'İntikal / devir',
     boundary_determination: 'Sınır belirleme',
     parcel_update: 'Parsel güncelleme',
+    garden_subdivision: 'Bahçe alt bölünmesi',
+    license_split: 'Ruhsat ayırımı',
 };
 
 export const LICENSE_STATUS_LABEL: Record<LicenseView['status'], string> = {
     active: 'Aktif',
     transfer_pending: 'İntikal bekliyor',
     inactive: 'Pasif',
+    split: 'Ayrıldı (parçalara)',
+    transferred: 'Devredildi',
 };

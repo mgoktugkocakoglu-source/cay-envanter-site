@@ -1,16 +1,19 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { BoundaryConflict, LicensingBlock, TeaInventoryArea, TeaPatch } from '@/tea-inventory/entities/tea-inventory-area.entity';
 import { ProducerAutoStatus, TeaInventoryProducer } from '@/tea-inventory/entities/tea-inventory-producer.entity';
 import {
     GardenApprovalStatus,
     GardenBoundaryProposal,
     GardenDiscrepancy,
+    GardenEvent,
     GardenGeometryVersion,
+    GardenRecordStatus,
     TeaInventoryGarden,
 } from '@/tea-inventory/entities/tea-inventory-garden.entity';
-import { LicenseMatchLevel, TeaInventoryLicense } from '@/tea-inventory/entities/tea-inventory-license.entity';
+import { LicenseEvent, LicenseMatchLevel, TeaInventoryLicense } from '@/tea-inventory/entities/tea-inventory-license.entity';
+import { LicensingOperationsService } from '@/tea-inventory/licensing-operations.service';
 import { ParcelLineage } from '@/tea-inventory/entities/parcel-lineage.entity';
 import {
     ApplicationDocument,
@@ -21,7 +24,7 @@ import {
 } from '@/tea-inventory/entities/licensing-application.entity';
 import { LicensingDecision } from '@/tea-inventory/entities/licensing-decision.entity';
 import { User } from '@/users/entities/user.entity';
-import { ApplicationDecisionDto, ApplicationQueryDto, LicensingProducerQueryDto } from '@/tea-inventory/dto';
+import { ApplicationDecisionDto, ApplicationQueryDto, CreateApplicationDto, LicensingProducerQueryDto } from '@/tea-inventory/dto';
 import { Paginated, paginate } from '@/common/dto/paginated.dto';
 
 /** Files in these statuses are closed; everything else is in the queue. */
@@ -108,6 +111,10 @@ export interface LicenseView {
     validFrom: string;
     validTo: string | null;
     gardenCodes: string[];
+    parentCode: string | null;
+    childCodes: string[];
+    history: LicenseEvent[];
+    source: 'engine' | 'site';
 }
 
 export interface ParcelLineageView {
@@ -140,6 +147,12 @@ export interface LicensedGardenView {
     versions: GardenGeometryVersion[];
     proposal: GardenBoundaryProposal | null;
     geometry: Record<string, unknown>;
+    recordStatus: GardenRecordStatus;
+    supersededBy: string[];
+    parentCode: string | null;
+    events: GardenEvent[];
+    source: 'engine' | 'site';
+    locality: string;
 }
 
 export interface ApplicationDecisionView {
@@ -167,6 +180,10 @@ export interface ApplicationRow {
     missingDocuments: number;
     lastActivityAt: string;
     allowedTransitions: ApplicationStatus[];
+    source: 'engine' | 'site';
+    hasPayload: boolean;
+    appliedAt: string | null;
+    createdByName: string | null;
 }
 
 export interface ApplicationDetail extends ApplicationRow {
@@ -175,6 +192,8 @@ export interface ApplicationDetail extends ApplicationRow {
     decisions: ApplicationDecisionView[];
     garden: LicensedGardenView | null;
     license: LicenseView | null;
+    payload: Record<string, unknown> | null;
+    effects: Record<string, unknown> | null;
 }
 
 export interface LicensingProducerProfile extends LicensingProducerRow {
@@ -224,13 +243,15 @@ export class LicensingService {
         private readonly decisionRepo: Repository<LicensingDecision>,
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
+        private readonly operations: LicensingOperationsService,
+        private readonly dataSource: DataSource,
     ) { }
 
     async summary(areaId: string): Promise<LicensingSummary> {
         const area = await this.findArea(areaId);
         const [licenses, gardens, applications, lineageCount, producers] = await Promise.all([
             this.licenseRepo.find({ where: { areaId } }),
-            this.gardenRepo.find({ where: { areaId }, select: ['code', 'producerCode', 'approvalStatus', 'licensedAreaM2', 'planimetricAreaM2', 'surfaceAreaM2', 'measuredTeaAreaM2', 'meanSlopeDeg', 'discrepancies'] }),
+            this.gardenRepo.find({ where: { areaId, recordStatus: 'active' }, select: ['code', 'producerCode', 'approvalStatus', 'licensedAreaM2', 'planimetricAreaM2', 'surfaceAreaM2', 'measuredTeaAreaM2', 'meanSlopeDeg', 'discrepancies'] }),
             this.applicationRepo.find({ where: { areaId } }),
             this.lineageRepo.count({ where: { areaId } }),
             this.producerIdentities(areaId),
@@ -343,8 +364,8 @@ export class LicensingService {
         const row = (await this.producerRows(areaId)).find((r) => r.code === code);
         if (!row) throw new NotFoundException('Producer not found');
         const [licenses, gardens, applications, lineage, seasons] = await Promise.all([
-            this.licenseRepo.find({ where: { areaId, producerCode: code }, order: { code: 'ASC' } }),
-            this.gardenRepo.find({ where: { areaId, producerCode: code }, order: { code: 'ASC' } }),
+            this.licenseRepo.find({ where: { areaId, producerCode: code }, order: { status: 'ASC', code: 'ASC' } }),
+            this.gardenRepo.find({ where: { areaId, producerCode: code }, order: { recordStatus: 'ASC', code: 'ASC' } }),
             this.applicationRepo.find({ where: { areaId, producerCode: code }, order: { submittedAt: 'DESC' } }),
             this.lineageRepo.find({ where: { areaId } }),
             this.producerRepo.find({ where: { areaId, code }, order: { season: 'ASC' } }),
@@ -424,7 +445,15 @@ export class LicensingService {
             })),
             garden: garden ? this.gardenView(garden) : null,
             license: license ? this.licenseView(license, licenseGardens, new Map(lineage.map((l) => [l.code, l]))) : null,
+            payload: application.payload ?? null,
+            effects: application.effects ?? null,
         };
+    }
+
+    /** A site-created file (subdivision, split, transfer, correction, boundary) with a validated payload. */
+    async createApplication(areaId: string, dto: CreateApplicationDto, userId: string): Promise<ApplicationDetail> {
+        const saved = await this.operations.create(areaId, dto, userId);
+        return this.application(areaId, saved.code);
     }
 
     async decide(areaId: string, code: string, dto: ApplicationDecisionDto, userId: string): Promise<ApplicationDetail> {
@@ -437,24 +466,38 @@ export class LicensingService {
         }
         const area = await this.findArea(areaId);
         const user = await this.userRepo.findOne({ where: { id: userId } });
-        await this.decisionRepo.save(
-            this.decisionRepo.create({
-                areaCode: area.code,
-                applicationCode: code,
-                fromStatus: current.status,
-                toStatus: dto.status,
-                note: dto.note?.trim() || null,
-                decidedById: userId,
-                decidedByName: user?.fullName ?? 'Bilinmeyen kullanıcı',
-            }),
-        );
+        const by = user?.fullName ?? 'Bilinmeyen kullanıcı';
+        await this.dataSource.transaction(async (manager) => {
+            await manager.save(
+                manager.create(LicensingDecision, {
+                    areaCode: area.code,
+                    applicationCode: code,
+                    fromStatus: current.status,
+                    toStatus: dto.status,
+                    note: dto.note?.trim() || null,
+                    decidedById: userId,
+                    decidedByName: by,
+                }),
+            );
+            // Approval of a site-created file changes the register (pieces, new licences, holders…), once.
+            if (dto.status === 'DEMO_APPROVED') {
+                const app = await manager.findOne(LicensingApplication, { where: { areaId, code } });
+                if (app?.payload && !app.appliedAt) {
+                    const effects = await this.operations.apply(manager, area, app, by);
+                    app.appliedAt = new Date();
+                    app.effects = effects;
+                    app.history = [...app.history, { at: new Date().toISOString().slice(0, 10), from: current.status, to: 'DEMO_APPROVED', by, note: 'Onaylandı ve sicile işlendi' }];
+                    await manager.save(app);
+                }
+            }
+        });
         return this.application(areaId, code);
     }
 
     /** Map layers: licensed gardens (by status), proposals, conflicts and the unlicensed-tea difference. */
     async layers(areaId: string): Promise<LicensingLayers> {
         const area = await this.findArea(areaId);
-        const [gardens, producers] = await Promise.all([this.gardenRepo.find({ where: { areaId } }), this.producerIdentities(areaId)]);
+        const [gardens, producers] = await Promise.all([this.gardenRepo.find({ where: { areaId, recordStatus: 'active' } }), this.producerIdentities(areaId)]);
         const names = new Map(producers.map((p) => [p.code, p.name]));
         const fc = (features: FeatureCollection['features']): FeatureCollection => ({ type: 'FeatureCollection', features });
         return {
@@ -546,7 +589,7 @@ export class LicensingService {
             this.producerIdentities(areaId),
             this.licenseRepo.find({ where: { areaId } }),
             this.gardenRepo.find({
-                where: { areaId },
+                where: { areaId, recordStatus: 'active' },
                 select: ['code', 'producerCode', 'approvalStatus', 'licensedAreaM2', 'planimetricAreaM2', 'surfaceAreaM2', 'measuredTeaAreaM2', 'discrepancies'],
             }),
             this.applicationRepo.find({ where: { areaId }, select: ['code', 'producerCode', 'status'] }),
@@ -604,7 +647,7 @@ export class LicensingService {
 
     /** Searchable garden tokens per producer: codes and "ada/parsel". */
     private async gardenSearchIndex(areaId: string): Promise<Map<string, string[]>> {
-        const gardens = await this.gardenRepo.find({ where: { areaId }, select: ['code', 'producerCode', 'block', 'parcel'] });
+        const gardens = await this.gardenRepo.find({ where: { areaId, recordStatus: 'active' }, select: ['code', 'producerCode', 'block', 'parcel'] });
         const out = new Map<string, string[]>();
         for (const g of gardens) out.set(g.producerCode, [...(out.get(g.producerCode) ?? []), g.code, `${g.block}/${g.parcel}`, `ada ${g.block} parsel ${g.parcel}`]);
         return out;
@@ -631,6 +674,10 @@ export class LicensingService {
             validFrom: l.validFrom,
             validTo: l.validTo,
             gardenCodes: l.gardenCodes,
+            parentCode: l.parentCode ?? null,
+            childCodes: l.childCodes ?? [],
+            history: l.history ?? [],
+            source: l.source ?? 'engine',
         };
     }
 
@@ -656,6 +703,12 @@ export class LicensingService {
             versions: g.versions,
             proposal: g.proposal,
             geometry: g.geometry,
+            recordStatus: g.recordStatus ?? 'active',
+            supersededBy: g.supersededBy ?? [],
+            parentCode: g.parentCode ?? null,
+            events: g.events ?? [],
+            source: g.source ?? 'engine',
+            locality: g.locality,
         };
     }
 
@@ -679,6 +732,10 @@ export class LicensingService {
             missingDocuments: a.documents.filter((d) => d.status === 'missing').length,
             lastActivityAt: lastHistory,
             allowedTransitions: ALLOWED_TRANSITIONS[status],
+            source: a.source ?? 'engine',
+            hasPayload: !!a.payload,
+            appliedAt: a.appliedAt ? new Date(a.appliedAt).toISOString() : null,
+            createdByName: a.createdByName ?? null,
         };
     }
 }
