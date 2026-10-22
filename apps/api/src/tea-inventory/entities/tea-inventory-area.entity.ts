@@ -114,6 +114,34 @@ export interface BoundaryConflict {
 }
 
 /** Licence register block (bundle v5): rules, conflicts and the unlicensed-tea difference layer. */
+/** Growing-season health block (garden-health module): rules, sensor dates and producer yield rows per year. */
+export interface HealthProducerRow {
+    code: string;
+    gardens: number;
+    teaAreaM2: number;
+    licensedAreaM2: number;
+    yieldKg: number;
+    quotaKg: number;
+    ratio: number | null;
+    flag: 'ok' | 'low' | 'high' | 'no_license' | 'no_data';
+    anomalies: Record<string, number>;
+    meanVigour: number | null;
+    reason: string;
+}
+
+export interface HealthBlock {
+    calibrated: boolean;
+    method: string;
+    rules: Record<string, unknown>;
+    seasons: Array<{
+        season: string;
+        window: [string, string];
+        sensors: { optical: { dates: string[] }; backscatter: Array<{ pass: string; relativeOrbit: number; dates: string[] }> };
+        neighbourhood: { dates: string[]; ndviMedian: Array<number | null>; ndreMedian: Array<number | null> };
+        producers: HealthProducerRow[];
+    }>;
+}
+
 export interface LicensingBlock {
     demo: boolean;
     generatedAt: string;
@@ -191,6 +219,10 @@ export class TeaInventoryArea {
     // Licence register (bundle v5): rules, boundary conflicts, unlicensed tea. Null before v5.
     @Column({ type: 'jsonb', nullable: true })
     licensing: LicensingBlock | null;
+
+    // Garden-health module block (growing-season scans), absent until scan-health has run.
+    @Column({ type: 'jsonb', nullable: true })
+    health: HealthBlock | null;
 
     // Bundle timestamp; a re-import is skipped when it has not changed.
     @Column({ type: 'timestamp', name: 'bundle_generated_at' })

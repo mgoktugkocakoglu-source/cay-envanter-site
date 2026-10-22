@@ -138,6 +138,38 @@ export interface GardenEvent {
     applicationCode: string | null;
 }
 
+/** Garden-health module (separate from pruning): growing-season vigour, anomaly and yield per year. */
+export type HealthAnomalyClass = 'chemical_suspect' | 'defoliation' | 'stress' | 'none' | 'no_data';
+
+export interface HealthAnomaly {
+    class: HealthAnomalyClass;
+    date: string | null;
+    dropNdvi: number | null;
+    dropNdre: number | null;
+    z: number | null;
+    radarDb: number | null;
+    radarStructural: boolean | null;
+    recovery: number | null;
+    nBefore: number;
+    nAfter: number;
+    reason: string;
+}
+
+export interface GardenHealthSeason {
+    teaAreaM2: number;
+    licensedAreaM2: number | null;
+    ndviMean: number | null;
+    ndreMean: number | null;
+    nbhdNdviMean: number | null;
+    vigour: number | null;
+    prunedShare: number;
+    anomaly: HealthAnomaly;
+    yieldKg: number;
+    yieldFactors: { vigour: number; pruning: number; anomaly: number };
+    observations: number;
+    series: { ndvi: Array<number | null>; ndre: Array<number | null>; nbr: Array<number | null>; vhAsc: Array<number | null> | null; vhDesc: Array<number | null> | null } | null;
+}
+
 /** Boundary approval state of the garden's geometry (the licensed sub-polygon). */
 export type GardenApprovalStatus = 'approved' | 'proposed' | 'boundary_conflict' | 'field_check_required' | 'unresolved';
 
@@ -279,6 +311,10 @@ export class TeaInventoryGarden {
     // Season → results and events ("2025-26" → …).
     @Column({ type: 'jsonb', default: () => "'{}'" })
     seasons: Record<string, GardenSeason>;
+
+    // Garden-health results keyed by growing season (year), from the engine's scan-health step.
+    @Column({ type: 'jsonb', default: () => "'{}'" })
+    health: Record<string, GardenHealthSeason>;
 
     @Column({ type: 'jsonb' })
     geometry: Record<string, unknown>;

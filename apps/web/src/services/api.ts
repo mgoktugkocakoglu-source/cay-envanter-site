@@ -2048,6 +2048,136 @@ export interface GardenEditorContext {
     rules: { areaTolerance: number; minLicenseM2: number; overlapToleranceM2: number };
 }
 
+
+// ── Garden-health module (P3): growing-season anomalies, vigour, yield vs quota, fertilisation feedback ──
+export type HealthAnomalyClass = 'chemical_suspect' | 'defoliation' | 'stress' | 'none' | 'no_data';
+export type YieldFlag = 'ok' | 'low' | 'high' | 'no_license' | 'no_data';
+export type FertiliserType = 'nitrogen' | 'compound' | 'organic' | 'foliar' | 'other';
+export type FertilisationResponseClass = 'strong' | 'weak' | 'none' | 'negative' | 'pending' | 'no_data';
+
+export interface HealthAnomaly {
+    class: HealthAnomalyClass;
+    date: string | null;
+    dropNdvi: number | null;
+    dropNdre: number | null;
+    z: number | null;
+    radarDb: number | null;
+    radarStructural: boolean | null;
+    recovery: number | null;
+    nBefore: number;
+    nAfter: number;
+    reason: string;
+}
+
+export interface HealthGardenRow {
+    id: string;
+    code: string;
+    block: string;
+    parcel: string;
+    locality: string;
+    producerCode: string;
+    producerName: string;
+    walletNo: string;
+    licenseCode: string | null;
+    teaAreaM2: number;
+    licensedAreaM2: number | null;
+    vigour: number | null;
+    ndviMean: number | null;
+    ndreMean: number | null;
+    nbhdNdviMean: number | null;
+    prunedShare: number;
+    anomaly: HealthAnomaly;
+    yieldKg: number;
+    yieldFactors: { vigour: number; pruning: number; anomaly: number };
+    observations: number;
+    fertilisations: number;
+    geometry: Record<string, unknown>;
+}
+
+export interface FertilisationView {
+    id: string;
+    gardenCode: string;
+    producerCode: string;
+    appliedAt: string;
+    type: FertiliserType;
+    product: string;
+    amountKgPerDa: number | null;
+    note: string | null;
+    source: 'producer' | 'staff';
+    createdByName: string;
+    createdAt: string;
+    response: { class: FertilisationResponseClass; ndreBefore: number | null; ndreAfter: number | null; ndviBefore: number | null; ndviAfter: number | null; deltaNdre: number | null; deltaNdvi: number | null; nBefore: number; nAfter: number; reason: string };
+}
+
+export interface HealthGardenDetail extends HealthGardenRow {
+    dates: string[];
+    series: { ndvi: Array<number | null>; ndre: Array<number | null>; nbr: Array<number | null>; vhAsc: Array<number | null> | null; vhDesc: Array<number | null> | null } | null;
+    relative: { ndvi: Array<number | null>; ndre: Array<number | null> };
+    neighbourhood: { ndviMedian: Array<number | null>; ndreMedian: Array<number | null> };
+    radarDates: Array<{ pass: string; dates: string[] }>;
+    fertilisationRecords: FertilisationView[];
+}
+
+export interface HealthProducerView {
+    id: string;
+    code: string;
+    name: string;
+    walletNo: string;
+    licenseNo: string;
+    gardens: number;
+    teaAreaM2: number;
+    licensedAreaM2: number;
+    yieldKg: number;
+    quotaKg: number;
+    ratio: number | null;
+    flag: YieldFlag;
+    anomalies: Record<string, number>;
+    meanVigour: number | null;
+    reason: string;
+}
+
+export interface HealthSummary {
+    season: string;
+    seasons: string[];
+    calibrated: boolean;
+    method: string;
+    rules: Record<string, unknown>;
+    window: [string, string];
+    sensors: { optical: { dates: string[] }; backscatter: Array<{ pass: string; relativeOrbit: number; dates: string[] }> };
+    gardens: { total: number; byAnomaly: Record<HealthAnomalyClass, number>; meanVigour: number | null; yieldKg: number; teaAreaM2: number };
+    producers: { total: number; byFlag: Record<YieldFlag, number>; yieldKg: number; quotaKg: number };
+    localities: Array<{ name: string; gardens: number; suspects: number; meanVigour: number | null }>;
+    fertilisation: { records: number; byResponse: Record<FertilisationResponseClass, number> };
+    neighbourhood: { dates: string[]; ndviMedian: Array<number | null>; ndreMedian: Array<number | null> };
+}
+
+export interface HealthGardenQuery {
+    page?: number;
+    limit?: number;
+    season?: string;
+    search?: string;
+    anomaly?: HealthAnomalyClass;
+    locality?: string;
+}
+
+export interface HealthProducerQuery {
+    page?: number;
+    limit?: number;
+    season?: string;
+    search?: string;
+    flag?: YieldFlag;
+}
+
+export interface CreateFertilisation {
+    gardenCode: string;
+    appliedAt: string;
+    type: FertiliserType;
+    product?: string;
+    amountKgPerDa?: number;
+    note?: string;
+    source?: 'producer' | 'staff';
+}
+
 export const api = {
     // Auth endpoints
     register: (data: {
@@ -2721,4 +2851,37 @@ export const api = {
         request<OperationPreview>(`/caykur/tea-inventory/areas/${areaId}/licensing/preview`, { method: 'POST', body: JSON.stringify(body) }),
     getLicensingGardenContext: (areaId: string, code: string) =>
         request<GardenEditorContext>(`/caykur/tea-inventory/areas/${areaId}/licensing/gardens/${encodeURIComponent(code)}/context`),
+
+    // ── Garden-health module ──
+    getHealthSummary: (areaId: string, season?: string) =>
+        request<HealthSummary>(`/caykur/tea-inventory/areas/${areaId}/health/summary${season ? `?season=${encodeURIComponent(season)}` : ''}`),
+    getHealthGardens: (areaId: string, params?: HealthGardenQuery) => {
+        const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
+        const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        return request<Paginated<HealthGardenRow>>(`/caykur/tea-inventory/areas/${areaId}/health/gardens${query ? `?${query}` : ''}`);
+    },
+    getHealthGarden: (areaId: string, code: string, season?: string) =>
+        request<HealthGardenDetail>(`/caykur/tea-inventory/areas/${areaId}/health/gardens/${encodeURIComponent(code)}${season ? `?season=${encodeURIComponent(season)}` : ''}`),
+    getHealthProducers: (areaId: string, params?: HealthProducerQuery) => {
+        const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
+        const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        return request<Paginated<HealthProducerView>>(`/caykur/tea-inventory/areas/${areaId}/health/producers${query ? `?${query}` : ''}`);
+    },
+    getHealthLayers: (areaId: string, season?: string) =>
+        request<GeoJSON.FeatureCollection>(`/caykur/tea-inventory/areas/${areaId}/health/layers${season ? `?season=${encodeURIComponent(season)}` : ''}`),
+    downloadHealthProducersCsv: (areaId: string, season?: string) =>
+        downloadFile(`/caykur/tea-inventory/areas/${areaId}/health/producers.csv${season ? `?season=${encodeURIComponent(season)}` : ''}`, 'Liste indirilemedi'),
+    getFertilisations: (areaId: string, gardenCode?: string, season?: string) => {
+        const q = new URLSearchParams();
+        if (gardenCode) q.set('gardenCode', gardenCode);
+        if (season) q.set('season', season);
+        const query = q.toString();
+        return request<FertilisationView[]>(`/caykur/tea-inventory/areas/${areaId}/health/fertilisation${query ? `?${query}` : ''}`);
+    },
+    addFertilisation: (areaId: string, body: CreateFertilisation) =>
+        request<FertilisationView>(`/caykur/tea-inventory/areas/${areaId}/health/fertilisation`, { method: 'POST', body: JSON.stringify(body) }),
+    deleteFertilisation: async (areaId: string, id: string): Promise<{ error?: string }> => {
+        const response = await authorizedFetch(`/caykur/tea-inventory/areas/${areaId}/health/fertilisation/${id}`, { method: 'DELETE' });
+        return response.ok ? {} : { error: await readErrorMessage(response, 'Kayıt silinemedi') };
+    },
 };

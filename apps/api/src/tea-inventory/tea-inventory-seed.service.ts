@@ -3,11 +3,11 @@ import { join } from 'node:path';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource, EntityManager } from 'typeorm';
-import { TeaInventoryArea, InventoryLicense, LicensingBlock, TeaPatch, ProducerScanBlock, ProducerSeasonSchedule, FusionUnassignedPatch, BoundaryConflict } from '@/tea-inventory/entities/tea-inventory-area.entity';
+import { TeaInventoryArea, InventoryLicense, LicensingBlock, TeaPatch, ProducerScanBlock, ProducerSeasonSchedule, FusionUnassignedPatch, BoundaryConflict, HealthBlock, HealthProducerRow } from '@/tea-inventory/entities/tea-inventory-area.entity';
 import { TeaInventoryParcel } from '@/tea-inventory/entities/tea-inventory-parcel.entity';
 import { InventoryClass } from '@/tea-inventory/enums/inventory-class.enum';
 import { TeaInventoryProducer, ProducerScan, ProducerAutoStatus, ProducerFusion } from '@/tea-inventory/entities/tea-inventory-producer.entity';
-import { TeaInventoryGarden, GardenSeason, GardenPruningEvent, GardenFusion, RadarResult, RadarSeries } from '@/tea-inventory/entities/tea-inventory-garden.entity';
+import { TeaInventoryGarden, GardenSeason, GardenPruningEvent, GardenFusion, RadarResult, RadarSeries, GardenHealthSeason } from '@/tea-inventory/entities/tea-inventory-garden.entity';
 import { TeaInventoryLicense } from '@/tea-inventory/entities/tea-inventory-license.entity';
 import { ParcelLineage } from '@/tea-inventory/entities/parcel-lineage.entity';
 import { LicensingApplication } from '@/tea-inventory/entities/licensing-application.entity';
@@ -96,6 +96,17 @@ interface InventoryBundle {
     licensing?: BundleLicensing | null;
     radar?: BundleRadar | null;
     fusion?: BundleFusion | null;
+    health?: BundleHealth | null;
+}
+
+/** Optional garden-health block: growing-season vigour, anomalies and yield per garden / producer per year. */
+interface BundleHealth extends Omit<HealthBlock, 'seasons'> {
+    seasons: Array<
+        HealthBlock['seasons'][number] & {
+            gardens: Array<GardenHealthSeason & { code: string; producerCode: string }>;
+            producers: HealthProducerRow[];
+        }
+    >;
 }
 
 /** Optional fusion block: multi-sensor verdicts per garden and producer per season. */
@@ -250,6 +261,14 @@ export class TeaInventorySeedService implements OnModuleInit {
                             unlicensedTea: bundle.licensing.unlicensedTea,
                         }
                         : null,
+                    health: bundle.health
+                        ? {
+                            calibrated: bundle.health.calibrated,
+                            method: bundle.health.method,
+                            rules: bundle.health.rules,
+                            seasons: bundle.health.seasons.map(({ gardens: _g, ...rest }) => rest),
+                        }
+                        : null,
                     bundleGeneratedAt: generatedAt,
                 }),
             );
@@ -258,7 +277,7 @@ export class TeaInventorySeedService implements OnModuleInit {
             );
             await manager.save(parcels, { chunk: INSERT_CHUNK });
             if (bundle.producers) {
-                await this.importProducers(manager, area.id, bundle.producers, bundle.licensing ?? null, bundle.radar ?? null, bundle.fusion ?? null);
+                await this.importProducers(manager, area.id, bundle.producers, bundle.licensing ?? null, bundle.radar ?? null, bundle.fusion ?? null, bundle.health ?? null);
             }
             if (bundle.licensing) {
                 await this.importLicensing(manager, area.id, bundle.licensing);
@@ -290,8 +309,16 @@ export class TeaInventorySeedService implements OnModuleInit {
         licensing: BundleLicensing | null,
         radar: BundleRadar | null,
         fusion: BundleFusion | null,
+        health: BundleHealth | null,
     ): Promise<void> {
         const licensingByGarden = new Map((licensing?.gardens ?? []).map((g) => [g.code, g]));
+        // Growing-season health keyed by garden -> year.
+        const healthByGarden = new Map<string, Record<string, GardenHealthSeason>>();
+        for (const s of health?.seasons ?? []) {
+            for (const { code, producerCode: _p, ...rest } of s.gardens) {
+                healthByGarden.set(code, { ...(healthByGarden.get(code) ?? {}), [s.season]: rest });
+            }
+        }
         // Fusion verdicts keyed by "<garden>:<season>" and "<producer>:<season>".
         const fusionByGarden = new Map<string, GardenFusion>();
         const fusionByProducer = new Map<string, ProducerFusion>();
@@ -376,7 +403,7 @@ export class TeaInventorySeedService implements OnModuleInit {
         }
         const gardens = block.gardens.map((g) => {
             const { code: _c, ...licensingFields } = licensingByGarden.get(g.code) ?? { code: g.code };
-            return manager.create(TeaInventoryGarden, { ...g, locality: g.locality ?? '', ...licensingFields, areaId, seasons: seasonsByGarden.get(g.code) ?? {} });
+            return manager.create(TeaInventoryGarden, { ...g, locality: g.locality ?? '', ...licensingFields, areaId, seasons: seasonsByGarden.get(g.code) ?? {}, health: healthByGarden.get(g.code) ?? {} });
         });
         await manager.save(gardens, { chunk: INSERT_CHUNK });
         this.logger.log(`Imported ${block.producers.length} producers × ${block.seasons.length} seasons and ${gardens.length} gardens`);

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, Info, Leaf, MapPinned, Scissors, ScrollText, X } from '@lucide/vue';
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, HeartPulse, Info, Leaf, MapPinned, Scissors, ScrollText, X } from '@lucide/vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import CaykurLayout from '@/layouts/CaykurLayout.vue';
@@ -22,6 +22,7 @@ import CaykurPruningRecords from '@/components/caykur/CaykurPruningRecords.vue';
 import CaykurPruningFusion from '@/components/caykur/CaykurPruningFusion.vue';
 import CaykurReports from '@/components/caykur/CaykurReports.vue';
 import CaykurCalibration from '@/components/caykur/CaykurCalibration.vue';
+import CaykurGardenHealth from '@/components/caykur/CaykurGardenHealth.vue';
 import { useTkgmParcelLookup } from '@/composables/useTkgmParcelLookup';
 import { toneVariant } from '@/components/caykur/tone';
 import {
@@ -75,7 +76,7 @@ const totalPages = ref(0);
 const isLoadingRows = ref(false);
 
 // ── Tabs: the inventory map stays mounted (v-show) and is resized when shown again ──
-const activeTab = ref<'inventory' | 'pruning' | 'licensing'>('inventory');
+const activeTab = ref<'inventory' | 'pruning' | 'licensing' | 'health'>('inventory');
 // Pruning is judged per producer (1/7 of all their gardens); the parcel view stays for inspection.
 type PruningView = 'fusion' | 'records' | 'producers' | 'parcels' | 'reports' | 'calibration';
 const PRUNING_VIEWS: PruningView[] = ['fusion', 'records', 'producers', 'parcels', 'reports', 'calibration'];
@@ -381,6 +382,7 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                         <TabsTrigger value="inventory"><Leaf aria-hidden="true" />Envanter</TabsTrigger>
                         <TabsTrigger value="pruning"><Scissors aria-hidden="true" />Budama Takibi</TabsTrigger>
                         <TabsTrigger value="licensing"><ScrollText aria-hidden="true" />Ruhsatlandırma</TabsTrigger>
+                        <TabsTrigger value="health"><HeartPulse aria-hidden="true" />Bahçe Sağlığı</TabsTrigger>
                     </TabsList>
                 </Tabs>
 
@@ -633,6 +635,7 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                 </template>
 
                 <CaykurLicensing v-if="activeTab === 'licensing' && mapData" :area-id="area.id" :map-data="mapData" :tea-patches="area.teaPatches" />
+                <CaykurGardenHealth v-if="activeTab === 'health'" :area-id="area.id" />
             </template>
         </PageContainer>
     </CaykurLayout>
