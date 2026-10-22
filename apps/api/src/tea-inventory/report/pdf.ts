@@ -1,6 +1,5 @@
-import { existsSync } from 'fs';
-import { join } from 'path';
 import PDFDocument from 'pdfkit';
+import { dejavuFonts } from '@/assets/fonts/dejavu-fonts';
 
 /**
  * Thin drawing layer over pdfkit used by the evidence pack and the season report: fonts with
@@ -21,23 +20,6 @@ export const PURPLE = '#6d28d9';
 export const FONT = 'DejaVu';
 export const FONT_BOLD = 'DejaVu-Bold';
 
-const FONT_DIRS = [
-    // Compiled layout: dist/tea-inventory/report → dist/assets/fonts (copied by nest-cli assets).
-    join(__dirname, '..', '..', 'assets', 'fonts'),
-    // ts-node / tests from the source tree.
-    join(__dirname, '..', '..', '..', 'src', 'assets', 'fonts'),
-    join(process.cwd(), 'apps', 'api', 'src', 'assets', 'fonts'),
-    join(process.cwd(), 'src', 'assets', 'fonts'),
-];
-
-function fontPath(file: string): string {
-    for (const dir of FONT_DIRS) {
-        const p = join(dir, file);
-        if (existsSync(p)) return p;
-    }
-    throw new Error(`PDF font not found: ${file}`);
-}
-
 export interface PdfOptions {
     title: string;
     author?: string;
@@ -50,10 +32,13 @@ export function createPdf(options: PdfOptions): Pdf {
         layout: options.landscape ? 'landscape' : 'portrait',
         margins: { top: 46, bottom: 50, left: 42, right: 42 },
         bufferPages: true,
+        // No default Helvetica: the standard-font data files are not part of a serverless bundle.
+        font: null as unknown as string,
         info: { Title: options.title, Author: options.author ?? 'ÇAYKUR · Çay Envanteri', Creator: 'Çay Hesabım' },
     });
-    doc.registerFont(FONT, fontPath('DejaVuSans.ttf'));
-    doc.registerFont(FONT_BOLD, fontPath('DejaVuSans-Bold.ttf'));
+    const fonts = dejavuFonts();
+    doc.registerFont(FONT, fonts.regular);
+    doc.registerFont(FONT_BOLD, fonts.bold);
     doc.font(FONT).fontSize(10).fillColor(INK);
     return doc;
 }
