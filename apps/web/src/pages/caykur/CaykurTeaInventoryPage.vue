@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -23,6 +23,7 @@ import CaykurPruningFusion from '@/components/caykur/CaykurPruningFusion.vue';
 import CaykurReports from '@/components/caykur/CaykurReports.vue';
 import CaykurCalibration from '@/components/caykur/CaykurCalibration.vue';
 import CaykurGardenHealth from '@/components/caykur/CaykurGardenHealth.vue';
+import CaykurRegionOverview from '@/components/caykur/CaykurRegionOverview.vue';
 import { useTkgmParcelLookup } from '@/composables/useTkgmParcelLookup';
 import { toneVariant } from '@/components/caykur/tone';
 import {
@@ -76,7 +77,21 @@ const totalPages = ref(0);
 const isLoadingRows = ref(false);
 
 // ── Tabs: the inventory map stays mounted (v-show) and is resized when shown again ──
-const activeTab = ref<'inventory' | 'pruning' | 'licensing' | 'health'>('inventory');
+const activeTab = ref<'region' | 'inventory' | 'pruning' | 'licensing' | 'health'>('inventory');
+const regionOverview = ref<InstanceType<typeof CaykurRegionOverview> | null>(null);
+/** Areas grouped by district for the selector and the region tab (the pilot grows one district at a time). */
+const areaGroups = computed(() => {
+    const groups = new Map<string, InventoryAreaSummary[]>();
+    for (const a of areas.value) {
+        const key = `${a.province} / ${a.district}`;
+        groups.set(key, [...(groups.get(key) ?? []), a]);
+    }
+    return [...groups.entries()].map(([label, items]) => ({ label, items }));
+});
+function openArea(id: string): void {
+    areaId.value = id;
+    activeTab.value = 'inventory';
+}
 // Pruning is judged per producer (1/7 of all their gardens); the parcel view stays for inspection.
 type PruningView = 'fusion' | 'records' | 'producers' | 'parcels' | 'reports' | 'calibration';
 const PRUNING_VIEWS: PruningView[] = ['fusion', 'records', 'producers', 'parcels', 'reports', 'calibration'];
@@ -85,9 +100,9 @@ function onPruningView(v: unknown): void {
     if (typeof v === 'string' && (PRUNING_VIEWS as string[]).includes(v)) pruningView.value = v as PruningView;
 }
 watch(activeTab, async (tab) => {
-    if (tab !== 'inventory') return;
     await nextTick();
-    map?.invalidateSize();
+    if (tab === 'inventory') map?.invalidateSize();
+    if (tab === 'region') regionOverview.value?.invalidate();
 });
 
 // ── Selection / map ──
@@ -357,7 +372,10 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                             <SelectValue placeholder="Alan seçin" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem v-for="a in areas" :key="a.id" :value="a.id">{{ a.district }} / {{ a.neighborhood }}</SelectItem>
+                            <SelectGroup v-for="g in areaGroups" :key="g.label">
+                                <SelectLabel>{{ g.label }}</SelectLabel>
+                                <SelectItem v-for="a in g.items" :key="a.id" :value="a.id">{{ a.neighborhood }}</SelectItem>
+                            </SelectGroup>
                         </SelectContent>
                     </Select>
                 </template>
@@ -379,12 +397,15 @@ function onRowKey(e: KeyboardEvent, id: string): void {
             <template v-else>
                 <Tabs v-model="activeTab">
                     <TabsList variant="line" class="w-full">
+                        <TabsTrigger v-if="areas.length > 1" value="region"><MapPinned aria-hidden="true" />Bölge</TabsTrigger>
                         <TabsTrigger value="inventory"><Leaf aria-hidden="true" />Envanter</TabsTrigger>
                         <TabsTrigger value="pruning"><Scissors aria-hidden="true" />Budama Takibi</TabsTrigger>
                         <TabsTrigger value="licensing"><ScrollText aria-hidden="true" />Ruhsatlandırma</TabsTrigger>
                         <TabsTrigger value="health"><HeartPulse aria-hidden="true" />Bahçe Sağlığı</TabsTrigger>
                     </TabsList>
                 </Tabs>
+
+                <CaykurRegionOverview v-if="activeTab === 'region'" ref="regionOverview" :selected-area-id="areaId" @select="openArea" />
 
                 <div v-show="activeTab === 'inventory'" class="flex flex-col gap-6">
                     <Alert variant="info">

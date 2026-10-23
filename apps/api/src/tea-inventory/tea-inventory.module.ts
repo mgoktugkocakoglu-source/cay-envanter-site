@@ -28,6 +28,7 @@ import { MinistryRequestController } from '@/tea-inventory/ministry-request.cont
 import { CalibrationService } from '@/tea-inventory/calibration.service';
 import { CalibrationController } from '@/tea-inventory/calibration.controller';
 import { GardenHealthService } from '@/tea-inventory/garden-health.service';
+import { RegionOverviewService } from '@/tea-inventory/region-overview.service';
 import { GardenHealthController } from '@/tea-inventory/garden-health.controller';
 import { TeaInventoryController } from '@/tea-inventory/tea-inventory.controller';
 import { TeaInventoryService } from '@/tea-inventory/tea-inventory.service';
@@ -52,6 +53,6 @@ import { TeaInventorySeedService } from '@/tea-inventory/tea-inventory-seed.serv
         ]),
     ],
     controllers: [TeaInventoryController, ProducerPruningController, LicensingController, PruningFusionController, ReportController, MinistryRequestController, CalibrationController, GardenHealthController],
-    providers: [TeaInventoryService, TeaInventorySeedService, ProducerPruningService, LicensingService, LicensingOperationsService, PruningFusionService, EvidenceService, SeasonReportService, MinistryRequestService, CalibrationService, GardenHealthService],
+    providers: [TeaInventoryService, TeaInventorySeedService, ProducerPruningService, LicensingService, LicensingOperationsService, PruningFusionService, EvidenceService, SeasonReportService, MinistryRequestService, CalibrationService, GardenHealthService, RegionOverviewService],
 })
 export class TeaInventoryModule { }

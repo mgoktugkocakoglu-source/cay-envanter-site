@@ -830,6 +830,68 @@ export interface InventoryAreaSummary {
     updatedAt: string;
 }
 
+// Region overview: every imported neighbourhood grouped by district with module headline numbers
+export interface RegionAreaRow {
+    id: string;
+    code: string;
+    province: string;
+    district: string;
+    neighborhood: string;
+    neighborhoodId: number | null;
+    boundary: GeoJSON.Geometry;
+    boundaryAreaM2: number;
+    coveredRatio: number;
+    demoLicenses: boolean;
+    updatedAt: string;
+    parcels: { total: number; flagged: number; byClass: Record<InventoryClass, number> };
+    teaPatchAreaM2: number;
+    detectedTeaAreaM2: number;
+    model: { teaRecall?: number; teaPrecision?: number; trainingNeighborhoods?: string[] };
+    licensing: { producers: number; licenses: number; gardens: number; withIssues: number; licensedAreaM2: number } | null;
+    pruning: {
+        season: string;
+        seasons: string[];
+        calibrated: boolean;
+        gardens: { total: number; byClass: Record<FusionClass, number>; prunedAreaM2: number; likelyAreaM2: number };
+        producers: { total: number; byDecision: Record<FusionDecision, number> };
+        unassigned: { count: number; areaM2: number; prunedAreaM2: number };
+    } | null;
+    health: {
+        season: string;
+        gardens: { total: number; byAnomaly: Record<HealthAnomalyClass, number>; meanVigour: number | null; yieldKg: number };
+        producers: { total: number; byFlag: Record<YieldFlag, number>; quotaKg: number };
+    } | null;
+}
+
+export interface RegionTotals {
+    areas: number;
+    parcels: number;
+    flagged: number;
+    teaPatchAreaM2: number;
+    producers: number;
+    licenses: number;
+    gardens: number;
+    pruned: number;
+    likely: number;
+    purchaseOpen: number;
+    expert: number;
+    healthSuspects: number;
+    yieldKg: number;
+}
+
+export interface RegionDistrict {
+    province: string;
+    district: string;
+    totals: RegionTotals;
+    areas: RegionAreaRow[];
+}
+
+export interface RegionOverview {
+    generatedAt: string;
+    totals: RegionTotals;
+    districts: RegionDistrict[];
+}
+
 export interface InventoryClassStat {
     count: number;
     teaAreaM2: number;
@@ -2446,6 +2508,7 @@ export const api = {
 
     // Çaykur tea inventory
     getInventoryAreas: () => request<Paginated<InventoryAreaSummary>>('/caykur/tea-inventory/areas?limit=100'),
+    getInventoryOverview: () => request<RegionOverview>('/caykur/tea-inventory/overview'),
     getInventoryArea: (id: string) => request<InventoryAreaDetail>(`/caykur/tea-inventory/areas/${id}`),
     getInventoryAreaMap: (id: string) => request<InventoryMap>(`/caykur/tea-inventory/areas/${id}/map`),
     getInventoryParcels: (areaId: string, params?: InventoryParcelQuery) => {

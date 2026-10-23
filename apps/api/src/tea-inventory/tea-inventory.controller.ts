@@ -14,6 +14,7 @@ import {
 } from '@/tea-inventory/tea-inventory.service';
 import { InventoryAreaQueryDto, InventoryParcelQueryDto } from '@/tea-inventory/dto';
 import { Paginated } from '@/common/dto/paginated.dto';
+import { RegionOverviewService, RegionOverview } from '@/tea-inventory/region-overview.service';
 
 // Inspection-facing roles; purchase-point and finance staff do not see license audit flags.
 const INVENTORY_ROLES = [
@@ -33,7 +34,17 @@ const INVENTORY_ROLES = [
 @CaykurRoles(...INVENTORY_ROLES)
 @Controller('caykur/tea-inventory')
 export class TeaInventoryController {
-    constructor(private readonly inventoryService: TeaInventoryService) { }
+    constructor(
+        private readonly inventoryService: TeaInventoryService,
+        private readonly overviewService: RegionOverviewService,
+    ) { }
+
+    @Get('overview')
+    @ApiOperation({ summary: 'Region overview: every imported neighbourhood grouped by district with module headline numbers' })
+    @ApiResponse({ status: 200, description: 'Region overview' })
+    async overview(): Promise<RegionOverview> {
+        return this.overviewService.overview();
+    }
 
     @Get('areas')
     @ApiOperation({ summary: 'List inventoried areas (neighborhood libraries)' })
