@@ -30,8 +30,10 @@ const latestSeason = computed(() => {
 });
 
 /** Harvest + module readiness of a neighbourhood, for the status column and the map colour. */
-type Stage = 'parcels' | 'tea' | 'pruning' | 'full';
+type Stage = 'parcels' | 'boundary' | 'tea' | 'pruning' | 'full';
 function stageOf(a: RegionAreaRow): { stage: Stage; label: string; tone: 'muted' | 'info' | 'warning' | 'success' } {
+    // A boundary-only library (TKGM harvest not yet started) is judged on free tea patches alone.
+    if (a.parcels.total === 0 && a.pruning) return { stage: 'boundary', label: 'Parsel bekliyor · serbest yama', tone: 'warning' };
     if (a.pruning && a.health) return { stage: 'full', label: 'Tüm modüller', tone: 'success' };
     if (a.pruning) return { stage: 'pruning', label: 'Budama taranıyor', tone: 'info' };
     if (a.teaPatchAreaM2 > 0) return { stage: 'tea', label: 'Çay tespiti', tone: 'warning' };
