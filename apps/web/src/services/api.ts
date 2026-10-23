@@ -882,13 +882,22 @@ export interface RegionTotals {
 export interface RegionDistrict {
     province: string;
     district: string;
+    note: string | null;
+    hasData: boolean;
     totals: RegionTotals;
     areas: RegionAreaRow[];
+}
+
+export interface RegionProvince {
+    province: string;
+    totals: RegionTotals;
+    districts: RegionDistrict[];
 }
 
 export interface RegionOverview {
     generatedAt: string;
     totals: RegionTotals;
+    provinces: RegionProvince[];
     districts: RegionDistrict[];
 }
 

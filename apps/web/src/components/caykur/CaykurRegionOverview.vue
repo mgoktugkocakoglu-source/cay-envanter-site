@@ -121,7 +121,7 @@ defineExpose({ refresh: load, invalidate: () => map?.invalidateSize() });
             </Alert>
 
             <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Bölge özeti">
-                <StatCard label="Mahalle" :value="formatNumber(overview.totals.areas)" :hint="`${overview.districts.length} ilçe`" />
+                <StatCard label="Mahalle" :value="formatNumber(overview.totals.areas)" :hint="`${overview.provinces.length} il · ${overview.districts.length} / ${overview.provinces.reduce((n, p) => n + p.districts.length, 0)} ilçede veri`" />
                 <StatCard label="TKGM parseli" :value="formatNumber(overview.totals.parcels)" :hint="`${formatNumber(overview.totals.flagged)} denetim gerektiren`" />
                 <StatCard label="Uyduda çay" :value="formatHectare(overview.totals.teaPatchAreaM2)" hint="mahalle sınırları içinde" />
                 <StatCard label="Müstahsil / bahçe" :value="`${formatNumber(overview.totals.producers)} / ${formatNumber(overview.totals.gardens)}`" :hint="`${formatNumber(overview.totals.licenses)} demo ruhsat`" />
@@ -141,14 +141,34 @@ defineExpose({ refresh: load, invalidate: () => map?.invalidateSize() });
                 </CardContent>
             </Card>
 
-            <Card v-for="d in overview.districts" :key="`${d.province}/${d.district}`">
+            <Card v-for="p in overview.provinces" :key="p.province">
                 <CardHeader>
-                    <CardTitle>{{ d.province }} / {{ d.district }}</CardTitle>
+                    <CardTitle>{{ p.province }}</CardTitle>
                     <CardDescription>
-                        {{ d.totals.areas }} mahalle · {{ formatNumber(d.totals.parcels) }} parsel · {{ formatHectare(d.totals.teaPatchAreaM2) }} çay · {{ formatNumber(d.totals.producers) }} müstahsil · {{ formatNumber(d.totals.pruned) }} budandı / {{ formatNumber(d.totals.likely) }} olası · {{ formatNumber(d.totals.purchaseOpen) }} alım açık
+                        <template v-if="p.totals.areas">
+                            {{ p.districts.filter((d) => d.hasData).length }} / {{ p.districts.length }} ilçede veri · {{ p.totals.areas }} mahalle · {{ formatNumber(p.totals.parcels) }} parsel · {{ formatHectare(p.totals.teaPatchAreaM2) }} çay · {{ formatNumber(p.totals.producers) }} müstahsil · {{ formatNumber(p.totals.pruned) }} budandı / {{ formatNumber(p.totals.likely) }} olası · {{ formatNumber(p.totals.purchaseOpen) }} alım açık
+                        </template>
+                        <template v-else>{{ p.districts.length }} çay ilçesi · henüz mahalle verisi yok</template>
                     </CardDescription>
                 </CardHeader>
-                <CardContent class="px-0">
+                <CardContent class="flex flex-col gap-4 px-0">
+                    <div class="flex flex-wrap gap-2 px-6" aria-label="İlçeler">
+                        <Badge
+                            v-for="d in p.districts"
+                            :key="d.district"
+                            :variant="d.hasData ? 'success' : 'outline'"
+                            :title="d.note ?? (d.hasData ? `${d.totals.areas} mahalle` : 'Henüz mahalle verisi yok')"
+                        >
+                            {{ d.district }}<span v-if="d.hasData" class="ml-1 opacity-70">{{ d.totals.areas }}</span>
+                        </Badge>
+                    </div>
+                    <template v-for="d in p.districts.filter((x) => x.hasData)" :key="`${d.province}/${d.district}`">
+                    <div class="px-6 pt-2">
+                        <h3 class="text-sm font-semibold">{{ d.district }}</h3>
+                        <p class="text-xs text-muted-foreground">
+                            {{ d.totals.areas }} mahalle · {{ formatNumber(d.totals.parcels) }} parsel · {{ formatHectare(d.totals.teaPatchAreaM2) }} çay · {{ formatNumber(d.totals.producers) }} müstahsil · {{ formatNumber(d.totals.pruned) }} budandı / {{ formatNumber(d.totals.likely) }} olası · {{ formatNumber(d.totals.purchaseOpen) }} alım açık<template v-if="d.note"> · {{ d.note }}</template>
+                        </p>
+                    </div>
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -211,6 +231,7 @@ defineExpose({ refresh: load, invalidate: () => map?.invalidateSize() });
                             </TableRow>
                         </TableBody>
                     </Table>
+                    </template>
                 </CardContent>
             </Card>
         </template>

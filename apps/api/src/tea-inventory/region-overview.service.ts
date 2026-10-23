@@ -65,13 +65,62 @@ export interface RegionTotals {
 export interface RegionDistrict {
     province: string;
     district: string;
+    /** ÇAYKUR note for the district (factory, purchase point) from the region catalogue. */
+    note: string | null;
+    /** False for a district that is in the catalogue but has no imported neighbourhood yet. */
+    hasData: boolean;
     totals: RegionTotals;
     areas: RegionAreaRow[];
 }
 
+export interface RegionProvince {
+    province: string;
+    totals: RegionTotals;
+    districts: RegionDistrict[];
+}
+
+/**
+ * The tea belt as ÇAYKUR works it: four provinces and the districts with licensed tea. The overview
+ * always shows this catalogue; districts fill up as neighbourhood libraries are imported.
+ */
+export const TEA_REGION: Array<{ province: string; districts: Array<{ district: string; note?: string }> }> = [
+    {
+        province: 'Rize',
+        districts: [
+            { district: 'Merkez' }, { district: 'Çayeli' }, { district: 'Ardeşen' }, { district: 'Pazar' }, { district: 'Fındıklı' },
+            { district: 'Güneysu' }, { district: 'Kalkandere' }, { district: 'Derepazarı' }, { district: 'İyidere' }, { district: 'Hemşin' },
+            { district: 'Çamlıhemşin' }, { district: 'İkizdere' },
+        ],
+    },
+    {
+        province: 'Trabzon',
+        districts: [
+            { district: 'Of' }, { district: 'Sürmene' }, { district: 'Araklı' }, { district: 'Arsin' }, { district: 'Hayrat' },
+            { district: 'Dernekpazarı' }, { district: 'Köprübaşı' },
+        ],
+    },
+    {
+        province: 'Artvin',
+        districts: [{ district: 'Kemalpaşa' }, { district: 'Hopa' }, { district: 'Arhavi' }, { district: 'Borçka' }],
+    },
+    {
+        province: 'Giresun',
+        districts: [
+            { district: 'Tirebolu', note: "ÇAYKUR'un Giresun'daki tek fabrikası; çevre ilçelerin ruhsatlı çayını da işler" },
+            { district: 'Eynesil', note: 'Alım yeri; merkezde ruhsatlı üretici var' },
+            { district: 'Görele' },
+        ],
+    },
+];
+
+const canonical = (s: string) => s.trim().toLocaleLowerCase('tr-TR').replace(/ı/g, 'i');
+
 export interface RegionOverview {
     generatedAt: string;
     totals: RegionTotals;
+    /** Catalogue order: Rize, Trabzon, Artvin, Giresun; every district listed, filled or not. */
+    provinces: RegionProvince[];
+    /** Only the districts that have imported neighbourhoods. */
     districts: RegionDistrict[];
 }
 
@@ -116,17 +165,32 @@ export class RegionOverviewService {
         const rows: RegionAreaRow[] = [];
         for (const area of areas) rows.push(await this.areaRow(area));
 
-        const districts = new Map<string, RegionDistrict>();
+        // Start from the catalogue so empty provinces/districts are listed; imported areas outside it are appended.
+        const provinces: RegionProvince[] = TEA_REGION.map((p) => ({
+            province: p.province,
+            totals: emptyTotals(),
+            districts: p.districts.map((d) => ({ province: p.province, district: d.district, note: d.note ?? null, hasData: false, totals: emptyTotals(), areas: [] })),
+        }));
         const totals = emptyTotals();
         for (const row of rows) {
-            const key = `${row.province}|${row.district}`;
-            const district = districts.get(key) ?? { province: row.province, district: row.district, totals: emptyTotals(), areas: [] };
+            let province = provinces.find((p) => canonical(p.province) === canonical(row.province));
+            if (!province) {
+                province = { province: row.province, totals: emptyTotals(), districts: [] };
+                provinces.push(province);
+            }
+            let district = province.districts.find((d) => canonical(d.district) === canonical(row.district));
+            if (!district) {
+                district = { province: province.province, district: row.district, note: null, hasData: false, totals: emptyTotals(), areas: [] };
+                province.districts.push(district);
+            }
+            district.hasData = true;
             district.areas.push(row);
             addRow(district.totals, row);
+            addRow(province.totals, row);
             addRow(totals, row);
-            districts.set(key, district);
         }
-        return { generatedAt: new Date().toISOString(), totals, districts: [...districts.values()] };
+        const districts = provinces.flatMap((p) => p.districts).filter((d) => d.hasData);
+        return { generatedAt: new Date().toISOString(), totals, provinces, districts };
     }
 
     private async areaRow(area: TeaInventoryArea): Promise<RegionAreaRow> {
