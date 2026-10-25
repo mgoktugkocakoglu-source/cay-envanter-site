@@ -61,13 +61,138 @@ veritabanından taşınacak bir şey yok: boş Postgres + seed yeterli.
 
 Mahalle paketleri büyüktür (Çataldere 15 MB, toplam ~45 MB); ilk açılışta içe aktarma Neon'da ~1–2 dk sürer.
 
-## 4. Ortam değişkenleri
+## 4. Sıfırdan çalışır hale getirme (bu depo, kendi sunucusu, veritabanı yok)
+
+Depo tek başına yeterlidir; veritabanı **boş** olmalı, içeriği uygulama kendisi üretir. Eski ortamdan
+dosya ya da veri taşınmaz.
+
+### 4.1 Gereksinimler
+
+- Node.js **22.18 veya üzeri** (motor 22 ister; site 20 ile de çalışır ama 22 önerilir), pnpm **8.15**
+  (`corepack enable && corepack prepare pnpm@8.15.0 --activate`).
+- PostgreSQL **16** (yerel kurulum, Docker ya da yönetilen hizmet: Neon, Supabase, RDS…). Boş bir veritabanı
+  ve yetkili bir kullanıcı: `CREATE DATABASE cayhesabim;`
+- Sunucuda giden HTTPS erişimi: tarayıcı istemcisi `cbsapi.tkgm.gov.tr`'ye, API ise (yalnız PDF üretirken)
+  kendi `APP_URL`'ine ulaşabilmeli.
+
+### 4.2 Kurulum
+
+```bash
+git clone https://github.com/mgoktugkocakoglu-source/cay-envanter-site.git
+cd cay-envanter-site
+pnpm install --frozen-lockfile
+```
+
+`apps/api/.env` dosyasını oluşturun (`.env.example` şablondur; aşağıdakiler **zorunlu**, eksikse API Joi
+doğrulamasıyla açılmaz):
+
+```ini
+NODE_ENV=production
+PORT=3000
+DB_HOST=localhost
+DB_PORT=5432
+DB_USERNAME=cayhesabim
+DB_PASSWORD=<güçlü-şifre>
+DB_DATABASE=cayhesabim
+DB_SSL=false                 # Neon/Supabase gibi yönetilen Postgres'te true
+JWT_SECRET=<rastgele 32+ karakter>
+JWT_REFRESH_SECRET=<rastgele 32+ karakter, farklı>
+APP_URL=https://www.alanadiniz.com   # sitenin kök adresi, sondaki / olmadan
+SEED_DEMO=true               # ilk açılışta paketleri ve demo kullanıcıları yükler
+SEED_DEMO_PASSWORD=<demo hesapların şifresi>   # verilmezse koddaki varsayılan kullanılır; üretimde mutlaka verin
+```
+
+Rastgele anahtar üretmek için: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
+
+İsteğe bağlı (yoksa ilgili özellik sessizce kapalı kalır): `RESEND_API_KEY`/`RESEND_FROM` (e-posta),
+`R2_*` (dosya yükleme), `GEMINI_*` (bilgi asistanı). `DATABASE_URL` tek satır olarak da verilebilir;
+`managed-postgres-env.ts` onu `DB_*`'ye çevirir.
+
+Web için `apps/web/.env.production` yalnız API **farklı bir origin'de** çalışıyorsa gerekir:
+`VITE_API_BASE_URL=https://api.alanadiniz.com/api`. Aynı alan adında `/api` ters vekille sunuluyorsa boş bırakın.
+
+### 4.3 Derleme ve çalıştırma
+
+```bash
+pnpm build:api      # apps/api/dist (seed-data/*.json ve fontlar dist'e kopyalanır)
+pnpm build:web      # apps/web/dist (statik dosyalar; inventory-imagery dahil)
+cd apps/api && node dist/main.js     # ya da pm2: pm2 start dist/main.js --name cayhesabim-api
+```
+
+İlk açılışta API, `synchronize` ile 12 tabloyu oluşturur, sonra paketleri içe aktarır. Logda şu satırlar
+görünmeli (12 mahalle için 12 satır, toplam 1–3 dk):
+
+```
+[TeaInventorySeedService] Imported tea inventory trabzon-of-cataldere: 339 parcels
+[TeaInventorySeedService] Imported tea inventory trabzon-of-tekoba: 157 parcels
+...
+```
+
+Web `apps/web/dist` bir statik sunucudan (nginx, Caddy, Apache) sunulur; `/api/*` istekleri 3000 portuna
+vekillenir, diğer her yol `index.html`'e düşer (SPA). Örnek nginx:
+
+```nginx
+server {
+    server_name www.alanadiniz.com;
+    root /srv/cay-envanter-site/apps/web/dist;
+    location /api/ { proxy_pass http://127.0.0.1:3000/api/; proxy_set_header Host $host; proxy_read_timeout 120; }
+    location / { try_files $uri /index.html; }
+}
+```
+
+`proxy_read_timeout` önemli: kanıt PDF'i ve sezon raporu 20–40 sn sürebilir. Statik görüntü klasörü
+(`inventory-imagery/`, ~30 MB) dist içinde gelir; ayrıca bir şey kopyalamak gerekmez.
+
+**Docker ile** (depodaki `docker-compose.yml`): `docker-compose up -d` Postgres 16 + API (3000) + web (5173,
+geliştirme sunucusu) kaldırır; `.env` yine `apps/api/.env`'den okunur. Üretim için `docker-compose.prod.yml`.
+
+**Vercel ile** (bu deponun şu anki dağıtımı): `vercel.json` hazırdır; projeyi depoya bağlayın, ortam
+değişkenlerini Vercel panelinde girin (`DATABASE_URL` + `DB_SSL=true` yeterli), her push `main`'i dağıtır.
+Serverless fonksiyon 60 sn / 1 GB ile ayarlı; ilk istek soğuk başlar.
+
+### 4.4 İlk giriş ve doğrulama
+
+`SEED_DEMO=true` ile oluşan ÇAYKUR hesapları (şifre `SEED_DEMO_PASSWORD`):
+
+| E-posta | Rol | Gördüğü |
+| --- | --- | --- |
+| `admin@caykur.gov.tr` | Kurum yöneticisi | Her şey, ruhsat onayları |
+| `fabrika@caykur.gov.tr` | Fabrika sorumlusu | Envanter, budama, ruhsat onayı |
+| `saha@caykur.gov.tr` | Saha personeli | Envanter, kalibrasyon etiketi girişi |
+| `denetci@caykur.gov.tr` | Denetçi | Salt okunur |
+| `alim@caykur.gov.tr`, `finans@caykur.gov.tr` | Alım yeri, finans | Çay Envanteri menüsünü **görmez** |
+
+Kontrol listesi:
+
+1. `GET /api/health` → 200.
+2. `admin@caykur.gov.tr` ile giriş → sol menüde "Çay Envanteri".
+3. `/caykur/tea-inventory` → **Bölge** sekmesi: Rize / Trabzon / Artvin / Giresun kartları, Trabzon → Of altında
+   12 mahalle, harita sınırları.
+4. Çataldere → Budama Takibi → bir müstahsilde **Kanıt dosyası (PDF)** inmeli (Türkçe karakterler ve uydu
+   kesitleri görünüyorsa fontlar ve `APP_URL` doğrudur).
+5. Ruhsatlandırma → bir bahçede "Alt bölünme" → harita editörü açılmalı (leaflet-geoman yüklü).
+6. Envanter haritasında boş bir noktaya tıklayınca TKGM ada/parsel gelmeli (tarayıcıdan doğrudan TKGM'ye gider;
+   kurumsal ağ dışarı çıkışı kesiyorsa çalışmaz, uygulamayı etkilemez).
+
+### 4.5 Sık karşılaşılan sorunlar
+
+| Belirti | Neden / çözüm |
+| --- | --- |
+| API açılmıyor, "ValidationError … required" | `.env`'de zorunlu değişken eksik (bkz. 4.2) |
+| Bölge sekmesi boş, log'da "Imported" yok | `SEED_DEMO` `true` değil ya da `dist/tea-inventory/seed-data` boş → `nest-cli.json` assets girişi silinmiş, `pnpm build:api` yeniden |
+| Paket değişti ama site eskisini gösteriyor | İçe aktarma yalnız `generatedAt` değişince yapılır; paket yeniden üretilmeli |
+| PDF 500 ya da kutu karakterler | Fontlar koda gömülü, bu olmaz; 500 ise `APP_URL` yanlış, API görüntüleri kendi adresinden çekemiyor |
+| PDF/rapor zaman aşımı | Ters vekil zaman aşımını 120 sn yapın |
+| Yönetilen Postgres'e bağlanamıyor | `DB_SSL=true` |
+| Vite dev sunucusu "EBUSY" ile çöküyor | `public/inventory-imagery` dosyaları çalışırken üzerine yazıldı; yeniden başlatın |
+
+## 5. Ortam değişkenleri (özet)
 
 | Değişken | Not |
 | --- | --- |
-| `DB_*` ya da `DATABASE_URL` | Postgres; yönetilen hizmette `DB_SSL=true` |
-| `JWT_SECRET`, `JWT_REFRESH_SECRET` | Çekirdekle aynı |
-| `SEED_DEMO=true` | Paketleri ve demo ÇAYKUR kullanıcılarını yükler (demo şifre `caykur-seed.service.ts` içinde varsayılan; üretimde `SEED_DEMO_PASSWORD` verin) |
+| `DB_HOST/PORT/USERNAME/PASSWORD/DATABASE`, `DB_SSL` | Postgres; yönetilen hizmette `DB_SSL=true`. Alternatif: `DATABASE_URL` |
+| `JWT_SECRET`, `JWT_REFRESH_SECRET` | Çekirdekle aynı; `JWT_EXPIRES_IN` (30m), `JWT_REFRESH_EXPIRES_IN` (7d) |
+| `SEED_DEMO=true`, `SEED_DEMO_PASSWORD` | Paketleri ve demo ÇAYKUR kullanıcılarını yükler; üretimde şifreyi mutlaka verin |
 | `APP_URL` | Sitenin kök adresi; kanıt PDF'leri uydu kesitlerini `APP_URL/inventory-imagery/...` üzerinden çeker |
 | `VITE_API_BASE_URL` (web) | API ayrı origin'deyse; aynı origin'de `/api` proxy yeterli |
 | R2 / Resend / Gemini | İsteğe bağlı, çekirdekteki gibi |
@@ -75,13 +200,13 @@ Mahalle paketleri büyüktür (Çataldere 15 MB, toplam ~45 MB); ilk açılışt
 TKGM parsel sorgusu tarayıcıdan `cbsapi.tkgm.gov.tr` halka açık servisine gider; günlük sorgu kotası IP
 başınadır (~200–250). Harici anahtar gerekmez.
 
-## 5. Roller ve menü
+## 6. Roller ve menü
 
 Modülün tamamı `CaykurRole` ile korunur: `KURUM_ADMIN`, `FABRIKA_SORUMLUSU`, `SAHA_PERSONELI`, `DENETCI`
 (alım yeri / finans rolleri görmez). Ruhsat işlemlerinde onay yalnız `KURUM_ADMIN` ve `FABRIKA_SORUMLUSU`;
 kalibrasyon etiketi `SAHA_PERSONELI` girer. Menü girişi `nav.ts` içinde "Çay Envanteri".
 
-## 6. Taşıma adımları (önerilen sıra)
+## 7. Çayhesabım.com koduna aktarma (önerilen sıra)
 
 1. `feat/tea-inventory` dalını çayhesabım.com deposuna çekin, `main` ile birleştirin (çakışma beklenen
    dosyalar: `app.module.ts`, `main.ts`, `router/index.ts`, `nav.ts`, `roles.ts`, `api.ts`, `package.json`).
@@ -94,7 +219,7 @@ kalibrasyon etiketi `SAHA_PERSONELI` girer. Menü girişi `nav.ts` içinde "Çay
 6. Vercel'e özel dosyalar (`api/index.js`, `serverless.ts`, `vercel.json`, `.vercelignore`,
    `managed-postgres-env.ts`) klasik sunucuda silinebilir.
 
-## 7. Bilinen sınırlar
+## 8. Bilinen sınırlar
 
 - Ruhsat/müstahsil verisi **DEMO** üretimidir; her ekranda etiketlidir. Gerçek ÇAYKUR verisi geldiğinde
   içe aktarma şablonu ayrıca yazılacak.
