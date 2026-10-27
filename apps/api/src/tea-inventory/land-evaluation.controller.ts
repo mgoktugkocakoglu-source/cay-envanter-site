@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@ne
 import { JwtAuthGuard, CaykurRolesGuard } from '@/auth/guards';
 import { CaykurRoles } from '@/auth/decorators';
 import { CaykurRole } from '@/auth/enums';
-import { LandEvaluationService, LandParcelDetail, LandParcelRow, LandSummary } from '@/tea-inventory/land-evaluation.service';
+import { LandEvaluationService, LandEvidence, LandParcelDetail, LandParcelRow, LandSummary } from '@/tea-inventory/land-evaluation.service';
 import { LandLayerQueryDto, LandParcelQueryDto } from '@/tea-inventory/dto';
 import { ClimateSummary } from '@/tea-inventory/entities/land-evaluation.types';
 import { Paginated } from '@/common/dto/paginated.dto';
@@ -27,8 +27,16 @@ export class LandEvaluationController {
         return this.service.summary(id);
     }
 
+    @Get('evidence')
+    @ApiOperation({ summary: 'Evidence behind the evaluation: source registry, cited crop requirement rules, MGM station normals, district facts' })
+    @ApiParam({ name: 'id', description: 'Inventory area id' })
+    @ApiResponse({ status: 200, description: 'Land evidence' })
+    async evidence(@Param('id', ParseUUIDPipe) id: string): Promise<LandEvidence> {
+        return this.service.evidence(id);
+    }
+
     @Get('climate')
-    @ApiOperation({ summary: 'Neighbourhood climate record: monthly and yearly series, climatology, anomalies, crop-calendar windows' })
+    @ApiOperation({ summary: 'Neighbourhood climate record (MGM-anchored): monthly/yearly/decade series, climatology, indices, phenology seasons, anomalies, crop-calendar windows' })
     @ApiParam({ name: 'id', description: 'Inventory area id' })
     @ApiResponse({ status: 200, description: 'Climate summary' })
     async climate(@Param('id', ParseUUIDPipe) id: string): Promise<ClimateSummary> {

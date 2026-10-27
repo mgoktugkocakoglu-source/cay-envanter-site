@@ -2132,10 +2132,115 @@ export type LandCropKey = 'tea' | 'hazelnut' | 'kiwi' | 'chestnut' | 'blueberry'
 export type LandDwClass = 'water' | 'trees' | 'grass' | 'flooded_vegetation' | 'crops' | 'shrub_and_scrub' | 'built' | 'bare' | 'snow_and_ice';
 export type LandClassFractions = Partial<Record<LandDwClass, number>>;
 
+export type LandSourceType = 'mevzuat' | 'kurum' | 'akademik' | 'istatistik' | 'meteoroloji' | 'cografi-isaret' | 'veri';
+
+/** One entry of the evidence registry (law, ministry report, paper, GI registration, data set). */
+export interface LandSourceRef {
+    id: string;
+    title: string;
+    org: string;
+    year: number | string;
+    url: string;
+    type: LandSourceType;
+    used: string;
+    caveat?: string;
+}
+
+export interface LandStationNormals {
+    id: string;
+    name: string;
+    lat: number;
+    lng: number;
+    elevationM: number;
+    period: string;
+    tmean: number[];
+    tmax: number[];
+    tmin: number[];
+    rainDays: number[];
+    precipMm: number[];
+    classes?: { erinc?: number; deMartonne?: number; aydeniz?: number; thornthwaite?: string };
+    anchor?: boolean;
+    sources: string[];
+}
+
+export interface LandDistrictFacts {
+    province: string;
+    district: string;
+    landUseDa: { agriculture: number; pasture: number; forest: number; nonAgri: number; total: number; source: string } | null;
+    supportedProducts: { products: string[]; source: string } | null;
+    notes: Array<{ text: string; source: string }>;
+}
+
+export interface LandFactorRule {
+    key: string;
+    label: string;
+    unit: string;
+    digits: number;
+    /** [lo0, lo1, hi1, hi0]; null = open end. */
+    band: Array<number | null>;
+    sources: string[];
+    note: string;
+}
+
+export interface LandCropRule {
+    key: LandCropKey;
+    label: string;
+    rationale: string;
+    factors: LandFactorRule[];
+    legal: Array<{ label: string; sources: string[]; kind: string }>;
+    sources: string[];
+}
+
+export interface LandFactorResult {
+    key: string;
+    label: string;
+    value: number | null;
+    display: string;
+    score: number;
+    sources: string[];
+    note: string;
+}
+
 export interface LandSuitability {
     crop: LandCropKey;
     score: number;
     limiting: string | null;
+    factors: LandFactorResult[];
+    legal: Array<{ label: string; sources: string[]; status: 'ok' | 'fail' | 'na' }>;
+    supported: boolean;
+}
+
+export interface LandParcelClimate {
+    offsetC: number;
+    years: number[];
+    tmean: number;
+    tminAbs: number;
+    tmaxAbs: number;
+    frostDays: number;
+    hotDays: number;
+    precipMm: number;
+    julyMean: number;
+    rhSummer: number;
+    chillHours: number;
+    frostFreeDays: number;
+    springFrostDays: number;
+    bloomRainDays: number;
+}
+
+export interface LandNdviPeriod {
+    period: string;
+    ndvi: number | null;
+    denseShare: number | null;
+}
+
+export interface LandEvidence {
+    cropRules: LandCropRule[];
+    sources: LandSourceRef[];
+    stations: LandStationNormals[];
+    district: LandDistrictFacts | null;
+    rules: Record<string, unknown>;
+    method: string;
+    generatedAt: string;
 }
 
 export interface ParcelLand {
@@ -2180,11 +2285,13 @@ export interface ParcelLand {
         worldcover: Record<string, number>;
         mismatches: LandMismatchFlag[];
         change: { from: LandDwClass; to: LandDwClass; fromYear: number; toYear: number } | null;
+        ndviHistory?: LandNdviPeriod[];
     };
-    erosion: { index: number | null; class: LandErosionClass; factors: { R: number | null; K: number | null; LS: number | null; C: number | null } };
-    capability: { akk: LandAkkClass | null; limitations: string[]; law5403: Law5403Class | null; law5403Label: string };
+    erosion: { index: number | null; class: LandErosionClass; factors: { R: number | null; K: number | null; LS: number | null; C: number | null }; sources?: string[] };
+    capability: { akk: LandAkkClass | null; limitations: string[]; law5403: Law5403Class | null; law5403Label: string; reasoning?: string; sources?: string[] };
+    climate?: LandParcelClimate | null;
     suitability: LandSuitability[];
-    recommendations: string[];
+    recommendations: Array<{ text: string; sources: string[] }>;
 }
 
 export interface LandClimatePeriod {
@@ -2204,15 +2311,33 @@ export interface LandClimatePeriod {
     drySpellMax: number;
 }
 
+type LandWindowAgg = Pick<LandClimatePeriod, 'tmean' | 'precipMm' | 'rainDays' | 'frostDays' | 'hotDays'> & { rhMean?: number };
+
 export interface LandClimateWindow {
     key: string;
     label: string;
     from: string;
     to: string;
     why: string;
+    sources?: string[];
     years: Array<{ year: number } & Omit<LandClimatePeriod, 'period'>>;
-    baseline: Pick<LandClimatePeriod, 'tmean' | 'precipMm' | 'rainDays' | 'frostDays' | 'hotDays'>;
-    recent: Pick<LandClimatePeriod, 'tmean' | 'precipMm' | 'rainDays' | 'frostDays' | 'hotDays'>;
+    baseline: LandWindowAgg;
+    recent: LandWindowAgg;
+}
+
+export interface LandStationAnchor {
+    stations: Array<{ id: string; name: string; distanceKm: number; weight: number; elevationM: number; period: string }>;
+    normal: { tmean: number[]; tmax: number[]; tmin: number[]; precipMm: number[]; rainDays: number[]; annualPrecipMm: number; annualTmean: number };
+    model: { tmean: number[]; precipEra: number[]; precipChirps: number[]; years: number[] };
+    monthlyOffsetC: number[];
+    monthlyPrecipRatio: number[];
+}
+
+export interface LandClimateIndices {
+    erinc: { value: number; class: string };
+    deMartonne: { value: number; class: string };
+    koppen: { code: string; label: string };
+    reference: Array<{ station: string; erinc: number | null; deMartonne: number | null; thornthwaite: string | null }>;
 }
 
 export interface LandClimate {
@@ -2220,13 +2345,18 @@ export interface LandClimate {
     from: string;
     to: string;
     lapse: { neighbourhoodElevationM: number; cellElevationM: number; correctionC: number };
+    /** Station anchoring, decades, indices and seasons exist on bundles produced by the cited model (2026-10-28 →). */
+    anchor?: LandStationAnchor;
     monthly: LandClimatePeriod[];
     yearly: LandClimatePeriod[];
+    decades?: Array<{ label: string; years: number[] } & Omit<LandClimatePeriod, 'period' | 'days'>>;
     climatology: Array<{ month: number; tmean: number; tmin: number; tmax: number; precipMm: number; rainDays: number; rhMean: number }>;
     baselineYears: number[];
     recentYears: number[];
     anomaly: { tmean: number; precipMm: number; frostDays: number; hotDays: number; rainDays: number; drySpellMax: number; rhMean: number };
     trend: { tmeanPerDecade: number; precipPerDecade: number; hotDaysPerDecade: number; frostDaysPerDecade: number };
+    indices?: LandClimateIndices;
+    seasons?: Array<{ year: number; lastSpringFrost: string | null; firstAutumnFrost: string | null; frostFreeDays: number; chillHours: number }>;
     windows: LandClimateWindow[];
 }
 
@@ -2248,10 +2378,13 @@ export interface LandSummary {
     generatedAt: string;
     rules: Record<string, unknown>;
     crops: Array<{ key: LandCropKey; label: string }>;
+    district: LandDistrictFacts | null;
     summary: LandSummaryCounts;
     boundaryAreaM2: number;
     landUse: { years: number[]; boundary: Record<number, LandClassFractions>; worldcover: Record<string, number> };
-    climate: Pick<LandClimate, 'source' | 'from' | 'to' | 'baselineYears' | 'recentYears' | 'anomaly' | 'trend'> & { years: number };
+    ndviHistory: LandNdviPeriod[];
+    ndviPeriods: Array<{ period: string; from: number; to: number; scenes: number }>;
+    climate: Pick<LandClimate, 'source' | 'from' | 'to' | 'baselineYears' | 'recentYears' | 'anomaly' | 'trend' | 'indices' | 'anchor'> & { years: number };
 }
 
 export interface LandParcelRow {
@@ -3108,6 +3241,7 @@ export const api = {
     // Land evaluation module
     getLandSummary: (areaId: string) => request<LandSummary>(`/caykur/tea-inventory/areas/${areaId}/land/summary`),
     getLandClimate: (areaId: string) => request<LandClimate>(`/caykur/tea-inventory/areas/${areaId}/land/climate`),
+    getLandEvidence: (areaId: string) => request<LandEvidence>(`/caykur/tea-inventory/areas/${areaId}/land/evidence`),
     getLandParcels: (areaId: string, params: LandParcelQuery = {}) => {
         const query = Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&');
         return request<Paginated<LandParcelRow>>(`/caykur/tea-inventory/areas/${areaId}/land/parcels${query ? `?${query}` : ''}`);

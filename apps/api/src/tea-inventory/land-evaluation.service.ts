@@ -7,12 +7,20 @@ import { ClimateSummary, CropKey, LandBlock, LandSummaryCounts, ParcelLand } fro
 import { LandLayerQueryDto, LandParcelQueryDto } from '@/tea-inventory/dto';
 import { Paginated, paginate } from '@/common/dto/paginated.dto';
 
-export interface LandSummary extends Omit<LandBlock, 'neighbourhood'> {
+/** Heavy reference material is served by `evidence()`, not with every summary. */
+type EvidenceKeys = 'cropRules' | 'sources' | 'stations';
+
+export interface LandSummary extends Omit<LandBlock, 'neighbourhood' | EvidenceKeys> {
     boundaryAreaM2: number;
     /** Neighbourhood-wide land cover per year (Dynamic World) and WorldCover 2021. */
     landUse: LandBlock['neighbourhood']['landUse'];
-    climate: Pick<ClimateSummary, 'source' | 'from' | 'to' | 'baselineYears' | 'recentYears' | 'anomaly' | 'trend'> & { years: number };
+    ndviHistory: LandBlock['neighbourhood']['ndviHistory'];
+    ndviPeriods: LandBlock['neighbourhood']['ndviPeriods'];
+    climate: Pick<ClimateSummary, 'source' | 'from' | 'to' | 'baselineYears' | 'recentYears' | 'anomaly' | 'trend' | 'indices' | 'anchor'> & { years: number };
 }
+
+/** Evidence registry, crop requirement rules, MGM station normals and district facts behind the evaluation. */
+export type LandEvidence = Pick<LandBlock, EvidenceKeys | 'district' | 'rules' | 'method' | 'generatedAt'>;
 
 export interface LandParcelRow {
     id: string;
@@ -67,14 +75,33 @@ export class LandEvaluationService {
 
     async summary(areaId: string): Promise<LandSummary> {
         const area = await this.findArea(areaId);
-        const { neighbourhood, ...rest } = area.land;
+        const { neighbourhood, cropRules: _cropRules, sources: _sources, stations: _stations, ...rest } = area.land;
         const c = neighbourhood.climate;
         return {
             ...rest,
             boundaryAreaM2: neighbourhood.boundaryAreaM2,
             landUse: neighbourhood.landUse,
-            climate: { source: c.source, from: c.from, to: c.to, baselineYears: c.baselineYears, recentYears: c.recentYears, anomaly: c.anomaly, trend: c.trend, years: c.yearly.length },
+            ndviHistory: neighbourhood.ndviHistory ?? [],
+            ndviPeriods: neighbourhood.ndviPeriods ?? [],
+            climate: {
+                source: c.source,
+                from: c.from,
+                to: c.to,
+                baselineYears: c.baselineYears,
+                recentYears: c.recentYears,
+                anomaly: c.anomaly,
+                trend: c.trend,
+                indices: c.indices,
+                anchor: c.anchor,
+                years: c.yearly.length,
+            },
         };
+    }
+
+    async evidence(areaId: string): Promise<LandEvidence> {
+        const area = await this.findArea(areaId);
+        const { cropRules, sources, stations, district, rules, method, generatedAt } = area.land;
+        return { cropRules: cropRules ?? [], sources: sources ?? [], stations: stations ?? [], district: district ?? null, rules, method, generatedAt };
     }
 
     async climate(areaId: string): Promise<ClimateSummary> {
@@ -107,10 +134,15 @@ export class LandEvaluationService {
             law5403: l.capability.law5403,
             law5403Label: l.capability.law5403Label,
             limitations: l.capability.limitations,
-            best: l.suitability[0] ?? null,
-            suitability: l.suitability,
+            // The list rows carry scores only; the per-factor breakdown comes with the parcel detail.
+            best: l.suitability[0] ? this.slim(l.suitability[0]) : null,
+            suitability: l.suitability.map((s) => this.slim(s)),
             recommendations: l.recommendations.length,
         };
+    }
+
+    private slim(s: ParcelLand['suitability'][number]): ParcelLand['suitability'][number] {
+        return { ...s, factors: [] };
     }
 
     async parcels(areaId: string, query: LandParcelQueryDto): Promise<Paginated<LandParcelRow>> {
