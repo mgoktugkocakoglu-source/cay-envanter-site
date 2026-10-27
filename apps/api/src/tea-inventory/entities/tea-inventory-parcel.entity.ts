@@ -1,3 +1,4 @@
+import { ParcelLand } from '@/tea-inventory/entities/land-evaluation.types';
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { TeaInventoryArea, InventoryLicense } from '@/tea-inventory/entities/tea-inventory-area.entity';
 import { InventoryClass } from '@/tea-inventory/enums/inventory-class.enum';
@@ -63,6 +64,10 @@ export class TeaInventoryParcel {
     // Per-season pruning result + NDVI curve of the parcel's tea pixels (bundle v2).
     @Column({ type: 'jsonb', nullable: true })
     pruning: Record<string, unknown> | null;
+
+    // Land evaluation result of this parcel (terrain, soil, land use, capability, suitability), when the module has run.
+    @Column({ type: 'jsonb', nullable: true })
+    land: ParcelLand | null;
 
     @Column({ type: 'jsonb' })
     geometry: Record<string, unknown>;

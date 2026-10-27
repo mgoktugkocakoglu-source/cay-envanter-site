@@ -2120,6 +2120,186 @@ export interface GardenEditorContext {
 }
 
 
+// Land evaluation module (Toprak Koruma ve Arazi Değerlendirme)
+export type LandSlopeCode = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
+export type LandAkkClass = 'I' | 'II' | 'III' | 'IV' | 'V' | 'VI' | 'VII' | 'VIII';
+export type Law5403Class = 'MT' | 'OT' | 'DT' | 'TA' | 'TD';
+export type LandDeclaredUse = 'tea' | 'hazelnut' | 'forest' | 'pasture' | 'field' | 'orchard' | 'built' | 'other';
+export type LandObservedUse = 'tea' | 'trees' | 'pasture' | 'field' | 'shrub' | 'built' | 'bare' | 'water' | 'wet' | 'unknown';
+export type LandMismatchFlag = 'tea_title_no_tea' | 'abandoned_to_trees' | 'agri_to_built' | 'forest_cleared' | 'pasture_to_crops' | 'wet_or_water';
+export type LandErosionClass = 'very_low' | 'low' | 'moderate' | 'high' | 'very_high' | 'no_data';
+export type LandCropKey = 'tea' | 'hazelnut' | 'kiwi' | 'chestnut' | 'blueberry' | 'pasture' | 'vegetable' | 'forestry';
+export type LandDwClass = 'water' | 'trees' | 'grass' | 'flooded_vegetation' | 'crops' | 'shrub_and_scrub' | 'built' | 'bare' | 'snow_and_ice';
+export type LandClassFractions = Partial<Record<LandDwClass, number>>;
+
+export interface LandSuitability {
+    crop: LandCropKey;
+    score: number;
+    limiting: string | null;
+}
+
+export interface ParcelLand {
+    key: string;
+    block: string;
+    parcel: string;
+    nature: string;
+    areaM2: number;
+    terrain: {
+        elevationM: number | null;
+        slopePct: number | null;
+        slopeMaxPct: number | null;
+        aspectDeg: number | null;
+        tpiM: number | null;
+        handM: number | null;
+        upstreamKm2: number | null;
+        streamDistM: number | null;
+        waterOccurrence: number | null;
+        slopeClass: LandSlopeCode;
+        slopeLabel: string;
+        aspectLabel: string | null;
+    };
+    soil: {
+        clayPct: number | null;
+        sandPct: number | null;
+        siltPct: number | null;
+        ph: number | null;
+        socPct: number | null;
+        cec: number | null;
+        bulkDensity: number | null;
+        textureCode: number | null;
+        textureLabel: string | null;
+        phLabel: string | null;
+    };
+    landUse: {
+        declared: LandDeclaredUse;
+        observed: LandObservedUse;
+        teaShare: number | null;
+        latestYear: number | null;
+        latest: LandClassFractions;
+        history: Array<{ year: number; dominant: LandDwClass | null; fractions: LandClassFractions }>;
+        worldcover: Record<string, number>;
+        mismatches: LandMismatchFlag[];
+        change: { from: LandDwClass; to: LandDwClass; fromYear: number; toYear: number } | null;
+    };
+    erosion: { index: number | null; class: LandErosionClass; factors: { R: number | null; K: number | null; LS: number | null; C: number | null } };
+    capability: { akk: LandAkkClass | null; limitations: string[]; law5403: Law5403Class | null; law5403Label: string };
+    suitability: LandSuitability[];
+    recommendations: string[];
+}
+
+export interface LandClimatePeriod {
+    period: string;
+    days: number;
+    tmean: number;
+    tmaxMean: number;
+    tminMean: number;
+    tminAbs: number;
+    tmaxAbs: number;
+    rhMean: number;
+    precipMm: number;
+    rainDays: number;
+    frostDays: number;
+    hotDays: number;
+    gdd10: number;
+    drySpellMax: number;
+}
+
+export interface LandClimateWindow {
+    key: string;
+    label: string;
+    from: string;
+    to: string;
+    why: string;
+    years: Array<{ year: number } & Omit<LandClimatePeriod, 'period'>>;
+    baseline: Pick<LandClimatePeriod, 'tmean' | 'precipMm' | 'rainDays' | 'frostDays' | 'hotDays'>;
+    recent: Pick<LandClimatePeriod, 'tmean' | 'precipMm' | 'rainDays' | 'frostDays' | 'hotDays'>;
+}
+
+export interface LandClimate {
+    source: string;
+    from: string;
+    to: string;
+    lapse: { neighbourhoodElevationM: number; cellElevationM: number; correctionC: number };
+    monthly: LandClimatePeriod[];
+    yearly: LandClimatePeriod[];
+    climatology: Array<{ month: number; tmean: number; tmin: number; tmax: number; precipMm: number; rainDays: number; rhMean: number }>;
+    baselineYears: number[];
+    recentYears: number[];
+    anomaly: { tmean: number; precipMm: number; frostDays: number; hotDays: number; rainDays: number; drySpellMax: number; rhMean: number };
+    trend: { tmeanPerDecade: number; precipPerDecade: number; hotDaysPerDecade: number; frostDaysPerDecade: number };
+    windows: LandClimateWindow[];
+}
+
+export interface LandSummaryCounts {
+    parcels: number;
+    evaluatedAreaM2: number;
+    byAkk: Record<LandAkkClass, number>;
+    byLaw5403: Record<Law5403Class, number>;
+    byObserved: Record<LandObservedUse, number>;
+    byErosion: Record<LandErosionClass, number>;
+    mismatches: Record<LandMismatchFlag, number>;
+    suitabilityMean: Record<LandCropKey, number>;
+    conversionCandidates: number;
+}
+
+export interface LandSummary {
+    calibrated: boolean;
+    method: string;
+    generatedAt: string;
+    rules: Record<string, unknown>;
+    crops: Array<{ key: LandCropKey; label: string }>;
+    summary: LandSummaryCounts;
+    boundaryAreaM2: number;
+    landUse: { years: number[]; boundary: Record<number, LandClassFractions>; worldcover: Record<string, number> };
+    climate: Pick<LandClimate, 'source' | 'from' | 'to' | 'baselineYears' | 'recentYears' | 'anomaly' | 'trend'> & { years: number };
+}
+
+export interface LandParcelRow {
+    id: string;
+    key: string;
+    block: string;
+    parcel: string;
+    nature: string;
+    locality: string;
+    areaM2: number;
+    elevationM: number | null;
+    slopePct: number | null;
+    slopeLabel: string;
+    aspectLabel: string | null;
+    ph: number | null;
+    textureLabel: string | null;
+    declared: LandDeclaredUse;
+    observed: LandObservedUse;
+    mismatches: LandMismatchFlag[];
+    change: ParcelLand['landUse']['change'];
+    erosionClass: LandErosionClass;
+    erosionIndex: number | null;
+    akk: LandAkkClass | null;
+    law5403: Law5403Class | null;
+    law5403Label: string;
+    limitations: string[];
+    best: LandSuitability | null;
+    suitability: LandSuitability[];
+    recommendations: number;
+}
+
+export interface LandParcelDetail extends LandParcelRow {
+    geometry: GeoJSON.Geometry;
+    land: ParcelLand;
+}
+
+export interface LandParcelQuery {
+    page?: number;
+    limit?: number;
+    search?: string;
+    akk?: LandAkkClass;
+    law5403?: Law5403Class;
+    observed?: LandObservedUse;
+    erosion?: LandErosionClass;
+    mismatch?: LandMismatchFlag;
+    crop?: LandCropKey;
+}
+
 // ── Garden-health module (P3): growing-season anomalies, vigour, yield vs quota, fertilisation feedback ──
 export type HealthAnomalyClass = 'chemical_suspect' | 'defoliation' | 'stress' | 'none' | 'no_data';
 export type YieldFlag = 'ok' | 'low' | 'high' | 'no_license' | 'no_data';
@@ -2925,6 +3105,16 @@ export const api = {
         request<GardenEditorContext>(`/caykur/tea-inventory/areas/${areaId}/licensing/gardens/${encodeURIComponent(code)}/context`),
 
     // ── Garden-health module ──
+    // Land evaluation module
+    getLandSummary: (areaId: string) => request<LandSummary>(`/caykur/tea-inventory/areas/${areaId}/land/summary`),
+    getLandClimate: (areaId: string) => request<LandClimate>(`/caykur/tea-inventory/areas/${areaId}/land/climate`),
+    getLandParcels: (areaId: string, params: LandParcelQuery = {}) => {
+        const query = Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&');
+        return request<Paginated<LandParcelRow>>(`/caykur/tea-inventory/areas/${areaId}/land/parcels${query ? `?${query}` : ''}`);
+    },
+    getLandParcel: (areaId: string, parcelId: string) => request<LandParcelDetail>(`/caykur/tea-inventory/areas/${areaId}/land/parcels/${parcelId}`),
+    getLandLayers: (areaId: string, by: string, crop?: LandCropKey) =>
+        request<GeoJSON.FeatureCollection>(`/caykur/tea-inventory/areas/${areaId}/land/layers?by=${by}${crop ? `&crop=${crop}` : ''}`),
     getHealthSummary: (areaId: string, season?: string) =>
         request<HealthSummary>(`/caykur/tea-inventory/areas/${areaId}/health/summary${season ? `?season=${encodeURIComponent(season)}` : ''}`),
     getHealthGardens: (areaId: string, params?: HealthGardenQuery) => {

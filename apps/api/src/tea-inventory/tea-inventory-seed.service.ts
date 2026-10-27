@@ -7,6 +7,7 @@ import { TeaInventoryArea, InventoryLicense, LicensingBlock, TeaPatch, ProducerS
 import { TeaInventoryParcel } from '@/tea-inventory/entities/tea-inventory-parcel.entity';
 import { InventoryClass } from '@/tea-inventory/enums/inventory-class.enum';
 import { TeaInventoryProducer, ProducerScan, ProducerAutoStatus, ProducerFusion } from '@/tea-inventory/entities/tea-inventory-producer.entity';
+import { LandBlock, ParcelLand } from '@/tea-inventory/entities/land-evaluation.types';
 import { TeaInventoryGarden, GardenSeason, GardenPruningEvent, GardenFusion, RadarResult, RadarSeries, GardenHealthSeason } from '@/tea-inventory/entities/tea-inventory-garden.entity';
 import { TeaInventoryLicense } from '@/tea-inventory/entities/tea-inventory-license.entity';
 import { ParcelLineage } from '@/tea-inventory/entities/parcel-lineage.entity';
@@ -97,6 +98,12 @@ interface InventoryBundle {
     radar?: BundleRadar | null;
     fusion?: BundleFusion | null;
     health?: BundleHealth | null;
+    land?: BundleLand | null;
+}
+
+/** Optional land-evaluation block: area-level climate/summary plus one evaluation per parcel key. */
+interface BundleLand extends LandBlock {
+    parcels: ParcelLand[];
 }
 
 /** Optional garden-health block: growing-season vigour, anomalies and yield per garden / producer per year. */
@@ -269,11 +276,13 @@ export class TeaInventorySeedService implements OnModuleInit {
                             seasons: bundle.health.seasons.map(({ gardens: _g, ...rest }) => rest),
                         }
                         : null,
+                    land: bundle.land ? (({ parcels: _p, ...rest }) => rest)(bundle.land) : null,
                     bundleGeneratedAt: generatedAt,
                 }),
             );
+            const landByKey = new Map((bundle.land?.parcels ?? []).map((l) => [l.key, l]));
             const parcels = bundle.parcels.map(({ key, ...parcel }) =>
-                manager.create(TeaInventoryParcel, { ...parcel, pruning: parcel.pruning ?? null, parcelKey: key, areaId: area.id }),
+                manager.create(TeaInventoryParcel, { ...parcel, pruning: parcel.pruning ?? null, parcelKey: key, areaId: area.id, land: landByKey.get(key) ?? null }),
             );
             await manager.save(parcels, { chunk: INSERT_CHUNK });
             if (bundle.producers) {

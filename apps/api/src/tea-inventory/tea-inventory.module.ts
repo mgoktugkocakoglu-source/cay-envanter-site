@@ -29,6 +29,8 @@ import { CalibrationService } from '@/tea-inventory/calibration.service';
 import { CalibrationController } from '@/tea-inventory/calibration.controller';
 import { GardenHealthService } from '@/tea-inventory/garden-health.service';
 import { RegionOverviewService } from '@/tea-inventory/region-overview.service';
+import { LandEvaluationService } from '@/tea-inventory/land-evaluation.service';
+import { LandEvaluationController } from '@/tea-inventory/land-evaluation.controller';
 import { GardenHealthController } from '@/tea-inventory/garden-health.controller';
 import { TeaInventoryController } from '@/tea-inventory/tea-inventory.controller';
 import { TeaInventoryService } from '@/tea-inventory/tea-inventory.service';
@@ -52,7 +54,7 @@ import { TeaInventorySeedService } from '@/tea-inventory/tea-inventory-seed.serv
             FertilisationRecord,
         ]),
     ],
-    controllers: [TeaInventoryController, ProducerPruningController, LicensingController, PruningFusionController, ReportController, MinistryRequestController, CalibrationController, GardenHealthController],
-    providers: [TeaInventoryService, TeaInventorySeedService, ProducerPruningService, LicensingService, LicensingOperationsService, PruningFusionService, EvidenceService, SeasonReportService, MinistryRequestService, CalibrationService, GardenHealthService, RegionOverviewService],
+    controllers: [TeaInventoryController, ProducerPruningController, LicensingController, PruningFusionController, ReportController, MinistryRequestController, CalibrationController, GardenHealthController, LandEvaluationController],
+    providers: [TeaInventoryService, TeaInventorySeedService, ProducerPruningService, LicensingService, LicensingOperationsService, PruningFusionService, EvidenceService, SeasonReportService, MinistryRequestService, CalibrationService, GardenHealthService, RegionOverviewService, LandEvaluationService],
 })
 export class TeaInventoryModule { }

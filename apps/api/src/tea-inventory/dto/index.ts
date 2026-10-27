@@ -8,3 +8,4 @@ export * from './calibration.dto';
 export * from './ministry-request.dto';
 export * from './licensing-operations.dto';
 export * from './garden-health.dto';
+export * from './land-evaluation.dto';
