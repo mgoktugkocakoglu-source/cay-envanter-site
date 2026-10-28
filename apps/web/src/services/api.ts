@@ -2433,6 +2433,98 @@ export interface LandParcelQuery {
     crop?: LandCropKey;
 }
 
+// ── Garden age / renewal module: Landsat establishment year, renewals, vigour, activity, abandonment, priority ──
+export type GardenAgeClass = 'under_10' | 'y10_25' | 'y25_40' | 'over_40' | 'not_tea' | 'unknown';
+export type GardenActivityClass = 'harvested' | 'low' | 'none' | 'no_data';
+export type GardenAbandonClass = 'active' | 'weak' | 'likely_abandoned' | 'not_tea';
+export type GardenPriorityClass = 'high' | 'medium' | 'low' | 'not_applicable';
+
+export interface ParcelAge {
+    key: string;
+    block: string;
+    parcel: string;
+    nature: string;
+    areaM2: number;
+    teaShare: number | null;
+    series: { years: number[]; ndvi: Array<number | null>; smooth: Array<number | null>; obs: Array<number | null> };
+    s2: { years: number[]; months: number[]; ndvi: Record<number, Array<number | null>>; dips: Record<number, number>; amplitude: Record<number, number | null> };
+    establishment: { year: number | null; preRecord: boolean; confidence: 'high' | 'medium' | 'low'; note: string };
+    ageYears: number | null;
+    ageClass: GardenAgeClass;
+    renewals: Array<{ year: number; drop: number; recoveredIn: number }>;
+    lastRenewalYear: number | null;
+    vigour: { trendPerDecade: number | null; recentMean: number | null; peakMean: number | null; peakYears: string | null; declinePct: number | null };
+    activity: { dipsPerYear: number | null; amplitude: number | null; class: GardenActivityClass };
+    abandonment: { score: number; class: GardenAbandonClass; reasons: string[] };
+    priority: { score: number; class: GardenPriorityClass; reasons: string[] };
+}
+
+export interface GardenAgeSummary {
+    calibrated: boolean;
+    method: string;
+    generatedAt: string;
+    rules: Record<string, unknown>;
+    sources: Array<{ id: string; title: string; org: string; year: number | string; url: string; used: string }>;
+    summary: {
+        parcels: number;
+        teaAreaM2: number;
+        byAgeClass: Record<GardenAgeClass, number>;
+        byActivity: Record<GardenActivityClass, number>;
+        byAbandonment: Record<GardenAbandonClass, number>;
+        byPriority: Record<GardenPriorityClass, number>;
+        establishmentByDecade: Record<string, number>;
+        renewalsByYear: Record<number, number>;
+        meanAgeYears: number | null;
+        medianEstablishmentYear: number | null;
+        highPriorityAreaM2: number;
+        likelyAbandonedAreaM2: number;
+    };
+}
+
+export interface GardenAgeParcelRow {
+    id: string;
+    key: string;
+    block: string;
+    parcel: string;
+    nature: string;
+    locality: string;
+    areaM2: number;
+    teaShare: number | null;
+    establishmentYear: number | null;
+    preRecord: boolean;
+    confidence: 'high' | 'medium' | 'low';
+    ageYears: number | null;
+    ageClass: GardenAgeClass;
+    renewals: number;
+    lastRenewalYear: number | null;
+    trendPerDecade: number | null;
+    recentMean: number | null;
+    declinePct: number | null;
+    activity: GardenActivityClass;
+    dipsPerYear: number | null;
+    abandonment: GardenAbandonClass;
+    abandonmentScore: number;
+    priority: GardenPriorityClass;
+    priorityScore: number;
+    priorityReasons: string[];
+}
+
+export interface GardenAgeParcelDetail extends GardenAgeParcelRow {
+    geometry: GeoJSON.Geometry;
+    age: ParcelAge;
+}
+
+export interface GardenAgeParcelQuery {
+    page?: number;
+    limit?: number;
+    search?: string;
+    ageClass?: GardenAgeClass;
+    activity?: GardenActivityClass;
+    abandonment?: GardenAbandonClass;
+    priority?: GardenPriorityClass;
+    sort?: 'priority' | 'age' | 'abandonment' | 'parcel';
+}
+
 // ── Garden-health module (P3): growing-season anomalies, vigour, yield vs quota, fertilisation feedback ──
 export type HealthAnomalyClass = 'chemical_suspect' | 'defoliation' | 'stress' | 'none' | 'no_data';
 export type YieldFlag = 'ok' | 'low' | 'high' | 'no_license' | 'no_data';
@@ -3249,6 +3341,13 @@ export const api = {
     getLandParcel: (areaId: string, parcelId: string) => request<LandParcelDetail>(`/caykur/tea-inventory/areas/${areaId}/land/parcels/${parcelId}`),
     getLandLayers: (areaId: string, by: string, crop?: LandCropKey) =>
         request<GeoJSON.FeatureCollection>(`/caykur/tea-inventory/areas/${areaId}/land/layers?by=${by}${crop ? `&crop=${crop}` : ''}`),
+    getGardenAgeSummary: (areaId: string) => request<GardenAgeSummary>(`/caykur/tea-inventory/areas/${areaId}/age/summary`),
+    getGardenAgeParcels: (areaId: string, params: GardenAgeParcelQuery = {}) => {
+        const query = Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&');
+        return request<Paginated<GardenAgeParcelRow>>(`/caykur/tea-inventory/areas/${areaId}/age/parcels${query ? `?${query}` : ''}`);
+    },
+    getGardenAgeParcel: (areaId: string, parcelId: string) => request<GardenAgeParcelDetail>(`/caykur/tea-inventory/areas/${areaId}/age/parcels/${parcelId}`),
+    getGardenAgeLayers: (areaId: string, by: string) => request<GeoJSON.FeatureCollection>(`/caykur/tea-inventory/areas/${areaId}/age/layers?by=${by}`),
     getHealthSummary: (areaId: string, season?: string) =>
         request<HealthSummary>(`/caykur/tea-inventory/areas/${areaId}/health/summary${season ? `?season=${encodeURIComponent(season)}` : ''}`),
     getHealthGardens: (areaId: string, params?: HealthGardenQuery) => {

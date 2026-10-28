@@ -1,4 +1,5 @@
 import { ParcelLand } from '@/tea-inventory/entities/land-evaluation.types';
+import { ParcelAge } from '@/tea-inventory/entities/garden-age.types';
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { TeaInventoryArea, InventoryLicense } from '@/tea-inventory/entities/tea-inventory-area.entity';
 import { InventoryClass } from '@/tea-inventory/enums/inventory-class.enum';
@@ -68,6 +69,10 @@ export class TeaInventoryParcel {
     // Land evaluation result of this parcel (terrain, soil, land use, capability, suitability), when the module has run.
     @Column({ type: 'jsonb', nullable: true })
     land: ParcelLand | null;
+
+    // Garden age / renewal result of this tea parcel (Landsat series, establishment, renewals, scores), when the module has run.
+    @Column({ type: 'jsonb', nullable: true })
+    age: ParcelAge | null;
 
     @Column({ type: 'jsonb' })
     geometry: Record<string, unknown>;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, HeartPulse, Info, Leaf, MapPinned, Mountain, Scissors, ScrollText, X } from '@lucide/vue';
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, HeartPulse, History, Info, Leaf, MapPinned, Mountain, Scissors, ScrollText, X } from '@lucide/vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import CaykurLayout from '@/layouts/CaykurLayout.vue';
@@ -25,6 +25,7 @@ import CaykurCalibration from '@/components/caykur/CaykurCalibration.vue';
 import CaykurGardenHealth from '@/components/caykur/CaykurGardenHealth.vue';
 import CaykurRegionOverview from '@/components/caykur/CaykurRegionOverview.vue';
 import CaykurLandEvaluation from '@/components/caykur/CaykurLandEvaluation.vue';
+import CaykurGardenAge from '@/components/caykur/CaykurGardenAge.vue';
 import { useTkgmParcelLookup } from '@/composables/useTkgmParcelLookup';
 import { toneVariant } from '@/components/caykur/tone';
 import {
@@ -78,7 +79,7 @@ const totalPages = ref(0);
 const isLoadingRows = ref(false);
 
 // ── Tabs: the inventory map stays mounted (v-show) and is resized when shown again ──
-const activeTab = ref<'region' | 'inventory' | 'pruning' | 'licensing' | 'health' | 'land'>('inventory');
+const activeTab = ref<'region' | 'inventory' | 'pruning' | 'licensing' | 'health' | 'land' | 'age'>('inventory');
 const regionOverview = ref<InstanceType<typeof CaykurRegionOverview> | null>(null);
 /** Areas grouped by district for the selector and the region tab (the pilot grows one district at a time). */
 const areaGroups = computed(() => {
@@ -404,6 +405,7 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                         <TabsTrigger value="licensing"><ScrollText aria-hidden="true" />Ruhsatlandırma</TabsTrigger>
                         <TabsTrigger value="health"><HeartPulse aria-hidden="true" />Bahçe Sağlığı</TabsTrigger>
                         <TabsTrigger value="land"><Mountain aria-hidden="true" />Arazi Değerlendirme</TabsTrigger>
+                        <TabsTrigger value="age"><History aria-hidden="true" />Bahçe Yaşı</TabsTrigger>
                     </TabsList>
                 </Tabs>
 
@@ -660,6 +662,7 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                 <CaykurLicensing v-if="activeTab === 'licensing' && mapData" :area-id="area.id" :map-data="mapData" :tea-patches="area.teaPatches" />
                 <CaykurGardenHealth v-if="activeTab === 'health'" :area-id="area.id" />
                 <CaykurLandEvaluation v-if="activeTab === 'land'" :area-id="area.id" />
+                <CaykurGardenAge v-if="activeTab === 'age'" :area-id="area.id" />
             </template>
         </PageContainer>
     </CaykurLayout>

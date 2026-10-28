@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { TeaInventoryParcel } from '@/tea-inventory/entities/tea-inventory-parcel.entity';
 import { LandBlock } from '@/tea-inventory/entities/land-evaluation.types';
+import { AgeBlock } from '@/tea-inventory/entities/garden-age.types';
 
 /** A detected tea patch (Sentinel-2, 10 m) stored with its area. */
 export interface TeaPatch {
@@ -228,6 +229,10 @@ export class TeaInventoryArea {
     // Land evaluation module block (terrain/soil/land-use rules, climate record, summary), absent until evaluate-land has run.
     @Column({ type: 'jsonb', nullable: true })
     land: LandBlock | null;
+
+    // Garden age / renewal module block (rules, sources, summary), absent until garden-age has run.
+    @Column({ type: 'jsonb', nullable: true })
+    age: AgeBlock | null;
 
     // Bundle timestamp; a re-import is skipped when it has not changed.
     @Column({ type: 'timestamp', name: 'bundle_generated_at' })

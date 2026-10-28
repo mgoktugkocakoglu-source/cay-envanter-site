@@ -31,6 +31,8 @@ import { GardenHealthService } from '@/tea-inventory/garden-health.service';
 import { RegionOverviewService } from '@/tea-inventory/region-overview.service';
 import { LandEvaluationService } from '@/tea-inventory/land-evaluation.service';
 import { LandEvaluationController } from '@/tea-inventory/land-evaluation.controller';
+import { GardenAgeService } from '@/tea-inventory/garden-age.service';
+import { GardenAgeController } from '@/tea-inventory/garden-age.controller';
 import { GardenHealthController } from '@/tea-inventory/garden-health.controller';
 import { TeaInventoryController } from '@/tea-inventory/tea-inventory.controller';
 import { TeaInventoryService } from '@/tea-inventory/tea-inventory.service';
@@ -54,7 +56,7 @@ import { TeaInventorySeedService } from '@/tea-inventory/tea-inventory-seed.serv
             FertilisationRecord,
         ]),
     ],
-    controllers: [TeaInventoryController, ProducerPruningController, LicensingController, PruningFusionController, ReportController, MinistryRequestController, CalibrationController, GardenHealthController, LandEvaluationController],
-    providers: [TeaInventoryService, TeaInventorySeedService, ProducerPruningService, LicensingService, LicensingOperationsService, PruningFusionService, EvidenceService, SeasonReportService, MinistryRequestService, CalibrationService, GardenHealthService, RegionOverviewService, LandEvaluationService],
+    controllers: [TeaInventoryController, ProducerPruningController, LicensingController, PruningFusionController, ReportController, MinistryRequestController, CalibrationController, GardenHealthController, LandEvaluationController, GardenAgeController],
+    providers: [TeaInventoryService, TeaInventorySeedService, ProducerPruningService, LicensingService, LicensingOperationsService, PruningFusionService, EvidenceService, SeasonReportService, MinistryRequestService, CalibrationService, GardenHealthService, RegionOverviewService, LandEvaluationService, GardenAgeService],
 })
 export class TeaInventoryModule { }
