@@ -4,7 +4,7 @@
  * (read at render time) so the layer follows light/dark mode.
  */
 
-import type {
+import type { FusionKind,
     ApplicationStatus,
     ApplicationType,
     FusionAnomaly,
@@ -267,13 +267,32 @@ export const RADAR_ORDER: RadarClass[] = ['confirmed', 'weak', 'neutral', 'contr
 // ── Multi-sensor step-change verdicts (fusion module) ──
 
 export const FUSION_CLASS_META: Record<FusionClass, ProducerStatusMeta> = {
-    pruned: { label: 'Budandı', description: 'Optik (NDVI/NBR) ve radar (VH) aynı tarihte, bahçenin kendi gürültüsüne göre anlamlı ve kalıcı örtü kaybı görüyor.', tone: 'success' },
-    likely: { label: 'Olası budama', description: 'Güçlü sinyal var ama tek birincil sensör görüyor ya da kalıcılık henüz doğrulanmadı.', tone: 'info' },
-    unclear: { label: 'Belirsiz', description: 'Zayıf sinyal, ya da düşüş geri döndü (gölge/kar/don olabilir).', tone: 'warning' },
+    pruned: { label: 'Budandı', description: 'Kalıcı, büyük ve yaz başında hâlâ süren örtü kaybı: bahçenin kendi NDVI\'si düşmüş, komşularına göre ayrışmış, kademeli değil; gerekiyorsa radar teyitli.', tone: 'success' },
+    likely: { label: 'Olası budama', description: 'Güçlü sinyal var ama bir koşul eksik: bulut boşluğunda radar teyidi yok, ham NDVI yeterince düşmemiş, ya da mahalleden yeterince ayrışmıyor — eksper incelemeli.', tone: 'info' },
+    unclear: { label: 'Belirsiz', description: 'Kış adımı yaz başında kapanmış (hafif budama / kar hasarı), kademeli kayıp (terk/sökme?), zayıf sinyal ya da çelişen sensörler.', tone: 'warning' },
     not_pruned: { label: 'Budama yok', description: 'İyi gözlenmiş; hiçbir sensörde kalıcı örtü kaybı yok.', tone: 'muted' },
     no_data: { label: 'Veri yetersiz', description: 'Değişim penceresinde yeterli gözlem yok.', tone: 'muted' },
 };
 export const FUSION_CLASS_ORDER: FusionClass[] = ['pruned', 'likely', 'unclear', 'not_pruned', 'no_data'];
+
+/** Short Turkish label per verdict kind (why the class is what it is). */
+export const FUSION_KIND_LABEL: Record<FusionKind, string> = {
+    deep_pruning: 'Derin budama',
+    light_or_transient: 'Hafif budama / kar hasarı (yazın toparlandı)',
+    gradual_loss: 'Kademeli kayıp (terk/sökme?)',
+    level: 'Ham NDVI düşmedi (komşu yeşillenmesi?)',
+    contradiction: 'Sensörler çelişiyor',
+    gap: 'Bulut/kar boşluğunda, radar teyitsiz',
+    small_ndvi: 'NDVI düşüşü küçük',
+    likely_optical: 'Optik sinyal, koşul eksik',
+    radar_only: 'Yalnız radar görüyor',
+    second_sensor: 'İkinci sensör bekleniyor',
+    transient: 'Geçici düşüş',
+    weak: 'Zayıf sinyal',
+    population: 'Mahalleden yeterince ayrışmıyor',
+    bulk: 'Mahalle geneliyle aynı',
+    none: 'Budama izi yok',
+};
 
 export const PRODUCER_FUSION_META: Record<ProducerFusionStatus, ProducerStatusMeta> = {
     pruned_full: { label: '1/7 tamam', description: 'Budandığı kesinleşen bahçe alanı, ruhsat alanının 1/7’sini karşılıyor.', tone: 'success' },
@@ -307,10 +326,14 @@ export const FUSION_ANOMALY_LABEL: Record<FusionAnomaly, string> = {
 };
 
 export const FUSION_CHANNEL_LABEL: Record<FusionChannelKey, string> = {
-    ndvi: 'NDVI (S2)',
-    nbr: 'NBR (S2, NIR–SWIR)',
-    vh_asc: 'VH çıkış (S1)',
-    vh_desc: 'VH iniş (S1)',
+    ndvi: 'NDVI (S2 + Landsat)',
+    nbr: 'NBR (NIR–SWIR2)',
+    ndre: 'NDRE (kırmızı kenar, S2)',
+    ndii: 'NDII (NIR–SWIR1, su içeriği)',
+    vh_asc: 'VH γ0 çıkış (S1)',
+    vh_desc: 'VH γ0 iniş (S1)',
+    ratio_asc: 'VH/VV çıkış (S1)',
+    ratio_desc: 'VH/VV iniş (S1)',
     coh_asc: 'Koherans çıkış',
     coh_desc: 'Koherans iniş',
 };

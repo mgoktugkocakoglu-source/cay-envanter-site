@@ -27,10 +27,22 @@ export interface FusionGardenRow {
     unitGeometry: Record<string, unknown> | null;
     repeat: GardenFusion['repeat'] | null;
     class: FusionClass;
+    kind: GardenFusion['verdict']['kind'] | null;
     z: number | null;
     p: number;
     opticalOk: boolean;
     backscatterOk: boolean;
+    coherenceOk: boolean;
+    crossIndexOk: boolean;
+    radarRequired: boolean;
+    review: boolean;
+    shadeProne: boolean;
+    observability: GardenFusion['verdict']['observability'] | null;
+    inCalendar: boolean | null;
+    levels: GardenFusion['verdict']['levels'] | null;
+    shape: GardenFusion['verdict']['shape'] | null;
+    recovery: GardenFusion['verdict']['recovery'] | null;
+    populationZ: number | null;
     changeDate: string | null;
     lastBeforeAt: string | null;
     firstAfterAt: string | null;
@@ -280,10 +292,22 @@ export class PruningFusionService {
             unitGeometry: f.unitGeometry ?? null,
             repeat: f.repeat ?? null,
             class: f.verdict.class,
+            kind: f.verdict.kind ?? null,
             z: f.verdict.z,
             p: f.verdict.p,
             opticalOk: f.verdict.opticalOk ?? false,
             backscatterOk: f.verdict.backscatterOk ?? false,
+            coherenceOk: f.verdict.coherenceOk ?? false,
+            crossIndexOk: f.verdict.crossIndexOk ?? false,
+            radarRequired: f.verdict.radarRequired ?? false,
+            review: f.verdict.review ?? f.verdict.class === 'likely',
+            shadeProne: f.verdict.shadeProne ?? false,
+            observability: f.verdict.observability ?? null,
+            inCalendar: f.verdict.inCalendar ?? null,
+            levels: f.verdict.levels ?? null,
+            shape: f.verdict.shape ?? null,
+            recovery: f.verdict.recovery ?? null,
+            populationZ: f.verdict.populationZ ?? null,
             changeDate: f.verdict.changeDate,
             lastBeforeAt: f.verdict.lastBeforeAt,
             firstAfterAt: f.verdict.firstAfterAt,

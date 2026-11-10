@@ -1260,8 +1260,21 @@ export interface PruningRecordSummary {
 
 // Multi-sensor step-change pruning verdicts (fusion module, uncalibrated)
 export type FusionClass = 'pruned' | 'likely' | 'unclear' | 'not_pruned' | 'no_data';
-export type FusionChannelKey = 'ndvi' | 'nbr' | 'vh_asc' | 'vh_desc' | 'coh_asc' | 'coh_desc';
+export type FusionChannelKey = 'ndvi' | 'nbr' | 'ndre' | 'ndii' | 'vh_asc' | 'vh_desc' | 'ratio_asc' | 'ratio_desc' | 'coh_asc' | 'coh_desc';
 export type FusionGroup = 'optical' | 'backscatter' | 'coherence';
+
+/** Observation density around a fusion verdict (v2 engine). */
+export interface FusionObservability {
+    opticalObs: number;
+    opticalObsInWindows: number;
+    before: number;
+    after: number;
+    late: number;
+    opticalGapDays: number | null;
+    radarObs: number;
+    coherenceObs: number;
+    underObserved: boolean;
+}
 export type ProducerFusionStatus = 'pruned_full' | 'pruned_partial' | 'none' | 'unclear' | 'no_license' | 'no_data';
 export type FusionDecision = 'auto_open' | 'auto_pending' | 'auto_short' | 'auto_none' | 'expert_anomaly' | 'no_license' | 'no_data';
 export type FusionAnomaly = 'sensors_contradict' | 'repeat_pruning' | 'boundary_conflict' | 'boundary_unresolved' | 'license_mismatch' | 'over_pruned' | 'unlicensed_pruning';
@@ -1293,6 +1306,60 @@ export interface FusionGroupEvidence {
     channels: FusionChannelEvidence[];
 }
 
+export type FusionKind =
+    | 'deep_pruning'
+    | 'light_or_transient'
+    | 'gradual_loss'
+    | 'level'
+    | 'contradiction'
+    | 'gap'
+    | 'small_ndvi'
+    | 'likely_optical'
+    | 'radar_only'
+    | 'second_sensor'
+    | 'transient'
+    | 'weak'
+    | 'population'
+    | 'bulk'
+    | 'none';
+
+export interface FusionLevels {
+    ndviBefore: number | null;
+    ndviAfter: number | null;
+    drop: number | null;
+    ndviMinAfter: number | null;
+    ok: boolean | null;
+}
+
+export interface FusionShape {
+    stepRss: number | null;
+    trendRss: number | null;
+    ratio: number | null;
+    trendChange: number | null;
+    preSlopePerMonth: number | null;
+    gradual: boolean;
+}
+
+export interface FusionRecovery {
+    autumnRel: number | null;
+    summerRel: number | null;
+    autumnRaw: number | null;
+    summerRaw: number | null;
+    delta: number | null;
+    z: number | null;
+    obs: [number, number];
+    ok: boolean | null;
+}
+
+export interface FusionExcludedDate {
+    date: string;
+    sensor: string | null;
+    coverage: number;
+    medianNdvi: number | null;
+    ok: boolean;
+    reason: 'snow_or_shadow' | 'sparse' | null;
+}
+
 export interface FusionGardenRow {
     id: string;
     code: string;
@@ -1313,10 +1380,22 @@ export interface FusionGardenRow {
     unitGeometry: GeoJSON.Geometry | null;
     repeat: { reusedM2: number; reusedShare: number; countedM2: number; evidence: Array<{ season: string; overlapM2: number; class: FusionClass }> } | null;
     class: FusionClass;
+    kind?: FusionKind | null;
     z: number | null;
     p: number;
     opticalOk: boolean;
     backscatterOk: boolean;
+    coherenceOk?: boolean;
+    crossIndexOk?: boolean;
+    radarRequired?: boolean;
+    review?: boolean;
+    shadeProne?: boolean;
+    observability?: FusionObservability | null;
+    inCalendar?: boolean | null;
+    levels?: FusionLevels | null;
+    shape?: FusionShape | null;
+    recovery?: FusionRecovery | null;
+    populationZ?: number | null;
     changeDate: string | null;
     lastBeforeAt: string | null;
     firstAfterAt: string | null;
@@ -1368,7 +1447,7 @@ export interface FusionSummary {
     scanFrom: string;
     scanTo: string;
     sensors: {
-        optical: { dates: string[] };
+        optical: { dates: string[]; sensors?: string[]; counts?: Record<string, number>; excluded?: FusionExcludedDate[] };
         backscatter: Array<{ pass: string; relativeOrbit: number; dates: string[] }>;
         coherence: Array<{ pass: string; dates: string[] }>;
     };
@@ -2619,7 +2698,7 @@ export interface HealthSummary {
     method: string;
     rules: Record<string, unknown>;
     window: [string, string];
-    sensors: { optical: { dates: string[] }; backscatter: Array<{ pass: string; relativeOrbit: number; dates: string[] }> };
+    sensors: { optical: { dates: string[]; sensors?: string[]; counts?: Record<string, number> }; backscatter: Array<{ pass: string; relativeOrbit: number; dates: string[] }> };
     gardens: { total: number; byAnomaly: Record<HealthAnomalyClass, number>; meanVigour: number | null; yieldKg: number; teaAreaM2: number };
     producers: { total: number; byFlag: Record<YieldFlag, number>; yieldKg: number; quotaKg: number };
     localities: Array<{ name: string; gardens: number; suspects: number; meanVigour: number | null }>;

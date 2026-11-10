@@ -48,8 +48,21 @@ export interface RadarSeries {
 
 /** Multi-sensor step-change verdict of a garden for a season (fusion module, uncalibrated). */
 export type FusionClass = 'pruned' | 'likely' | 'unclear' | 'not_pruned' | 'no_data';
-export type FusionChannelKey = 'ndvi' | 'nbr' | 'vh_asc' | 'vh_desc' | 'coh_asc' | 'coh_desc';
+export type FusionChannelKey = 'ndvi' | 'nbr' | 'ndre' | 'ndii' | 'vh_asc' | 'vh_desc' | 'ratio_asc' | 'ratio_desc' | 'coh_asc' | 'coh_desc';
 export type FusionGroup = 'optical' | 'backscatter' | 'coherence';
+
+/** Observation density around the verdict (v2 engine). */
+export interface FusionObservability {
+    opticalObs: number;
+    opticalObsInWindows: number;
+    before: number;
+    after: number;
+    late: number;
+    opticalGapDays: number | null;
+    radarObs: number;
+    coherenceObs: number;
+    underObserved: boolean;
+}
 
 export interface FusionChannelEvidence {
     key: FusionChannelKey;
@@ -63,8 +76,58 @@ export interface FusionChannelEvidence {
     magnitudeOk: boolean;
 }
 
+/** Raw (absolute) NDVI around the change date: a cut must lower the garden itself, not only its rank among neighbours. */
+export interface FusionLevels {
+    ndviBefore: number | null;
+    ndviAfter: number | null;
+    drop: number | null;
+    ndviMinAfter: number | null;
+    ok: boolean | null;
+}
+
+/** Step against ramp on the season's relative NDVI: a season-long slide is loss, not a cut. */
+export interface FusionShape {
+    stepRss: number | null;
+    trendRss: number | null;
+    ratio: number | null;
+    trendChange: number | null;
+    preSlopePerMonth: number | null;
+    gradual: boolean;
+}
+
+/** Early-summer canopy against the previous autumn (neighbourhood-relative, pruning-positive delta). */
+export interface FusionRecovery {
+    autumnRel: number | null;
+    summerRel: number | null;
+    autumnRaw: number | null;
+    summerRaw: number | null;
+    delta: number | null;
+    z: number | null;
+    obs: [number, number];
+    ok: boolean | null;
+}
+
+/** Machine-readable tag for why the fusion class is what it is (v2.1). */
+export type FusionKind =
+    | 'deep_pruning'
+    | 'light_or_transient'
+    | 'gradual_loss'
+    | 'level'
+    | 'contradiction'
+    | 'gap'
+    | 'small_ndvi'
+    | 'likely_optical'
+    | 'radar_only'
+    | 'second_sensor'
+    | 'transient'
+    | 'weak'
+    | 'population'
+    | 'bulk'
+    | 'none';
+
 export interface FusionVerdict {
     class: FusionClass;
+    kind?: FusionKind | null;
     z: number | null;
     p: number;
     changeDate: string | null;
@@ -73,6 +136,19 @@ export interface FusionVerdict {
     agreeing: number;
     opticalOk: boolean;
     backscatterOk: boolean;
+    // v2 fields (absent on bundles from the first engine version).
+    coherenceOk?: boolean;
+    crossIndexOk?: boolean;
+    radarRequired?: boolean;
+    review?: boolean;
+    shadeProne?: boolean;
+    observability?: FusionObservability;
+    // v2.1 fields: calendar check, physical guards and the population calibration.
+    inCalendar?: boolean | null;
+    levels?: FusionLevels | null;
+    shape?: FusionShape | null;
+    recovery?: FusionRecovery | null;
+    populationZ?: number | null;
     groups: Array<{ group: FusionGroup; z: number | null; channels: FusionChannelEvidence[] }>;
     reason: string;
 }

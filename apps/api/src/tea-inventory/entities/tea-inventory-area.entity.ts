@@ -54,6 +54,16 @@ export interface FusionUnassignedPatch {
     likelyAt: string | null;
 }
 
+/** An optical date the fusion screening dropped for every garden (neighbourhood-wide snow / shadow collapse, sparse coverage). */
+export interface FusionExcludedDate {
+    date: string;
+    sensor: string | null;
+    coverage: number;
+    medianNdvi: number | null;
+    ok: boolean;
+    reason: 'snow_or_shadow' | 'sparse' | null;
+}
+
 /** Fusion module header (bundle `fusion` block): rules, channel settings, per-season scan cadence and sensors. */
 export interface FusionBlock {
     calibrated: boolean;
@@ -67,7 +77,7 @@ export interface FusionBlock {
         scanFrom: string;
         scanTo: string;
         sensors: {
-            optical: { dates: string[] };
+            optical: { dates: string[]; sensors?: string[]; counts?: Record<string, number>; excluded?: FusionExcludedDate[] };
             backscatter: Array<{ pass: string; relativeOrbit: number; dates: string[] }>;
             coherence: Array<{ pass: string; dates: string[] }>;
         };
@@ -138,7 +148,7 @@ export interface HealthBlock {
     seasons: Array<{
         season: string;
         window: [string, string];
-        sensors: { optical: { dates: string[] }; backscatter: Array<{ pass: string; relativeOrbit: number; dates: string[] }> };
+        sensors: { optical: { dates: string[]; sensors?: string[]; counts?: Record<string, number> }; backscatter: Array<{ pass: string; relativeOrbit: number; dates: string[] }> };
         neighbourhood: { dates: string[]; ndviMedian: Array<number | null>; ndreMedian: Array<number | null> };
         producers: HealthProducerRow[];
     }>;

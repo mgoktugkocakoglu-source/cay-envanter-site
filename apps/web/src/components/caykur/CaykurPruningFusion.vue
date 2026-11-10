@@ -29,7 +29,7 @@ import {
     type InventoryMap,
     type ProducerFusionStatus,
 } from '@/services/api';
-import {
+import { FUSION_KIND_LABEL,
     FUSION_ANOMALY_LABEL,
     FUSION_CHANNEL_LABEL,
     FUSION_CLASS_META,
@@ -93,6 +93,7 @@ const isLoadingGardens = ref(false);
 // ── Garden sheet ──
 const sheetOpen = ref(false);
 const detail = ref<FusionGardenDetail | null>(null);
+const fmtNum = (v: number | null | undefined, digits = 2) => (v === null || v === undefined ? '—' : v.toFixed(digits));
 const isLoadingDetail = ref(false);
 const chipContainer = ref<HTMLElement | null>(null);
 let chipMap: L.Map | null = null;
@@ -496,11 +497,15 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                 <Badge variant="warning">Kalibre edilmedi · demo müstahsil verisi</Badge>
             </AlertTitle>
             <AlertDescription>
-                Denklem: her bahçe (ve optik taramanın çizdiği değişim yaması) için Sentinel-2 <strong>NDVI ve NBR</strong>, Sentinel-1 <strong>VH geri saçılımı</strong> (çıkış + iniş yörüngesi)
-                ve varsa koherans serileri komşuluğa göreli alınır. Aday her değişim tarihinde "önce/sonra" basamağı bahçenin <em>kendi</em> gürültüsüne bölünerek z-skoruna çevrilir;
-                basamak fiziksel olarak derin budamaya yetecek büyüklükte olmalı (NDVI ≥ 0,12, VH ≥ 1 dB) ve <strong>≥ 25 gün sonra da sürmeli</strong> (gölge/kar/don geri döner, budama dönmez).
-                Sensörler Stouffer ile birleştirilir; <strong>"Budandı"</strong> için optik ve radar birlikte görmeli (z ≥ 3,5). Mahalle her {{ summary.everyDays }} günde bir yeniden değerlendirilir
-                ({{ summary.sensors.optical.dates.length }} S2 tarihi, {{ summary.sensors.backscatter.map((b) => `${b.dates.length} S1`).join(' + ') }}{{ summary.sensors.coherence.length ? `, ${summary.sensors.coherence.map((c) => c.dates.length).join('+')} koherans çifti` : '' }}).
+                Denklem (v2.1): her bahçe (ve optik taramanın çizdiği değişim yaması) için Sentinel-2 + Landsat 8/9 <strong>NDVI, NBR, NDRE, NDII</strong>, Sentinel-1 arazi-düzleştirilmiş <strong>VH ve VH/VV</strong> (çıkış + iniş yörüngesi)
+                ve varsa koherans serileri komşuluğa göreli alınır. Aday her değişim tarihinde "önce/sonra" basamağı bahçenin <em>kendi</em> gürültüsüne (önceki kışı dahil) bölünerek z-skoruna çevrilir;
+                basamak derin budamaya yetecek büyüklükte olmalı (NDVI ≥ 0,12, VH ≥ 1 dB), <strong>NDVI ile bir SWIR indeksi birlikte düşmeli</strong> (kar NDVI'yi düşürür, NBR'yi yükseltir) ve <strong>≥ 25 gün sonra da sürmeli</strong>.
+                <strong>"Budandı"</strong>: optik tek başına yeter — her iki yanda ≥ 3 ve ≥ 2 geç gözlem, bulut boşluğu ≤ 20 gün; boşluk daha uzunsa radar teyit etmeli; radar anlamlı yükseliyorsa karar eksperde.
+                Önceki kışta geçici düşüş gösteren bahçelerde eşikler sıkılaştırılır. Dört fiziksel kontrol daha vardır: mahalle ortancasının çöktüğü <strong>kar/gölge günleri</strong> herkes için dışlanır;
+                bahçenin <strong>kendi (ham) NDVI'si</strong> de düşmüş olmalı (komşuların yeşillenmesi tek başına budama değildir); sezon boyu süren <strong>kademeli düşüş</strong> budama basamağı sayılmaz (terk/sökme/hastalık);
+                20 cm'ye kesilen ocak <strong>yaz başında (20 May–15 Tem) komşularının hâlâ belirgin altında</strong> olmalı — toparlanmışsa derin budama değildir (hafif budama/üst alma, kar hasarı), karar "belirsiz"e iner; yaz teyidi varsa kar ve bulut boşluğu kuralları aranmaz. Son olarak bahçenin optik z'si mahalle genelinin sağlam dağılımına göre ayrışmalıdır (toplum kalibrasyonu): kütlenin içinde kalan zayıf sinyaller "budama yok" sayılır.
+                Mahalle her {{ summary.everyDays }} günde bir yeniden değerlendirilir
+                ({{ summary.sensors.optical.dates.length }} optik tarih{{ summary.sensors.optical.counts ? ` (${Object.entries(summary.sensors.optical.counts).map(([k, v]) => `${v} ${k}`).join(', ')})` : '' }}{{ summary.sensors.optical.excluded?.length ? `, ${summary.sensors.optical.excluded.length} tarih kar/gölge ya da seyrek kapsama nedeniyle dışlandı` : '' }}, {{ summary.sensors.backscatter.map((b) => `${b.dates.length} S1`).join(' + ') }}{{ summary.sensors.coherence.length ? `, ${summary.sensors.coherence.map((c) => c.dates.length).join('+')} koherans çifti` : '' }}).
             </AlertDescription>
         </Alert>
 
@@ -686,6 +691,7 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                                 <TableCell class="hidden md:table-cell">{{ r.producerName || r.producerCode }}</TableCell>
                                 <TableCell>
                                     <Badge :variant="toneVariant(FUSION_CLASS_META[r.class].tone)" :title="r.reason">{{ FUSION_CLASS_META[r.class].label }}</Badge>
+                                    <div v-if="r.kind && r.kind !== 'deep_pruning' && r.kind !== 'none'" class="text-xs text-muted-foreground">{{ FUSION_KIND_LABEL[r.kind] }}</div>
                                     <div v-if="r.z !== null" class="text-xs text-muted-foreground">z {{ r.z }} · p {{ formatShare(r.p) }}</div>
                                 </TableCell>
                                 <TableCell class="hidden lg:table-cell">
@@ -731,9 +737,30 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                         <SheetDescription>{{ detail.code }} · {{ detail.locality }} · {{ detail.unit === 'patch' ? `optik değişim yaması ${formatM2(detail.unitAreaM2)} (bahçe ${formatM2(detail.areaM2)})` : formatM2(detail.areaM2) }}</SheetDescription>
                         <div class="flex flex-wrap items-center gap-2">
                             <Badge :variant="toneVariant(FUSION_CLASS_META[detail.class].tone)">{{ FUSION_CLASS_META[detail.class].label }}</Badge>
+                            <Badge v-if="detail.kind && detail.kind !== 'deep_pruning' && detail.kind !== 'none'" variant="outline">{{ FUSION_KIND_LABEL[detail.kind] }}</Badge>
                             <Badge :variant="detail.opticalOk ? 'success' : 'outline'">Optik {{ detail.opticalOk ? '✓' : '—' }}</Badge>
                             <Badge :variant="detail.backscatterOk ? 'success' : 'outline'">Radar {{ detail.backscatterOk ? '✓' : '—' }}</Badge>
+                            <Badge v-if="detail.coherenceOk" variant="success">Koherans ✓</Badge>
+                            <Badge v-if="detail.crossIndexOk" variant="outline">NDVI + SWIR birlikte</Badge>
+                            <Badge v-if="detail.review" variant="warning">İncelensin</Badge>
+                            <Badge v-if="detail.shadeProne" variant="outline">Gölgeye yatkın bahçe</Badge>
+                            <Badge v-if="detail.recovery?.ok === true" variant="success">Yaz toparlanma testi ✓</Badge>
+                            <Badge v-else-if="detail.recovery?.ok === false" variant="warning">Yaz başında toparlanmış</Badge>
+                            <Badge v-if="detail.shape?.gradual" variant="warning">Kademeli kayıp</Badge>
+                            <Badge v-if="detail.levels?.ok === false" variant="warning">Ham NDVI düşmedi</Badge>
+                            <Badge v-if="detail.inCalendar === false" variant="outline">Takvim dışı tarih</Badge>
                             <span class="text-xs text-muted-foreground">{{ detail.reason }}</span>
+                        </div>
+                        <div v-if="detail.levels || detail.recovery || detail.shape || (detail.populationZ !== null && detail.populationZ !== undefined)" class="text-xs text-muted-foreground">
+                            Fiziksel kontroller:
+                            <span v-if="detail.levels">ham NDVI {{ fmtNum(detail.levels.ndviBefore) }} → {{ fmtNum(detail.levels.ndviAfter) }} (en düşük {{ fmtNum(detail.levels.ndviMinAfter) }}){{ detail.levels.ok === false ? ' · düşüş yetersiz' : '' }};</span>
+                            <span v-if="detail.recovery">yaz başı komşulara göre fark {{ fmtNum(detail.recovery.delta) }} (z {{ fmtNum(detail.recovery.z, 1) }}, {{ detail.recovery.obs[0] }}+{{ detail.recovery.obs[1] }} gözlem){{ detail.recovery.ok === null ? ' · henüz test edilemedi' : '' }};</span>
+                            <span v-if="detail.shape">eğim/basamak oranı {{ fmtNum(detail.shape.ratio) }}{{ detail.shape.gradual ? ' · kademeli' : '' }};</span>
+                            <span v-if="detail.populationZ !== null && detail.populationZ !== undefined">mahalle içi sapma {{ fmtNum(detail.populationZ, 1) }} σ.</span>
+                        </div>
+                        <div v-if="detail.observability" class="text-xs text-muted-foreground">
+                            Gözlenebilirlik: {{ detail.observability.opticalObs }} temiz optik gözlem ({{ detail.observability.opticalObsInWindows }} budama penceresinde), değişim çevresinde {{ detail.observability.before }} önce / {{ detail.observability.after }} sonra / {{ detail.observability.late }} geç;
+                            optik boşluk {{ detail.observability.opticalGapDays ?? '—' }} gün{{ detail.radarRequired ? ' (radar teyidi gerekti)' : '' }}; radar {{ detail.observability.radarObs }}, koherans {{ detail.observability.coherenceObs }} gözlem{{ detail.observability.underObserved ? ' · az gözlenen bahçe' : '' }}.
                         </div>
                         <div class="flex flex-wrap gap-2 pt-1">
                             <Button variant="outline" size="sm" class="h-11 md:h-9" :disabled="pdfBusy === detail.id" @click="downloadGardenPdf"><FileText aria-hidden="true" />Bahçe kanıtı (PDF)</Button>
@@ -781,7 +808,7 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                                             <TableRow v-for="c in g.channels" :key="c.key">
                                                 <TableCell class="text-sm">{{ FUSION_CHANNEL_LABEL[c.key] }}</TableCell>
                                                 <TableCell class="text-right text-xs tabular-nums">{{ c.before }} / {{ c.after }}<span class="text-muted-foreground"> ({{ c.late }} geç)</span></TableCell>
-                                                <TableCell class="text-right text-xs tabular-nums" :class="c.magnitudeOk ? 'font-semibold text-foreground' : ''">{{ c.delta ?? '—' }}{{ c.key.startsWith('vh') ? ' dB' : '' }}</TableCell>
+                                                <TableCell class="text-right text-xs tabular-nums" :class="c.magnitudeOk ? 'font-semibold text-foreground' : ''">{{ c.delta ?? '—' }}{{ c.key.startsWith('vh') || c.key.startsWith('ratio') ? ' dB' : '' }}</TableCell>
                                                 <TableCell class="text-right text-xs tabular-nums">±{{ c.noise }}</TableCell>
                                                 <TableCell class="text-right text-xs tabular-nums">{{ c.z ?? '—' }}</TableCell>
                                                 <TableCell class="text-right text-xs tabular-nums">{{ c.persistence === null ? 'bekleniyor' : formatShare(c.persistence) }}</TableCell>

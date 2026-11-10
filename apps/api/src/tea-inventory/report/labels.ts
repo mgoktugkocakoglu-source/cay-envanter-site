@@ -52,10 +52,14 @@ export const AUTO_STATUS_LABEL: Record<ProducerAutoStatus, string> = {
 };
 
 export const CHANNEL_LABEL: Record<FusionChannelKey, string> = {
-    ndvi: 'NDVI (S2)',
-    nbr: 'NBR (S2, NIR–SWIR)',
-    vh_asc: 'VH çıkış (S1)',
-    vh_desc: 'VH iniş (S1)',
+    ndvi: 'NDVI (S2 + Landsat)',
+    nbr: 'NBR (NIR–SWIR2)',
+    ndre: 'NDRE (kırmızı kenar, S2)',
+    ndii: 'NDII (NIR–SWIR1)',
+    vh_asc: 'VH γ0 çıkış (S1)',
+    vh_desc: 'VH γ0 iniş (S1)',
+    ratio_asc: 'VH/VV çıkış (S1)',
+    ratio_desc: 'VH/VV iniş (S1)',
     coh_asc: 'Koherans çıkış (S1)',
     coh_desc: 'Koherans iniş (S1)',
 };
