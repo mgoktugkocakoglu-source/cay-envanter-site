@@ -13,8 +13,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { toneVariant } from '@/components/caykur/tone';
 import { useToast } from '@/composables/useToast';
-import { api, type InventoryMap, type PruningRecordRow, type PruningRecordSummary, type PruningRegistration, type RadarClass, type RadarSeries } from '@/services/api';
-import { PRODUCER_STATUS_META, RADAR_META, RADAR_ORDER, REGISTRATION_META, REGISTRATION_ORDER, formatM2, formatShare } from '@/services/caykur/teaInventory';
+import { api, type FusionClass, type InventoryMap, type PruningRecordRow, type PruningRecordSummary, type PruningRegistration, type RadarClass, type RadarSeries } from '@/services/api';
+import { FUSION_KIND_LABEL, PRODUCER_STATUS_META, RADAR_META, RADAR_ORDER, RECORD_FUSION_ORDER, REGISTRATION_META, REGISTRATION_ORDER, formatM2, formatShare, radarBadge, recordFusionMeta } from '@/services/caykur/teaInventory';
 import { formatNumber } from '@/services/caykur';
 
 /**
@@ -43,6 +43,7 @@ const scanDate = ref<string | typeof ALL>(ALL);
 const locality = ref<string | typeof ALL>(ALL);
 const registration = ref<PruningRegistration | typeof ALL>(ALL);
 const radarFilter = ref<RadarClass | typeof ALL>(ALL);
+const fusionFilter = ref<FusionClass | 'none' | typeof ALL>(ALL);
 const search = ref('');
 const page = ref(1);
 const rows = ref<PruningRecordRow[]>([]);
@@ -103,6 +104,7 @@ async function loadRows(): Promise<void> {
         locality: locality.value === ALL ? undefined : locality.value,
         registration: registration.value === ALL ? undefined : registration.value,
         radar: radarFilter.value === ALL ? undefined : radarFilter.value,
+        fusion: fusionFilter.value === ALL ? undefined : fusionFilter.value,
         search: search.value.trim() || undefined,
     });
     if (res.data) {
@@ -179,7 +181,7 @@ watch(season, async () => {
     await loadSummary();
     await loadRows();
 });
-watch([scanDate, locality, registration, radarFilter], () => {
+watch([scanDate, locality, registration, radarFilter, fusionFilter], () => {
     page.value = 1;
     void loadRows();
 });
@@ -267,6 +269,9 @@ function onRegistration(v: unknown): void {
 function onRadar(v: unknown): void {
     radarFilter.value = typeof v === 'string' && v !== '' ? (v as RadarClass | typeof ALL) : ALL;
 }
+function onFusion(v: unknown): void {
+    fusionFilter.value = typeof v === 'string' && v !== '' ? (v as FusionClass | 'none' | typeof ALL) : ALL;
+}
 function onRowKey(e: KeyboardEvent, r: PruningRecordRow): void {
     if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
@@ -318,6 +323,19 @@ function onRowKey(e: KeyboardEvent, r: PruningRecordRow): void {
             <StatCard label="ÇAYKUR sistemine düşen" :value="formatNumber(summary.byRegistration.auto + summary.byRegistration.expert)" :hint="`${summary.byRegistration.auto} otomatik · ${summary.byRegistration.expert} eksper onayıyla`" />
             <StatCard label="Eksper onayı bekleyen" :value="formatNumber(summary.byRegistration.pending)" :hint="`${summary.byRegistration.no_license} ruhsatsız/eşleşmemiş · ${summary.byRegistration.unattributed} sınırı belirsiz`" />
         </div>
+
+        <Card v-if="summary.byFusion" class="gap-3">
+            <CardHeader>
+                <CardTitle>Çok-sensör karar ile ilişki</CardTitle>
+                <CardDescription>
+                    Her kayıt, optik taramanın gördüğü bir değişim yamasıdır. Alım dosyasının izlediği karar ise bahçenin çok-sensör (v2.1) kararıdır:
+                    kayıt çok olabilir, "budandı" az; çünkü karar ham NDVI düşüşü, kademeli/geçici ayrımı, yaz toparlanma testi ve mahalle kalibrasyonundan geçer.
+                </CardDescription>
+            </CardHeader>
+            <CardContent class="flex flex-wrap gap-2">
+                <Badge v-for="k in RECORD_FUSION_ORDER" :key="k" :variant="toneVariant(recordFusionMeta(k).tone)" :title="recordFusionMeta(k).description">{{ recordFusionMeta(k).label }} · {{ summary.byFusion[k] }}</Badge>
+            </CardContent>
+        </Card>
 
         <Card v-if="summary.radar">
             <CardHeader>
@@ -379,6 +397,13 @@ function onRowKey(e: KeyboardEvent, r: PruningRecordRow): void {
                                     <SelectItem v-for="k in REGISTRATION_ORDER" :key="k" :value="k">{{ REGISTRATION_META[k].label }} ({{ summary.byRegistration[k] }})</SelectItem>
                                 </SelectContent>
                             </Select>
+                            <Select v-if="summary.byFusion" :model-value="fusionFilter" @update:model-value="onFusion">
+                                <SelectTrigger class="h-11 w-full md:h-9 md:w-52" aria-label="Çok-sensör kararı"><SelectValue placeholder="Çok-sensör kararı" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem :value="ALL">Tüm çok-sensör kararları</SelectItem>
+                                    <SelectItem v-for="k in RECORD_FUSION_ORDER" :key="k" :value="k">{{ recordFusionMeta(k).label }} ({{ summary.byFusion[k] }})</SelectItem>
+                                </SelectContent>
+                            </Select>
                             <Select v-if="summary.radar" :model-value="radarFilter" @update:model-value="onRadar">
                                 <SelectTrigger class="h-11 w-full md:h-9 md:w-48" aria-label="Radar teyidi"><SelectValue placeholder="Radar teyidi" /></SelectTrigger>
                                 <SelectContent>
@@ -400,6 +425,7 @@ function onRowKey(e: KeyboardEvent, r: PruningRecordRow): void {
                                     <TableHead class="text-right">Budama</TableHead>
                                     <TableHead class="hidden lg:table-cell">Gözlem aralığı</TableHead>
                                     <TableHead>ÇAYKUR kaydı</TableHead>
+                                    <TableHead v-if="summary.byFusion" class="hidden md:table-cell">Çok-sensör kararı</TableHead>
                                     <TableHead v-if="summary.radar" class="hidden md:table-cell">Radar</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -432,9 +458,14 @@ function onRowKey(e: KeyboardEvent, r: PruningRecordRow): void {
                                     <TableCell>
                                         <Badge :variant="toneVariant(REGISTRATION_META[r.registration].tone)" :title="REGISTRATION_META[r.registration].description">{{ REGISTRATION_META[r.registration].label }}</Badge>
                                     </TableCell>
+                                    <TableCell v-if="summary.byFusion" class="hidden md:table-cell">
+                                        <Badge :variant="toneVariant(recordFusionMeta(r.fusion?.class).tone)" :title="recordFusionMeta(r.fusion?.class).description">{{ recordFusionMeta(r.fusion?.class).label }}</Badge>
+                                        <div v-if="r.fusion?.kind && r.fusion.kind !== 'deep_pruning' && r.fusion.kind !== 'none'" class="text-xs text-muted-foreground">{{ FUSION_KIND_LABEL[r.fusion.kind] }}</div>
+                                        <div v-else-if="r.fusion?.z !== null && r.fusion?.z !== undefined" class="text-xs text-muted-foreground">z {{ r.fusion.z }}</div>
+                                    </TableCell>
                                     <TableCell v-if="summary.radar" class="hidden md:table-cell">
-                                        <Badge :variant="toneVariant(RADAR_META[r.radar?.class ?? 'no_data'].tone)" :title="RADAR_META[r.radar?.class ?? 'no_data'].description">{{ RADAR_META[r.radar?.class ?? 'no_data'].label }}</Badge>
-                                        <div v-if="r.radar?.z !== null && r.radar?.z !== undefined" class="text-xs text-muted-foreground">z {{ r.radar.z }} · {{ r.radar.vhDropDb }} dB</div>
+                                        <Badge :variant="toneVariant(radarBadge(r.radar).tone)" :title="radarBadge(r.radar).description">{{ radarBadge(r.radar).label }}</Badge>
+                                        <div v-if="r.radar?.z !== null && r.radar?.z !== undefined" class="text-xs text-muted-foreground">z {{ r.radar.z }} · {{ r.radar.vhDropDb }} dB<span v-if="r.radar.windowSource === 'fusion'"> · füzyon penceresi</span></div>
                                     </TableCell>
                                 </TableRow>
                             </TableBody>
@@ -479,12 +510,29 @@ function onRowKey(e: KeyboardEvent, r: PruningRecordRow): void {
                             <AlertDescription>{{ REGISTRATION_META[selected.registration].description }}</AlertDescription>
                         </Alert>
 
+                        <div v-if="summary.byFusion" class="flex flex-col gap-2 rounded-lg border p-3">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <span class="text-sm font-medium">Çok-sensör kararı (bahçe, bu sezon)</span>
+                                <span class="flex flex-wrap gap-1">
+                                    <Badge :variant="toneVariant(recordFusionMeta(selected.fusion?.class).tone)">{{ recordFusionMeta(selected.fusion?.class).label }}</Badge>
+                                    <Badge v-if="selected.fusion?.kind && selected.fusion.kind !== 'deep_pruning' && selected.fusion.kind !== 'none'" variant="outline">{{ FUSION_KIND_LABEL[selected.fusion.kind] }}</Badge>
+                                    <Badge v-if="selected.fusion?.review" variant="warning">İncelensin</Badge>
+                                </span>
+                            </div>
+                            <p class="text-xs text-muted-foreground">{{ recordFusionMeta(selected.fusion?.class).description }}</p>
+                            <p v-if="selected.fusion" class="text-xs text-muted-foreground">
+                                Birim: {{ selected.fusion.unit === 'patch' ? `optik değişim yaması ${formatM2(selected.fusion.unitAreaM2)}` : `bütün bahçe ${formatM2(selected.fusion.unitAreaM2)}` }}
+                                · z {{ selected.fusion.z ?? '—' }}<span v-if="selected.fusion.changeDate"> · değişim {{ fmtDate(selected.fusion.changeDate) }}</span>
+                                · ayrıntı ve kanıt PDF'i "Çok-sensör karar" görünümünde.
+                            </p>
+                        </div>
+
                         <div v-if="summary.radar" class="flex flex-col gap-2 rounded-lg border p-3">
                             <div class="flex flex-wrap items-center justify-between gap-2">
                                 <span class="text-sm font-medium">Radar teyidi (Sentinel-1 VH, komşuluğa göreli)</span>
-                                <Badge :variant="toneVariant(RADAR_META[selected.radar?.class ?? 'no_data'].tone)">{{ RADAR_META[selected.radar?.class ?? 'no_data'].label }}</Badge>
+                                <Badge :variant="toneVariant(radarBadge(selected.radar).tone)">{{ radarBadge(selected.radar).label }}</Badge>
                             </div>
-                            <p class="text-xs text-muted-foreground">{{ RADAR_META[selected.radar?.class ?? 'no_data'].description }}</p>
+                            <p class="text-xs text-muted-foreground">{{ radarBadge(selected.radar).description }}<span v-if="selected.radar?.windowSource === 'fusion'"> Pencere, çok-sensör kararın değişim tarihinden alındı (tarama kaydı tarihsizdi).</span></p>
                             <div v-if="selected.radar && selected.radar.z !== null" class="grid gap-1 text-xs sm:grid-cols-2">
                                 <span>VH düşüşü: <strong class="tabular-nums">{{ selected.radar.vhDropDb ?? '—' }} dB</strong> · VH/VV: {{ selected.radar.ratioDropDb ?? '—' }} dB</span>
                                 <span>z-skoru: <strong class="tabular-nums">{{ selected.radar.z }}</strong> · kalıcılık {{ selected.radar.persistence === null ? '—' : formatShare(selected.radar.persistence) }}</span>

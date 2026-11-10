@@ -6,6 +6,8 @@ import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 
 export const PRUNING_REGISTRATIONS = ['auto', 'expert', 'pending', 'rejected', 'unattributed', 'no_license'] as const;
 export type PruningRegistration = (typeof PRUNING_REGISTRATIONS)[number];
 export const RADAR_CLASSES = ['confirmed', 'weak', 'neutral', 'contradicted', 'no_data'] as const;
+/** Multi-sensor verdict classes (fusion module) a record can be filtered by; 'none' = garden never judged. */
+export const RECORD_FUSION_CLASSES = ['pruned', 'likely', 'unclear', 'not_pruned', 'no_data', 'none'] as const;
 
 /** Query params for the scan-centred pruning record feed. */
 export class PruningRecordQueryDto {
@@ -50,6 +52,11 @@ export class PruningRecordQueryDto {
     @IsOptional()
     @IsIn(RADAR_CLASSES)
     radar?: (typeof RADAR_CLASSES)[number];
+
+    @ApiPropertyOptional({ enum: RECORD_FUSION_CLASSES, description: 'Multi-sensor (fusion) verdict of the record\'s garden this season' })
+    @IsOptional()
+    @IsIn(RECORD_FUSION_CLASSES)
+    fusion?: (typeof RECORD_FUSION_CLASSES)[number];
 
     @ApiPropertyOptional({ description: 'Producer name, producer / wallet / licence code, garden code or "ada/parsel"' })
     @IsOptional()

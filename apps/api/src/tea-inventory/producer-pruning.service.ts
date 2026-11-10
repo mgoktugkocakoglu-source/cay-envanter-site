@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TeaInventoryArea, ProducerScanBlock, ProducerSeasonSchedule } from '@/tea-inventory/entities/tea-inventory-area.entity';
 import { TeaInventoryProducer, ProducerAutoStatus, ProducerScan } from '@/tea-inventory/entities/tea-inventory-producer.entity';
-import { TeaInventoryGarden, GardenPruningEvent, GardenSeason, RadarClass, RadarResult, RadarSeries } from '@/tea-inventory/entities/tea-inventory-garden.entity';
+import { TeaInventoryGarden, FusionClass, FusionKind, GardenPruningEvent, GardenSeason, RadarClass, RadarResult, RadarSeries } from '@/tea-inventory/entities/tea-inventory-garden.entity';
 import { PruningDecision, PruningDecisionValue } from '@/tea-inventory/entities/pruning-decision.entity';
 import { User } from '@/users/entities/user.entity';
 import {
@@ -185,6 +185,18 @@ export interface PruningRecordRow {
     /** Sentinel-1 verdict and the garden's relative backscatter series (null before the radar module ran). */
     radar: RadarResult | null;
     radarSeries: RadarSeries[] | null;
+    /** Multi-sensor (fusion v2.1) verdict of the garden this season: the decision the purchase file follows. Null when fusion has not run. */
+    fusion: RecordFusion | null;
+}
+
+export interface RecordFusion {
+    class: FusionClass;
+    kind: FusionKind | null;
+    z: number | null;
+    changeDate: string | null;
+    review: boolean;
+    unit: 'garden' | 'patch';
+    unitAreaM2: number;
 }
 
 export interface PruningRecordSummary {
@@ -196,6 +208,8 @@ export interface PruningRecordSummary {
     gardens: number;
     producers: number;
     byRegistration: Record<PruningRegistration, number>;
+    /** Fusion verdict counts over the season's records ('none' = garden never judged); null when fusion has not run. */
+    byFusion: Record<FusionClass | 'none', number> | null;
     /** Radar module: verdict counts over the season's records, radar-only candidates, rules. Null when it has not run. */
     radar: {
         byClass: Record<RadarClass, number>;
@@ -444,6 +458,7 @@ export class ProducerPruningService {
             if (query.locality && r.locality !== query.locality) return false;
             if (query.registration && r.registration !== query.registration) return false;
             if (query.radar && (r.radar?.class ?? 'no_data') !== query.radar) return false;
+            if (query.fusion && (r.fusion?.class ?? 'none') !== query.fusion) return false;
             if (search) {
                 const haystack = [r.producerName, r.producerCode, r.walletNo, r.licenseCode ?? '', r.gardenCode, `${r.block}/${r.parcel}`, r.locality].join(' ').toLocaleLowerCase('tr-TR');
                 if (!haystack.includes(search)) return false;
@@ -463,8 +478,12 @@ export class ProducerPruningService {
         const byRegistration = Object.fromEntries(PRUNING_REGISTRATIONS.map((k) => [k, 0])) as Record<PruningRegistration, number>;
         const localities = new Map<string, number>();
         const byScanMap = new Map<string, { records: number; areaM2: number }>();
+        const byFusion: Record<FusionClass | 'none', number> = { pruned: 0, likely: 0, unclear: 0, not_pruned: 0, no_data: 0, none: 0 };
+        let fusionSeen = false;
         for (const r of rows) {
             byRegistration[r.registration]++;
+            byFusion[r.fusion?.class ?? 'none']++;
+            if (r.fusion) fusionSeen = true;
             localities.set(r.locality, (localities.get(r.locality) ?? 0) + 1);
             if (r.detectedAt) {
                 const entry = byScanMap.get(r.detectedAt) ?? { records: 0, areaM2: 0 };
@@ -496,6 +515,7 @@ export class ProducerPruningService {
             gardens: new Set(rows.map((r) => r.gardenCode)).size,
             producers: new Set(rows.map((r) => r.producerCode)).size,
             byRegistration,
+            byFusion: fusionSeen ? byFusion : null,
             radar,
             byScan: (schedule?.scanDates ?? []).map((date, i) => ({
                 date,
@@ -529,6 +549,11 @@ export class ProducerPruningService {
 
     /** Every event polygon of the season as a record, joined to its garden, producer and licence. */
     private async recordRows(area: TeaInventoryArea, season: string): Promise<PruningRecordRow[]> {
+        const fusionOf = (s: GardenSeason | undefined): RecordFusion | null => {
+            const f = s?.fusion;
+            if (!f) return null;
+            return { class: f.verdict.class, kind: f.verdict.kind ?? null, z: f.verdict.z, changeDate: f.verdict.changeDate, review: f.verdict.review ?? false, unit: f.unit, unitAreaM2: f.unitAreaM2 };
+        };
         const [gardens, producers] = await Promise.all([
             this.gardenRepo.find({ where: { areaId: area.id }, order: { parcelKey: 'ASC', holderIndex: 'ASC' } }),
             this.rawRows('WHERE p.area_id = $1 AND p.season = $2', [area.id, season]),
@@ -576,6 +601,7 @@ export class ProducerPruningService {
                     geometry: e.geometry,
                     radar: e.radar ?? null,
                     radarSeries: g.seasons[season]?.radarSeries ?? null,
+                    fusion: fusionOf(g.seasons[season]),
                 });
             });
         }

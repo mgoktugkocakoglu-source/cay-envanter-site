@@ -1192,6 +1192,8 @@ export interface RadarResult {
     zCoh?: number | null;
     cohClass?: RadarClass;
     passes: RadarPassResult[];
+    reason?: 'no_change_date' | 'few_observations';
+    windowSource?: 'scan' | 'fusion';
 }
 
 export interface RadarSeries {
@@ -1232,6 +1234,18 @@ export interface PruningRecordRow {
     geometry: GeoJSON.Geometry;
     radar: RadarResult | null;
     radarSeries: RadarSeries[] | null;
+    /** Multi-sensor (fusion v2.1) verdict of the garden this season; null when fusion has not run. */
+    fusion: RecordFusion | null;
+}
+
+export interface RecordFusion {
+    class: FusionClass;
+    kind: FusionKind | null;
+    z: number | null;
+    changeDate: string | null;
+    review: boolean;
+    unit: 'garden' | 'patch';
+    unitAreaM2: number;
 }
 
 export interface PruningRecordSummary {
@@ -1243,6 +1257,7 @@ export interface PruningRecordSummary {
     gardens: number;
     producers: number;
     byRegistration: Record<PruningRegistration, number>;
+    byFusion: Record<FusionClass | 'none', number> | null;
     radar: {
         byClass: Record<RadarClass, number>;
         radarOnly: number;
@@ -1486,6 +1501,7 @@ export interface PruningRecordQuery {
     locality?: string;
     registration?: PruningRegistration;
     radar?: RadarClass;
+    fusion?: FusionClass | 'none';
     search?: string;
 }
 

@@ -33,6 +33,10 @@ export interface RadarResult {
     zCoh?: number | null;
     cohClass?: RadarClass;
     passes: RadarPassResult[];
+    /** Why the class is no_data: the scan record has no change date, or too few passes bracket it. */
+    reason?: 'no_change_date' | 'few_observations';
+    /** Change window the passes were compared around: the scan record's own or the fusion verdict's. */
+    windowSource?: 'scan' | 'fusion';
 }
 
 /** Neighbourhood-relative VH / VH-VV series of one orbit pass (dB), for the sparkline. */

@@ -262,6 +262,22 @@ export const RADAR_META: Record<RadarClass, ProducerStatusMeta> = {
     contradicted: { label: 'Radar çelişiyor', description: 'Geri saçılım anlamlı şekilde YÜKSELDİ; optik düşüş kar/gölge olabilir, eksper baksın.', tone: 'danger' },
     no_data: { label: 'Radar verisi yetersiz', description: 'Değişim penceresinin iki yanında yeterli Sentinel-1 geçişi yok.', tone: 'muted' },
 };
+
+/** Label for a record's radar badge: a no_data verdict says WHY (dateless record vs. too few passes). */
+export function radarBadge(r: { class: RadarClass; reason?: 'no_change_date' | 'few_observations' | null } | null | undefined): ProducerStatusMeta {
+    if (!r) return RADAR_META.no_data;
+    if (r.class === 'no_data' && r.reason === 'no_change_date') {
+        return { label: 'Değişim tarihi yok', description: 'Tarama akışı bu yamaya değişim tarihi yazamadı (yalnız sezon sonu karşılaştırmasında görüldü); radar için önce/sonra penceresi kurulamadı. Çok-sensör karar bahçeye kendi tarihini verdiyse radar o pencerede puanlanır.', tone: 'muted' };
+    }
+    return RADAR_META[r.class];
+}
+
+/** Record-feed fusion classes incl. 'none' (garden never judged by the fusion module). */
+export const RECORD_FUSION_ORDER: Array<FusionClass | 'none'> = ['pruned', 'likely', 'unclear', 'not_pruned', 'no_data', 'none'];
+export const RECORD_FUSION_NONE: ProducerStatusMeta = { label: 'Karar yok', description: 'Çok-sensör modülü bu bahçeyi bu sezon değerlendirmedi.', tone: 'muted' };
+export function recordFusionMeta(cls: FusionClass | 'none' | null | undefined): ProducerStatusMeta {
+    return !cls || cls === 'none' ? RECORD_FUSION_NONE : FUSION_CLASS_META[cls];
+}
 export const RADAR_ORDER: RadarClass[] = ['confirmed', 'weak', 'neutral', 'contradicted', 'no_data'];
 
 // ── Multi-sensor step-change verdicts (fusion module) ──
