@@ -33,6 +33,12 @@ const { isMobile, setOpenMobile } = useSidebar();
 const logoSrc = computed(() => (themeStore.theme === 'dark' ? logoDark : logoLight));
 
 function isActive(item: NavItem): boolean {
+    const [path, query] = item.to.split('?');
+    if (query) {
+        // Deep link into a tabbed page: active only when every query pair matches.
+        if (route.path !== path) return false;
+        return [...new URLSearchParams(query)].every(([k, v]) => String(route.query[k] ?? '') === v);
+    }
     if (item.exact) return route.path === item.to;
     return route.path === item.to || route.path.startsWith(`${item.to}/`);
 }

@@ -51,7 +51,7 @@ const crumbs = computed<Crumb[]>(() => {
     const moduleKey = route.meta.module as ModuleKey | undefined;
     if (moduleKey && route.path !== '/caykur') {
         const navItem = NAV_GROUPS.flatMap((group) => group.items).find((item) => item.module === moduleKey);
-        const listPath = navItem?.to ?? `/caykur/${moduleKey}`;
+        const listPath = (navItem?.to ?? `/caykur/${moduleKey}`).split('?')[0];
         list.push({ label: MODULE_LABELS[moduleKey], to: listPath });
         if (route.path !== listPath) {
             list.push({

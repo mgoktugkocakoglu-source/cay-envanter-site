@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, HeartPulse, History, Info, Leaf, MapPinned, Mountain, Scissors, ScrollText, X } from '@lucide/vue';
+import { useRoute, useRouter } from 'vue-router';
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, Info, Leaf, MapPinned, X } from '@lucide/vue';
+import { TEA_INVENTORY_TABS, type TeaInventoryTab } from '@/services/caykur/nav';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import CaykurLayout from '@/layouts/CaykurLayout.vue';
@@ -79,7 +81,23 @@ const totalPages = ref(0);
 const isLoadingRows = ref(false);
 
 // ── Tabs: the inventory map stays mounted (v-show) and is resized when shown again ──
-const activeTab = ref<'region' | 'inventory' | 'pruning' | 'licensing' | 'health' | 'land' | 'age'>('inventory');
+// The sidebar deep-links to tabs with `?tab=`; the strip and the address bar stay in sync.
+const route = useRoute();
+const router = useRouter();
+const TAB_KEYS = TEA_INVENTORY_TABS.map((t) => t.key);
+function tabFromRoute(): TeaInventoryTab {
+    const q = route.query.tab;
+    return typeof q === 'string' && (TAB_KEYS as string[]).includes(q) ? (q as TeaInventoryTab) : 'inventory';
+}
+const activeTab = ref<TeaInventoryTab>(tabFromRoute());
+watch(() => route.query.tab, () => { const t = tabFromRoute(); if (t !== activeTab.value) activeTab.value = t; });
+watch(activeTab, (tab) => {
+    if (route.query.tab !== tab) void router.replace({ query: { ...route.query, tab } });
+});
+// Always carry the tab in the address bar so the sidebar highlights the matching entry.
+if (route.query.tab !== activeTab.value) void router.replace({ query: { ...route.query, tab: activeTab.value } });
+/** Tabs offered for the loaded area (the region tab needs more than one area). */
+const visibleTabs = computed(() => TEA_INVENTORY_TABS.filter((t) => t.key !== 'region' || areas.value.length > 1));
 const regionOverview = ref<InstanceType<typeof CaykurRegionOverview> | null>(null);
 /** Areas grouped by district for the selector and the region tab (the pilot grows one district at a time). */
 const areaGroups = computed(() => {
@@ -399,13 +417,7 @@ function onRowKey(e: KeyboardEvent, id: string): void {
             <template v-else>
                 <Tabs v-model="activeTab">
                     <TabsList variant="line" class="w-full">
-                        <TabsTrigger v-if="areas.length > 1" value="region"><MapPinned aria-hidden="true" />Bölge</TabsTrigger>
-                        <TabsTrigger value="inventory"><Leaf aria-hidden="true" />Envanter</TabsTrigger>
-                        <TabsTrigger value="pruning"><Scissors aria-hidden="true" />Budama Takibi</TabsTrigger>
-                        <TabsTrigger value="licensing"><ScrollText aria-hidden="true" />Ruhsatlandırma</TabsTrigger>
-                        <TabsTrigger value="health"><HeartPulse aria-hidden="true" />Bahçe Sağlığı</TabsTrigger>
-                        <TabsTrigger value="land"><Mountain aria-hidden="true" />Arazi Değerlendirme</TabsTrigger>
-                        <TabsTrigger value="age"><History aria-hidden="true" />Bahçe Yaşı</TabsTrigger>
+                        <TabsTrigger v-for="t in visibleTabs" :key="t.key" :value="t.key"><component :is="t.icon" aria-hidden="true" />{{ t.label }}</TabsTrigger>
                     </TabsList>
                 </Tabs>
 
@@ -501,7 +513,7 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                                     </p>
                                     <p class="text-muted-foreground">Kayıttaki parsel: {{ selected.license.recordedParcelRef }}</p>
                                     <p v-if="(selected.license.licenseCount ?? 1) > 1 || (selected.license.producerCount ?? 1) > 1" class="text-muted-foreground">
-                                        Parselde {{ selected.license.producerCount ?? 1 }} müstahsil, {{ selected.license.licenseCount ?? 1 }} ruhsat (müstahsil bazlı kayıt için Ruhsatlandırma sekmesi)
+                                        Parselde {{ selected.license.producerCount ?? 1 }} müstahsil, {{ selected.license.licenseCount ?? 1 }} ruhsat (müstahsil bazlı kayıt için Ruhsat İşlemleri sekmesi)
                                     </p>
                                     <Badge v-if="selected.license.pendingMatch" variant="warning">Ruhsat var, parsel eşleşmesi bekliyor — alan tahsis edilmedi</Badge>
                                     <Badge v-if="selected.license.holderDeceased" variant="warning">Ruhsat sahibi vefat etmiş görünüyor</Badge>
