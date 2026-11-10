@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, Info, Leaf, MapPinned, X } from '@lucide/vue';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, Info, Leaf, MapPinned, X } from '@lucide/vue';
 import { TEA_INVENTORY_TABS, type TeaInventoryTab } from '@/services/caykur/nav';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -113,8 +113,10 @@ function openArea(id: string): void {
     activeTab.value = 'inventory';
 }
 // Pruning is judged per producer (1/7 of all their gardens); the parcel view stays for inspection.
-type PruningView = 'fusion' | 'records' | 'producers' | 'parcels' | 'reports' | 'calibration';
-const PRUNING_VIEWS: PruningView[] = ['fusion', 'records', 'producers', 'parcels', 'reports', 'calibration'];
+type PruningView = 'fusion' | 'records' | 'producers' | 'reports' | 'calibration';
+const PRUNING_VIEWS: PruningView[] = ['fusion', 'records', 'producers', 'reports', 'calibration'];
+/** The v1 parcel/scene browser lives under the multi-sensor view as a collapsed inspection tool. */
+const showParcelTool = ref(false);
 const pruningView = ref<PruningView>('fusion');
 function onPruningView(v: unknown): void {
     if (typeof v === 'string' && (PRUNING_VIEWS as string[]).includes(v)) pruningView.value = v as PruningView;
@@ -658,17 +660,31 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                             <ToggleGroupItem value="fusion" class="h-11 px-3 md:h-9">Çok-sensör karar</ToggleGroupItem>
                             <ToggleGroupItem value="records" class="h-11 px-3 md:h-9">Tarama kayıtları (önce / sonra)</ToggleGroupItem>
                             <ToggleGroupItem value="producers" class="h-11 px-3 md:h-9">Müstahsil (ruhsat sahibi)</ToggleGroupItem>
-                            <ToggleGroupItem value="parcels" class="h-11 px-3 md:h-9">Parsel ve uydu görüntüleri</ToggleGroupItem>
                             <ToggleGroupItem value="reports" class="h-11 px-3 md:h-9">Raporlar ve Bakanlık talepleri</ToggleGroupItem>
                             <ToggleGroupItem value="calibration" class="h-11 px-3 md:h-9">Kalibrasyon (saha)</ToggleGroupItem>
                         </ToggleGroup>
                     </div>
-                    <CaykurPruningFusion v-if="pruningView === 'fusion'" :area-id="area.id" :map-data="mapData" />
+                    <template v-if="pruningView === 'fusion'">
+                        <CaykurPruningFusion :area-id="area.id" :map-data="mapData" />
+                        <Card class="gap-0 py-0">
+                            <CardHeader class="py-4">
+                                <CardTitle>Parsel ve uydu görüntüleri</CardTitle>
+                                <CardDescription>İnceleme aracı: parsel seçip NDVI eğrisine ve sezonun ham uydu görüntülerine bakın. Karar üretmez; karar yukarıdaki çok-sensör değerlendirmedir.</CardDescription>
+                                <CardAction>
+                                    <Button variant="outline" size="sm" class="h-11 md:h-9" :aria-expanded="showParcelTool" @click="showParcelTool = !showParcelTool">
+                                        <ChevronDown aria-hidden="true" :class="['transition-transform', showParcelTool && 'rotate-180']" />{{ showParcelTool ? 'Gizle' : 'Göster' }}
+                                    </Button>
+                                </CardAction>
+                            </CardHeader>
+                            <CardContent v-if="showParcelTool" class="border-t pt-6 pb-6">
+                                <CaykurPruningMonitor :area-id="area.id" :boundary="area.boundary" :map-data="mapData" />
+                            </CardContent>
+                        </Card>
+                    </template>
                     <CaykurPruningRecords v-else-if="pruningView === 'records'" :area-id="area.id" :map-data="mapData" />
                     <CaykurProducerPruning v-else-if="pruningView === 'producers'" :area-id="area.id" :map-data="mapData" />
                     <CaykurReports v-else-if="pruningView === 'reports'" :area-id="area.id" />
                     <CaykurCalibration v-else-if="pruningView === 'calibration'" :area-id="area.id" />
-                    <CaykurPruningMonitor v-else :area-id="area.id" :boundary="area.boundary" :map-data="mapData" />
                 </template>
 
                 <CaykurLicensing v-if="activeTab === 'licensing' && mapData" :area-id="area.id" :map-data="mapData" :tea-patches="area.teaPatches" />
