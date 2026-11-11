@@ -29,6 +29,7 @@ import CaykurRegionOverview from '@/components/caykur/CaykurRegionOverview.vue';
 import CaykurLandEvaluation from '@/components/caykur/CaykurLandEvaluation.vue';
 import CaykurGardenAge from '@/components/caykur/CaykurGardenAge.vue';
 import CaykurFieldTests from '@/components/caykur/CaykurFieldTests.vue';
+import CaykurPixelScan from '@/components/caykur/CaykurPixelScan.vue';
 import { useTkgmParcelLookup } from '@/composables/useTkgmParcelLookup';
 import { toneVariant } from '@/components/caykur/tone';
 import {
@@ -109,13 +110,20 @@ const areaGroups = computed(() => {
     }
     return [...groups.entries()].map(([label, items]) => ({ label, items }));
 });
+/** Field tests exist for one neighbourhood only for now: the tab opens it directly and hides the area selector. */
+const FIELD_TEST_AREA_CODE = 'trabzon-of-cataldere';
+watch([activeTab, areas], () => {
+    if (activeTab.value !== 'field') return;
+    const target = areas.value.find((a) => a.code === FIELD_TEST_AREA_CODE);
+    if (target && areaId.value !== target.id) areaId.value = target.id;
+});
 function openArea(id: string): void {
     areaId.value = id;
     activeTab.value = 'inventory';
 }
 // Pruning is judged per producer (1/7 of all their gardens); the parcel view stays for inspection.
-type PruningView = 'fusion' | 'records' | 'producers' | 'reports' | 'calibration';
-const PRUNING_VIEWS: PruningView[] = ['fusion', 'records', 'producers', 'reports', 'calibration'];
+type PruningView = 'fusion' | 'pixels' | 'records' | 'producers' | 'reports' | 'calibration';
+const PRUNING_VIEWS: PruningView[] = ['fusion', 'pixels', 'records', 'producers', 'reports', 'calibration'];
 /** The v1 parcel/scene browser lives under the multi-sensor view as a collapsed inspection tool. */
 const showParcelTool = ref(false);
 const pruningView = ref<PruningView>('fusion');
@@ -389,7 +397,7 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                 <template #meta>
                     <Badge v-if="area?.demoLicenses" variant="warning">Demo ruhsat verisi</Badge>
                 </template>
-                <template v-if="areas.length > 1" #actions>
+                <template v-if="areas.length > 1 && activeTab !== 'field'" #actions>
                     <Select v-model="areaSelect">
                         <SelectTrigger class="w-64" aria-label="Envanter alanı">
                             <SelectValue placeholder="Alan seçin" />
@@ -659,6 +667,7 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                         <span class="text-sm text-muted-foreground">Değerlendirme</span>
                         <ToggleGroup :model-value="pruningView" type="single" aria-label="Budama değerlendirme birimi" @update:model-value="onPruningView">
                             <ToggleGroupItem value="fusion" class="h-11 px-3 md:h-9">Çok-sensör karar</ToggleGroupItem>
+                            <ToggleGroupItem value="pixels" class="h-11 px-3 md:h-9">Piksel taraması (deneysel)</ToggleGroupItem>
                             <ToggleGroupItem value="records" class="h-11 px-3 md:h-9">Tarama kayıtları (önce / sonra)</ToggleGroupItem>
                             <ToggleGroupItem value="producers" class="h-11 px-3 md:h-9">Müstahsil (ruhsat sahibi)</ToggleGroupItem>
                             <ToggleGroupItem value="reports" class="h-11 px-3 md:h-9">Raporlar ve Bakanlık talepleri</ToggleGroupItem>
@@ -682,6 +691,7 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                             </CardContent>
                         </Card>
                     </template>
+                    <CaykurPixelScan v-else-if="pruningView === 'pixels'" :area-id="area.id" :map-data="mapData" />
                     <CaykurPruningRecords v-else-if="pruningView === 'records'" :area-id="area.id" :map-data="mapData" />
                     <CaykurProducerPruning v-else-if="pruningView === 'producers'" :area-id="area.id" :map-data="mapData" />
                     <CaykurReports v-else-if="pruningView === 'reports'" :area-id="area.id" />

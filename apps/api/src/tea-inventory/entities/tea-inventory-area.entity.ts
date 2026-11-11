@@ -11,6 +11,7 @@ import { TeaInventoryParcel } from '@/tea-inventory/entities/tea-inventory-parce
 import { LandBlock } from '@/tea-inventory/entities/land-evaluation.types';
 import { AgeBlock } from '@/tea-inventory/entities/garden-age.types';
 import { FieldTestsBlock } from '@/tea-inventory/entities/field-test.types';
+import { PixelScanBlock } from '@/tea-inventory/entities/pixel-scan.types';
 
 /** A detected tea patch (Sentinel-2, 10 m) stored with its area. */
 export interface TeaPatch {
@@ -248,6 +249,11 @@ export class TeaInventoryArea {
     // Independent field tests (inspector ground truth + satellite step test per claim), absent until field-test has run.
     @Column({ type: 'jsonb', nullable: true, name: 'field_tests' })
     fieldTests: FieldTestsBlock | null;
+
+    // Pixel-scan module block (lattice-level undated pruning scan per garden and season), absent until scan-pixels has run.
+    // Not selected by default: it is large and only the pixel-scan service reads it.
+    @Column({ type: 'jsonb', nullable: true, name: 'pixel_scan', select: false })
+    pixelScan: PixelScanBlock | null;
 
     // Bundle timestamp; a re-import is skipped when it has not changed.
     @Column({ type: 'timestamp', name: 'bundle_generated_at' })

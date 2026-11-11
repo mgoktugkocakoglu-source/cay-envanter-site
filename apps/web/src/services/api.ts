@@ -2557,6 +2557,91 @@ export interface ParcelAge {
     priority: { score: number; class: GardenPriorityClass; reasons: string[] };
 }
 
+// ── Pixel scan (Piksel taraması) ──
+export type PixelKind = 'deep' | 'light' | 'transient' | 'pending';
+export type PixelConfidence = 'high' | 'medium' | 'low';
+export type PixelVerdict = 'deep' | 'light' | 'pending' | 'transient' | 'weak' | 'none' | 'no_data';
+export type PixelVerdictFilter = 'found' | 'counted' | PixelVerdict;
+export interface PixelCluster {
+    index: number;
+    pixels: number;
+    corePixels: number;
+    edgePixels: number;
+    areaM2: number;
+    areaLowM2: number;
+    areaUpperM2: number;
+    centroid: [number, number];
+    meanDelta: number;
+    maxZ: number;
+    nbrDelta: number | null;
+    crossIndexOk: boolean;
+    kind: PixelKind;
+    depth: number | null;
+    recoveryDays: number | null;
+    summerRecovery: number | null;
+    lastObsDays: number;
+    confidence: PixelConfidence;
+    note: string;
+}
+export interface PixelGardenRow {
+    id: string;
+    code: string;
+    block: string;
+    parcel: string;
+    locality: string;
+    producerCode: string;
+    producerName: string;
+    areaM2: number;
+    pixels: number;
+    evaluatedPixels: number;
+    verdict: PixelVerdict;
+    fusionClass: string | null;
+    fusionKind: string | null;
+    best: { date: string; lastBefore: string | null; score: number } | null;
+    candidates: Array<{ date: string; lastBefore: string | null; pixels: number; score: number }>;
+    prunedM2: number;
+    prunedLowM2: number;
+    prunedUpperM2: number;
+    mainCluster: number | null;
+    clusters: PixelCluster[];
+}
+export interface PixelGardenDetail extends PixelGardenRow {
+    season: string;
+    epsg: string;
+    /** [e, n, insideM2, delta, z, flag (0 none · 1 grown · 2 core), cluster (−1 none), edge (0/1)]. */
+    px: Array<[number, number, number, number | null, number | null, number, number, number]>;
+    series: { dates: string[]; cluster: Array<number | null>; rest: Array<number | null> } | null;
+    geometry: GeoJSON.Geometry;
+}
+export interface PixelScanSummary {
+    season: string;
+    seasons: string[];
+    generatedAt: string;
+    method: string;
+    rules: Record<string, number | string | number[] | string[]>;
+    epsg: string;
+    window: [string, string];
+    scan: { from: string; to: string; candidates: number };
+    dates: number;
+    excludedDates: string[];
+    summary: {
+        gardens: number;
+        pixels: number;
+        flaggedPixels: number;
+        byVerdict: Record<PixelVerdict, number>;
+        areaM2: { deep: number; light: number; pending: number };
+        vsFusion: Record<string, Partial<Record<PixelVerdict, number>>>;
+        newFinds: number;
+    };
+}
+export interface PixelScanGardenQuery {
+    page?: number;
+    limit?: number;
+    season?: string;
+    verdict?: PixelVerdictFilter;
+    newOnly?: 'true';
+}
+
 // ── Blind field tests (Saha testi) ──
 export type FieldTestVerdict = 'detected' | 'not_detected' | 'pending';
 export type FieldTestConfidence = 'high' | 'medium' | 'low';
@@ -3577,6 +3662,15 @@ export const api = {
         request<GeoJSON.FeatureCollection>(`/caykur/tea-inventory/areas/${areaId}/land/layers?by=${by}${crop ? `&crop=${crop}` : ''}`),
     getGardenAgeSummary: (areaId: string) => request<GardenAgeSummary>(`/caykur/tea-inventory/areas/${areaId}/age/summary`),
     getFieldTests: (areaId: string) => request<FieldTestsBlock>(`/caykur/tea-inventory/areas/${areaId}/field-tests`),
+    getPixelScanSummary: (areaId: string, season?: string) =>
+        request<PixelScanSummary>(`/caykur/tea-inventory/areas/${areaId}/pixel-scan/summary${season ? `?season=${encodeURIComponent(season)}` : ''}`),
+    getPixelScanGardens: (areaId: string, params?: PixelScanGardenQuery) => {
+        const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
+        const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        return request<Paginated<PixelGardenRow>>(`/caykur/tea-inventory/areas/${areaId}/pixel-scan/gardens${query ? `?${query}` : ''}`);
+    },
+    getPixelScanGarden: (areaId: string, code: string, season?: string) =>
+        request<PixelGardenDetail>(`/caykur/tea-inventory/areas/${areaId}/pixel-scan/gardens/${encodeURIComponent(code)}${season ? `?season=${encodeURIComponent(season)}` : ''}`),
     downloadFieldTestReport: (areaId: string, caseId: string) =>
         downloadFile(`/caykur/tea-inventory/areas/${areaId}/field-tests/${encodeURIComponent(caseId)}/report.pdf`, 'Rapor üretilemedi'),
     getGardenAgeParcels: (areaId: string, params: GardenAgeParcelQuery = {}) => {
