@@ -75,6 +75,34 @@ export interface FieldTestGroundTruthComparison {
     text: string;
 }
 
+export interface FieldTestUndated {
+    scan: { from: string; to: string; candidates: number; zThreshold: number };
+    verdict: 'detected' | 'not_detected';
+    bestDate: string | null;
+    dateBracket: { lastBefore: string | null; firstAfter: string | null };
+    candidates: Array<{ date: string; lastBefore: string | null; flagged: number; clusterPixels: number; score: number }>;
+    pixels: Array<{ id: string; delta: number | null; z: number | null; nBefore: number; nAfter: number; flagged: boolean; strong: boolean; fraction: number | null; prunedM2: number | null; cluster: number | null }>;
+    clusters: Array<{
+        index: number;
+        pixelIds: string[];
+        areaM2: number;
+        areaUpperM2: number;
+        centroid: [number, number];
+        position: string;
+        meanDelta: number;
+        maxZ: number;
+        edgeShare: number;
+        confidence: FieldTestConfidence;
+        radar: Partial<Record<FieldTestPass, FieldStepTest>>;
+        radarChange: boolean;
+    }>;
+    prunedM2: number;
+    shareOfParcel: number;
+    mainCluster: number | null;
+    summary: string[];
+    evaluation: { dateHit: boolean | null; dateErrorDays: number | null; location: FieldTestGroundTruthComparison | null; text: string } | null;
+}
+
 export interface FieldTestCase {
     id: string;
     block: string;
@@ -109,6 +137,8 @@ export interface FieldTestCase {
     };
     groundTruth: { geometry: Record<string, unknown>; areaM2: number; approximate: boolean; note: string | null; measuredAreaM2?: number | null; comparison: FieldTestGroundTruthComparison } | null;
     calibration?: { ndviPruned: number; range: [number, number]; source: 'default' | 'field'; measuredAreaM2: number | null; note: string };
+    /** The same parcel judged without the field date (season scan). */
+    undated?: FieldTestUndated;
 }
 
 export interface FieldTestsBlock {

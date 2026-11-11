@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
-import { ClipboardCheck, Eye, EyeOff, FileText, Grid3x3 } from '@lucide/vue';
+import { ClipboardCheck, Eye, EyeOff, FileText, Grid3x3, ScanSearch } from '@lucide/vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { EmptyState, LoadingState } from '@/components/shared';
@@ -85,7 +85,10 @@ async function load(): Promise<void> {
     }
     block.value = res.data;
     await nextTick();
-    for (const c of res.data.cases) renderMap(c);
+    for (const c of res.data.cases) {
+        renderMap(c);
+        renderUndatedMap(c);
+    }
 }
 
 function setMapEl(id: string, el: unknown): void {
@@ -138,6 +141,41 @@ function renderMap(c: FieldTestCase): void {
     if (showGrid.value) entry.grid = gridFor(map, c).addTo(map);
     if (showGroundTruth.value) entry.truth = truthLayer(c)?.addTo(map) ?? null;
 }
+/** The undated scan's own map: same lattice, coloured by the step at the date the scan chose by itself. */
+const undatedKey = (c: FieldTestCase) => `${c.id}:undated`;
+function renderUndatedMap(c: FieldTestCase): void {
+    const u = c.undated;
+    const el = mapEls.get(undatedKey(c));
+    if (!u || !el) return;
+    maps.get(undatedKey(c))?.map.remove();
+    const map = L.map(el, { zoomControl: false, attributionControl: false, scrollWheelZoom: false, dragging: false });
+    L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, maxNativeZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
+    L.geoJSON(props.mapData, { style: { color: '#ffffff', weight: 0.7, opacity: 0.5, fill: false }, interactive: false }).addTo(map);
+    const geometryOf = new Map(c.pixels.map((p) => [p.id, p.geometry]));
+    for (const p of u.pixels) {
+        const geometry = geometryOf.get(p.id);
+        if (!geometry) continue;
+        const color = deltaColor(p.delta);
+        L.geoJSON({ type: 'Feature', geometry, properties: {} } as GeoJSON.Feature, {
+            style: { color: p.flagged ? '#0f172a' : '#e2e8f0', weight: p.flagged ? 2.2 : 0.5, opacity: p.flagged ? 1 : 0.6, fillColor: color ?? '#000000', fillOpacity: color ? 0.6 : 0 },
+            interactive: true,
+        })
+            .addTo(map)
+            .bindTooltip(`${p.flagged ? (p.strong ? 'Budanmış (güçlü)' : 'Budanmış') : 'Değişim yok'} · göreli NDVI ${signed(p.delta)} (z ${fmtNum(p.z, 1)}, ${p.nBefore}/${p.nAfter} gözlem)${p.fraction !== null ? ` · pay %${Math.round(p.fraction * 100)} ≈ ${p.prunedM2} m²` : ''}`, { sticky: true });
+    }
+    const parcel = L.geoJSON({ type: 'Feature', geometry: c.parcelGeometry, properties: {} } as GeoJSON.Feature, { style: { color: '#ffffff', weight: 2.5, fill: false }, interactive: false }).addTo(map);
+    for (const k of u.clusters) {
+        L.marker([k.centroid[1], k.centroid[0]], {
+            interactive: false,
+            icon: L.divIcon({ className: '', html: `<span style="display:inline-block;min-width:22px;padding:1px 5px;border-radius:999px;background:${CONF_META[k.confidence].color};color:#fff;font:600 11px Inter,sans-serif;text-align:center;box-shadow:0 0 0 1px #fff">T${k.index + 1}</span>`, iconSize: [24, 16], iconAnchor: [12, 8] }),
+        }).addTo(map);
+    }
+    map.fitBounds(parcel.getBounds().pad(0.45), { maxZoom: 19 });
+    const entry: MapEntry = { map, grid: null, truth: null };
+    maps.set(undatedKey(c), entry);
+    if (showGrid.value) entry.grid = gridFor(map, c).addTo(map);
+    if (showGroundTruth.value) entry.truth = truthLayer(c)?.addTo(map) ?? null;
+}
 function gridFor(map: L.Map, c: FieldTestCase): L.LayerGroup {
     const b = map.getBounds().pad(0.2);
     const lines = pixelGridLines({ south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() }, utmZone(geometryLon(c.parcelGeometry)));
@@ -149,18 +187,22 @@ function truthLayer(c: FieldTestCase): L.LayerGroup | null {
 }
 watch(showGrid, (on) => {
     for (const c of block.value?.cases ?? []) {
-        const e = maps.get(c.id);
-        if (!e) continue;
-        e.grid?.remove();
-        e.grid = on ? gridFor(e.map, c).addTo(e.map) : null;
+        for (const key of [c.id, undatedKey(c)]) {
+            const e = maps.get(key);
+            if (!e) continue;
+            e.grid?.remove();
+            e.grid = on ? gridFor(e.map, c).addTo(e.map) : null;
+        }
     }
 });
 watch(showGroundTruth, (on) => {
     for (const c of block.value?.cases ?? []) {
-        const e = maps.get(c.id);
-        if (!e) continue;
-        e.truth?.remove();
-        e.truth = on ? truthLayer(c)?.addTo(e.map) ?? null : null;
+        for (const key of [c.id, undatedKey(c)]) {
+            const e = maps.get(key);
+            if (!e) continue;
+            e.truth?.remove();
+            e.truth = on ? truthLayer(c)?.addTo(e.map) ?? null : null;
+        }
     }
 });
 onBeforeUnmount(() => {
@@ -256,9 +298,10 @@ const generatedAt = computed(() => (block.value ? fmtDate(block.value.generatedA
                 </CardHeader>
             </Card>
 
-            <Card v-for="c in block.cases" :key="c.id" class="gap-0 py-0">
+            <template v-for="c in block.cases" :key="c.id">
+            <Card class="gap-0 py-0">
                 <CardHeader class="py-4">
-                    <CardTitle>Ada {{ c.block }} / Parsel {{ c.parcel }}</CardTitle>
+                    <CardTitle>Ada {{ c.block }} / Parsel {{ c.parcel }} · tarihli kör test</CardTitle>
                     <CardDescription>Saha bilgisi: {{ fmtDate(c.prunedAt) }} tarihinde kesim · {{ c.source }}</CardDescription>
                     <div class="flex flex-wrap items-center gap-2 pt-1">
                         <Badge :variant="toneVariant(VERDICT_META[c.detection.verdict].tone)">{{ VERDICT_META[c.detection.verdict].label }}</Badge>
@@ -414,6 +457,107 @@ const generatedAt = computed(() => (block.value ? fmtDate(block.value.generatedA
                     </p>
                 </CardContent>
             </Card>
+
+            <!-- ── Undated blind test: same parcel, no field date given ── -->
+            <Card v-if="c.undated" class="gap-0 py-0">
+                <CardHeader class="py-4">
+                    <CardTitle class="flex items-center gap-2"><ScanSearch aria-hidden="true" class="size-5" />Ada {{ c.block }} / Parsel {{ c.parcel }} · tarihsiz kör test</CardTitle>
+                    <CardDescription>
+                        Uyduya yalnız ada/parsel verilir, tarih verilmez. Sezonun her temiz sahnesi ({{ fmtDate(c.undated.scan.from) }} → {{ fmtDate(c.undated.scan.to) }}, {{ c.undated.scan.candidates }} sahne) aday değişim tarihi olarak denenir; en güçlü, kümelenmiş basamağı veren sahne seçilir.
+                        Çok tarih denendiği için eşik daha sıkıdır (z ≥ {{ c.undated.scan.zThreshold }}; tek zayıf piksel olay sayılmaz). Saha tarihi ve işareti yalnız en sondaki kıyasta kullanılır. Yukarıdaki tarihli testten bağımsız değerlendirilir.
+                    </CardDescription>
+                    <div class="flex flex-wrap items-center gap-2 pt-1">
+                        <Badge :variant="toneVariant(c.undated.verdict === 'detected' ? 'success' : 'danger')">{{ c.undated.verdict === 'detected' ? 'Tarihsiz taramada kesim bulundu' : 'Tarihsiz taramada kesim bulunamadı' }}</Badge>
+                        <Badge v-if="c.undated.evaluation && c.undated.evaluation.dateHit !== null" :variant="toneVariant(c.undated.evaluation.dateHit ? 'success' : 'danger')">{{ c.undated.evaluation.dateHit ? 'Tarih tuttu' : 'Tarih tutmadı' }}</Badge>
+                        <Badge v-if="c.undated.evaluation?.location" :variant="toneVariant(MATCH_META[c.undated.evaluation.location.verdict].tone)">Konum: {{ MATCH_META[c.undated.evaluation.location.verdict].label.toLocaleLowerCase('tr-TR') }}</Badge>
+                    </div>
+                </CardHeader>
+                <CardContent class="flex flex-col gap-6 border-t pt-6 pb-6">
+                    <section class="flex flex-col gap-2 rounded-lg border bg-card p-4">
+                        <h3 class="text-base font-semibold">Sonuç</h3>
+                        <p v-for="(line, i) in c.undated.summary" :key="i" :class="i === 0 ? 'text-base font-medium text-foreground' : 'text-sm text-muted-foreground'">{{ line }}</p>
+                    </section>
+
+                    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <div class="rounded-lg border bg-card p-3"><div class="text-xs text-muted-foreground">Uydunun bulduğu aralık</div><div class="font-semibold tabular-nums">{{ c.undated.dateBracket.firstAfter ? `${fmtDate(c.undated.dateBracket.lastBefore)} – ${fmtDate(c.undated.dateBracket.firstAfter)}` : '—' }}</div><div class="text-xs text-muted-foreground">tarih verilmeden</div></div>
+                        <div class="rounded-lg border bg-card p-3"><div class="text-xs text-muted-foreground">Tespit edilen alan</div><div class="font-semibold tabular-nums">{{ c.undated.verdict === 'detected' ? formatM2(c.undated.prunedM2) : '—' }}</div><div class="text-xs text-muted-foreground">{{ c.undated.verdict === 'detected' ? `parselin %${Math.round(c.undated.shareOfParcel * 100)}'i · tarihli test ${formatM2(c.detection.prunedM2)}` : '' }}</div></div>
+                        <div class="rounded-lg border bg-card p-3"><div class="text-xs text-muted-foreground">Saha tarihi (kıyas)</div><div class="font-semibold tabular-nums">{{ fmtDate(c.prunedAt) }}</div><div class="text-xs text-muted-foreground">{{ c.undated.evaluation?.dateHit === true ? 'bulunan aralığın içinde' : c.undated.evaluation?.dateHit === false ? (c.undated.evaluation.dateErrorDays !== null ? `${c.undated.evaluation.dateErrorDays} gün sapma` : 'kaçırıldı') : '' }}</div></div>
+                        <div class="rounded-lg border bg-card p-3"><div class="text-xs text-muted-foreground">Konum (kıyas)</div><div class="font-semibold">{{ c.undated.evaluation?.location ? MATCH_META[c.undated.evaluation.location.verdict].label : '—' }}</div><div class="text-xs text-muted-foreground">{{ c.undated.evaluation?.location ? `merkezler arası ${c.undated.evaluation.location.centroidDistanceM} m · tespitin %${Math.round(c.undated.evaluation.location.detectedInsideShare * 100)}'i işaret içinde` : '' }}</div></div>
+                    </div>
+
+                    <section class="flex flex-col gap-2">
+                        <h3 class="text-base font-semibold">Tarihsiz taramanın çizdiği alan</h3>
+                        <div :ref="(el) => setMapEl(undatedKey(c), el)" class="h-80 w-full overflow-hidden rounded-lg border" />
+                        <p class="text-xs text-muted-foreground">Renkler, taramanın kendi seçtiği sahnedeki ({{ fmtDate(c.undated.bestDate) }}) önce/sonra göreli NDVI değişimidir; koyu çerçeve budanmış sayılan pikseller, T1, T2…: kümeler. "Saha işaretini göster" ve "Ağı gizle" düğmeleri yukarıdaki kartta; iki haritayı birlikte yönetir.</p>
+                    </section>
+
+                    <section v-if="c.undated.evaluation" class="flex flex-col gap-2 rounded-lg border bg-card p-4">
+                        <h3 class="text-base font-semibold">Saha gerçeğiyle kıyas (tarihsiz)</h3>
+                        <p class="text-sm">{{ c.undated.evaluation.text }}</p>
+                    </section>
+
+                    <section v-if="c.undated.candidates.length" class="flex flex-col gap-2">
+                        <h3 class="text-base font-semibold">Aday değişim tarihleri</h3>
+                        <div class="overflow-x-auto rounded-lg border bg-card">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Sıra</TableHead>
+                                        <TableHead>Değişim aralığı</TableHead>
+                                        <TableHead class="text-right">Eşiği geçen piksel</TableHead>
+                                        <TableHead class="text-right">Öndeki küme</TableHead>
+                                        <TableHead class="text-right">Skor (Σz)</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    <TableRow v-for="(k, i) in c.undated.candidates" :key="k.date">
+                                        <TableCell class="font-medium">{{ i + 1 }}{{ i === 0 ? ' · seçilen' : '' }}</TableCell>
+                                        <TableCell class="text-sm tabular-nums">{{ fmtDate(k.lastBefore) }} – {{ fmtDate(k.date) }}</TableCell>
+                                        <TableCell class="text-right text-xs tabular-nums">{{ k.flagged }}</TableCell>
+                                        <TableCell class="text-right text-xs tabular-nums">{{ k.clusterPixels }} piksel</TableCell>
+                                        <TableCell class="text-right text-xs tabular-nums font-semibold">{{ k.score.toFixed(1) }}</TableCell>
+                                    </TableRow>
+                                </TableBody>
+                            </Table>
+                        </div>
+                        <p class="text-xs text-muted-foreground">Skor: öndeki kümenin piksel z değerleri toplamı. Birinci ile ikinci aday arasındaki fark, tarihin ne kadar kesin olduğunu gösterir.</p>
+                    </section>
+
+                    <section v-if="c.undated.clusters.length" class="flex flex-col gap-2">
+                        <h3 class="text-base font-semibold">Kümeler</h3>
+                        <div class="overflow-x-auto rounded-lg border bg-card">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Küme</TableHead>
+                                        <TableHead>Konum</TableHead>
+                                        <TableHead class="text-right">Piksel</TableHead>
+                                        <TableHead class="text-right">Tahmini alan</TableHead>
+                                        <TableHead class="text-right">Üst sınır</TableHead>
+                                        <TableHead class="text-right">NDVI Δ / z</TableHead>
+                                        <TableHead class="text-right">VH çıkış / iniş (dB)</TableHead>
+                                        <TableHead>Güven</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    <TableRow v-for="k in c.undated.clusters" :key="k.index">
+                                        <TableCell class="font-medium">T{{ k.index + 1 }}</TableCell>
+                                        <TableCell class="text-sm">parselin {{ k.position }}</TableCell>
+                                        <TableCell class="text-right text-xs tabular-nums">{{ k.pixelIds.length }}</TableCell>
+                                        <TableCell class="text-right text-xs tabular-nums font-semibold">{{ k.areaM2 }} m²</TableCell>
+                                        <TableCell class="text-right text-xs tabular-nums">{{ k.areaUpperM2 }} m²</TableCell>
+                                        <TableCell class="text-right text-xs tabular-nums">{{ signed(k.meanDelta) }} / {{ fmtNum(k.maxZ, 1) }}</TableCell>
+                                        <TableCell class="text-right text-xs tabular-nums">{{ k.radar.ASCENDING ? signed(k.radar.ASCENDING.delta, 2) : '—' }} / {{ k.radar.DESCENDING ? signed(k.radar.DESCENDING.delta, 2) : '—' }}</TableCell>
+                                        <TableCell><Badge :variant="toneVariant(CONF_META[k.confidence].tone)">{{ CONF_META[k.confidence].label }}</Badge></TableCell>
+                                    </TableRow>
+                                </TableBody>
+                            </Table>
+                        </div>
+                        <p class="text-xs text-muted-foreground">Alan, tarihli testle aynı uç değerle ({{ c.calibration?.ndviPruned ?? block.rules.ndviPruned }}) hesaplanır{{ c.calibration?.source === 'field' ? '; bu değer bu vakanın saha ölçümünden kalibre edildiği için alan kıyası bağımsız değildir, tarih ve konum bağımsızdır' : '' }}.</p>
+                    </section>
+                </CardContent>
+            </Card>
+            </template>
         </template>
     </div>
 </template>
