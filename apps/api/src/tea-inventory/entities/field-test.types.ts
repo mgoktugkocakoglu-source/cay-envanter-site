@@ -1,18 +1,14 @@
 /**
- * Independent field-test block: inspector-recorded ground truth (ada/parsel, the marked spot, dated claims)
- * with the satellite step test of each claim, computed apart from the pruning detection chain.
+ * Blind field-test block: a parcel and a known pruning date go in, the satellite delineates the pruned
+ * area on its own (Sentinel-2 pixels relative to the surrounding tea, Sentinel-1 VH/VV), estimates its
+ * size, brackets the change date from its own scenes, and only then is compared with the inspector's
+ * ground truth. Computed apart from the pruning detection chain.
  */
 
-export type FieldTestUnit = 'spot' | 'rest' | 'parcel' | 'neighbours';
-export type FieldTestVerdict = 'supports' | 'likely' | 'contradicts' | 'unclear' | 'pending';
-
-export interface FieldPixelChange {
-    before: [string, string];
-    after: [string, string];
-    reference: { before: number | null; after: number | null };
-    epsg: string;
-    pixels: Array<{ lon: number; lat: number; before: number | null; after: number | null; delta: number | null; nBefore: number; nAfter: number }>;
-}
+export type FieldTestVerdict = 'detected' | 'not_detected' | 'pending';
+export type FieldTestConfidence = 'high' | 'medium' | 'low';
+export type FieldTestPass = 'ASCENDING' | 'DESCENDING';
+export type FieldTestMatch = 'match' | 'partial' | 'miss' | 'no_detection';
 
 export interface FieldStepTest {
     nBefore: number;
@@ -24,39 +20,99 @@ export interface FieldStepTest {
     z: number | null;
 }
 
-export interface FieldTestClaim {
-    kind: 'pruned' | 'not_pruned';
-    label: string;
-    dates: string[];
-    windows: { before: [string, string]; after: [string, string] } | null;
-    tests: Record<string, FieldStepTest>;
-    verdict: FieldTestVerdict;
-    reason: string;
+export interface FieldTestPixel {
+    id: string;
+    e: number;
+    n: number;
+    geometry: Record<string, unknown>;
+    insideM2: number;
+    insideShare: number;
+    edgeNonTea: boolean;
+    optical: { ndvi: FieldStepTest; nbr: FieldStepTest; ndviBeforeAbs: number | null; clearShare: number };
+    radar: Partial<Record<FieldTestPass, { vh: FieldStepTest; ratio: FieldStepTest }>>;
+    flagged: boolean;
+    strong: boolean;
+    fraction: number | null;
+    prunedM2: number | null;
+    cluster: number | null;
+}
+
+export interface FieldTestDateBracket {
+    lastBefore: string | null;
+    firstAfter: string | null;
+    bestSplit: string | null;
+    bestDelta: number | null;
+    containsPrunedAt: boolean | null;
+}
+
+export interface FieldTestCluster {
+    index: number;
+    pixelIds: string[];
+    areaM2: number;
+    areaRange: [number, number];
+    areaUpperM2: number;
+    shareOfParcel: number;
+    centroid: [number, number];
+    position: string;
+    edgeShare: number;
+    meanDelta: number;
+    maxZ: number;
+    dateBracket: FieldTestDateBracket;
+    radar: Partial<Record<FieldTestPass, { vh: FieldStepTest; ratio: FieldStepTest }>>;
+    radarChange: boolean;
+    confidence: FieldTestConfidence;
+    note: string;
+}
+
+export interface FieldTestGroundTruthComparison {
+    detectedM2: number;
+    overlapM2: number;
+    detectedInsideShare: number;
+    groundTruthCoveredShare: number;
+    centroidDistanceM: number | null;
+    mainClusterInside: boolean;
+    verdict: FieldTestMatch;
+    text: string;
 }
 
 export interface FieldTestCase {
     id: string;
     block: string;
     parcel: string;
-    observedAt: string;
-    observer: string;
+    prunedAt: string;
+    reportedAt: string | null;
+    source: string;
     note: string | null;
     parcelGeometry: Record<string, unknown>;
     deedAreaM2: number | null;
-    spot: { geometry: Record<string, unknown>; areaM2: number; approximate: boolean; description: string };
-    pixels: Record<FieldTestUnit, number>;
+    parcelAreaM2: number;
+    parcelCentroid: [number, number];
+    epsg: string;
     window: [string, string];
-    pixelChange?: FieldPixelChange | null;
-    series: {
-        optical: { dates: string[]; units: Record<FieldTestUnit, { ndvi: Array<number | null>; nbr: Array<number | null>; clearShare: Array<number | null> }> };
-        radar: Array<{ pass: 'ASCENDING' | 'DESCENDING'; relativeOrbit: number; dates: string[]; units: Record<FieldTestUnit, { vh: Array<number | null>; vv: Array<number | null> }> }>;
+    windows: { before: [string, string]; after: [string, string] };
+    reference: { pixels: number; areaM2: number };
+    excludedDates: string[];
+    pixels: FieldTestPixel[];
+    clusters: FieldTestCluster[];
+    detection: {
+        verdict: FieldTestVerdict;
+        prunedM2: number;
+        prunedRange: [number, number];
+        shareOfParcel: number;
+        mainCluster: number | null;
+        dateBracket: FieldTestDateBracket | null;
+        summary: string[];
     };
-    claims: FieldTestClaim[];
+    series: {
+        optical: { dates: string[]; clusters: Record<string, Array<number | null>>; rest: Array<number | null>; parcel: Array<number | null>; neighbours: Array<number | null> };
+        radar: Array<{ pass: FieldTestPass; relativeOrbit: number; dates: string[]; clusters: Record<string, Array<number | null>>; rest: Array<number | null> }>;
+    };
+    groundTruth: { geometry: Record<string, unknown>; areaM2: number; approximate: boolean; note: string | null; comparison: FieldTestGroundTruthComparison } | null;
 }
 
 export interface FieldTestsBlock {
     generatedAt: string;
     method: string;
-    rules: Record<string, number>;
+    rules: Record<string, number | number[]>;
     cases: FieldTestCase[];
 }

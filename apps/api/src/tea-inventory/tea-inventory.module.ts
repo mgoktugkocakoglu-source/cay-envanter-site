@@ -34,6 +34,7 @@ import { LandEvaluationController } from '@/tea-inventory/land-evaluation.contro
 import { GardenAgeService } from '@/tea-inventory/garden-age.service';
 import { GardenAgeController } from '@/tea-inventory/garden-age.controller';
 import { FieldTestService } from '@/tea-inventory/field-test.service';
+import { FieldTestReportService } from '@/tea-inventory/field-test-report.service';
 import { FieldTestController } from '@/tea-inventory/field-test.controller';
 import { GardenHealthController } from '@/tea-inventory/garden-health.controller';
 import { TeaInventoryController } from '@/tea-inventory/tea-inventory.controller';
@@ -59,6 +60,6 @@ import { TeaInventorySeedService } from '@/tea-inventory/tea-inventory-seed.serv
         ]),
     ],
     controllers: [TeaInventoryController, ProducerPruningController, LicensingController, PruningFusionController, ReportController, MinistryRequestController, CalibrationController, GardenHealthController, LandEvaluationController, GardenAgeController, FieldTestController],
-    providers: [TeaInventoryService, TeaInventorySeedService, ProducerPruningService, LicensingService, LicensingOperationsService, PruningFusionService, EvidenceService, SeasonReportService, MinistryRequestService, CalibrationService, GardenHealthService, RegionOverviewService, LandEvaluationService, GardenAgeService, FieldTestService],
+    providers: [TeaInventoryService, TeaInventorySeedService, ProducerPruningService, LicensingService, LicensingOperationsService, PruningFusionService, EvidenceService, SeasonReportService, MinistryRequestService, CalibrationService, GardenHealthService, RegionOverviewService, LandEvaluationService, GardenAgeService, FieldTestService, FieldTestReportService],
 })
 export class TeaInventoryModule { }
