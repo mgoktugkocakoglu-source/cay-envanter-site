@@ -2559,7 +2559,14 @@ export interface ParcelAge {
 
 // ── Independent field tests (Saha testi) ──
 export type FieldTestUnit = 'spot' | 'rest' | 'parcel' | 'neighbours';
-export type FieldTestVerdict = 'supports' | 'contradicts' | 'unclear' | 'pending';
+export type FieldTestVerdict = 'supports' | 'likely' | 'contradicts' | 'unclear' | 'pending';
+export interface FieldPixelChange {
+    before: [string, string];
+    after: [string, string];
+    reference: { before: number | null; after: number | null };
+    epsg: string;
+    pixels: Array<{ lon: number; lat: number; before: number | null; after: number | null; delta: number | null; nBefore: number; nAfter: number }>;
+}
 export interface FieldStepTest {
     nBefore: number;
     nAfter: number;
@@ -2590,6 +2597,7 @@ export interface FieldTestCase {
     spot: { geometry: GeoJSON.Geometry; areaM2: number; approximate: boolean; description: string };
     pixels: Record<FieldTestUnit, number>;
     window: [string, string];
+    pixelChange?: FieldPixelChange | null;
     series: {
         optical: { dates: string[]; units: Record<FieldTestUnit, { ndvi: Array<number | null>; nbr: Array<number | null>; clearShare: Array<number | null> }> };
         radar: Array<{ pass: 'ASCENDING' | 'DESCENDING'; relativeOrbit: number; dates: string[]; units: Record<FieldTestUnit, { vh: Array<number | null>; vv: Array<number | null> }> }>;
