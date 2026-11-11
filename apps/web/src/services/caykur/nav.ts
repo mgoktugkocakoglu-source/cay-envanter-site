@@ -15,11 +15,12 @@ export interface CaykurNavItem extends NavItem {
 }
 
 /** Tab keys of the tea-inventory page; the sidebar deep-links to them with `?tab=`. */
-export type TeaInventoryTab = 'region' | 'inventory' | 'pruning' | 'licensing' | 'health' | 'land' | 'age';
+export type TeaInventoryTab = 'region' | 'inventory' | 'pruning' | 'field' | 'licensing' | 'health' | 'land' | 'age';
 export const TEA_INVENTORY_PATH = '/caykur/tea-inventory';
 export const TEA_INVENTORY_TABS: Array<{ key: TeaInventoryTab; label: string; icon: NavItem['icon'] }> = [
     { key: 'region', label: 'Bölge', icon: MapPinned },
     { key: 'pruning', label: 'Budama Takibi', icon: Scissors },
+    { key: 'field', label: 'Saha Testi', icon: ClipboardCheck },
     { key: 'inventory', label: 'Bahçe Kayıtları', icon: Leaf },
     { key: 'licensing', label: 'Ruhsat İşlemleri', icon: ScrollText },
     { key: 'health', label: 'Bahçe Sağlığı', icon: HeartPulse },
@@ -42,7 +43,7 @@ export const NAV_GROUPS: CaykurNavGroup[] = [
         items: [{ label: 'Araziler', to: '/caykur/fields', module: 'fields', icon: Icons.fields }],
     },
     // The tea-inventory page keeps its own tab strip; these entries deep-link to its tabs.
-    { label: 'Budama', items: [tabItem('region'), tabItem('pruning')] },
+    { label: 'Budama', items: [tabItem('region'), tabItem('pruning'), tabItem('field')] },
     { label: 'Ruhsatlandırma', items: [tabItem('inventory'), tabItem('licensing')] },
     { label: 'Zirai Analizler', items: [tabItem('health'), tabItem('land'), tabItem('age')] },
     {

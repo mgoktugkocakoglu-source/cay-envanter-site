@@ -56,7 +56,7 @@ export class PruningFusionController {
     @ApiOperation({ summary: 'Garden verdict with the emulated scan timeline and every channel series' })
     @ApiParam({ name: 'id', description: 'Garden id' })
     @ApiResponse({ status: 200, description: 'Garden fusion detail' })
-    async garden(@Param('id', ParseUUIDPipe) id: string): Promise<FusionGardenDetail> {
-        return this.service.garden(id);
+    async garden(@Param('id', ParseUUIDPipe) id: string, @Query() query: SeasonQueryDto): Promise<FusionGardenDetail> {
+        return this.service.garden(id, query.season);
     }
 }

@@ -55,8 +55,11 @@ export interface FusionGardenRow {
 }
 
 export interface FusionGardenDetail extends FusionGardenRow {
+    season: string;
     scans: GardenFusion['scans'];
     series: GardenFusion['series'];
+    /** The season's exported Sentinel-2 scenes (true colour, 10 m), for the before/after comparison. */
+    scenes: { baseUrl: string; bounds: { west: number; south: number; east: number; north: number }; items: Array<{ date: string; file: string; teaVisible: number; teaMedianNdvi: number }> } | null;
 }
 
 export interface FusionProducerRow extends ProducerFusion {
@@ -197,16 +200,23 @@ export class PruningFusionService {
         return paginate(filtered.slice((page - 1) * limit, page * limit), filtered.length, page, limit);
     }
 
-    async garden(id: string): Promise<FusionGardenDetail> {
+    async garden(id: string, requested?: string): Promise<FusionGardenDetail> {
         const g = await this.gardenRepo.findOne({ where: { id } });
         if (!g) throw new NotFoundException('Garden not found');
         const area = await this.findArea(g.areaId);
         const seasons = (area.producerScan?.fusion?.seasons ?? []).map((s) => s.season).sort();
-        const season = seasons.at(-1);
+        const season = requested && seasons.includes(requested) ? requested : seasons.at(-1);
         const f = season ? g.seasons[season]?.fusion : null;
         if (!season || !f) throw new NotFoundException('No fusion verdict for this garden');
         const producer = await this.producerRepo.findOne({ where: { areaId: g.areaId, code: g.producerCode, season } });
-        return { ...this.toRow(g, f, season, producer), scans: f.scans, series: f.series };
+        const scenes = area.producerScan?.scenes ?? null;
+        return {
+            ...this.toRow(g, f, season, producer),
+            season,
+            scans: f.scans,
+            series: f.series,
+            scenes: scenes ? { baseUrl: scenes.baseUrl, bounds: scenes.bounds, items: scenes.seasons[season] ?? [] } : null,
+        };
     }
 
     async producers(areaId: string, query: FusionProducerQueryDto): Promise<Paginated<FusionProducerRow>> {

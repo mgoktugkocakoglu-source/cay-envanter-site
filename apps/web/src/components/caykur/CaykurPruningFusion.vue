@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
-import { ChevronLeft, ChevronRight, Download, FileText, Layers, Radar, Scissors, TriangleAlert, Users } from '@lucide/vue';
+import { ChevronLeft, ChevronRight, Download, FileText, Grid3x3, Layers, Radar, Scissors, TriangleAlert, Users } from '@lucide/vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { EmptyState, ListToolbar, LoadingState, SearchInput, StatCard } from '@/components/shared';
@@ -28,6 +28,7 @@ import {
     type FusionUnassignedPatch,
     type InventoryMap,
     type ProducerFusionStatus,
+    type ProducerSceneItem,
 } from '@/services/api';
 import { FUSION_KIND_LABEL,
     FUSION_ANOMALY_LABEL,
@@ -44,6 +45,7 @@ import { FUSION_KIND_LABEL,
     formatShare,
 } from '@/services/caykur/teaInventory';
 import { formatNumber } from '@/services/caykur';
+import { countPixelCentres, geometryLon, pixelGridLines, utmZone } from '@/services/caykur/sentinelGrid';
 
 /**
  * Multi-sensor pruning verdicts ("the equation"): every garden is judged on NDVI/NBR (S2), VH
@@ -97,6 +99,115 @@ const fmtNum = (v: number | null | undefined, digits = 2) => (v === null || v ==
 const isLoadingDetail = ref(false);
 const chipContainer = ref<HTMLElement | null>(null);
 let chipMap: L.Map | null = null;
+let chipGrid: L.LayerGroup | null = null;
+
+// ── Sentinel-2 pixel lattice: the 10 m squares the verdict actually averaged ──
+const showGrid = ref(true);
+const gridZone = computed(() => (detail.value ? utmZone(geometryLon(detail.value.geometry)) : 37));
+const gardenPixels = computed(() => (detail.value ? countPixelCentres(detail.value.geometry, gridZone.value) : 0));
+const unitPixels = computed(() => (detail.value?.unit === 'patch' && detail.value.unitGeometry ? countPixelCentres(detail.value.unitGeometry, gridZone.value) : null));
+
+function gridLayerFor(m: L.Map): L.LayerGroup {
+    const b = m.getBounds().pad(0.2);
+    const lines = pixelGridLines({ south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() }, gridZone.value);
+    return L.layerGroup(lines.map((pts) => L.polyline(pts, { color: '#ffffff', weight: 0.7, opacity: 0.55, interactive: false })));
+}
+
+// ── Before / after swipe on the season's real Sentinel-2 scenes ──
+const swipeContainer = ref<HTMLElement | null>(null);
+let swipeMap: L.Map | null = null;
+let beforeOverlay: L.ImageOverlay | null = null;
+let afterOverlay: L.ImageOverlay | null = null;
+let swipeGrid: L.LayerGroup | null = null;
+const swipePct = ref(50);
+const beforeIdx = ref(-1);
+const afterIdx = ref(-1);
+const sceneList = computed<ProducerSceneItem[]>(() => [...(detail.value?.scenes?.items ?? [])].sort((a, b) => a.date.localeCompare(b.date)));
+const beforeScene = computed(() => sceneList.value[beforeIdx.value] ?? null);
+const afterScene = computed(() => sceneList.value[afterIdx.value] ?? null);
+
+/** Same choice as the evidence PDF: the clear scene nearest each end of the change window. */
+function pickScenes(): void {
+    const list = sceneList.value;
+    const d = detail.value;
+    beforeIdx.value = -1;
+    afterIdx.value = -1;
+    if (!d || list.length === 0) return;
+    const clear = (i: number) => (list[i] as ProducerSceneItem).teaVisible >= 0.8;
+    const lastAtOrBefore = (date: string, onlyClear: boolean) => {
+        for (let i = list.length - 1; i >= 0; i--) if ((list[i] as ProducerSceneItem).date <= date && (!onlyClear || clear(i))) return i;
+        return -1;
+    };
+    const firstAtOrAfter = (date: string, onlyClear: boolean) => list.findIndex((x, i) => x.date >= date && (!onlyClear || clear(i)));
+    const firstClear = list.findIndex((_, i) => clear(i));
+    let lastClear = -1;
+    for (let i = list.length - 1; i >= 0 && lastClear < 0; i--) if (clear(i)) lastClear = i;
+    if (d.lastBeforeAt) {
+        const i = lastAtOrBefore(d.lastBeforeAt, true);
+        beforeIdx.value = i >= 0 ? i : lastAtOrBefore(d.lastBeforeAt, false);
+    }
+    if (beforeIdx.value < 0) beforeIdx.value = firstClear >= 0 ? firstClear : 0;
+    if (d.firstAfterAt) {
+        const i = firstAtOrAfter(d.firstAfterAt, true);
+        afterIdx.value = i >= 0 ? i : firstAtOrAfter(d.firstAfterAt, false);
+    }
+    if (afterIdx.value < 0) afterIdx.value = lastClear >= 0 ? lastClear : list.length - 1;
+}
+function stepScene(which: 'before' | 'after', delta: number): void {
+    const r = which === 'before' ? beforeIdx : afterIdx;
+    r.value = Math.min(sceneList.value.length - 1, Math.max(0, r.value + delta));
+}
+function sceneUrl(sc: ProducerSceneItem | null): string {
+    const base = detail.value?.scenes?.baseUrl ?? '';
+    return sc ? `${base}${sc.file}` : '';
+}
+/** Clip the "after" image left of the divider so the two real scenes meet on one line. */
+function applyClip(): void {
+    const img = afterOverlay?.getElement();
+    const b = detail.value?.scenes?.bounds;
+    if (!img || !swipeMap || !b) return;
+    const divider = (swipeMap.getSize().x * swipePct.value) / 100;
+    const left = swipeMap.latLngToContainerPoint([b.north, b.west]).x;
+    img.style.clipPath = `inset(0 0 0 ${Math.max(0, divider - left)}px)`;
+}
+function renderSwipe(): void {
+    swipeMap?.remove();
+    swipeMap = null;
+    beforeOverlay = null;
+    afterOverlay = null;
+    swipeGrid = null;
+    const d = detail.value;
+    const sc = d?.scenes;
+    if (!swipeContainer.value || !d || !sc || sceneList.value.length === 0) return;
+    pickScenes();
+    swipeMap = L.map(swipeContainer.value, { zoomControl: false, attributionControl: false, scrollWheelZoom: false, dragging: false });
+    const box: L.LatLngBoundsExpression = [[sc.bounds.south, sc.bounds.west], [sc.bounds.north, sc.bounds.east]];
+    beforeOverlay = L.imageOverlay(sceneUrl(beforeScene.value), box, { interactive: false, alt: `Sentinel-2, ${beforeScene.value?.date ?? ''}` }).addTo(swipeMap);
+    afterOverlay = L.imageOverlay(sceneUrl(afterScene.value), box, { interactive: false, alt: `Sentinel-2, ${afterScene.value?.date ?? ''}` }).addTo(swipeMap);
+    L.geoJSON(props.mapData, { style: { color: '#ffffff', weight: 0.8, opacity: 0.5, fill: false }, interactive: false }).addTo(swipeMap);
+    const color = classColor(d.class);
+    const layer = L.geoJSON({ type: 'Feature', geometry: d.geometry, properties: {} } as GeoJSON.Feature, { style: { color, weight: 2.5, fill: false }, interactive: false }).addTo(swipeMap);
+    if (d.unitGeometry && d.unit === 'patch') {
+        L.geoJSON({ type: 'Feature', geometry: d.unitGeometry, properties: {} } as GeoJSON.Feature, { style: { color, weight: 2, dashArray: '4 3', fill: false }, interactive: false }).addTo(swipeMap);
+    }
+    swipeMap.fitBounds(layer.getBounds().pad(0.8), { maxZoom: 18 });
+    if (showGrid.value) swipeGrid = gridLayerFor(swipeMap).addTo(swipeMap);
+    swipeMap.on('moveend zoomend resize', applyClip);
+    swipeMap.whenReady(() => applyClip());
+    afterOverlay.on('load', applyClip);
+}
+watch(swipePct, applyClip);
+watch(beforeIdx, () => beforeOverlay?.setUrl(sceneUrl(beforeScene.value)));
+watch(afterIdx, () => afterOverlay?.setUrl(sceneUrl(afterScene.value)));
+watch(showGrid, (on) => {
+    chipGrid?.remove();
+    chipGrid = null;
+    swipeGrid?.remove();
+    swipeGrid = null;
+    if (!on) return;
+    if (chipMap) chipGrid = gridLayerFor(chipMap).addTo(chipMap);
+    if (swipeMap) swipeGrid = gridLayerFor(swipeMap).addTo(swipeMap);
+});
 
 // ── Map view ──
 const mapContainer = ref<HTMLElement | null>(null);
@@ -179,7 +290,7 @@ async function openGarden(id: string): Promise<void> {
     sheetOpen.value = true;
     isLoadingDetail.value = true;
     detail.value = null;
-    const res = await api.getFusionGarden(id);
+    const res = await api.getFusionGarden(id, season.value || undefined);
     isLoadingDetail.value = false;
     if (!res.data) {
         toast.error(res.error?.message ?? 'Bahçe yüklenemedi');
@@ -189,6 +300,7 @@ async function openGarden(id: string): Promise<void> {
     detail.value = res.data;
     await nextTick();
     renderChip();
+    renderSwipe();
 }
 
 async function downloadCsv(): Promise<void> {
@@ -226,6 +338,7 @@ function renderChip(): void {
         L.geoJSON({ type: 'Feature', geometry: d.unitGeometry, properties: {} } as GeoJSON.Feature, { style: { color, weight: 2, fillColor: color, fillOpacity: 0.45 }, interactive: false }).addTo(chipMap);
     }
     chipMap.fitBounds(layer.getBounds().pad(0.8), { maxZoom: 18 });
+    chipGrid = showGrid.value ? gridLayerFor(chipMap).addTo(chipMap) : null;
 }
 
 async function renderMap(): Promise<void> {
@@ -385,6 +498,10 @@ watch(sheetOpen, (open) => {
     if (!open) {
         chipMap?.remove();
         chipMap = null;
+        chipGrid = null;
+        swipeMap?.remove();
+        swipeMap = null;
+        swipeGrid = null;
     }
 });
 let pTimer: ReturnType<typeof setTimeout> | null = null;
@@ -414,6 +531,7 @@ onBeforeUnmount(() => {
     if (gTimer) clearTimeout(gTimer);
     map?.remove();
     chipMap?.remove();
+    swipeMap?.remove();
 });
 
 function onSeason(v: unknown): void {
@@ -774,7 +892,47 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                             <div class="rounded-lg border bg-card p-3"><div class="text-xs text-muted-foreground">Tarama tespiti</div><div class="text-sm">{{ detail.likelyAt ? `olası ${fmtDate(detail.likelyAt)}` : '—' }}<span v-if="detail.detectedAt"> · kesin {{ fmtDate(detail.detectedAt) }}</span></div></div>
                         </div>
 
-                        <div ref="chipContainer" class="h-56 w-full overflow-hidden rounded-lg border" />
+                        <section class="flex flex-col gap-2">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <h3 class="text-base font-semibold">Bahçe ve Sentinel-2 piksel ağı</h3>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs tabular-nums text-muted-foreground">bahçe ≈ {{ gardenPixels }} piksel (10 m)<template v-if="unitPixels !== null"> · yama ≈ {{ unitPixels }} piksel</template></span>
+                                    <Button variant="outline" size="sm" class="h-11 md:h-9" :aria-pressed="showGrid" @click="showGrid = !showGrid"><Grid3x3 aria-hidden="true" />{{ showGrid ? 'Ağı gizle' : 'Ağı göster' }}</Button>
+                                </div>
+                            </div>
+                            <div ref="chipContainer" class="h-56 w-full overflow-hidden rounded-lg border" />
+                            <p class="text-xs text-muted-foreground">
+                                Zemin: Google uydu altlığı, tarihsiz; yalnız sınır ve arazi okuması için, karar verisi değildir. Beyaz ağ Sentinel-2'nin gerçek 10 m piksel ızgarasıdır (UTM {{ gridZone }}N):
+                                karar bu karelerin ortalamasından üretilir, kare içindeki ayrıntı veride yoktur.
+                            </p>
+                        </section>
+
+                        <section v-if="sceneList.length > 0" class="flex flex-col gap-2">
+                            <h3 class="text-base font-semibold">Önce / sonra · Sentinel-2 gerçek sahne (10 m piksel)</h3>
+                            <div class="relative overflow-hidden rounded-lg border bg-muted">
+                                <div ref="swipeContainer" class="h-64 w-full" />
+                                <div class="pointer-events-none absolute inset-y-0 z-[1001] w-0.5 bg-background shadow" :style="{ left: `${swipePct}%` }" aria-hidden="true" />
+                                <span class="pointer-events-none absolute left-2 top-2 z-[1001] rounded bg-background/90 px-2 py-0.5 text-xs font-medium">Önce · {{ fmtDate(beforeScene?.date) }}</span>
+                                <span class="pointer-events-none absolute right-2 top-2 z-[1001] rounded bg-background/90 px-2 py-0.5 text-xs font-medium">Sonra · {{ fmtDate(afterScene?.date) }}</span>
+                            </div>
+                            <input v-model.number="swipePct" type="range" min="0" max="100" step="1" class="h-11 w-full accent-primary md:h-6" aria-label="Önce ve sonra görüntüsü arasındaki ayırıcı" />
+                            <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+                                <div class="flex items-center gap-1">
+                                    <Button variant="outline" size="icon" class="size-11 md:size-9" :disabled="beforeIdx <= 0" aria-label="Önceki sahne (önce)" @click="stepScene('before', -1)"><ChevronLeft aria-hidden="true" /></Button>
+                                    <span class="tabular-nums">Önce: {{ fmtDate(beforeScene?.date) }}<span v-if="beforeScene" class="text-muted-foreground"> · çay görünür {{ formatShare(beforeScene.teaVisible) }} · NDVI {{ beforeScene.teaMedianNdvi.toFixed(2) }}</span></span>
+                                    <Button variant="outline" size="icon" class="size-11 md:size-9" :disabled="beforeIdx >= sceneList.length - 1" aria-label="Sonraki sahne (önce)" @click="stepScene('before', 1)"><ChevronRight aria-hidden="true" /></Button>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <Button variant="outline" size="icon" class="size-11 md:size-9" :disabled="afterIdx <= 0" aria-label="Önceki sahne (sonra)" @click="stepScene('after', -1)"><ChevronLeft aria-hidden="true" /></Button>
+                                    <span class="tabular-nums">Sonra: {{ fmtDate(afterScene?.date) }}<span v-if="afterScene" class="text-muted-foreground"> · çay görünür {{ formatShare(afterScene.teaVisible) }} · NDVI {{ afterScene.teaMedianNdvi.toFixed(2) }}</span></span>
+                                    <Button variant="outline" size="icon" class="size-11 md:size-9" :disabled="afterIdx >= sceneList.length - 1" aria-label="Sonraki sahne (sonra)" @click="stepScene('after', 1)"><ChevronRight aria-hidden="true" /></Button>
+                                </div>
+                            </div>
+                            <p class="text-xs text-muted-foreground">
+                                Bulutsuz ham Sentinel-2 gerçek renk sahneleri; değişim aralığına ({{ fmtDate(detail.lastBeforeAt) }} → {{ fmtDate(detail.firstAfterAt) }}) en yakın temiz sahneler seçildi, oklarla sezonun {{ sceneList.length }} sahnesi gezilir.
+                                Görüntü ekranda yumuşatılmıştır; çözünürlük 10 m'dir ve daha ince ayrıntı üretilmez. Siyah alanlar bulut/kar maskesidir.
+                            </p>
+                        </section>
 
                         <Alert v-if="detail.repeat && detail.repeat.reusedM2 > 0" :variant="detail.repeat.reusedShare >= 0.2 ? 'warning' : 'info'">
                             <AlertTitle>7 yıl kuralı: {{ formatM2(detail.repeat.reusedM2) }} ({{ formatShare(detail.repeat.reusedShare) }}) daha önce budanmış alanla çakışıyor</AlertTitle>

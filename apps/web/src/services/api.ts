@@ -1423,8 +1423,11 @@ export interface FusionGardenRow {
 }
 
 export interface FusionGardenDetail extends FusionGardenRow {
+    season: string;
     scans: Array<{ date: string; z: number | null; class: FusionClass }>;
     series: Array<{ key: FusionChannelKey; dates: string[]; values: Array<number | null> }>;
+    /** The season's exported Sentinel-2 scenes (true colour, 10 m) for the before/after comparison. */
+    scenes: { baseUrl: string; bounds: { west: number; south: number; east: number; north: number }; items: ProducerSceneItem[] } | null;
 }
 
 export interface FusionProducerRow {
@@ -2554,6 +2557,52 @@ export interface ParcelAge {
     priority: { score: number; class: GardenPriorityClass; reasons: string[] };
 }
 
+// ── Independent field tests (Saha testi) ──
+export type FieldTestUnit = 'spot' | 'rest' | 'parcel' | 'neighbours';
+export type FieldTestVerdict = 'supports' | 'contradicts' | 'unclear' | 'pending';
+export interface FieldStepTest {
+    nBefore: number;
+    nAfter: number;
+    meanBefore: number | null;
+    meanAfter: number | null;
+    sdBefore: number | null;
+    delta: number | null;
+    z: number | null;
+}
+export interface FieldTestClaim {
+    kind: 'pruned' | 'not_pruned';
+    label: string;
+    dates: string[];
+    windows: { before: [string, string]; after: [string, string] } | null;
+    tests: Record<string, FieldStepTest>;
+    verdict: FieldTestVerdict;
+    reason: string;
+}
+export interface FieldTestCase {
+    id: string;
+    block: string;
+    parcel: string;
+    observedAt: string;
+    observer: string;
+    note: string | null;
+    parcelGeometry: GeoJSON.Geometry;
+    deedAreaM2: number | null;
+    spot: { geometry: GeoJSON.Geometry; areaM2: number; approximate: boolean; description: string };
+    pixels: Record<FieldTestUnit, number>;
+    window: [string, string];
+    series: {
+        optical: { dates: string[]; units: Record<FieldTestUnit, { ndvi: Array<number | null>; nbr: Array<number | null>; clearShare: Array<number | null> }> };
+        radar: Array<{ pass: 'ASCENDING' | 'DESCENDING'; relativeOrbit: number; dates: string[]; units: Record<FieldTestUnit, { vh: Array<number | null>; vv: Array<number | null> }> }>;
+    };
+    claims: FieldTestClaim[];
+}
+export interface FieldTestsBlock {
+    generatedAt: string;
+    method: string;
+    rules: Record<string, number>;
+    cases: FieldTestCase[];
+}
+
 export interface GardenAgeSummary {
     calibrated: boolean;
     method: string;
@@ -3071,7 +3120,7 @@ export const api = {
         const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
         return request<Paginated<FusionGardenRow>>(`/caykur/tea-inventory/areas/${areaId}/pruning-fusion/gardens${query ? `?${query}` : ''}`);
     },
-    getFusionGarden: (id: string) => request<FusionGardenDetail>(`/caykur/tea-inventory/pruning-fusion/gardens/${id}`),
+    getFusionGarden: (id: string, season?: string) => request<FusionGardenDetail>(`/caykur/tea-inventory/pruning-fusion/gardens/${id}${season ? `?season=${encodeURIComponent(season)}` : ''}`),
     getFusionProducers: (areaId: string, params?: FusionProducerQuery) => {
         const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
         const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
@@ -3437,6 +3486,7 @@ export const api = {
     getLandLayers: (areaId: string, by: string, crop?: LandCropKey) =>
         request<GeoJSON.FeatureCollection>(`/caykur/tea-inventory/areas/${areaId}/land/layers?by=${by}${crop ? `&crop=${crop}` : ''}`),
     getGardenAgeSummary: (areaId: string) => request<GardenAgeSummary>(`/caykur/tea-inventory/areas/${areaId}/age/summary`),
+    getFieldTests: (areaId: string) => request<FieldTestsBlock>(`/caykur/tea-inventory/areas/${areaId}/field-tests`),
     getGardenAgeParcels: (areaId: string, params: GardenAgeParcelQuery = {}) => {
         const query = Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&');
         return request<Paginated<GardenAgeParcelRow>>(`/caykur/tea-inventory/areas/${areaId}/age/parcels${query ? `?${query}` : ''}`);

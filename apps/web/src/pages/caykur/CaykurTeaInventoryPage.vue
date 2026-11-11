@@ -28,6 +28,7 @@ import CaykurGardenHealth from '@/components/caykur/CaykurGardenHealth.vue';
 import CaykurRegionOverview from '@/components/caykur/CaykurRegionOverview.vue';
 import CaykurLandEvaluation from '@/components/caykur/CaykurLandEvaluation.vue';
 import CaykurGardenAge from '@/components/caykur/CaykurGardenAge.vue';
+import CaykurFieldTests from '@/components/caykur/CaykurFieldTests.vue';
 import { useTkgmParcelLookup } from '@/composables/useTkgmParcelLookup';
 import { toneVariant } from '@/components/caykur/tone';
 import {
@@ -687,6 +688,7 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                     <CaykurCalibration v-else-if="pruningView === 'calibration'" :area-id="area.id" />
                 </template>
 
+                <CaykurFieldTests v-if="activeTab === 'field' && mapData" :area-id="area.id" :map-data="mapData" />
                 <CaykurLicensing v-if="activeTab === 'licensing' && mapData" :area-id="area.id" :map-data="mapData" :tea-patches="area.teaPatches" />
                 <CaykurGardenHealth v-if="activeTab === 'health'" :area-id="area.id" />
                 <CaykurLandEvaluation v-if="activeTab === 'land'" :area-id="area.id" />
