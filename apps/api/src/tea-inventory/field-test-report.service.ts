@@ -323,7 +323,7 @@ export class FieldTestReportService {
         const lines = [
             `Pencereler: kesimden önceki ${r.beforeDays} gün taban, kesimden sonraki tüm sahneler. En az ${r.minBefore} önce / ${r.minAfter} sonra temiz gözlem.`,
             `Piksel eşiği: göreli NDVI düşüşü ≥ ${r.pixelDrop} ve z ≥ ${r.pixelZ}; ≥ ${r.pixelDropStrong} "güçlü". Gürültü tabanı ${r.noiseFloor}.`,
-            `Alan: pikselin budanmış payı = düşüş / (NDVI_önce − ${r.ndviPruned}); aralık NDVI_budanmış ${(r.ndviPrunedRange as number[]).join('–')} için. Tam piksel üst sınırı ayrıca verilir.`,
+            `Alan: pikselin budanmış payı = düşüş / (NDVI_önce − NDVI_budanmış); NDVI_budanmış ${c.calibration ? `${c.calibration.ndviPruned} (${c.calibration.source === 'field' ? 'saha ölçümüyle kalibre' : 'varsayılan'}; aralık ${c.calibration.range.join('–')})` : r.ndviPruned}. ${c.calibration?.note ?? ''} Tam piksel üst sınırı ayrıca verilir.`,
             `Radar: Sentinel-1 γ0 VH ve VH/VV, arazi düzleştirilmiş, komşulara göreli; küme ortalamasında ≥ ${r.radarChangeDb} dB ve |z| ≥ ${r.radarZ} değişim (işaret bağımsız) zamanlama kanıtıdır.`,
             `Tarih taraması: saha tarihinin ±${r.dateSearchDays} günü içinde en büyük basamağı veren sahne çifti; "son önce" ve "ilk sonra" sahneleri aralığı verir.`,
             `Dışlanan tarihler (referans NDVI < ${r.collapseNdvi}: kar/don/gölge): ${c.excludedDates.length ? c.excludedDates.map((d) => formatDateTr(d)).join(', ') : 'yok'}.`,

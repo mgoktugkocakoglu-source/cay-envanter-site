@@ -2654,7 +2654,8 @@ export interface FieldTestCase {
         optical: { dates: string[]; clusters: Record<string, Array<number | null>>; rest: Array<number | null>; parcel: Array<number | null>; neighbours: Array<number | null> };
         radar: Array<{ pass: FieldTestPass; relativeOrbit: number; dates: string[]; clusters: Record<string, Array<number | null>>; rest: Array<number | null> }>;
     };
-    groundTruth: { geometry: GeoJSON.Geometry; areaM2: number; approximate: boolean; note: string | null; comparison: FieldTestGroundTruthComparison } | null;
+    groundTruth: { geometry: GeoJSON.Geometry; areaM2: number; approximate: boolean; note: string | null; measuredAreaM2?: number | null; comparison: FieldTestGroundTruthComparison } | null;
+    calibration?: { ndviPruned: number; range: [number, number]; source: 'default' | 'field'; measuredAreaM2: number | null; note: string };
 }
 export interface FieldTestsBlock {
     generatedAt: string;

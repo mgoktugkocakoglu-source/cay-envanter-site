@@ -389,7 +389,7 @@ const generatedAt = computed(() => (block.value ? fmtDate(block.value.generatedA
                             </Table>
                         </div>
                         <p class="text-xs text-muted-foreground">
-                            Göreli Δ: kesim sonrası − öncesi ortalaması (piksel − komşu çay örtüsü); z: basamak / (öncesi gürültü · √(1/n_önce + 1/n_sonra)). Pay: −Δ / (NDVI_önce − {{ block.rules.ndviPruned }}); alan = pay × parsel içi m².
+                            Göreli Δ: kesim sonrası − öncesi ortalaması (piksel − komşu çay örtüsü); z: basamak / (öncesi gürültü · √(1/n_önce + 1/n_sonra)). Pay: −Δ / (NDVI_önce − {{ c.calibration?.ndviPruned ?? block.rules.ndviPruned }}); alan = pay × parsel içi m².{{ c.calibration ? ` ${c.calibration.note}` : '' }}
                             Eşik: düşüş ≥ {{ block.rules.pixelDrop }} ve z ≥ {{ block.rules.pixelZ }}; ≥ {{ block.rules.pixelDropStrong }} güçlü.
                         </p>
                     </section>
