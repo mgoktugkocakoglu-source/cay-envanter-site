@@ -1,0 +1,434 @@
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue';
+import { ChevronLeft, ChevronRight, Combine } from '@lucide/vue';
+import { EmptyState, LoadingState, StatCard } from '@/components/shared';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { toneVariant, type Tone } from '@/components/caykur/tone';
+import { useToast } from '@/composables/useToast';
+import {
+    api,
+    type CombinedAgreement,
+    type CombinedClass,
+    type CombinedClassFilter,
+    type CombinedGardenRow,
+    type CombinedProducerFilter,
+    type CombinedProducerRow,
+    type CombinedProducerStatus,
+    type CombinedRate,
+    type CombinedSummary,
+} from '@/services/api';
+import { formatM2 } from '@/services/caykur/teaInventory';
+import { formatNumber } from '@/services/caykur';
+
+/**
+ * Combined verdict (Birleşik karar): a separate module that reads the multi-sensor verdict and the pixel scan
+ * and gives one verdict per garden. Confirmed = both saw the same cut; probable = one of them did; light = a
+ * quickly recovering cut only the pixel scan saw (not credited toward the 1/7). Radar is a witness, never a judge.
+ * It changes neither module, and purchase decisions stay with the multi-sensor module.
+ */
+const props = defineProps<{ areaId: string }>();
+
+const PAGE_SIZE = 15;
+const MONTHS_TR = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+const CLASS_META: Record<CombinedClass, { label: string; tone: Tone }> = {
+    confirmed: { label: 'Kesin', tone: 'success' },
+    probable: { label: 'Muhtemel', tone: 'info' },
+    light: { label: 'Hafif budama', tone: 'warning' },
+    none: { label: 'Budama yok', tone: 'muted' },
+    no_data: { label: 'Veri yok', tone: 'muted' },
+};
+const AGREEMENT_LABEL: Record<CombinedAgreement, string> = {
+    both: 'İki modül de gördü',
+    both_other_dates: 'İkisi de gördü, tarihler ayrı',
+    fusion_only: 'Yalnız çok-sensör',
+    pixel_only: 'Yalnız piksel taraması',
+    neither: 'Hiçbiri görmedi',
+};
+const STATUS_META: Record<CombinedProducerStatus, { label: string; tone: Tone }> = {
+    met: { label: 'Hedef kesin alanla doldu', tone: 'success' },
+    met_with_probable: { label: 'Hedef muhtemel alanla doldu', tone: 'info' },
+    partial: { label: 'Budama var, hedef dolmadı', tone: 'warning' },
+    light_only: { label: 'Yalnız hafif budama', tone: 'muted' },
+    none: { label: 'Budama görülmedi', tone: 'muted' },
+    no_license: { label: 'Ruhsatlı alan yok', tone: 'muted' },
+};
+const SOURCE_LABEL: Record<'pixel_scan' | 'change_patch' | 'ndvi_fraction', string> = {
+    pixel_scan: 'piksel kümesi',
+    change_patch: 'optik yama',
+    ndvi_fraction: 'NDVI payı',
+};
+const FUSION_LABEL: Record<string, string> = { pruned: 'budandı', likely: 'olası', unclear: 'belirsiz', not_pruned: 'budama yok', no_data: 'veri yok' };
+const PIXEL_LABEL: Record<string, string> = { deep: 'derin budama', light: 'hafif budama', pending: 'sınıf bekliyor', transient: 'geçici düşüş', weak: 'zayıf sinyal', none: 'değişim yok', no_data: 'veri yok' };
+const DECISION_LABEL: Record<string, string> = { auto_open: 'alım açık', auto_pending: 'bekliyor', auto_short: 'eksik', auto_none: 'görülmedi', expert_anomaly: 'eksper', no_license: 'ruhsat yok', no_data: 'veri yok' };
+const GARDEN_FILTERS: Array<{ value: CombinedClassFilter; label: string }> = [
+    { value: 'positive', label: 'Budama görülen bahçeler (kesin + muhtemel + hafif)' },
+    { value: 'counted', label: '1/7 hesabına girenler (kesin + muhtemel)' },
+    { value: 'confirmed', label: 'Kesin' },
+    { value: 'probable', label: 'Muhtemel' },
+    { value: 'light', label: 'Hafif budama' },
+    { value: 'none', label: 'Budama yok' },
+];
+const PRODUCER_FILTERS: Array<{ value: CombinedProducerFilter; label: string }> = [
+    { value: 'active', label: 'Budama görülen müstahsiller' },
+    { value: 'open', label: 'Hedefi dolanlar' },
+    { value: 'changed', label: 'Çok-sensör alım kararından farklı çıkanlar' },
+    { value: 'partial', label: 'Budama var, hedef dolmadı' },
+    { value: 'light_only', label: 'Yalnız hafif budama' },
+    { value: 'none', label: 'Budama görülmedi' },
+];
+const VALIDATION_ROWS: Record<string, string> = {
+    confirmed_low: 'Kesin · alt sınır',
+    confirmed_high: 'Kesin · üst sınır',
+    counted_low: 'Kesin + muhtemel · alt sınır',
+    counted_high: 'Kesin + muhtemel · üst sınır',
+    light: 'Hafif sınıfına düşen',
+    any: 'Herhangi bir sınıf',
+};
+
+const toast = useToast();
+const summary = ref<CombinedSummary | null>(null);
+const isLoading = ref(true);
+const view = ref<'gardens' | 'producers'>('gardens');
+
+const gardenFilter = ref<CombinedClassFilter>('positive');
+const gardens = ref<CombinedGardenRow[]>([]);
+const gardenPage = ref(1);
+const gardenPages = ref(1);
+const gardenTotal = ref(0);
+const isLoadingGardens = ref(false);
+
+const producerFilter = ref<CombinedProducerFilter>('active');
+const producers = ref<CombinedProducerRow[]>([]);
+const producerPage = ref(1);
+const producerPages = ref(1);
+const producerTotal = ref(0);
+const isLoadingProducers = ref(false);
+
+const selected = ref<CombinedGardenRow | null>(null);
+const sheetOpen = computed({
+    get: () => selected.value !== null,
+    set: (open: boolean) => {
+        if (!open) selected.value = null;
+    },
+});
+
+function fmtDate(d: string | null | undefined): string {
+    if (!d) return '—';
+    return `${Number(d.slice(8, 10))} ${MONTHS_TR[Number(d.slice(5, 7)) - 1]} ${d.slice(0, 4)}`;
+}
+function seasonLabel(s: string | undefined): string {
+    if (!s) return '';
+    const [a, b] = s.split('-');
+    return `${a}–20${b}`;
+}
+const rateText = (r: CombinedRate) => (r.n ? `${r.hit} / ${r.n} (%${Math.round((r.hit / r.n) * 100)})` : '—');
+const fmtZ = (v: number | null | undefined) => (v === null || v === undefined ? '—' : v.toFixed(1));
+const positives = computed(() => (summary.value ? summary.value.summary.byClass.confirmed + summary.value.summary.byClass.probable + summary.value.summary.byClass.light : 0));
+
+async function loadSummary(): Promise<void> {
+    isLoading.value = true;
+    const res = await api.getCombinedSummary(props.areaId);
+    isLoading.value = false;
+    summary.value = res.data ?? null;
+    if (res.data) await Promise.all([loadGardens(), loadProducers()]);
+}
+async function loadGardens(): Promise<void> {
+    isLoadingGardens.value = true;
+    const res = await api.getCombinedGardens(props.areaId, { page: gardenPage.value, limit: PAGE_SIZE, season: summary.value?.season, class: gardenFilter.value });
+    isLoadingGardens.value = false;
+    if (!res.data) {
+        toast.error(res.error?.message ?? 'Bahçe listesi alınamadı');
+        return;
+    }
+    gardens.value = res.data.data;
+    gardenTotal.value = res.data.meta.total;
+    gardenPages.value = Math.max(1, res.data.meta.totalPages);
+}
+async function loadProducers(): Promise<void> {
+    isLoadingProducers.value = true;
+    const res = await api.getCombinedProducers(props.areaId, { page: producerPage.value, limit: PAGE_SIZE, season: summary.value?.season, status: producerFilter.value });
+    isLoadingProducers.value = false;
+    if (!res.data) {
+        toast.error(res.error?.message ?? 'Müstahsil listesi alınamadı');
+        return;
+    }
+    producers.value = res.data.data;
+    producerTotal.value = res.data.meta.total;
+    producerPages.value = Math.max(1, res.data.meta.totalPages);
+}
+watch(gardenFilter, () => {
+    gardenPage.value = 1;
+    void loadGardens();
+});
+watch(producerFilter, () => {
+    producerPage.value = 1;
+    void loadProducers();
+});
+watch(gardenPage, () => void loadGardens());
+watch(producerPage, () => void loadProducers());
+watch(() => props.areaId, () => void loadSummary(), { immediate: true });
+function onGardenFilter(v: unknown): void {
+    if (typeof v === 'string' && GARDEN_FILTERS.some((f) => f.value === v)) gardenFilter.value = v as CombinedClassFilter;
+}
+function onProducerFilter(v: unknown): void {
+    if (typeof v === 'string' && PRODUCER_FILTERS.some((f) => f.value === v)) producerFilter.value = v as CombinedProducerFilter;
+}
+function onView(v: unknown): void {
+    if (v === 'gardens' || v === 'producers') view.value = v;
+}
+</script>
+
+<template>
+    <div class="flex flex-col gap-6">
+        <LoadingState v-if="isLoading" text="Birleşik karar yükleniyor…" />
+        <EmptyState v-else-if="!summary" :icon="Combine" title="Bu mahalle için birleşik karar yok" description="Motor tarafında combine-pruning çalıştırıldığında burada görünür: çok-sensör karar ile piksel taraması bahçe başına tek karara indirilir." />
+        <template v-else>
+            <Card class="gap-0 py-0">
+                <CardHeader class="py-4">
+                    <CardTitle class="flex flex-wrap items-center gap-2">Birleşik karar <Badge variant="warning">Saha doğrulaması bekliyor</Badge></CardTitle>
+                    <CardDescription>
+                        Ayrı bir modül: çok-sensör kararı ile piksel taramasını okur, ikisini de değiştirmez ve bahçe başına tek karar verir.
+                        <strong>Kesin</strong>: iki modül de aynı kesimi gördü (değişim tarihleri {{ summary.rules.sameEventDays }} gün içinde).
+                        <strong>Muhtemel</strong>: yalnız biri gördü.
+                        <strong>Hafif budama</strong>: yalnız piksel taraması gördü ve kesim hızla toparlandı; 1/7 hesabına girmez.
+                        Alan, piksel taramasının çizdiği kümeden; o yoksa çok-sensörün alan çıktısından gelir. Radar ve koherans karar vermez, yalnızca tanık olarak gösterilir.
+                        Alım kararları çok-sensör modülde kalır; buradaki müstahsil hesabı karşılaştırma içindir. Sezon {{ seasonLabel(summary.season) }}.
+                    </CardDescription>
+                </CardHeader>
+            </Card>
+
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <StatCard label="Kesin" :value="formatNumber(summary.summary.byClass.confirmed)" :hint="`bahçe · ${formatM2(summary.summary.areaM2.confirmed)} · iki modül de gördü`" :icon="Combine" />
+                <StatCard label="Muhtemel" :value="formatNumber(summary.summary.byClass.probable)" :hint="`bahçe · ${formatM2(summary.summary.areaM2.probable)} · yalnız çok-sensör ${summary.summary.byAgreement.fusion_only}, yalnız piksel ${summary.summary.byClass.probable - summary.summary.byAgreement.fusion_only - summary.summary.byAgreement.both_other_dates}, tarihi ayrı ${summary.summary.byAgreement.both_other_dates}`" />
+                <StatCard label="Hafif budama" :value="formatNumber(summary.summary.byClass.light)" :hint="`bahçe · ${formatM2(summary.summary.areaM2.light)} · 1/7 hesabına girmez`" />
+                <StatCard label="Hedefi dolan müstahsil" :value="formatNumber(summary.summary.producers.met + summary.summary.producers.met_with_probable)" :hint="`${summary.summary.producers.met} kesin alanla · ${summary.summary.producers.met_with_probable} muhtemel alanla · ${summary.summary.producersChanged} müstahsilde çok-sensör alım kararından farklı`" />
+            </div>
+
+            <Card v-if="summary.validation" class="gap-0 py-0">
+                <CardHeader class="py-4">
+                    <CardTitle>Ölçülen doğruluk (saha verisi olmadan)</CardTitle>
+                    <CardDescription>
+                        Yanlış alarm üst sınırı, {{ summary.validation.gardens }} bahçede: kesin {{ summary.validation.falseAlarms.confirmed }}, muhtemel {{ summary.validation.falseAlarms.probable }}, hafif {{ summary.validation.falseAlarms.light }}.
+                        Gerçek çalışmada kesin {{ summary.summary.byClass.confirmed }}, muhtemel {{ summary.summary.byClass.probable }}, hafif {{ summary.summary.byClass.light }} bahçe var.
+                        {{ summary.validation.falseAlarms.note }}
+                    </CardDescription>
+                </CardHeader>
+                <CardContent class="flex flex-col gap-3 border-t pt-4 pb-4">
+                    <div class="overflow-x-auto rounded-lg border bg-card">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Yakalama oranı ({{ summary.validation.detection.trials }} sentetik kesim)</TableHead>
+                                    <TableHead class="text-right">Tümü</TableHead>
+                                    <TableHead class="text-right">Derin kesim</TableHead>
+                                    <TableHead class="text-right">Hafif kesim</TableHead>
+                                    <TableHead class="text-right">≥ 3 piksel, ≥ 0,15</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow v-for="r in summary.validation.detection.rows" :key="r.key">
+                                    <TableCell class="font-medium">{{ VALIDATION_ROWS[r.key] ?? r.key }}</TableCell>
+                                    <TableCell class="text-right text-sm tabular-nums">{{ rateText(r.overall) }}</TableCell>
+                                    <TableCell class="text-right text-sm tabular-nums">{{ rateText(r.deep) }}</TableCell>
+                                    <TableCell class="text-right text-sm tabular-nums">{{ rateText(r.light) }}</TableCell>
+                                    <TableCell class="text-right text-sm tabular-nums">{{ rateText(r.clear) }}</TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </div>
+                    <p class="text-xs text-muted-foreground">{{ summary.validation.detection.note }} Bu sayılar gerçek saha doğrulamasının yerini tutmaz; Saha Testi vakaları geldikçe onunla değiştirilecek.</p>
+                </CardContent>
+            </Card>
+
+            <div class="flex flex-wrap items-center gap-3">
+                <span class="text-sm text-muted-foreground">Görünüm</span>
+                <ToggleGroup :model-value="view" type="single" aria-label="Birleşik karar görünümü" @update:model-value="onView">
+                    <ToggleGroupItem value="gardens" class="h-11 px-3 md:h-9">Bahçeler</ToggleGroupItem>
+                    <ToggleGroupItem value="producers" class="h-11 px-3 md:h-9">Müstahsiller (1/7 karşılaştırması)</ToggleGroupItem>
+                </ToggleGroup>
+            </div>
+
+            <Card v-if="view === 'gardens'" class="gap-0 py-0">
+                <CardHeader class="py-4">
+                    <CardTitle>Bahçeler</CardTitle>
+                    <CardDescription>{{ formatNumber(gardenTotal) }} bahçe · toplam {{ formatNumber(positives) }} bahçede budama görüldü · satıra tıklayınca iki modülün bulguları</CardDescription>
+                    <div class="pt-2">
+                        <Select :model-value="gardenFilter" @update:model-value="onGardenFilter">
+                            <SelectTrigger class="h-11 w-full sm:w-96 md:h-9" aria-label="Birleşik karar filtresi"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="f in GARDEN_FILTERS" :key="f.value" :value="f.value">{{ f.label }}</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </CardHeader>
+                <CardContent class="border-t px-0 pb-0">
+                    <LoadingState v-if="isLoadingGardens && gardens.length === 0" text="Bahçeler yükleniyor…" class="p-6" />
+                    <p v-else-if="gardens.length === 0" class="p-6 text-sm text-muted-foreground">Bu filtreye uyan bahçe yok.</p>
+                    <div v-else class="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Bahçe</TableHead>
+                                    <TableHead>Müstahsil</TableHead>
+                                    <TableHead>Birleşik karar</TableHead>
+                                    <TableHead>Dayanak</TableHead>
+                                    <TableHead>Kesim aralığı</TableHead>
+                                    <TableHead class="text-right">Budanan alan</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow v-for="r in gardens" :key="r.code" class="cursor-pointer" tabindex="0" role="button" :aria-label="`${r.block}/${r.parcel} bahçesinin dayanaklarını aç`" @click="selected = r" @keydown.enter="selected = r">
+                                    <TableCell>
+                                        <div class="font-medium">{{ r.block }}/{{ r.parcel }}</div>
+                                        <div class="text-xs text-muted-foreground">{{ r.code }} · {{ formatM2(r.areaM2) }}</div>
+                                    </TableCell>
+                                    <TableCell class="text-sm">{{ r.producerName || r.producerCode || '—' }}</TableCell>
+                                    <TableCell>
+                                        <Badge :variant="toneVariant(CLASS_META[r.class].tone)">{{ CLASS_META[r.class].label }}</Badge>
+                                        <Badge v-if="r.radar?.witness" variant="outline" class="ml-1">Radar tanığı</Badge>
+                                    </TableCell>
+                                    <TableCell class="text-sm">{{ AGREEMENT_LABEL[r.agreement] }}</TableCell>
+                                    <TableCell class="text-sm tabular-nums">{{ r.bracket ? `${fmtDate(r.bracket.from)} → ${fmtDate(r.bracket.to)}` : '—' }}</TableCell>
+                                    <TableCell class="text-right text-sm tabular-nums">
+                                        <span class="font-semibold">{{ r.area ? formatM2(r.area.m2) : '—' }}</span>
+                                        <div v-if="r.area" class="text-xs text-muted-foreground">{{ r.area.lowM2 }}–{{ r.area.highM2 }} m² · {{ SOURCE_LABEL[r.area.source] }}</div>
+                                    </TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </div>
+                    <div v-if="gardenPages > 1" class="flex items-center justify-between border-t p-4">
+                        <span class="text-sm text-muted-foreground">Sayfa {{ gardenPage }} / {{ gardenPages }}</span>
+                        <div class="flex gap-2">
+                            <Button variant="outline" size="icon" class="size-11 md:size-9" :disabled="gardenPage <= 1" aria-label="Önceki sayfa" @click="gardenPage--"><ChevronLeft aria-hidden="true" /></Button>
+                            <Button variant="outline" size="icon" class="size-11 md:size-9" :disabled="gardenPage >= gardenPages" aria-label="Sonraki sayfa" @click="gardenPage++"><ChevronRight aria-hidden="true" /></Button>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card v-else class="gap-0 py-0">
+                <CardHeader class="py-4">
+                    <CardTitle>Müstahsiller · 1/{{ summary.rules.pruningRatio }} karşılaştırması</CardTitle>
+                    <CardDescription>{{ formatNumber(producerTotal) }} müstahsil · sayılan alan = kesin + muhtemel (önceki sezonlarda sayılmış zemin düşülür); hafif budama sayılmaz. Alım kararını bu tablo vermez.</CardDescription>
+                    <div class="pt-2">
+                        <Select :model-value="producerFilter" @update:model-value="onProducerFilter">
+                            <SelectTrigger class="h-11 w-full sm:w-96 md:h-9" aria-label="Müstahsil durumu filtresi"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="f in PRODUCER_FILTERS" :key="f.value" :value="f.value">{{ f.label }}</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </CardHeader>
+                <CardContent class="border-t px-0 pb-0">
+                    <LoadingState v-if="isLoadingProducers && producers.length === 0" text="Müstahsiller yükleniyor…" class="p-6" />
+                    <p v-else-if="producers.length === 0" class="p-6 text-sm text-muted-foreground">Bu filtreye uyan müstahsil yok.</p>
+                    <div v-else class="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Müstahsil</TableHead>
+                                    <TableHead>Birleşik durum</TableHead>
+                                    <TableHead>Çok-sensör alım kararı</TableHead>
+                                    <TableHead class="text-right">Hedef</TableHead>
+                                    <TableHead class="text-right">Kesin</TableHead>
+                                    <TableHead class="text-right">Muhtemel</TableHead>
+                                    <TableHead class="text-right">Hafif</TableHead>
+                                    <TableHead class="text-right">Eksik</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow v-for="p in producers" :key="p.code">
+                                    <TableCell>
+                                        <div class="font-medium">{{ p.name || p.code }}</div>
+                                        <div class="text-xs text-muted-foreground">{{ p.code }} · {{ p.gardens }} bahçe · ruhsatlı {{ formatM2(p.licensedAreaM2) }}</div>
+                                    </TableCell>
+                                    <TableCell><Badge :variant="toneVariant(STATUS_META[p.status].tone)">{{ STATUS_META[p.status].label }}</Badge></TableCell>
+                                    <TableCell class="text-sm">{{ p.fusionDecision ? (DECISION_LABEL[p.fusionDecision] ?? p.fusionDecision) : '—' }}</TableCell>
+                                    <TableCell class="text-right text-sm tabular-nums">{{ formatM2(p.requiredM2) }}</TableCell>
+                                    <TableCell class="text-right text-sm font-semibold tabular-nums">{{ p.confirmedM2 ? formatM2(p.confirmedM2) : '—' }}</TableCell>
+                                    <TableCell class="text-right text-sm tabular-nums">{{ p.probableM2 ? formatM2(p.probableM2) : '—' }}</TableCell>
+                                    <TableCell class="text-right text-sm tabular-nums text-muted-foreground">{{ p.lightM2 ? formatM2(p.lightM2) : '—' }}</TableCell>
+                                    <TableCell class="text-right text-sm tabular-nums">{{ p.shortfallM2 ? formatM2(p.shortfallM2) : '—' }}</TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </div>
+                    <div v-if="producerPages > 1" class="flex items-center justify-between border-t p-4">
+                        <span class="text-sm text-muted-foreground">Sayfa {{ producerPage }} / {{ producerPages }}</span>
+                        <div class="flex gap-2">
+                            <Button variant="outline" size="icon" class="size-11 md:size-9" :disabled="producerPage <= 1" aria-label="Önceki sayfa" @click="producerPage--"><ChevronLeft aria-hidden="true" /></Button>
+                            <Button variant="outline" size="icon" class="size-11 md:size-9" :disabled="producerPage >= producerPages" aria-label="Sonraki sayfa" @click="producerPage++"><ChevronRight aria-hidden="true" /></Button>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        </template>
+
+        <Sheet v-model:open="sheetOpen">
+            <SheetContent class="w-full overflow-y-auto sm:max-w-xl">
+                <template v-if="selected">
+                    <SheetHeader class="border-b">
+                        <SheetTitle>{{ selected.block }}/{{ selected.parcel }} · {{ selected.producerName || selected.producerCode }}</SheetTitle>
+                        <SheetDescription>{{ selected.code }} · {{ selected.locality || 'mevkii yok' }} · {{ formatM2(selected.areaM2) }}</SheetDescription>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <Badge :variant="toneVariant(CLASS_META[selected.class].tone)">{{ CLASS_META[selected.class].label }}</Badge>
+                            <Badge variant="outline">{{ AGREEMENT_LABEL[selected.agreement] }}</Badge>
+                            <Badge v-if="selected.radar?.witness" variant="outline">Radar tanığı</Badge>
+                        </div>
+                    </SheetHeader>
+                    <div class="flex flex-col gap-4 p-4 text-sm">
+                        <p>{{ selected.reason }}.</p>
+                        <div class="rounded-lg border bg-muted/40 p-3">
+                            <div class="font-medium">Budanan alan {{ selected.area ? `≈ ${formatM2(selected.area.m2)}` : '—' }}</div>
+                            <div v-if="selected.area" class="text-xs text-muted-foreground">Aralık {{ formatM2(selected.area.lowM2) }} – {{ formatM2(selected.area.highM2) }} · kaynak: {{ SOURCE_LABEL[selected.area.source] }} · 1/7 hesabına giren {{ formatM2(selected.countedM2) }}</div>
+                            <div class="text-xs text-muted-foreground">Kesim aralığı: {{ selected.bracket ? `${fmtDate(selected.bracket.from)} → ${fmtDate(selected.bracket.to)}` : '—' }}</div>
+                        </div>
+                        <div class="overflow-x-auto rounded-lg border bg-card">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Modül</TableHead>
+                                        <TableHead>Bulgu</TableHead>
+                                        <TableHead>Tarih</TableHead>
+                                        <TableHead class="text-right">Alan</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    <TableRow>
+                                        <TableCell class="font-medium">Çok-sensör karar</TableCell>
+                                        <TableCell>{{ FUSION_LABEL[selected.fusion.class] ?? selected.fusion.class }} <span class="text-xs text-muted-foreground">z {{ fmtZ(selected.fusion.z) }}</span></TableCell>
+                                        <TableCell class="tabular-nums">{{ fmtDate(selected.fusion.changeDate) }}</TableCell>
+                                        <TableCell class="text-right tabular-nums">{{ formatM2(selected.fusion.unitAreaM2) }} <span class="text-xs text-muted-foreground">{{ selected.fusion.unit === 'patch' ? 'yama' : 'bahçe' }}</span></TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell class="font-medium">Piksel taraması</TableCell>
+                                        <TableCell>{{ selected.pixel ? (PIXEL_LABEL[selected.pixel.verdict] ?? selected.pixel.verdict) : 'tarama yok' }} <span v-if="selected.pixel?.score" class="text-xs text-muted-foreground">skor {{ fmtZ(selected.pixel.score) }}</span></TableCell>
+                                        <TableCell class="tabular-nums">{{ selected.pixel?.date ? `${fmtDate(selected.pixel.lastBefore)} → ${fmtDate(selected.pixel.date)}` : '—' }}</TableCell>
+                                        <TableCell class="text-right tabular-nums">{{ selected.pixel?.prunedM2 ? formatM2(selected.pixel.prunedM2) : '—' }}</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell class="font-medium">Radar (tanık)</TableCell>
+                                        <TableCell>{{ selected.radar ? (selected.radar.witness ? 'değişim gördü' : 'ayrışmadı') : 'ölçülmedi' }}</TableCell>
+                                        <TableCell class="text-xs text-muted-foreground">koherans z {{ fmtZ(selected.radar?.coherenceZ) }} · VH z {{ fmtZ(selected.radar?.vhZ) }}</TableCell>
+                                        <TableCell class="text-right">—</TableCell>
+                                    </TableRow>
+                                </TableBody>
+                            </Table>
+                        </div>
+                        <p class="text-xs text-muted-foreground">
+                            Kanıt görüntüleri ve seriler için aynı bahçeyi “Çok-sensör karar” ve “Piksel taraması” görünümlerinde açın; birleşik karar yalnızca bu iki modülün çıktısını bir araya getirir.
+                            Radar tanığı, bahçenin koherans yükselişi ya da VH düşüşünün aynı tarihlerdeki sessiz çayın %90 eşiğini aşması demektir; tek başına karar değiştirmez.
+                        </p>
+                    </div>
+                </template>
+            </SheetContent>
+        </Sheet>
+    </div>
+</template>

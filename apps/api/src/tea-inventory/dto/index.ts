@@ -11,3 +11,4 @@ export * from './garden-health.dto';
 export * from './land-evaluation.dto';
 export * from './garden-age.dto';
 export * from './pixel-scan.dto';
+export * from './pruning-combined.dto';

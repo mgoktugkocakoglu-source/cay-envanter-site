@@ -11,6 +11,7 @@ import { LandBlock, ParcelLand } from '@/tea-inventory/entities/land-evaluation.
 import { AgeBlock, ParcelAge } from '@/tea-inventory/entities/garden-age.types';
 import { FieldTestsBlock } from '@/tea-inventory/entities/field-test.types';
 import { PixelScanBlock } from '@/tea-inventory/entities/pixel-scan.types';
+import { PruningCombinedBlock } from '@/tea-inventory/entities/pruning-combined.types';
 import { TeaInventoryGarden, GardenSeason, GardenPruningEvent, GardenFusion, RadarResult, RadarSeries, GardenHealthSeason } from '@/tea-inventory/entities/tea-inventory-garden.entity';
 import { TeaInventoryLicense } from '@/tea-inventory/entities/tea-inventory-license.entity';
 import { ParcelLineage } from '@/tea-inventory/entities/parcel-lineage.entity';
@@ -105,6 +106,7 @@ interface InventoryBundle {
     age?: BundleAge | null;
     fieldTests?: FieldTestsBlock | null;
     pixelScan?: PixelScanBlock | null;
+    pruningCombined?: PruningCombinedBlock | null;
 }
 
 /** Optional land-evaluation block: area-level climate/summary plus one evaluation per parcel key. */
@@ -295,6 +297,7 @@ export class TeaInventorySeedService implements OnModuleInit {
                     age: bundle.age ? (({ parcels: _p, ...rest }) => rest)(bundle.age) : null,
                     fieldTests: bundle.fieldTests ?? null,
                     pixelScan: bundle.pixelScan ?? null,
+                    pruningCombined: bundle.pruningCombined ?? null,
                     bundleGeneratedAt: generatedAt,
                 }),
             );

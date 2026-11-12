@@ -30,6 +30,7 @@ import CaykurLandEvaluation from '@/components/caykur/CaykurLandEvaluation.vue';
 import CaykurGardenAge from '@/components/caykur/CaykurGardenAge.vue';
 import CaykurFieldTests from '@/components/caykur/CaykurFieldTests.vue';
 import CaykurPixelScan from '@/components/caykur/CaykurPixelScan.vue';
+import CaykurPruningCombined from '@/components/caykur/CaykurPruningCombined.vue';
 import { useTkgmParcelLookup } from '@/composables/useTkgmParcelLookup';
 import { toneVariant } from '@/components/caykur/tone';
 import {
@@ -122,8 +123,8 @@ function openArea(id: string): void {
     activeTab.value = 'inventory';
 }
 // Pruning is judged per producer (1/7 of all their gardens); the parcel view stays for inspection.
-type PruningView = 'fusion' | 'pixels' | 'records' | 'producers' | 'reports' | 'calibration';
-const PRUNING_VIEWS: PruningView[] = ['fusion', 'pixels', 'records', 'producers', 'reports', 'calibration'];
+type PruningView = 'fusion' | 'pixels' | 'combined' | 'records' | 'producers' | 'reports' | 'calibration';
+const PRUNING_VIEWS: PruningView[] = ['fusion', 'pixels', 'combined', 'records', 'producers', 'reports', 'calibration'];
 /** The v1 parcel/scene browser lives under the multi-sensor view as a collapsed inspection tool. */
 const showParcelTool = ref(false);
 const pruningView = ref<PruningView>('fusion');
@@ -668,6 +669,7 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                         <ToggleGroup :model-value="pruningView" type="single" aria-label="Budama değerlendirme birimi" @update:model-value="onPruningView">
                             <ToggleGroupItem value="fusion" class="h-11 px-3 md:h-9">Çok-sensör karar</ToggleGroupItem>
                             <ToggleGroupItem value="pixels" class="h-11 px-3 md:h-9">Piksel taraması (deneysel)</ToggleGroupItem>
+                            <ToggleGroupItem value="combined" class="h-11 px-3 md:h-9">Birleşik karar</ToggleGroupItem>
                             <ToggleGroupItem value="records" class="h-11 px-3 md:h-9">Tarama kayıtları (önce / sonra)</ToggleGroupItem>
                             <ToggleGroupItem value="producers" class="h-11 px-3 md:h-9">Müstahsil (ruhsat sahibi)</ToggleGroupItem>
                             <ToggleGroupItem value="reports" class="h-11 px-3 md:h-9">Raporlar ve Bakanlık talepleri</ToggleGroupItem>
@@ -692,6 +694,7 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                         </Card>
                     </template>
                     <CaykurPixelScan v-else-if="pruningView === 'pixels'" :area-id="area.id" :map-data="mapData" />
+                    <CaykurPruningCombined v-else-if="pruningView === 'combined'" :area-id="area.id" />
                     <CaykurPruningRecords v-else-if="pruningView === 'records'" :area-id="area.id" :map-data="mapData" />
                     <CaykurProducerPruning v-else-if="pruningView === 'producers'" :area-id="area.id" :map-data="mapData" />
                     <CaykurReports v-else-if="pruningView === 'reports'" :area-id="area.id" />

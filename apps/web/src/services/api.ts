@@ -2709,6 +2709,82 @@ export interface PixelValidation {
         kindCorrect: { hit: number; n: number };
     };
 }
+export type CombinedClass = 'confirmed' | 'probable' | 'light' | 'none' | 'no_data';
+export type CombinedAgreement = 'both' | 'both_other_dates' | 'fusion_only' | 'pixel_only' | 'neither';
+export type CombinedProducerStatus = 'met' | 'met_with_probable' | 'partial' | 'light_only' | 'none' | 'no_license';
+export type CombinedClassFilter = 'positive' | 'counted' | CombinedClass;
+export type CombinedProducerFilter = 'active' | 'open' | 'changed' | CombinedProducerStatus;
+export interface CombinedRate {
+    hit: number;
+    n: number;
+    rate: number | null;
+}
+export interface CombinedValidation {
+    season: string;
+    generatedAt: string;
+    gardens: number;
+    falseAlarms: { confirmed: number; probable: number; light: number; note: string };
+    detection: { trials: number; note: string; rows: Array<{ key: string; overall: CombinedRate; deep: CombinedRate; light: CombinedRate; clear: CombinedRate }> };
+}
+/** Combined pruning verdict (separate module): the multi-sensor module and the pixel scan as one verdict per garden. */
+export interface CombinedSummary {
+    season: string;
+    seasons: string[];
+    generatedAt: string;
+    method: string;
+    rules: Record<string, number>;
+    sources: { fusion: boolean; pixel: boolean; radarCheck: boolean };
+    summary: {
+        gardens: number;
+        byClass: Record<CombinedClass, number>;
+        byAgreement: Record<CombinedAgreement, number>;
+        areaM2: { confirmed: number; probable: number; light: number; lowM2: number; highM2: number };
+        radarWitness: { confirmed: number; probable: number; light: number };
+        producers: Record<CombinedProducerStatus, number>;
+        producersChanged: number;
+    };
+    validation: CombinedValidation | null;
+}
+export interface CombinedGardenRow {
+    id: string;
+    code: string;
+    block: string;
+    parcel: string;
+    locality: string;
+    producerCode: string;
+    producerName: string;
+    areaM2: number;
+    licensedAreaM2: number | null;
+    class: CombinedClass;
+    kind: 'deep' | 'light' | null;
+    agreement: CombinedAgreement;
+    bracket: { from: string; to: string } | null;
+    area: { m2: number; lowM2: number; highM2: number; source: 'pixel_scan' | 'change_patch' | 'ndvi_fraction' } | null;
+    countedM2: number;
+    fusion: { class: string; kind: string | null; z: number | null; changeDate: string | null; lastBeforeAt: string | null; firstAfterAt: string | null; unit: string; unitAreaM2: number; reusedShare: number };
+    pixel: { verdict: string; date: string | null; lastBefore: string | null; score: number | null; prunedM2: number; clusters: number; kind: string | null; confidence: string | null } | null;
+    radar: { coherenceZ: number | null; vhZ: number | null; witness: boolean } | null;
+    reason: string;
+}
+export interface CombinedProducerRow {
+    id: string;
+    code: string;
+    name: string;
+    walletNo: string;
+    licensedAreaM2: number;
+    requiredM2: number;
+    confirmedM2: number;
+    probableM2: number;
+    lightM2: number;
+    countedM2: number;
+    shortfallM2: number;
+    gardens: number;
+    confirmedGardens: string[];
+    probableGardens: string[];
+    lightGardens: string[];
+    status: CombinedProducerStatus;
+    fusionDecision: string | null;
+}
 export interface PixelScanSummary {
     season: string;
     seasons: string[];
@@ -3765,6 +3841,18 @@ export const api = {
         const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
         const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
         return request<Paginated<PixelGardenRow>>(`/caykur/tea-inventory/areas/${areaId}/pixel-scan/gardens${query ? `?${query}` : ''}`);
+    },
+    getCombinedSummary: (areaId: string, season?: string) =>
+        request<CombinedSummary>(`/caykur/tea-inventory/areas/${areaId}/pruning-combined/summary${season ? `?season=${encodeURIComponent(season)}` : ''}`),
+    getCombinedGardens: (areaId: string, params?: { page?: number; limit?: number; season?: string; class?: CombinedClassFilter }) => {
+        const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
+        const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        return request<Paginated<CombinedGardenRow>>(`/caykur/tea-inventory/areas/${areaId}/pruning-combined/gardens${query ? `?${query}` : ''}`);
+    },
+    getCombinedProducers: (areaId: string, params?: { page?: number; limit?: number; season?: string; status?: CombinedProducerFilter }) => {
+        const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
+        const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        return request<Paginated<CombinedProducerRow>>(`/caykur/tea-inventory/areas/${areaId}/pruning-combined/producers${query ? `?${query}` : ''}`);
     },
     getPixelScanGarden: (areaId: string, code: string, season?: string) =>
         request<PixelGardenDetail>(`/caykur/tea-inventory/areas/${areaId}/pixel-scan/gardens/${encodeURIComponent(code)}${season ? `?season=${encodeURIComponent(season)}` : ''}`),

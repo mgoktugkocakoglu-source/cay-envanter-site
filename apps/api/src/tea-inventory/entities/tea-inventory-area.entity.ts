@@ -12,6 +12,7 @@ import { LandBlock } from '@/tea-inventory/entities/land-evaluation.types';
 import { AgeBlock } from '@/tea-inventory/entities/garden-age.types';
 import { FieldTestsBlock } from '@/tea-inventory/entities/field-test.types';
 import { PixelScanBlock } from '@/tea-inventory/entities/pixel-scan.types';
+import { PruningCombinedBlock } from '@/tea-inventory/entities/pruning-combined.types';
 
 /** A detected tea patch (Sentinel-2, 10 m) stored with its area. */
 export interface TeaPatch {
@@ -309,6 +310,11 @@ export class TeaInventoryArea {
     // Not selected by default: it is large and only the pixel-scan service reads it.
     @Column({ type: 'jsonb', nullable: true, name: 'pixel_scan', select: false })
     pixelScan: PixelScanBlock | null;
+
+    // Combined pruning verdict block (fusion + pixel scan as one verdict per garden), absent until combine-pruning has run.
+    // Not selected by default: only the combined-verdict service reads it.
+    @Column({ type: 'jsonb', nullable: true, name: 'pruning_combined', select: false })
+    pruningCombined: PruningCombinedBlock | null;
 
     // Bundle timestamp; a re-import is skipped when it has not changed.
     @Column({ type: 'timestamp', name: 'bundle_generated_at' })
