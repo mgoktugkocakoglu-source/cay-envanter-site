@@ -2613,6 +2613,32 @@ export interface PixelGardenDetail extends PixelGardenRow {
     series: { dates: string[]; cluster: Array<number | null>; rest: Array<number | null> } | null;
     geometry: GeoJSON.Geometry;
 }
+export interface PixelRate {
+    hit: number;
+    n: number;
+    rate: number | null;
+}
+/** Measured without ground truth: mirrored-series false alarms and simulated-cut detection rate. */
+export interface PixelValidation {
+    season: string;
+    generatedAt: string;
+    gardens: number;
+    falseAlarms: { gardens: number; share: number; note: string };
+    detection: {
+        trials: number;
+        note: string;
+        overall: PixelRate;
+        realistic: PixelRate;
+        clear: PixelRate;
+        deep: PixelRate;
+        light: PixelRate;
+        bySize: Record<string, PixelRate>;
+        byDepth: Record<string, PixelRate>;
+        table: Array<{ pixels: number; cells: PixelRate[] }>;
+        detectedAnyDate: number;
+        kindCorrect: { hit: number; n: number };
+    };
+}
 export interface PixelScanSummary {
     season: string;
     seasons: string[];
@@ -2624,6 +2650,7 @@ export interface PixelScanSummary {
     scan: { from: string; to: string; candidates: number };
     dates: number;
     excludedDates: string[];
+    validation?: PixelValidation | null;
     summary: {
         gardens: number;
         pixels: number;

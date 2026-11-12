@@ -247,7 +247,8 @@ const fusionMissed = computed(() => {
                     <CardDescription>
                         Çok-sensör karar bahçeyi tek bir ortalama seriyle yargılar; bahçenin onda biri kesildiğinde bu ortalamada kaybolur. Burada her bahçenin her 10 m Sentinel-2 pikseli, 300 m çevresindeki diğer bahçe piksellerine göre okunur ve sezonun her temiz sahnesi
                         aday tarih olarak denenir ({{ fmtDate(summary.scan.from) }} → {{ fmtDate(summary.scan.to) }}, {{ summary.scan.candidates }} aday · {{ summary.dates }} sahne, {{ summary.excludedDates.length }} tarih kar/gölge nedeniyle dışlandı).
-                        Küme çekirdeği z ≥ {{ summary.rules.zCore }} ile kurulur, komşular z ≥ {{ summary.rules.zGrow }} ile eklenir. Sınır pikselleri (çay örtüsü dışı) çekirdek olamaz. Kümeler toparlanma hızına göre derin budama, hafif budama ya da geçici düşüş olarak ayrılır.
+                        Her pikselin kendi mevsimsel örüntüsü önceki iki sezonundan çıkarılır ve tarama bu örüntüden sapma üzerinde yapılır; piksel ayrıca o tarihte mahalledeki tüm piksellerin değişim dağılımından ayrışmalıdır.
+                        Küme çekirdeği z ≥ {{ summary.rules.zCore }} ile kurulur, komşular z ≥ {{ summary.rules.zGrow }} ile eklenir, kümenin birleşik z'si ≥ {{ summary.rules.clusterZ }} olmalıdır. Sınır pikselleri (çay örtüsü dışı) çekirdek olamaz. Kümeler toparlanma hızına göre derin budama, hafif budama ya da geçici düşüş olarak ayrılır.
                         Çok-sensör kararını değiştirmez; yanında gösterilir. Sezon {{ seasonLabel(summary.season) }}.
                     </CardDescription>
                 </CardHeader>
@@ -259,6 +260,42 @@ const fusionMissed = computed(() => {
                 <StatCard label="Geçici düşüş (elendi)" :value="formatNumber(summary.summary.byVerdict.transient + summary.summary.byVerdict.weak)" :hint="`bahçe · ${summary.summary.byVerdict.transient} hızlı toparlanan + ${summary.summary.byVerdict.weak} zayıf / sınır sinyali`" />
                 <StatCard label="Çok-sensörün görmediği" :value="formatNumber(summary.summary.newFinds)" hint="bahçe · çok-sensör 'belirsiz' ya da 'budama yok' demişti" />
             </div>
+
+            <Card v-if="summary.validation" class="gap-0 py-0">
+                <CardHeader class="py-4">
+                    <CardTitle>Ölçülen doğruluk (saha verisi olmadan)</CardTitle>
+                    <CardDescription>
+                        Yanlış alarm üst sınırı: {{ summary.validation.falseAlarms.gardens }} / {{ summary.validation.gardens }} bahçe ({{ pct(summary.validation.falseAlarms.share) }}). {{ summary.validation.falseAlarms.note }}
+                    </CardDescription>
+                </CardHeader>
+                <CardContent class="flex flex-col gap-3 border-t pt-4 pb-4">
+                    <p class="text-sm">
+                        Yakalama oranı ({{ summary.validation.detection.trials }} sentetik kesim): belirgin kesimlerde (≥ 3 piksel, pikselde ≥ 0,15 NDVI düşüşü) {{ pct(summary.validation.detection.clear.rate) }},
+                        gerçekçi kesimlerde (≥ 2 piksel, ≥ 0,10) {{ pct(summary.validation.detection.realistic.rate) }}, tümünde {{ pct(summary.validation.detection.overall.rate) }}.
+                        Yakalananların {{ summary.validation.detection.kindCorrect.hit }} / {{ summary.validation.detection.kindCorrect.n }}'inde derin / hafif sınıfı doğru.
+                    </p>
+                    <div class="overflow-x-auto rounded-lg border bg-card">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Kesilen piksel sayısı</TableHead>
+                                    <TableHead v-for="d in Object.keys(summary.validation.detection.byDepth)" :key="d" class="text-right">Pikselde NDVI düşüşü {{ Number(d).toFixed(2) }}</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow v-for="r in summary.validation.detection.table" :key="r.pixels">
+                                    <TableCell class="font-medium">{{ r.pixels }} piksel</TableCell>
+                                    <TableCell v-for="(c, i) in r.cells" :key="i" class="text-right text-sm tabular-nums">{{ c.n ? `${c.hit} / ${c.n}` : '—' }}</TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </div>
+                    <p class="text-xs text-muted-foreground">
+                        {{ summary.validation.detection.note }} Küçük ve sığ kesimler (tek piksel ya da pikselin küçük bir kısmı) 10 m çözünürlükte gürültüden ayrışmaz; ayrıca 22 Ara – 15 Şub arası tek temiz sahne olmadığı için o aralıkta yapılıp hızla toparlanan hafif kesimler görülemez.
+                        Bu sayılar gerçek saha doğrulamasının yerini tutmaz; Saha Testi vakaları geldikçe onunla değiştirilecek.
+                    </p>
+                </CardContent>
+            </Card>
 
             <Card class="gap-0 py-0">
                 <CardHeader class="py-4">
@@ -361,7 +398,7 @@ const fusionMissed = computed(() => {
                             </div>
                             <div ref="mapEl" class="h-72 w-full overflow-hidden rounded-lg border" />
                             <p class="text-xs text-muted-foreground">
-                                Renk: seçilen tarihte önce/sonra göreli NDVI değişimi (koyu kırmızı ≤ −0,15 · kırmızı ≤ −0,10 · turuncu ≤ −0,05 · sarı ≤ −0,025 · mavi ≥ +0,05). Kalın çerçeve çekirdek piksel (z ≥ {{ summary?.rules.zCore }}), kesikli çerçeve büyütülen komşu (z ≥ {{ summary?.rules.zGrow }}).
+                                Renk: seçilen tarihte önce/sonra göreli NDVI değişimi (koyu kırmızı ≤ −0,15 · kırmızı ≤ −0,10 · turuncu ≤ −0,05 · sarı ≤ −0,025 · mavi ≥ +0,05). Kalın çerçeve çekirdek piksel (z ≥ {{ summary?.rules.zCore }}), kesikli çerçeve büyütülen komşu (z ≥ {{ summary?.rules.zGrow }}); z, pikselin kendi mevsimsel örüntüsünden sapmasına göredir.
                                 Beyaz çizgi bahçe sınırı. Zemin Google uydu altlığı, tarihsiz. Kareye gelince sayılar görünür.
                             </p>
                         </section>
