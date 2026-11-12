@@ -287,6 +287,7 @@ export class EvidenceService {
         x += badge(doc, v.opticalOk ? 'Optik ✓' : 'Optik —', v.opticalOk ? GREEN : MUTED, x, y, 8) + 4;
         x += badge(doc, v.backscatterOk ? 'Radar ✓' : 'Radar —', v.backscatterOk ? GREEN : MUTED, x, y, 8) + 4;
         if (f.unit === 'patch') x += badge(doc, `Optik yama · ${formatM2(f.unitAreaM2)}`, BLUE, x, y, 8) + 4;
+        if (f.prunedArea) x += badge(doc, `Budanan alan ≈ ${formatM2(f.prunedArea.m2)} (${formatM2(f.prunedArea.lowM2)} – ${formatM2(f.prunedArea.highM2)})`, GREEN, x, y, 8) + 4;
         doc.y = y + 22;
         doc.x = x0;
         kvGrid(doc, [

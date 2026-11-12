@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { FusionBlock, FusionUnassignedPatch, TeaInventoryArea } from '@/tea-inventory/entities/tea-inventory-area.entity';
+import { FusionBlock, FusionUnassignedPatch, FusionValidation, RadarBlockCheck, TeaInventoryArea } from '@/tea-inventory/entities/tea-inventory-area.entity';
 import { FusionDecision, ProducerFusion, ProducerFusionStatus, TeaInventoryProducer } from '@/tea-inventory/entities/tea-inventory-producer.entity';
-import { FusionClass, GardenFusion, TeaInventoryGarden } from '@/tea-inventory/entities/tea-inventory-garden.entity';
+import { FusionClass, FusionPrunedArea, GardenFusion, TeaInventoryGarden } from '@/tea-inventory/entities/tea-inventory-garden.entity';
 import { FUSION_CLASSES, FUSION_DECISIONS, FusionGardenQueryDto, FusionProducerQueryDto, PRODUCER_FUSION_STATUSES } from '@/tea-inventory/dto';
 import { Paginated, paginate } from '@/common/dto/paginated.dto';
 
@@ -26,6 +26,7 @@ export interface FusionGardenRow {
     unitAreaM2: number;
     unitGeometry: Record<string, unknown> | null;
     repeat: GardenFusion['repeat'] | null;
+    prunedArea: FusionPrunedArea | null;
     class: FusionClass;
     kind: GardenFusion['verdict']['kind'] | null;
     z: number | null;
@@ -83,7 +84,16 @@ export interface FusionSummary {
     scanFrom: string;
     scanTo: string;
     sensors: FusionBlock['seasons'][number]['sensors'];
-    gardens: { total: number; byClass: Record<FusionClass, number>; prunedAreaM2: number; likelyAreaM2: number };
+    gardens: {
+        total: number;
+        byClass: Record<FusionClass, number>;
+        prunedAreaM2: number;
+        likelyAreaM2: number;
+        /** Pruned square metres as measured (pixel-scan cluster, change patch or NDVI share); null for seasons exported before the area output. */
+        measured: { gardens: number; prunedM2: number; likelyM2: number; lowM2: number; highM2: number; byMethod: Record<string, number> } | null;
+    };
+    validation: FusionValidation | null;
+    radarCheck: RadarBlockCheck | null;
     producers: { total: number; byStatus: Record<ProducerFusionStatus, number>; byDecision: Record<FusionDecision, number> };
     /** Gardens confirmed pruned as of each emulated scan date (the season's pruning curve). */
     timeline: Array<{ date: string; pruned: number; likely: number }>;
@@ -125,6 +135,7 @@ export class PruningFusionService {
         const byStatus = Object.fromEntries(PRODUCER_FUSION_STATUSES.map((s) => [s, 0])) as Record<ProducerFusionStatus, number>;
         let prunedArea = 0;
         let likelyArea = 0;
+        const measured = { gardens: 0, prunedM2: 0, likelyM2: 0, lowM2: 0, highM2: 0, byMethod: {} as Record<string, number> };
         const timeline = new Map<string, { pruned: number; likely: number }>();
         const localities = new Map<string, { pruned: number; total: number }>();
         for (const g of gardens) {
@@ -134,6 +145,14 @@ export class PruningFusionService {
             const area = f.unitAreaM2 ?? (g.planimetricAreaM2 || g.geometryAreaM2);
             if (f.verdict.class === 'pruned') prunedArea += area;
             if (f.verdict.class === 'likely') likelyArea += area;
+            if (f.prunedArea) {
+                measured.gardens++;
+                if (f.verdict.class === 'pruned') measured.prunedM2 += f.prunedArea.m2;
+                else measured.likelyM2 += f.prunedArea.m2;
+                measured.lowM2 += f.prunedArea.lowM2;
+                measured.highM2 += f.prunedArea.highM2;
+                measured.byMethod[f.prunedArea.method] = (measured.byMethod[f.prunedArea.method] ?? 0) + 1;
+            }
             const loc = localities.get(g.locality || '—') ?? { pruned: 0, total: 0 };
             loc.total++;
             if (f.verdict.class === 'pruned') loc.pruned++;
@@ -166,7 +185,9 @@ export class PruningFusionService {
             scanFrom: seasonHeader.scanFrom,
             scanTo: seasonHeader.scanTo,
             sensors: seasonHeader.sensors,
-            gardens: { total: Object.values(byClass).reduce((a, b) => a + b, 0), byClass, prunedAreaM2: Math.round(prunedArea), likelyAreaM2: Math.round(likelyArea) },
+            gardens: { total: Object.values(byClass).reduce((a, b) => a + b, 0), byClass, prunedAreaM2: Math.round(prunedArea), likelyAreaM2: Math.round(likelyArea), measured: measured.gardens ? measured : null },
+            validation: seasonHeader.validation ?? null,
+            radarCheck: seasonHeader.radarCheck ?? null,
             producers: { total: producers.filter((p) => p.fusion).length, byStatus, byDecision },
             timeline: [...timeline.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, t]) => ({ date, ...t })),
             localities: [...localities.entries()].map(([name, v]) => ({ name, ...v })).sort((a, b) => b.pruned - a.pruned || b.total - a.total),
@@ -301,6 +322,7 @@ export class PruningFusionService {
             unitAreaM2: f.unitAreaM2 ?? Math.round(g.planimetricAreaM2 || g.geometryAreaM2),
             unitGeometry: f.unitGeometry ?? null,
             repeat: f.repeat ?? null,
+            prunedArea: f.prunedArea ?? null,
             class: f.verdict.class,
             kind: f.verdict.kind ?? null,
             z: f.verdict.z,

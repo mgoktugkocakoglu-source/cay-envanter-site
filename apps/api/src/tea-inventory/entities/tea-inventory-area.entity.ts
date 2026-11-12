@@ -66,6 +66,59 @@ export interface FusionExcludedDate {
     reason: 'snow_or_shadow' | 'sparse' | null;
 }
 
+export interface FusionRate {
+    hit: number;
+    n: number;
+    rate: number | null;
+}
+export interface FusionRateBlock {
+    overall: FusionRate;
+    realistic: FusionRate;
+    clear: FusionRate;
+    deep: FusionRate;
+    light: FusionRate;
+    bySize: Record<string, FusionRate>;
+    byDepth: Record<string, FusionRate>;
+    byShare: Record<string, FusionRate>;
+    table: Array<{ pixels: number; cells: FusionRate[] }>;
+}
+/** Measured without ground truth, on the same simulated cuts as the pixel scan (mirrored-series false alarms, detection rate). */
+export interface FusionValidation {
+    season: string;
+    generatedAt: string;
+    gardens: number;
+    real: { pruned: number; likely: number; unclear: number };
+    falseAlarms: { gardens: number; pruned: number; likely: number; share: number; unclear: number; note: string };
+    detection: { trials: number; note: string } & Record<'fusionGarden' | 'fusionPatch' | 'fusionPatchConfirmed' | 'fusionPatchDated' | 'pixel' | 'pixelFull' | 'either', FusionRateBlock>;
+}
+export interface RadarStack {
+    n: number;
+    medianStep: number | null;
+    meanZExpected: number | null;
+    stoufferZ: number | null;
+    beyond90: number | null;
+    beyond95: number | null;
+}
+export interface RadarStep {
+    step: number;
+    z: number;
+    nullSigma: number;
+}
+/** Block-scale radar test: noise floor by averaged area, pruned gardens and neighbouring blocks against quiet tea of the same size and dates. */
+export interface RadarBlockCheck {
+    season: string;
+    generatedAt: string;
+    windowDays: number;
+    events: number;
+    quietGardens: number;
+    note: string;
+    noiseFloor: Array<{ targetM2: number; medianAreaM2: number } & Record<string, { sigma: number | null; detectable: number | null; n: number } | number>>;
+    singleStack: Record<string, Record<string, RadarStack | null>>;
+    placebo: Record<string, RadarStack | null>;
+    blocks: Array<{ members: string[]; gardens: number; areaM2: number; b0: string; b1: string } & Record<string, RadarStep | null | string | number | string[]>>;
+    blockStack: Record<string, RadarStack | null>;
+}
+
 /** Fusion module header (bundle `fusion` block): rules, channel settings, per-season scan cadence and sensors. */
 export interface FusionBlock {
     calibrated: boolean;
@@ -85,6 +138,8 @@ export interface FusionBlock {
         };
         parcelCoverage?: number;
         unassigned?: FusionUnassignedPatch[];
+        validation?: FusionValidation | null;
+        radarCheck?: RadarBlockCheck | null;
     }>;
 }
 

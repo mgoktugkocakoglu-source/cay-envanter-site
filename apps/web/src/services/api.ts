@@ -1394,6 +1394,7 @@ export interface FusionGardenRow {
     unitAreaM2: number;
     unitGeometry: GeoJSON.Geometry | null;
     repeat: { reusedM2: number; reusedShare: number; countedM2: number; evidence: Array<{ season: string; overlapM2: number; class: FusionClass }> } | null;
+    prunedArea: FusionPrunedArea | null;
     class: FusionClass;
     kind?: FusionKind | null;
     z: number | null;
@@ -1454,6 +1455,67 @@ export interface FusionProducerRow {
     ratio: number;
 }
 
+/** Pruned square metres of a "pruned" / "likely" garden with its range and how it was measured. */
+export interface FusionPrunedArea {
+    m2: number;
+    lowM2: number;
+    highM2: number;
+    method: 'pixel_scan' | 'change_patch' | 'ndvi_fraction';
+    shareOfGarden: number;
+    note: string;
+}
+export interface FusionRate {
+    hit: number;
+    n: number;
+    rate: number | null;
+}
+export interface FusionRateBlock {
+    overall: FusionRate;
+    realistic: FusionRate;
+    clear: FusionRate;
+    deep: FusionRate;
+    light: FusionRate;
+    bySize: Record<string, FusionRate>;
+    byDepth: Record<string, FusionRate>;
+    byShare: Record<string, FusionRate>;
+    table: Array<{ pixels: number; cells: FusionRate[] }>;
+}
+/** Measured without ground truth, on the same simulated cuts as the pixel scan (mirrored-series false alarms, detection rate). */
+export interface FusionValidation {
+    season: string;
+    generatedAt: string;
+    gardens: number;
+    real: { pruned: number; likely: number; unclear: number };
+    falseAlarms: { gardens: number; pruned: number; likely: number; share: number; unclear: number; note: string };
+    detection: { trials: number; note: string } & Record<'fusionGarden' | 'fusionPatch' | 'fusionPatchConfirmed' | 'fusionPatchDated' | 'pixel' | 'pixelFull' | 'either', FusionRateBlock>;
+}
+export interface RadarStack {
+    n: number;
+    medianStep: number | null;
+    meanZExpected: number | null;
+    stoufferZ: number | null;
+    beyond90: number | null;
+    beyond95: number | null;
+}
+export interface RadarStep {
+    step: number;
+    z: number;
+    nullSigma: number;
+}
+/** Block-scale radar test: noise floor by averaged area, pruned gardens and neighbouring blocks against quiet tea of the same size and dates. */
+export interface RadarBlockCheck {
+    season: string;
+    generatedAt: string;
+    windowDays: number;
+    events: number;
+    quietGardens: number;
+    note: string;
+    noiseFloor: Array<{ targetM2: number; medianAreaM2: number } & Record<string, { sigma: number | null; detectable: number | null; n: number } | number>>;
+    singleStack: Record<string, Record<string, RadarStack | null>>;
+    placebo: Record<string, RadarStack | null>;
+    blocks: Array<{ members: string[]; gardens: number; areaM2: number; b0: string; b1: string } & Record<string, RadarStep | null | string | number | string[]>>;
+    blockStack: Record<string, RadarStack | null>;
+}
 export interface FusionSummary {
     season: string;
     seasons: string[];
@@ -1469,7 +1531,15 @@ export interface FusionSummary {
         backscatter: Array<{ pass: string; relativeOrbit: number; dates: string[] }>;
         coherence: Array<{ pass: string; dates: string[] }>;
     };
-    gardens: { total: number; byClass: Record<FusionClass, number>; prunedAreaM2: number; likelyAreaM2: number };
+    gardens: {
+        total: number;
+        byClass: Record<FusionClass, number>;
+        prunedAreaM2: number;
+        likelyAreaM2: number;
+        measured: { gardens: number; prunedM2: number; likelyM2: number; lowM2: number; highM2: number; byMethod: Record<string, number> } | null;
+    };
+    validation: FusionValidation | null;
+    radarCheck: RadarBlockCheck | null;
     producers: { total: number; byStatus: Record<ProducerFusionStatus, number>; byDecision: Record<FusionDecision, number> };
     timeline: Array<{ date: string; pruned: number; likely: number }>;
     localities: Array<{ name: string; pruned: number; total: number }>;

@@ -157,6 +157,16 @@ export interface FusionVerdict {
     reason: string;
 }
 
+/** Pruned square metres of a "pruned" / "likely" garden with its range and how it was measured. */
+export interface FusionPrunedArea {
+    m2: number;
+    lowM2: number;
+    highM2: number;
+    method: 'pixel_scan' | 'change_patch' | 'ndvi_fraction';
+    shareOfGarden: number;
+    note: string;
+}
+
 export interface GardenFusion {
     // The unit that carried the verdict: the whole garden or the optical change patch inside it.
     unit: 'garden' | 'patch';
@@ -165,6 +175,8 @@ export interface GardenFusion {
     // Overlap with ground pruned in earlier seasons of the 7-season cycle (not credited again).
     repeat?: { reusedM2: number; reusedShare: number; countedM2: number; evidence: Array<{ season: string; overlapM2: number; class: FusionClass }> } | null;
     verdict: FusionVerdict;
+    // Pruned square metres next to the verdict (null unless pruned / likely; absent in bundles before the area output).
+    prunedArea?: FusionPrunedArea | null;
     detectedAt: string | null;
     likelyAt: string | null;
     scans: Array<{ date: string; z: number | null; class: FusionClass }>;

@@ -45,6 +45,7 @@ import { FUSION_KIND_LABEL,
     formatShare,
 } from '@/services/caykur/teaInventory';
 import { formatNumber } from '@/services/caykur';
+import type { FusionPrunedArea, FusionRate, RadarStack } from '@/services/api';
 import { countPixelCentres, geometryLon, pixelGridLines, utmZone } from '@/services/caykur/sentinelGrid';
 
 /**
@@ -232,6 +233,27 @@ function classColor(c: FusionClass): string {
     if (c === 'not_pruned') return cssVar('--muted-foreground', '#64748b');
     return cssVar('--border', '#94a3b8');
 }
+
+const AREA_METHOD_LABEL: Record<FusionPrunedArea['method'], string> = {
+    pixel_scan: 'piksel taramasının çizdiği küme',
+    change_patch: 'optik değişim yaması',
+    ndvi_fraction: 'NDVI düşüşünden hesaplanan pay',
+};
+const rateText = (r: FusionRate | undefined) => (r && r.n ? `${r.hit} / ${r.n} (%${Math.round((r.hit / r.n) * 100)})` : '—');
+const sharePct = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `%${Math.round(v * 100)}`);
+/** Rows of the measured-accuracy table: the two fusion bounds, the pixel scan and their union, on the same simulated cuts. */
+const VALIDATION_ROWS = [
+    { key: 'fusionGarden', label: 'Çok-sensör · yalnız bahçe ortalaması (alt sınır)' },
+    { key: 'fusionPatch', label: 'Çok-sensör · kesim yaması çizilmiş (üst sınır)' },
+    { key: 'pixel', label: 'Piksel taraması' },
+    { key: 'either', label: 'İkisinden en az biri' },
+] as const;
+const RADAR_FAMILIES = ['VH', 'VH/VV', 'Koherans'] as const;
+const floorCell = (row: Record<string, unknown>, family: string) => {
+    const v = row[family] as { detectable: number | null } | undefined;
+    return v?.detectable === null || v?.detectable === undefined ? '—' : family === 'Koherans' ? v.detectable.toFixed(3) : `${v.detectable.toFixed(2)} dB`;
+};
+const stackText = (s: RadarStack | null | undefined) => (s ? `${sharePct(s.beyond90)} (n ${s.n})` : '—');
 
 async function loadSummary(): Promise<void> {
     error.value = null;
@@ -635,8 +657,8 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
         </div>
 
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Budandı (kesin)" :value="formatNumber(summary.gardens.byClass.pruned)" :hint="`bahçe · ${formatM2(summary.gardens.prunedAreaM2)} · optik + radar birlikte`" :icon="Scissors" />
-            <StatCard label="Olası budama" :value="formatNumber(summary.gardens.byClass.likely)" :hint="`bahçe · ${formatM2(summary.gardens.likelyAreaM2)} · tek sensör ya da kalıcılık bekleniyor`" />
+            <StatCard label="Budandı (kesin)" :value="formatNumber(summary.gardens.byClass.pruned)" :hint="`bahçe · budanan alan ${formatM2(summary.gardens.measured ? summary.gardens.measured.prunedM2 : summary.gardens.prunedAreaM2)} · optik + radar birlikte`" :icon="Scissors" />
+            <StatCard label="Olası budama" :value="formatNumber(summary.gardens.byClass.likely)" :hint="`bahçe · budanan alan ${formatM2(summary.gardens.measured ? summary.gardens.measured.likelyM2 : summary.gardens.likelyAreaM2)} · tek sensör ya da kalıcılık bekleniyor`" />
             <StatCard label="Alım otomatik açıldı" :value="formatNumber(summary.producers.byDecision.auto_open)" :hint="`müstahsil · ${summary.producers.byDecision.auto_pending} bekliyor · ${summary.producers.byDecision.auto_none} görülmedi`" :icon="Users" />
             <StatCard label="Eksper kuyruğu (anomali)" :value="formatNumber(summary.producers.byDecision.expert_anomaly)" :hint="`yalnız çelişki / tekrar / sınır / ruhsat dosyaları · tarama her ${summary.everyDays} gün, ${summary.timeline.length} tarama`" :icon="Radar" />
         </div>
@@ -649,6 +671,120 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                 Haritada kesikli çizgiyle gösterilir; herhangi bir noktaya tıklayınca TKGM'den ada/parsel canlı sorgulanır.
             </AlertDescription>
         </Alert>
+
+        <Alert v-if="summary.gardens.measured" variant="info">
+            <AlertTitle>Budanan alan: {{ formatM2(summary.gardens.measured.prunedM2 + summary.gardens.measured.likelyM2) }} ({{ formatM2(summary.gardens.measured.lowM2) }} – {{ formatM2(summary.gardens.measured.highM2) }}) · {{ summary.gardens.measured.gardens }} bahçe</AlertTitle>
+            <AlertDescription>
+                Her “budandı / olası” bahçe için kesilen alan metrekare olarak aralığıyla verilir:
+                {{ summary.gardens.measured.byMethod.pixel_scan ?? 0 }} bahçede piksel taramasının çizdiği kümeden,
+                {{ summary.gardens.measured.byMethod.change_patch ?? 0 }} bahçede optik değişim yamasından,
+                {{ summary.gardens.measured.byMethod.ndvi_fraction ?? 0 }} bahçede bahçe ortalamasındaki NDVI düşüşünden.
+                Karar biriminin toplam alanı {{ formatM2(summary.gardens.prunedAreaM2 + summary.gardens.likelyAreaM2) }}; müstahsilin 1/7 hesabı şimdilik bu birim alanıyla yürür.
+            </AlertDescription>
+        </Alert>
+
+        <Card v-if="summary.validation" class="gap-0 py-0">
+            <CardHeader class="py-4">
+                <CardTitle>Ölçülen doğruluk · piksel taramasıyla aynı sentetik kesimlerde</CardTitle>
+                <CardDescription>
+                    Yanlış alarm üst sınırı: {{ summary.validation.falseAlarms.gardens }} / {{ summary.validation.gardens }} bahçe
+                    ({{ summary.validation.falseAlarms.pruned }} “budandı” + {{ summary.validation.falseAlarms.likely }} “olası”); gerçek çalışmada {{ summary.validation.real.pruned }} + {{ summary.validation.real.likely }} bahçe bu sınıflarda.
+                    {{ summary.validation.falseAlarms.note }}
+                </CardDescription>
+            </CardHeader>
+            <CardContent class="flex flex-col gap-3 border-t pt-4 pb-4">
+                <div class="overflow-x-auto rounded-lg border bg-card">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Yakalama oranı ({{ summary.validation.detection.trials }} sentetik kesim)</TableHead>
+                                <TableHead class="text-right">Tümü</TableHead>
+                                <TableHead class="text-right">Derin kesim</TableHead>
+                                <TableHead class="text-right">Hafif kesim</TableHead>
+                                <TableHead class="text-right">≥ 3 piksel, ≥ 0,15</TableHead>
+                                <TableHead class="text-right">Bahçenin ≥ %50'si</TableHead>
+                                <TableHead class="text-right">Bahçenin &lt; %25'i</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <TableRow v-for="row in VALIDATION_ROWS" :key="row.key">
+                                <TableCell class="font-medium">{{ row.label }}</TableCell>
+                                <TableCell class="text-right text-sm tabular-nums">{{ rateText(summary.validation.detection[row.key].overall) }}</TableCell>
+                                <TableCell class="text-right text-sm tabular-nums">{{ rateText(summary.validation.detection[row.key].deep) }}</TableCell>
+                                <TableCell class="text-right text-sm tabular-nums">{{ rateText(summary.validation.detection[row.key].light) }}</TableCell>
+                                <TableCell class="text-right text-sm tabular-nums">{{ rateText(summary.validation.detection[row.key].clear) }}</TableCell>
+                                <TableCell class="text-right text-sm tabular-nums">{{ rateText(summary.validation.detection[row.key].byShare.high) }}</TableCell>
+                                <TableCell class="text-right text-sm tabular-nums">{{ rateText(summary.validation.detection[row.key].byShare.low) }}</TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                </div>
+                <p class="text-xs text-muted-foreground">
+                    {{ summary.validation.detection.note }}
+                    Çok-sensör karar hafif kesimi bilerek “budandı” saymaz (yaz başında toparlanan kesim 1/7 kuralındaki derin budama değildir); o sütundaki sıfır bir kusur değil, tasarımdır.
+                    Bu sayılar gerçek saha doğrulamasının yerini tutmaz.
+                </p>
+            </CardContent>
+        </Card>
+
+        <Card v-if="summary.radarCheck" class="gap-0 py-0">
+            <CardHeader class="py-4">
+                <CardTitle>Radar blok testi · Sentinel-1 hangi ölçekte ne görebiliyor</CardTitle>
+                <CardDescription>
+                    Optik modüllerin budanmış bulduğu {{ summary.radarCheck.events }} bahçe ve {{ summary.radarCheck.blocks.length }} komşu bahçe bloğu, aynı tarihlerde aynı büyüklükteki sessiz çay bloklarıyla ({{ summary.radarCheck.quietGardens }} bahçelik kontrol havuzu) kıyaslandı.
+                </CardDescription>
+            </CardHeader>
+            <CardContent class="flex flex-col gap-3 border-t pt-4 pb-4">
+                <div class="overflow-x-auto rounded-lg border bg-card">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Ortalaması alınan alan</TableHead>
+                                <TableHead v-for="f in RADAR_FAMILIES" :key="f" class="text-right">{{ f }} · görülebilen en küçük değişim (2σ)</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <TableRow v-for="r in summary.radarCheck.noiseFloor" :key="r.targetM2">
+                                <TableCell class="font-medium">{{ r.targetM2 === 0 ? 'Tek bahçe' : 'Blok' }} · {{ formatM2(r.medianAreaM2) }}</TableCell>
+                                <TableCell v-for="f in RADAR_FAMILIES" :key="f" class="text-right text-sm tabular-nums">{{ floorCell(r, f) }}</TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                </div>
+                <div class="overflow-x-auto rounded-lg border bg-card">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Beklenen yönde %90 eşiğini aşanların payı (şans %10)</TableHead>
+                                <TableHead v-for="f in RADAR_FAMILIES" :key="f" class="text-right">{{ f }}</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <TableRow>
+                                <TableCell class="font-medium">Budanmış bahçeler, tek tek</TableCell>
+                                <TableCell v-for="f in RADAR_FAMILIES" :key="f" class="text-right text-sm tabular-nums">{{ stackText(summary.radarCheck.singleStack['tümü']?.[f]) }}</TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell class="font-medium">Yalnız derin budama</TableCell>
+                                <TableCell v-for="f in RADAR_FAMILIES" :key="f" class="text-right text-sm tabular-nums">{{ stackText(summary.radarCheck.singleStack['derin']?.[f]) }}</TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell class="font-medium">Komşu bahçe blokları (≥ 2 bahçe)</TableCell>
+                                <TableCell v-for="f in RADAR_FAMILIES" :key="f" class="text-right text-sm tabular-nums">{{ stackText(summary.radarCheck.blockStack[f]) }}</TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell class="font-medium">Plasebo: sessiz bahçeler, aynı tarihler</TableCell>
+                                <TableCell v-for="f in RADAR_FAMILIES" :key="f" class="text-right text-sm tabular-nums">{{ stackText(summary.radarCheck.placebo[f]) }}</TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                </div>
+                <p class="text-xs text-muted-foreground">
+                    {{ summary.radarCheck.note }}
+                    Saçılım (VH, VH/VV) blok ortalamasında da sessiz çaydan ayrışmıyor; koherans hem tek bahçede hem blokta şansın üzerinde, ama tek bir bahçe için karar verdirecek büyüklükte değil. Radar bu yüzden kararı tek başına vermez, optik bulguyu destekleyen ek tanık olarak kalır.
+                </p>
+            </CardContent>
+        </Card>
 
         <Card v-if="curve">
             <CardHeader>
@@ -805,6 +941,7 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                                 <TableCell>
                                     <div class="font-medium text-foreground">{{ r.block }}/{{ r.parcel }}<span v-if="r.holderCount > 1" class="font-normal text-muted-foreground"> · hisse {{ r.holderIndex }}/{{ r.holderCount }}</span></div>
                                     <div class="text-xs text-muted-foreground">{{ r.locality }} · {{ r.unit === 'patch' ? `yama ${formatM2(r.unitAreaM2)}` : formatM2(r.areaM2) }}</div>
+                                    <div v-if="r.prunedArea" class="text-xs font-medium text-foreground">budanan ≈ {{ formatM2(r.prunedArea.m2) }} <span class="font-normal text-muted-foreground">({{ formatM2(r.prunedArea.lowM2) }} – {{ formatM2(r.prunedArea.highM2) }})</span></div>
                                 </TableCell>
                                 <TableCell class="hidden md:table-cell">{{ r.producerName || r.producerCode }}</TableCell>
                                 <TableCell>
@@ -868,6 +1005,11 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                             <Badge v-if="detail.levels?.ok === false" variant="warning">Ham NDVI düşmedi</Badge>
                             <Badge v-if="detail.inCalendar === false" variant="outline">Takvim dışı tarih</Badge>
                             <span class="text-xs text-muted-foreground">{{ detail.reason }}</span>
+                        </div>
+                        <div v-if="detail.prunedArea" class="rounded-lg border bg-muted/40 p-3 text-sm">
+                            <span class="font-medium">Budanan alan ≈ {{ formatM2(detail.prunedArea.m2) }}</span>
+                            <span class="text-muted-foreground"> · aralık {{ formatM2(detail.prunedArea.lowM2) }} – {{ formatM2(detail.prunedArea.highM2) }} · bahçenin {{ sharePct(detail.prunedArea.shareOfGarden) }}'i</span>
+                            <div class="text-xs text-muted-foreground">Yöntem: {{ AREA_METHOD_LABEL[detail.prunedArea.method] }}. {{ detail.prunedArea.note }}.</div>
                         </div>
                         <div v-if="detail.levels || detail.recovery || detail.shape || (detail.populationZ !== null && detail.populationZ !== undefined)" class="text-xs text-muted-foreground">
                             Fiziksel kontroller:

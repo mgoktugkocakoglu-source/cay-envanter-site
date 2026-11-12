@@ -173,7 +173,7 @@ export class SeasonReportService {
         ws.columns = [
             { header: 'Bahçe kodu', key: 'code', width: 14 }, { header: 'Ada/Parsel', key: 'parcel', width: 12 }, { header: 'Mevkii', key: 'locality', width: 16 }, { header: 'Hisse', key: 'share', width: 8 },
             { header: 'Müstahsil', key: 'producer', width: 24 }, { header: 'Müstahsil no', key: 'producerCode', width: 14 }, { header: 'Ruhsat', key: 'license', width: 14 },
-            { header: 'Alan (m²)', key: 'areaM2', width: 10 }, { header: 'Ruhsat alanı (m²)', key: 'licensedAreaM2', width: 14 }, { header: 'Karar birimi', key: 'unit', width: 12 }, { header: 'Birim alanı (m²)', key: 'unitAreaM2', width: 14 },
+            { header: 'Alan (m²)', key: 'areaM2', width: 10 }, { header: 'Ruhsat alanı (m²)', key: 'licensedAreaM2', width: 14 }, { header: 'Karar birimi', key: 'unit', width: 12 }, { header: 'Birim alanı (m²)', key: 'unitAreaM2', width: 14 }, { header: 'Budanan alan (m²)', key: 'prunedM2', width: 14 }, { header: 'Alt sınır (m²)', key: 'prunedLowM2', width: 12 }, { header: 'Üst sınır (m²)', key: 'prunedHighM2', width: 12 }, { header: 'Alan yöntemi', key: 'prunedMethod', width: 18 },
             { header: 'Karar', key: 'class', width: 16 }, { header: 'z', key: 'z', width: 8 }, { header: 'p', key: 'p', width: 8 }, { header: 'Optik', key: 'optical', width: 8 }, { header: 'Radar', key: 'radar', width: 8 },
             { header: 'Değişim', key: 'changeDate', width: 12 }, { header: 'Kesin tespit', key: 'detectedAt', width: 12 }, { header: 'Olası tespit', key: 'likelyAt', width: 12 },
             { header: 'Tekrar (m²)', key: 'reusedM2', width: 12 }, { header: 'Sayılan (m²)', key: 'countedM2', width: 12 }, { header: 'Gerekçe', key: 'reason', width: 60 },
@@ -181,7 +181,7 @@ export class SeasonReportService {
         for (const g of d.gardens) {
             ws.addRow({
                 code: g.code, parcel: `${g.block}/${g.parcel}`, locality: g.locality, share: g.holderCount > 1 ? `${g.holderIndex}/${g.holderCount}` : '', producer: g.producerName, producerCode: g.producerCode,
-                license: g.licenseCode ?? '', areaM2: g.areaM2, licensedAreaM2: g.licensedAreaM2 != null ? Math.round(g.licensedAreaM2) : '', unit: g.unit === 'patch' ? 'optik yama' : 'bahçe', unitAreaM2: Math.round(g.unitAreaM2),
+                license: g.licenseCode ?? '', areaM2: g.areaM2, licensedAreaM2: g.licensedAreaM2 != null ? Math.round(g.licensedAreaM2) : '', unit: g.unit === 'patch' ? 'optik yama' : 'bahçe', unitAreaM2: Math.round(g.unitAreaM2), prunedM2: g.prunedArea?.m2 ?? '', prunedLowM2: g.prunedArea?.lowM2 ?? '', prunedHighM2: g.prunedArea?.highM2 ?? '', prunedMethod: g.prunedArea ? ({ pixel_scan: 'piksel taraması', change_patch: 'optik yama', ndvi_fraction: 'NDVI payı' }[g.prunedArea.method]) : '',
                 class: FUSION_CLASS_LABEL[g.class], z: g.z != null ? Math.round(g.z * 100) / 100 : '', p: Math.round(g.p * 1000) / 1000, optical: g.opticalOk ? 'Evet' : 'Hayır', radar: g.backscatterOk ? 'Evet' : 'Hayır',
                 changeDate: g.changeDate ?? '', detectedAt: g.detectedAt ?? '', likelyAt: g.likelyAt ?? '', reusedM2: g.repeat ? Math.round(g.repeat.reusedM2) : 0, countedM2: g.repeat ? Math.round(g.repeat.countedM2) : Math.round(g.unitAreaM2), reason: g.reason,
             });
