@@ -99,7 +99,9 @@ export class PixelScanService {
         const list = area.pixelScan?.seasons ?? [];
         if (list.length === 0) throw new NotFoundException('No pixel scan for this area');
         const seasons = list.map((s) => s.season).sort();
-        const season = list.find((s) => s.season === requested) ?? (list.find((s) => s.season === seasons.at(-1)) as PixelSeason);
+        // A running season is shown only when asked for: the default stays the latest finished one.
+        const finished = list.filter((s) => !s.inProgress).map((s) => s.season).sort();
+        const season = list.find((s) => s.season === requested) ?? (list.find((s) => s.season === (finished.at(-1) ?? seasons.at(-1))) as PixelSeason);
         return { season, seasons };
     }
 }

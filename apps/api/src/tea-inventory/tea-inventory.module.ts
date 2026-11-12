@@ -39,6 +39,7 @@ import { PixelScanService } from '@/tea-inventory/pixel-scan.service';
 import { PixelScanController } from '@/tea-inventory/pixel-scan.controller';
 import { PruningCombinedService } from '@/tea-inventory/pruning-combined.service';
 import { PruningCombinedController } from '@/tea-inventory/pruning-combined.controller';
+import { PruningWorklistService } from '@/tea-inventory/pruning-worklist.service';
 import { FieldTestController } from '@/tea-inventory/field-test.controller';
 import { GardenHealthController } from '@/tea-inventory/garden-health.controller';
 import { TeaInventoryController } from '@/tea-inventory/tea-inventory.controller';
@@ -64,6 +65,6 @@ import { TeaInventorySeedService } from '@/tea-inventory/tea-inventory-seed.serv
         ]),
     ],
     controllers: [TeaInventoryController, ProducerPruningController, LicensingController, PruningFusionController, ReportController, MinistryRequestController, CalibrationController, GardenHealthController, LandEvaluationController, GardenAgeController, FieldTestController, PixelScanController, PruningCombinedController],
-    providers: [TeaInventoryService, TeaInventorySeedService, ProducerPruningService, LicensingService, LicensingOperationsService, PruningFusionService, EvidenceService, SeasonReportService, MinistryRequestService, CalibrationService, GardenHealthService, RegionOverviewService, LandEvaluationService, GardenAgeService, FieldTestService, FieldTestReportService, PixelScanService, PruningCombinedService],
+    providers: [TeaInventoryService, TeaInventorySeedService, ProducerPruningService, LicensingService, LicensingOperationsService, PruningFusionService, EvidenceService, SeasonReportService, MinistryRequestService, CalibrationService, GardenHealthService, RegionOverviewService, LandEvaluationService, GardenAgeService, FieldTestService, FieldTestReportService, PixelScanService, PruningCombinedService, PruningWorklistService],
 })
 export class TeaInventoryModule { }

@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { toneVariant, type Tone } from '@/components/caykur/tone';
+import CaykurPruningWorklist from '@/components/caykur/CaykurPruningWorklist.vue';
 import { useToast } from '@/composables/useToast';
 import {
     api,
@@ -44,6 +45,7 @@ const CLASS_META: Record<CombinedClass, { label: string; tone: Tone }> = {
     confirmed: { label: 'Kesin', tone: 'success' },
     probable: { label: 'Muhtemel', tone: 'info' },
     light: { label: 'Hafif budama', tone: 'warning' },
+    seasonal: { label: 'Mevsimsel desen', tone: 'muted' },
     none: { label: 'Budama yok', tone: 'muted' },
     no_data: { label: 'Veri yok', tone: 'muted' },
 };
@@ -76,8 +78,10 @@ const GARDEN_FILTERS: Array<{ value: CombinedClassFilter; label: string }> = [
     { value: 'confirmed', label: 'Kesin' },
     { value: 'probable', label: 'Muhtemel' },
     { value: 'light', label: 'Hafif budama' },
+    { value: 'seasonal', label: 'Mevsimsel desen (önceki sezonda da aynı düşüş)' },
     { value: 'none', label: 'Budama yok' },
     { value: 'doubtful', label: 'Geriye dönük sınamada budama gibi davranmayanlar' },
+    { value: 'recent', label: 'Son 35 günde görülen kesimler' },
 ];
 const PRODUCER_FILTERS: Array<{ value: CombinedProducerFilter; label: string }> = [
     { value: 'active', label: 'Budama görülen müstahsiller' },
@@ -110,6 +114,7 @@ const VALIDATION_ROWS: Record<string, string> = {
     counted_low: 'Kesin + muhtemel · alt sınır',
     counted_high: 'Kesin + muhtemel · üst sınır',
     light: 'Hafif sınıfına düşen',
+    seasonal: 'Mevsimsel desene ayrılan (kayıp)',
     any: 'Herhangi bir sınıf',
 };
 
@@ -117,7 +122,7 @@ const toast = useToast();
 const summary = ref<CombinedSummary | null>(null);
 const isLoading = ref(true);
 const season = ref<string | undefined>(undefined);
-const view = ref<'gardens' | 'producers'>('gardens');
+const view = ref<'gardens' | 'producers' | 'worklist'>('gardens');
 
 const gardenFilter = ref<CombinedClassFilter>('positive');
 const gardens = ref<CombinedGardenRow[]>([]);
@@ -163,6 +168,7 @@ const followUpRows = computed<Array<{ key: string; label: string; counts: Follow
         { key: 'probable', label: 'Muhtemel', counts: h.byClass.probable, muted: false },
         { key: 'light', label: 'Hafif budama', counts: h.byClass.light, muted: false },
     ];
+    if (h.byClass.seasonal) rows.push({ key: 'seasonal', label: 'Mevsimsel desen (1/7 dışında)', counts: h.byClass.seasonal, muted: true });
     if (h.mirror) {
         rows.push({ key: 'mirror-pixel', label: 'Ayna testi · piksel taramasının sahte tespitleri', counts: h.mirror.pixel, muted: true });
         rows.push({ key: 'mirror-fusion', label: 'Ayna testi · çok-sensörün sahte tespitleri', counts: h.mirror.fusion, muted: true });
@@ -244,7 +250,7 @@ function onProducerFilter(v: unknown): void {
     if (typeof v === 'string' && PRODUCER_FILTERS.some((f) => f.value === v)) producerFilter.value = v as CombinedProducerFilter;
 }
 function onView(v: unknown): void {
-    if (v === 'gardens' || v === 'producers') view.value = v;
+    if (v === 'gardens' || v === 'producers' || v === 'worklist') view.value = v;
 }
 </script>
 
@@ -261,6 +267,7 @@ function onView(v: unknown): void {
                         <strong>Kesin</strong>: iki modül de aynı kesimi gördü (değişim tarihleri {{ summary.rules.sameEventDays }} gün içinde).
                         <strong>Muhtemel</strong>: yalnız biri gördü.
                         <strong>Hafif budama</strong>: yalnız piksel taraması gördü ve kesim hızla toparlandı; 1/7 hesabına girmez.
+                        <strong>Mevsimsel desen</strong>: muhtemel olacaktı, ama aynı piksellerde aynı düşüş bir önceki sezonun aynı döneminde de var (gölge, bakı, erken sürgün); 1/7 hesabına girmez.
                         Alan, piksel taramasının çizdiği kümeden; o yoksa çok-sensörün alan çıktısından gelir. Radar ve koherans karar vermez, yalnızca tanık olarak gösterilir.
                         Alım kararları çok-sensör modülde kalır; buradaki müstahsil hesabı karşılaştırma içindir.
                     </CardDescription>
@@ -269,7 +276,7 @@ function onView(v: unknown): void {
                         <Select :model-value="summary.season" @update:model-value="onSeason">
                             <SelectTrigger class="h-11 w-44 md:h-9" aria-label="Budama sezonu"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                                <SelectItem v-for="s in summary.seasons" :key="s" :value="s">{{ seasonLabel(s) }}</SelectItem>
+                                <SelectItem v-for="s in summary.seasons" :key="s" :value="s">{{ seasonLabel(s) }}{{ s === summary.liveSeason ? ' · devam ediyor' : '' }}</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -277,10 +284,22 @@ function onView(v: unknown): void {
                 </CardHeader>
             </Card>
 
+            <Card v-if="summary.inProgress" class="gap-0 border-warning py-0">
+                <CardHeader class="py-4">
+                    <CardTitle class="flex flex-wrap items-center gap-2">Devam eden sezon <Badge variant="warning">Ara sonuç</Badge></CardTitle>
+                    <CardDescription>
+                        Sezon sürüyor; son kullanılabilir görüntü {{ fmtDate(summary.dataThrough) }}. Şimdilik yalnız piksel taraması konuşuyor: çok-sensör karar sezon bitince eklenir, o yüzden “kesin” sınıfı henüz oluşamaz ve görülen kesimler “muhtemel” olarak listelenir.
+                        Kesimin derin mi hafif mi olduğu toparlanma izlenmeden bilinemez; bu sayılar yeni görüntü geldikçe değişir.
+                        <template v-if="summary.liveFalseAlarms !== null && summary.liveFalseAlarms !== undefined">Aynı görüntülerde ayna testi {{ summary.liveFalseAlarms }} sahte tespit veriyor (üst sınır); listedeki {{ positives }} tespitin bir kısmı gerçek olmayabilir, saha kontrolü bu yüzden önemli.</template>
+                        Alım kararı için kullanılmaz.
+                    </CardDescription>
+                </CardHeader>
+            </Card>
+
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <StatCard label="Kesin" :value="formatNumber(summary.summary.byClass.confirmed)" :hint="`bahçe · ${formatM2(summary.summary.areaM2.confirmed)} · iki modül de gördü`" :icon="Combine" />
                 <StatCard label="Muhtemel" :value="formatNumber(summary.summary.byClass.probable)" :hint="`bahçe · ${formatM2(summary.summary.areaM2.probable)} · yalnız çok-sensör ${summary.summary.byAgreement.fusion_only}, yalnız piksel ${summary.summary.byClass.probable - summary.summary.byAgreement.fusion_only - summary.summary.byAgreement.both_other_dates}, tarihi ayrı ${summary.summary.byAgreement.both_other_dates}`" />
-                <StatCard label="Hafif budama" :value="formatNumber(summary.summary.byClass.light)" :hint="`bahçe · ${formatM2(summary.summary.areaM2.light)} · 1/7 hesabına girmez`" />
+                <StatCard label="Hafif budama" :value="formatNumber(summary.summary.byClass.light)" :hint="`bahçe · ${formatM2(summary.summary.areaM2.light)} · 1/7 hesabına girmez · ayrıca ${summary.summary.byClass.seasonal ?? 0} bahçe mevsimsel desen`" />
                 <StatCard label="Hedefi dolan müstahsil" :value="formatNumber(summary.summary.producers.met + summary.summary.producers.met_with_probable)" :hint="`${summary.summary.producers.met} kesin alanla · ${summary.summary.producers.met_with_probable} muhtemel alanla · ${summary.summary.producersChanged} müstahsilde çok-sensör alım kararından farklı`" />
             </div>
 
@@ -288,7 +307,7 @@ function onView(v: unknown): void {
                 <CardHeader class="py-4">
                     <CardTitle>Ölçülen doğruluk (saha verisi olmadan)</CardTitle>
                     <CardDescription>
-                        Yanlış alarm üst sınırı, {{ summary.validation.gardens }} bahçede: kesin {{ summary.validation.falseAlarms.confirmed }}, muhtemel {{ summary.validation.falseAlarms.probable }}, hafif {{ summary.validation.falseAlarms.light }}.
+                        Yanlış alarm üst sınırı, {{ summary.validation.gardens }} bahçede: kesin {{ summary.validation.falseAlarms.confirmed }}, muhtemel {{ summary.validation.falseAlarms.probable }}, hafif {{ summary.validation.falseAlarms.light }}<template v-if="summary.validation.falseAlarms.seasonal !== undefined">; {{ summary.validation.falseAlarms.seasonal }} sahte tespit mevsimsel desen sınamasıyla ayıklandı</template>.
                         Gerçek çalışmada kesin {{ summary.summary.byClass.confirmed }}, muhtemel {{ summary.summary.byClass.probable }}, hafif {{ summary.summary.byClass.light }} bahçe var.
                         {{ summary.validation.falseAlarms.note }}
                     </CardDescription>
@@ -326,7 +345,7 @@ function onView(v: unknown): void {
                     <CardDescription>
                         Her tespit, kararında kullanılmamış olan komşu sezonların piksel serisinde izlenir: düşüş bir yıl sonra kapanmış mı, aynı pikseller aynı dönemde başka bir sezonda da düşüyor mu.
                         Aynı sınama ayna testinin sahte tespitlerine de uygulanır; sahte tespitlerin ne kadarının geçtiği bilinmeden gerçek tespitlerin geçme oranı bir şey söylemez.
-                        <template v-if="!summary.history.season.hasFollowUp">Bu sezonun bir yıl sonrası henüz gözlenmedi; şimdilik yalnızca önceki sezonla tekrarlama sınaması yapılabiliyor.</template>
+                        <template v-if="!summary.history.season.hasFollowUp">Bu sezonun bir yıl sonrası henüz tam gözlenmedi; erken kesimler dışında şimdilik yalnızca önceki sezonla tekrarlama sınaması yapılabiliyor.</template>
                     </CardDescription>
                 </CardHeader>
                 <CardContent class="flex flex-col gap-3 border-t pt-4 pb-4">
@@ -365,6 +384,7 @@ function onView(v: unknown): void {
                 <ToggleGroup :model-value="view" type="single" aria-label="Birleşik karar görünümü" @update:model-value="onView">
                     <ToggleGroupItem value="gardens" class="h-11 px-3 md:h-9">Bahçeler</ToggleGroupItem>
                     <ToggleGroupItem value="producers" class="h-11 px-3 md:h-9">Müstahsiller (1/7 karşılaştırması)</ToggleGroupItem>
+                    <ToggleGroupItem value="worklist" class="h-11 px-3 md:h-9">Eksper iş listesi</ToggleGroupItem>
                 </ToggleGroup>
             </div>
 
@@ -430,6 +450,8 @@ function onView(v: unknown): void {
                     </div>
                 </CardContent>
             </Card>
+
+            <CaykurPruningWorklist v-else-if="view === 'worklist'" :area-id="areaId" :season="summary.season" />
 
             <Card v-else class="gap-0 py-0">
                 <CardHeader class="py-4">
@@ -518,6 +540,15 @@ function onView(v: unknown): void {
                             <div class="font-medium">Budanan alan {{ selected.area ? `≈ ${formatM2(selected.area.m2)}` : '—' }}</div>
                             <div v-if="selected.area" class="text-xs text-muted-foreground">Aralık {{ formatM2(selected.area.lowM2) }} – {{ formatM2(selected.area.highM2) }} · kaynak: {{ SOURCE_LABEL[selected.area.source] }} · 1/7 hesabına giren {{ formatM2(selected.countedM2) }}</div>
                             <div class="text-xs text-muted-foreground">Kesim aralığı: {{ selected.bracket ? `${fmtDate(selected.bracket.from)} → ${fmtDate(selected.bracket.to)}` : '—' }}</div>
+                        </div>
+                        <div v-if="selected.seasonal" class="rounded-lg border p-3">
+                            <div class="font-medium">Mevsimsel desen sınaması · {{ selected.seasonal.repeat === true ? 'önceki sezonda da var' : selected.seasonal.repeat === false ? 'önceki sezonda yok' : 'sınanamadı' }}</div>
+                            <div class="text-xs text-muted-foreground">
+                                {{ selected.seasonal.unit === 'cluster' ? 'Piksel kümesi, bahçenin kalanına göre' : 'Bahçenin tamamı, mahalledeki çaya göre' }} ·
+                                bu sezonki göreli NDVI düşüşü {{ selected.seasonal.drop === null ? '—' : selected.seasonal.drop.toFixed(2) }} ·
+                                bir önceki sezonun aynı dönemi {{ selected.seasonal.prevStep === null ? '—' : selected.seasonal.prevStep.toFixed(2) }}.
+                                Önceki sezondaki düşüş bu sezonkinin en az %{{ Math.round((summary?.rules.seasonalRepeatShare ?? 0.6) * 100) }} kadarıysa tespit mevsimsel desen sayılır.
+                            </div>
                         </div>
                         <div v-if="selected.followUp || selected.repeatedGround.length" class="rounded-lg border p-3">
                             <div class="flex flex-wrap items-center gap-2 font-medium">

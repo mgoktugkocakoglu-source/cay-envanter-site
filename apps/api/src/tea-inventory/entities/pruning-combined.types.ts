@@ -3,7 +3,8 @@
  * pixel scan together. It reads the two modules' outputs and changes neither; purchase decisions stay with fusion.
  */
 
-export type CombinedClass = 'confirmed' | 'probable' | 'light' | 'none' | 'no_data';
+/** `seasonal` = would be probable, but the same step is there a year earlier on the same pixels: a yearly pattern, not credited. */
+export type CombinedClass = 'confirmed' | 'probable' | 'light' | 'seasonal' | 'none' | 'no_data';
 export type CombinedAgreement = 'both' | 'both_other_dates' | 'fusion_only' | 'pixel_only' | 'neither';
 export type CombinedProducerStatus = 'met' | 'met_with_probable' | 'partial' | 'light_only' | 'none' | 'no_license';
 export type CombinedAreaSource = 'pixel_scan' | 'change_patch' | 'ndvi_fraction';
@@ -22,6 +23,8 @@ export interface CombinedGarden {
     fusion: { class: string; kind: string | null; z: number | null; changeDate: string | null; lastBeforeAt: string | null; firstAfterAt: string | null; unit: string; unitAreaM2: number; reusedShare: number };
     pixel: { verdict: string; date: string | null; lastBefore: string | null; score: number | null; prunedM2: number; clusters: number; kind: string | null; confidence: string | null } | null;
     radar: { coherenceZ: number | null; vhZ: number | null; witness: boolean } | null;
+    /** Previous-season repeat test (run on would-be probable detections). */
+    seasonal?: { unit: 'cluster' | 'garden'; drop: number | null; prevStep: number | null; repeat: boolean | null } | null;
     reason: string;
 }
 
@@ -38,6 +41,7 @@ export interface CombinedProducer {
     confirmedGardens: string[];
     probableGardens: string[];
     lightGardens: string[];
+    seasonalGardens?: string[];
     status: CombinedProducerStatus;
     fusionDecision: string | null;
 }
@@ -51,12 +55,18 @@ export interface CombinedValidation {
     season: string;
     generatedAt: string;
     gardens: number;
-    falseAlarms: { confirmed: number; probable: number; light: number; note: string };
+    falseAlarms: { confirmed: number; probable: number; light: number; seasonal?: number; note: string };
     detection: { trials: number; note: string; rows: Array<{ key: string; overall: CombinedRate; deep: CombinedRate; light: CombinedRate; clear: CombinedRate }> };
 }
 
 export interface CombinedSeason {
     season: string;
+    /** The season is still running: only the pixel scan has spoken, verdicts are interim. */
+    inProgress?: boolean;
+    /** Last usable image of the season's series. */
+    dataThrough?: string | null;
+    /** Live season: pixel-scan detections on the mirrored series so far (upper bound of the interim false alarms). */
+    liveFalseAlarms?: number | null;
     generatedAt: string;
     method: string;
     rules: Record<string, number>;
@@ -65,7 +75,7 @@ export interface CombinedSeason {
         gardens: number;
         byClass: Record<CombinedClass, number>;
         byAgreement: Record<CombinedAgreement, number>;
-        areaM2: { confirmed: number; probable: number; light: number; lowM2: number; highM2: number };
+        areaM2: { confirmed: number; probable: number; light: number; seasonal?: number; lowM2: number; highM2: number };
         radarWitness: { confirmed: number; probable: number; light: number };
         producers: Record<CombinedProducerStatus, number>;
         producersChanged: number;
@@ -94,8 +104,9 @@ export interface HistoryPrecision {
 }
 export interface CombinedHistorySeason {
     season: string;
+    inProgress?: boolean;
     hasFollowUp: boolean;
-    byClass: Record<'confirmed' | 'probable' | 'light', FollowUpCounts>;
+    byClass: Record<'confirmed' | 'probable' | 'light', FollowUpCounts> & { seasonal?: FollowUpCounts };
     mirror: { pixel: FollowUpCounts; fusion: FollowUpCounts } | null;
     real: Record<'confirmed' | 'probable' | 'light' | 'counted', HistoryPrecision>;
     falsePassRate: HistoryPrecision | null;

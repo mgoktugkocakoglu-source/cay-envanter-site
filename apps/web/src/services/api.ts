@@ -2709,10 +2709,43 @@ export interface PixelValidation {
         kindCorrect: { hit: number; n: number };
     };
 }
-export type CombinedClass = 'confirmed' | 'probable' | 'light' | 'none' | 'no_data';
+export type CombinedClass = 'confirmed' | 'probable' | 'light' | 'seasonal' | 'none' | 'no_data';
 export type CombinedAgreement = 'both' | 'both_other_dates' | 'fusion_only' | 'pixel_only' | 'neither';
 export type CombinedProducerStatus = 'met' | 'met_with_probable' | 'partial' | 'light_only' | 'none' | 'no_license';
-export type CombinedClassFilter = 'positive' | 'counted' | 'doubtful' | CombinedClass;
+export type CombinedClassFilter = 'positive' | 'counted' | 'doubtful' | 'recent' | CombinedClass;
+/** Why a garden is on the expert worklist. */
+export type WorklistReason =
+    | 'repeated_ground'
+    | 'followup_permanent'
+    | 'followup_repeating'
+    | 'probable_single_module'
+    | 'probable_dates_differ'
+    | 'tips_target'
+    | 'fresh_cut'
+    | 'confirmed_check'
+    | 'light_check'
+    | 'seasonal_check'
+    | 'control_sample';
+export interface WorklistLabel {
+    id: string;
+    label: CalibrationLabelValue;
+    method: string;
+    observedAt: string;
+    prunedShare: number | null;
+    note: string | null;
+    labelledBy: string;
+    updatedAt: string;
+}
+export interface WorklistRate {
+    hit: number;
+    n: number;
+}
+export interface WorklistFieldMetrics {
+    labelled: number;
+    byClass: Partial<Record<CombinedClass, Record<CalibrationLabelValue, number>>>;
+    precision: Record<'confirmed' | 'probable' | 'light' | 'seasonal', WorklistRate>;
+    missed: WorklistRate;
+}
 export type CombinedProducerFilter = 'active' | 'open' | 'changed' | 'behind' | CombinedProducerStatus;
 /** Retrospective check: how a detection behaves in the neighbouring seasons, which its own verdict did not use. */
 export type FollowUpStatus = 'pattern' | 'slow' | 'permanent' | 'repeating' | 'no_followup' | 'not_seen';
@@ -2734,7 +2767,7 @@ export interface HistoryPrecision {
 export interface CombinedHistorySeason {
     season: string;
     hasFollowUp: boolean;
-    byClass: Record<'confirmed' | 'probable' | 'light', FollowUpCounts>;
+    byClass: Record<'confirmed' | 'probable' | 'light', FollowUpCounts> & { seasonal?: FollowUpCounts };
     mirror: { pixel: FollowUpCounts; fusion: FollowUpCounts } | null;
     real: Record<'confirmed' | 'probable' | 'light' | 'counted', HistoryPrecision>;
     falsePassRate: HistoryPrecision | null;
@@ -2772,7 +2805,7 @@ export interface CombinedValidation {
     season: string;
     generatedAt: string;
     gardens: number;
-    falseAlarms: { confirmed: number; probable: number; light: number; note: string };
+    falseAlarms: { confirmed: number; probable: number; light: number; seasonal?: number; note: string };
     detection: { trials: number; note: string; rows: Array<{ key: string; overall: CombinedRate; deep: CombinedRate; light: CombinedRate; clear: CombinedRate }> };
 }
 /** Combined pruning verdict (separate module): the multi-sensor module and the pixel scan as one verdict per garden. */
@@ -2787,13 +2820,17 @@ export interface CombinedSummary {
         gardens: number;
         byClass: Record<CombinedClass, number>;
         byAgreement: Record<CombinedAgreement, number>;
-        areaM2: { confirmed: number; probable: number; light: number; lowM2: number; highM2: number };
+        areaM2: { confirmed: number; probable: number; light: number; seasonal?: number; lowM2: number; highM2: number };
         radarWitness: { confirmed: number; probable: number; light: number };
         producers: Record<CombinedProducerStatus, number>;
         producersChanged: number;
     };
     validation: CombinedValidation | null;
     history: CombinedHistorySummary | null;
+    inProgress?: boolean;
+    dataThrough?: string | null;
+    liveFalseAlarms?: number | null;
+    liveSeason: string | null;
 }
 export interface CombinedGardenRow {
     id: string;
@@ -2814,9 +2851,22 @@ export interface CombinedGardenRow {
     fusion: { class: string; kind: string | null; z: number | null; changeDate: string | null; lastBeforeAt: string | null; firstAfterAt: string | null; unit: string; unitAreaM2: number; reusedShare: number };
     pixel: { verdict: string; date: string | null; lastBefore: string | null; score: number | null; prunedM2: number; clusters: number; kind: string | null; confidence: string | null } | null;
     radar: { coherenceZ: number | null; vhZ: number | null; witness: boolean } | null;
+    seasonal?: { unit: 'cluster' | 'garden'; drop: number | null; prevStep: number | null; repeat: boolean | null } | null;
     reason: string;
     followUp: CombinedFollowUp | null;
     repeatedGround: RepeatedGround[];
+}
+export interface WorklistRow extends CombinedGardenRow {
+    priority: number;
+    reasons: WorklistReason[];
+    label: WorklistLabel | null;
+}
+export interface Worklist extends Paginated<WorklistRow> {
+    season: string;
+    inProgress: boolean;
+    listed: number;
+    pending: number;
+    field: WorklistFieldMetrics;
 }
 export interface CombinedProducerRow {
     id: string;
@@ -3902,6 +3952,13 @@ export const api = {
         const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
         return request<Paginated<CombinedGardenRow>>(`/caykur/tea-inventory/areas/${areaId}/pruning-combined/gardens${query ? `?${query}` : ''}`);
     },
+    getCombinedWorklist: (areaId: string, params?: { page?: number; limit?: number; season?: string; pending?: 'true' }) => {
+        const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
+        const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        return request<Worklist>(`/caykur/tea-inventory/areas/${areaId}/pruning-combined/worklist${query ? `?${query}` : ''}`);
+    },
+    saveCombinedLabel: (areaId: string, body: SaveCalibrationLabel) =>
+        request<WorklistLabel>(`/caykur/tea-inventory/areas/${areaId}/pruning-combined/labels`, { method: 'POST', body: JSON.stringify(body) }),
     getCombinedProducers: (areaId: string, params?: { page?: number; limit?: number; season?: string; status?: CombinedProducerFilter }) => {
         const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
         const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();

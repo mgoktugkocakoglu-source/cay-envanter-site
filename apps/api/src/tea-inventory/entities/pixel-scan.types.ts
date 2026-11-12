@@ -95,6 +95,8 @@ export interface PixelSeason {
     rules: Record<string, number | string | number[] | string[]>;
     epsg: string;
     window: [string, string];
+    inProgress?: boolean;
+    dataThrough?: string | null;
     scan: { from: string; to: string; candidates: number };
     dates: number;
     excludedDates: string[];
