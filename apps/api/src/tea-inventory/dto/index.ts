@@ -12,3 +12,4 @@ export * from './land-evaluation.dto';
 export * from './garden-age.dto';
 export * from './pixel-scan.dto';
 export * from './pruning-combined.dto';
+export * from './licence-audit.dto';

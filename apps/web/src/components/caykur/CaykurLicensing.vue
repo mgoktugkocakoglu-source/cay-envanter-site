@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Download, FileText, MapPinned, MoreHorizonta
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import CaykurLicensingOperations, { type OperationKind } from '@/components/caykur/CaykurLicensingOperations.vue';
+import CaykurLicenceAudit from '@/components/caykur/CaykurLicenceAudit.vue';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmptyState, ListToolbar, LoadingState, SearchInput, StatCard } from '@/components/shared';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -80,7 +81,7 @@ const tkgm = useTkgmParcelLookup();
 const summary = ref<LicensingSummary | null>(null);
 const isLoading = ref(true);
 const error = ref<string | null>(null);
-const view = ref<'producers' | 'applications' | 'map'>('producers');
+const view = ref<'producers' | 'applications' | 'map' | 'audit'>('producers');
 
 // ── Producers ──
 const search = ref('');
@@ -508,7 +509,7 @@ onBeforeUnmount(() => {
 });
 
 function onView(v: unknown): void {
-    if (v === 'producers' || v === 'applications' || v === 'map') view.value = v;
+    if (v === 'producers' || v === 'applications' || v === 'map' || v === 'audit') view.value = v;
 }
 function onMatch(v: unknown): void {
     matchFilter.value = typeof v === 'string' && v !== '' ? (v as LicenseMatchLevel | typeof ALL) : ALL;
@@ -655,8 +656,12 @@ function toggleGarden(code: string): void {
                 <ToggleGroupItem value="producers" class="h-11 px-3 md:h-9">Müstahsiller</ToggleGroupItem>
                 <ToggleGroupItem value="applications" class="h-11 px-3 md:h-9">Başvuru kuyruğu</ToggleGroupItem>
                 <ToggleGroupItem value="map" class="h-11 px-3 md:h-9">Kurum haritası</ToggleGroupItem>
+                <ToggleGroupItem value="audit" class="h-11 px-3 md:h-9">Arazi tespit kararı</ToggleGroupItem>
             </ToggleGroup>
         </div>
+
+        <!-- ── Licence audit: deed title × licence register × satellite detection (separate module) ── -->
+        <CaykurLicenceAudit v-if="view === 'audit'" :area-id="areaId" />
 
         <!-- ── Producers ── -->
         <Card v-if="view === 'producers'">

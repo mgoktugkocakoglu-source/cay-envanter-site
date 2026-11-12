@@ -2709,6 +2709,82 @@ export interface PixelValidation {
         kindCorrect: { hit: number; n: number };
     };
 }
+// ── Licence audit (Arazi tespit kararı): deed title × licence register × satellite detection ──
+export type AuditTeaState = 'present' | 'absent' | 'inconclusive' | 'not_assessable';
+export type AuditBuildingState = 'inside' | 'boundary' | 'none' | 'unknown';
+export type AuditConfidence = 'high' | 'medium' | 'low';
+export type AuditDecision = 'tea_land' | 'licensing_error' | 'unlicensed_tea' | 'unlicensed_tea_titled' | 'licence_no_tea' | 'title_outdated' | 'title_only' | 'out_of_scope' | 'needs_review';
+export type AuditDecisionFilter = 'findings' | 'attention' | AuditDecision;
+export type AuditFlag = 'area_over' | 'area_under' | 'building_not_in_title' | 'title_building_not_seen' | 'public_land' | 'beyond_training' | 'small_parcel' | 'detectors_disagree' | 'expert_confirmed' | 'licence_unverified' | 'large_parcel';
+export type AuditConsistency = 'match' | 'title_only' | 'ground_only' | 'unknown';
+export interface LicenceAuditRow {
+    key: string;
+    block: string;
+    parcel: string;
+    nature: string;
+    locality: string;
+    areaM2: number;
+    deedAreaM2: number | null;
+    title: { tea: boolean; building: boolean; publicLand: boolean; uses: string[] };
+    detection: {
+        tea: AuditTeaState;
+        teaShare: number | null;
+        teaAreaM2: number | null;
+        teaProbability: number | null;
+        inventoryShare: number | null;
+        fullPixels: number;
+        beyondTraining: boolean;
+        ndviSummer: number | null;
+        ndviLeafOff: number | null;
+        evergreen: number | null;
+        vhSummer: number | null;
+        elevationM: number | null;
+        leafOffObs: number | null;
+    };
+    building: { state: AuditBuildingState; count: number; insideM2: number; source: string };
+    licence: { licensed: boolean; areaM2: number | null; codes: string[]; source: 'demo' | 'caykur' | 'none' };
+    confirmation: { tea: boolean; source: string; note: string; date: string } | null;
+    decision: AuditDecision;
+    leaning: Exclude<AuditDecision, 'needs_review'>;
+    confidence: AuditConfidence;
+    flags: AuditFlag[];
+    consistency: { tea: AuditConsistency; building: AuditConsistency };
+    reason: string;
+}
+export interface LicenceAuditDetail extends LicenceAuditRow {
+    geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon;
+    buildings: Array<{ areaM2: number; geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon }>;
+}
+export interface LicenceAuditSummary {
+    neighborhood: string;
+    generatedAt: string;
+    method: string;
+    rules: Record<string, number>;
+    licenceSource: 'demo' | 'caykur';
+    buildingSource: string;
+    model: {
+        type: string;
+        period: { start: string; end: string };
+        features: number;
+        threshold: number;
+        trainingParcels: { tea: number; nonTea: number; neighborhoods: string[] };
+        heldOut: { accuracy: number; kappa: number; teaRecall: number; teaPrecision: number; confusion: number[][] };
+        byElevation: Array<{ band: string; pixels: { nonTea: number; tea: number }; accuracy: number | null; teaRecall: number | null; teaPrecision: number | null }>;
+        byGroup: Array<{ group: string; pixels: number; calledTea: Record<string, number | null> }>;
+        maxTrainingTeaElevationM: number | null;
+        topFeatures: Array<{ band: string; importance: number }>;
+    };
+    summary: {
+        parcels: number;
+        byDecision: Record<AuditDecision, number>;
+        byConfidence: Record<AuditConfidence, number>;
+        byLeaning: Record<string, number>;
+        flags: Partial<Record<AuditFlag, number>>;
+        titleVsGround: { titleTeaGroundTea: number; titleTeaGroundNone: number; titleOtherGroundTea: number; titleOtherGroundNone: number; unknown: number };
+        areaM2: { unlicensedTea: number; licensedNoTea: number };
+    };
+}
+
 export type CombinedClass = 'confirmed' | 'probable' | 'light' | 'seasonal' | 'none' | 'no_data';
 export type CombinedAgreement = 'both' | 'both_other_dates' | 'fusion_only' | 'pixel_only' | 'neither';
 export type CombinedProducerStatus = 'met' | 'met_with_probable' | 'partial' | 'light_only' | 'none' | 'no_license';
@@ -3945,6 +4021,16 @@ export const api = {
         const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
         return request<Paginated<PixelGardenRow>>(`/caykur/tea-inventory/areas/${areaId}/pixel-scan/gardens${query ? `?${query}` : ''}`);
     },
+    getLicenceAuditSummary: (areaId: string) => request<LicenceAuditSummary>(`/caykur/tea-inventory/areas/${areaId}/licence-audit/summary`),
+    getLicenceAuditParcels: (areaId: string, params?: { page?: number; limit?: number; decision?: AuditDecisionFilter; confidence?: AuditConfidence; flag?: AuditFlag; search?: string }) => {
+        const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
+        const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        return request<Paginated<LicenceAuditRow>>(`/caykur/tea-inventory/areas/${areaId}/licence-audit/parcels${query ? `?${query}` : ''}`);
+    },
+    getLicenceAuditParcel: (areaId: string, block: string, parcel: string) =>
+        request<LicenceAuditDetail>(`/caykur/tea-inventory/areas/${areaId}/licence-audit/parcels/${encodeURIComponent(block)}/${encodeURIComponent(parcel)}`),
+    downloadLicenceAuditKml: (areaId: string, block: string, parcel: string, east = 0, north = 0) =>
+        downloadFile(`/caykur/tea-inventory/areas/${areaId}/licence-audit/parcels/${encodeURIComponent(block)}/${encodeURIComponent(parcel)}/kml${east || north ? `?east=${east}&north=${north}` : ''}`, 'KML üretilemedi'),
     getCombinedSummary: (areaId: string, season?: string) =>
         request<CombinedSummary>(`/caykur/tea-inventory/areas/${areaId}/pruning-combined/summary${season ? `?season=${encodeURIComponent(season)}` : ''}`),
     getCombinedGardens: (areaId: string, params?: { page?: number; limit?: number; season?: string; class?: CombinedClassFilter }) => {

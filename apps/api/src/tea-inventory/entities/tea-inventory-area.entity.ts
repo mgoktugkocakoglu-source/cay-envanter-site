@@ -13,6 +13,7 @@ import { AgeBlock } from '@/tea-inventory/entities/garden-age.types';
 import { FieldTestsBlock } from '@/tea-inventory/entities/field-test.types';
 import { PixelScanBlock } from '@/tea-inventory/entities/pixel-scan.types';
 import { PruningCombinedBlock } from '@/tea-inventory/entities/pruning-combined.types';
+import { LicenceAuditBlock } from '@/tea-inventory/entities/licence-audit.types';
 
 /** A detected tea patch (Sentinel-2, 10 m) stored with its area. */
 export interface TeaPatch {
@@ -315,6 +316,11 @@ export class TeaInventoryArea {
     // Not selected by default: only the combined-verdict service reads it.
     @Column({ type: 'jsonb', nullable: true, name: 'pruning_combined', select: false })
     pruningCombined: PruningCombinedBlock | null;
+
+    // Licence audit block (deed title × licence register × satellite detection, one decision per parcel), absent until audit-licensing has run.
+    // Not selected by default: only the licence-audit service reads it.
+    @Column({ type: 'jsonb', nullable: true, name: 'licence_audit', select: false })
+    licenceAudit: LicenceAuditBlock | null;
 
     // Bundle timestamp; a re-import is skipped when it has not changed.
     @Column({ type: 'timestamp', name: 'bundle_generated_at' })
