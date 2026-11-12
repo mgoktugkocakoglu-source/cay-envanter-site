@@ -75,6 +75,67 @@ export interface CombinedSeason {
     producers: CombinedProducer[];
 }
 
+/** Retrospective check: how a detection behaves in the neighbouring seasons, which its own verdict did not use. */
+export type FollowUpStatus = 'pattern' | 'slow' | 'permanent' | 'repeating' | 'no_followup' | 'not_seen';
+export interface CombinedFollowUp {
+    status: FollowUpStatus;
+    unit: 'cluster' | 'garden';
+    pixels: number;
+    drop: number | null;
+    recoveredShare: number | null;
+    repeatPrev: boolean | null;
+    repeatNext: boolean | null;
+}
+export type FollowUpCounts = Record<FollowUpStatus, number>;
+export interface HistoryPrecision {
+    evaluated: number;
+    pattern: number;
+    share: number | null;
+}
+export interface CombinedHistorySeason {
+    season: string;
+    hasFollowUp: boolean;
+    byClass: Record<'confirmed' | 'probable' | 'light', FollowUpCounts>;
+    mirror: { pixel: FollowUpCounts; fusion: FollowUpCounts } | null;
+    real: Record<'confirmed' | 'probable' | 'light' | 'counted', HistoryPrecision>;
+    falsePassRate: HistoryPrecision | null;
+    precisionFloor: number | null;
+}
+export interface RepeatedGround {
+    a: string;
+    b: string;
+    share: number;
+    m2: number;
+}
+export interface CombinedHistoryGarden {
+    id: string;
+    producerId: string;
+    seasons: Record<string, { class: CombinedClass; countedM2: number; followUp: CombinedFollowUp | null }>;
+    repeatedGround: RepeatedGround[];
+}
+export type MultiYearStatus = 'on_track' | 'behind' | 'none' | 'no_license';
+export interface CombinedHistoryProducer {
+    id: string;
+    licensedAreaM2: number;
+    bySeason: Record<string, { countedM2: number; requiredM2: number; status: string }>;
+    cumulativeM2: number;
+    repeatedM2: number;
+    netM2: number;
+    requiredM2: number;
+    seasonsMet: number;
+    status: MultiYearStatus;
+}
+export interface CombinedHistory {
+    generatedAt: string;
+    method: string;
+    rules: Record<string, number>;
+    seasons: CombinedHistorySeason[];
+    multiYear: { seasons: string[]; gardensRepeated: number; repeatedM2: number; producers: Record<MultiYearStatus, number> };
+    gardens: CombinedHistoryGarden[];
+    producers: CombinedHistoryProducer[];
+}
+
 export interface PruningCombinedBlock {
     seasons: CombinedSeason[];
+    history?: CombinedHistory | null;
 }

@@ -2712,8 +2712,57 @@ export interface PixelValidation {
 export type CombinedClass = 'confirmed' | 'probable' | 'light' | 'none' | 'no_data';
 export type CombinedAgreement = 'both' | 'both_other_dates' | 'fusion_only' | 'pixel_only' | 'neither';
 export type CombinedProducerStatus = 'met' | 'met_with_probable' | 'partial' | 'light_only' | 'none' | 'no_license';
-export type CombinedClassFilter = 'positive' | 'counted' | CombinedClass;
-export type CombinedProducerFilter = 'active' | 'open' | 'changed' | CombinedProducerStatus;
+export type CombinedClassFilter = 'positive' | 'counted' | 'doubtful' | CombinedClass;
+export type CombinedProducerFilter = 'active' | 'open' | 'changed' | 'behind' | CombinedProducerStatus;
+/** Retrospective check: how a detection behaves in the neighbouring seasons, which its own verdict did not use. */
+export type FollowUpStatus = 'pattern' | 'slow' | 'permanent' | 'repeating' | 'no_followup' | 'not_seen';
+export type FollowUpCounts = Record<FollowUpStatus, number>;
+export interface CombinedFollowUp {
+    status: FollowUpStatus;
+    unit: 'cluster' | 'garden';
+    pixels: number;
+    drop: number | null;
+    recoveredShare: number | null;
+    repeatPrev: boolean | null;
+    repeatNext: boolean | null;
+}
+export interface HistoryPrecision {
+    evaluated: number;
+    pattern: number;
+    share: number | null;
+}
+export interface CombinedHistorySeason {
+    season: string;
+    hasFollowUp: boolean;
+    byClass: Record<'confirmed' | 'probable' | 'light', FollowUpCounts>;
+    mirror: { pixel: FollowUpCounts; fusion: FollowUpCounts } | null;
+    real: Record<'confirmed' | 'probable' | 'light' | 'counted', HistoryPrecision>;
+    falsePassRate: HistoryPrecision | null;
+    precisionFloor: number | null;
+}
+export type MultiYearStatus = 'on_track' | 'behind' | 'none' | 'no_license';
+export interface CombinedHistorySummary {
+    generatedAt: string;
+    method: string;
+    rules: Record<string, number>;
+    season: CombinedHistorySeason | null;
+    multiYear: { seasons: string[]; gardensRepeated: number; repeatedM2: number; producers: Record<MultiYearStatus, number> };
+}
+export interface RepeatedGround {
+    a: string;
+    b: string;
+    share: number;
+    m2: number;
+}
+export interface CombinedProducerMultiYear {
+    bySeason: Record<string, { countedM2: number; requiredM2: number; status: string }>;
+    cumulativeM2: number;
+    repeatedM2: number;
+    netM2: number;
+    requiredM2: number;
+    seasonsMet: number;
+    status: MultiYearStatus;
+}
 export interface CombinedRate {
     hit: number;
     n: number;
@@ -2744,6 +2793,7 @@ export interface CombinedSummary {
         producersChanged: number;
     };
     validation: CombinedValidation | null;
+    history: CombinedHistorySummary | null;
 }
 export interface CombinedGardenRow {
     id: string;
@@ -2765,6 +2815,8 @@ export interface CombinedGardenRow {
     pixel: { verdict: string; date: string | null; lastBefore: string | null; score: number | null; prunedM2: number; clusters: number; kind: string | null; confidence: string | null } | null;
     radar: { coherenceZ: number | null; vhZ: number | null; witness: boolean } | null;
     reason: string;
+    followUp: CombinedFollowUp | null;
+    repeatedGround: RepeatedGround[];
 }
 export interface CombinedProducerRow {
     id: string;
@@ -2784,6 +2836,7 @@ export interface CombinedProducerRow {
     lightGardens: string[];
     status: CombinedProducerStatus;
     fusionDecision: string | null;
+    multiYear: CombinedProducerMultiYear | null;
 }
 export interface PixelScanSummary {
     season: string;

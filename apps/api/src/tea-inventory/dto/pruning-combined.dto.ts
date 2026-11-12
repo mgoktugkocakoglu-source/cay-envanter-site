@@ -2,10 +2,10 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
-/** `positive` = confirmed, probable or light; `counted` = confirmed or probable (credited toward the 1/7). */
-export const COMBINED_CLASS_FILTERS = ['positive', 'counted', 'confirmed', 'probable', 'light', 'none', 'no_data'] as const;
+/** `positive` = confirmed, probable or light; `counted` = confirmed or probable (credited toward the 1/7); `doubtful` = a detection the retrospective check does not support. */
+export const COMBINED_CLASS_FILTERS = ['positive', 'counted', 'confirmed', 'probable', 'light', 'none', 'no_data', 'doubtful'] as const;
 /** `open` = target met (with or without probable area); `changed` = differs from the fusion purchase decision. */
-export const COMBINED_PRODUCER_FILTERS = ['active', 'open', 'changed', 'met', 'met_with_probable', 'partial', 'light_only', 'none', 'no_license'] as const;
+export const COMBINED_PRODUCER_FILTERS = ['active', 'open', 'changed', 'met', 'met_with_probable', 'partial', 'light_only', 'none', 'no_license', 'behind'] as const;
 
 export class CombinedQueryDto {
     @ApiPropertyOptional({ default: 1, minimum: 1 })

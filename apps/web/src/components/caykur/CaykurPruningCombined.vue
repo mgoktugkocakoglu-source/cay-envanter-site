@@ -16,12 +16,16 @@ import {
     type CombinedAgreement,
     type CombinedClass,
     type CombinedClassFilter,
+    type CombinedFollowUp,
     type CombinedGardenRow,
     type CombinedProducerFilter,
     type CombinedProducerRow,
     type CombinedProducerStatus,
     type CombinedRate,
     type CombinedSummary,
+    type FollowUpCounts,
+    type FollowUpStatus,
+    type MultiYearStatus,
 } from '@/services/api';
 import { formatM2 } from '@/services/caykur/teaInventory';
 import { formatNumber } from '@/services/caykur';
@@ -73,6 +77,7 @@ const GARDEN_FILTERS: Array<{ value: CombinedClassFilter; label: string }> = [
     { value: 'probable', label: 'Muhtemel' },
     { value: 'light', label: 'Hafif budama' },
     { value: 'none', label: 'Budama yok' },
+    { value: 'doubtful', label: 'Geriye dönük sınamada budama gibi davranmayanlar' },
 ];
 const PRODUCER_FILTERS: Array<{ value: CombinedProducerFilter; label: string }> = [
     { value: 'active', label: 'Budama görülen müstahsiller' },
@@ -81,7 +86,24 @@ const PRODUCER_FILTERS: Array<{ value: CombinedProducerFilter; label: string }> 
     { value: 'partial', label: 'Budama var, hedef dolmadı' },
     { value: 'light_only', label: 'Yalnız hafif budama' },
     { value: 'none', label: 'Budama görülmedi' },
+    { value: 'behind', label: 'Birikimli hedefin gerisinde kalanlar' },
 ];
+/** Retrospective check outcomes, in the order the table shows them. */
+const FOLLOW_UP_META: Record<FollowUpStatus, { label: string; tone: Tone; hint: string }> = {
+    pattern: { label: 'Budama deseni', tone: 'success', hint: 'düşüş bir yıl sonra kapanmış, komşu sezonda tekrarlamıyor' },
+    slow: { label: 'Yavaş kapanıyor', tone: 'info', hint: 'bir yıl sonra kısmen kapanmış' },
+    permanent: { label: 'Kalıcı değişim', tone: 'danger', hint: 'bir yıl sonra hâlâ kapanmamış; söküm, yapılaşma ya da örtü değişimi olabilir' },
+    repeating: { label: 'Her yıl tekrarlıyor', tone: 'warning', hint: 'aynı piksellerde, aynı dönemde komşu sezonda da benzer düşüş var' },
+    not_seen: { label: 'Düz seride görülmedi', tone: 'muted', hint: 'mevsimsel taban olmadan bakıldığında düşüş ayırt edilmiyor' },
+    no_followup: { label: 'Sonrası henüz yok', tone: 'muted', hint: 'bir yıl sonrası henüz gözlenmedi' },
+};
+const FOLLOW_UP_ORDER: FollowUpStatus[] = ['pattern', 'slow', 'permanent', 'repeating', 'not_seen', 'no_followup'];
+const MULTI_YEAR_META: Record<MultiYearStatus, { label: string; tone: Tone }> = {
+    on_track: { label: 'hedefinde', tone: 'success' },
+    behind: { label: 'geride', tone: 'warning' },
+    none: { label: 'sayılan alan yok', tone: 'muted' },
+    no_license: { label: 'ruhsat yok', tone: 'muted' },
+};
 const VALIDATION_ROWS: Record<string, string> = {
     confirmed_low: 'Kesin · alt sınır',
     confirmed_high: 'Kesin · üst sınır',
@@ -94,6 +116,7 @@ const VALIDATION_ROWS: Record<string, string> = {
 const toast = useToast();
 const summary = ref<CombinedSummary | null>(null);
 const isLoading = ref(true);
+const season = ref<string | undefined>(undefined);
 const view = ref<'gardens' | 'producers'>('gardens');
 
 const gardenFilter = ref<CombinedClassFilter>('positive');
@@ -130,13 +153,39 @@ function seasonLabel(s: string | undefined): string {
 const rateText = (r: CombinedRate) => (r.n ? `${r.hit} / ${r.n} (%${Math.round((r.hit / r.n) * 100)})` : '—');
 const fmtZ = (v: number | null | undefined) => (v === null || v === undefined ? '—' : v.toFixed(1));
 const positives = computed(() => (summary.value ? summary.value.summary.byClass.confirmed + summary.value.summary.byClass.probable + summary.value.summary.byClass.light : 0));
+const pct = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `%${Math.round(v * 100)}`);
+/** Rows of the retrospective table: the three classes, then the mirrored (false) detections the same check was run on. */
+const followUpRows = computed<Array<{ key: string; label: string; counts: FollowUpCounts; muted: boolean }>>(() => {
+    const h = summary.value?.history?.season;
+    if (!h) return [];
+    const rows = [
+        { key: 'confirmed', label: 'Kesin', counts: h.byClass.confirmed, muted: false },
+        { key: 'probable', label: 'Muhtemel', counts: h.byClass.probable, muted: false },
+        { key: 'light', label: 'Hafif budama', counts: h.byClass.light, muted: false },
+    ];
+    if (h.mirror) {
+        rows.push({ key: 'mirror-pixel', label: 'Ayna testi · piksel taramasının sahte tespitleri', counts: h.mirror.pixel, muted: true });
+        rows.push({ key: 'mirror-fusion', label: 'Ayna testi · çok-sensörün sahte tespitleri', counts: h.mirror.fusion, muted: true });
+    }
+    return rows;
+});
+function followUpText(f: CombinedFollowUp): string {
+    const parts = [FOLLOW_UP_META[f.status].hint];
+    if (f.drop !== null) parts.push(`göreli NDVI düşüşü ${f.drop.toFixed(2)}`);
+    if (f.recoveredShare !== null) parts.push(`bir yıl sonra düşüşün ${pct(Math.max(0, Math.min(1, f.recoveredShare)))} kadarı kapanmış`);
+    parts.push(f.unit === 'cluster' ? `${f.pixels} piksellik küme, bahçenin kalanına göre` : `bahçenin ${f.pixels} pikseli, mahalledeki çaya göre`);
+    return parts.join(' · ');
+}
 
 async function loadSummary(): Promise<void> {
     isLoading.value = true;
-    const res = await api.getCombinedSummary(props.areaId);
+    const res = await api.getCombinedSummary(props.areaId, season.value);
     isLoading.value = false;
     summary.value = res.data ?? null;
-    if (res.data) await Promise.all([loadGardens(), loadProducers()]);
+    if (res.data) {
+        season.value = res.data.season;
+        await Promise.all([loadGardens(), loadProducers()]);
+    }
 }
 async function loadGardens(): Promise<void> {
     isLoadingGardens.value = true;
@@ -172,7 +221,22 @@ watch(producerFilter, () => {
 });
 watch(gardenPage, () => void loadGardens());
 watch(producerPage, () => void loadProducers());
-watch(() => props.areaId, () => void loadSummary(), { immediate: true });
+watch(
+    () => props.areaId,
+    () => {
+        season.value = undefined;
+        void loadSummary();
+    },
+    { immediate: true },
+);
+function onSeason(v: unknown): void {
+    if (typeof v !== 'string' || v === season.value || !summary.value?.seasons.includes(v)) return;
+    season.value = v;
+    selected.value = null;
+    gardenPage.value = 1;
+    producerPage.value = 1;
+    void loadSummary();
+}
 function onGardenFilter(v: unknown): void {
     if (typeof v === 'string' && GARDEN_FILTERS.some((f) => f.value === v)) gardenFilter.value = v as CombinedClassFilter;
 }
@@ -198,8 +262,18 @@ function onView(v: unknown): void {
                         <strong>Muhtemel</strong>: yalnız biri gördü.
                         <strong>Hafif budama</strong>: yalnız piksel taraması gördü ve kesim hızla toparlandı; 1/7 hesabına girmez.
                         Alan, piksel taramasının çizdiği kümeden; o yoksa çok-sensörün alan çıktısından gelir. Radar ve koherans karar vermez, yalnızca tanık olarak gösterilir.
-                        Alım kararları çok-sensör modülde kalır; buradaki müstahsil hesabı karşılaştırma içindir. Sezon {{ seasonLabel(summary.season) }}.
+                        Alım kararları çok-sensör modülde kalır; buradaki müstahsil hesabı karşılaştırma içindir.
                     </CardDescription>
+                    <div v-if="summary.seasons.length > 1" class="flex flex-wrap items-center gap-3 pt-2">
+                        <span class="text-sm text-muted-foreground">Sezon</span>
+                        <Select :model-value="summary.season" @update:model-value="onSeason">
+                            <SelectTrigger class="h-11 w-44 md:h-9" aria-label="Budama sezonu"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="s in summary.seasons" :key="s" :value="s">{{ seasonLabel(s) }}</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <p v-else class="pt-2 text-sm text-muted-foreground">Sezon {{ seasonLabel(summary.season) }}</p>
                 </CardHeader>
             </Card>
 
@@ -243,6 +317,46 @@ function onView(v: unknown): void {
                         </Table>
                     </div>
                     <p class="text-xs text-muted-foreground">{{ summary.validation.detection.note }} Bu sayılar gerçek saha doğrulamasının yerini tutmaz; Saha Testi vakaları geldikçe onunla değiştirilecek.</p>
+                </CardContent>
+            </Card>
+
+            <Card v-if="summary.history?.season" class="gap-0 py-0">
+                <CardHeader class="py-4">
+                    <CardTitle>Geriye dönük sınama · komşu sezonlarla</CardTitle>
+                    <CardDescription>
+                        Her tespit, kararında kullanılmamış olan komşu sezonların piksel serisinde izlenir: düşüş bir yıl sonra kapanmış mı, aynı pikseller aynı dönemde başka bir sezonda da düşüyor mu.
+                        Aynı sınama ayna testinin sahte tespitlerine de uygulanır; sahte tespitlerin ne kadarının geçtiği bilinmeden gerçek tespitlerin geçme oranı bir şey söylemez.
+                        <template v-if="!summary.history.season.hasFollowUp">Bu sezonun bir yıl sonrası henüz gözlenmedi; şimdilik yalnızca önceki sezonla tekrarlama sınaması yapılabiliyor.</template>
+                    </CardDescription>
+                </CardHeader>
+                <CardContent class="flex flex-col gap-3 border-t pt-4 pb-4">
+                    <div class="overflow-x-auto rounded-lg border bg-card">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Tespit</TableHead>
+                                    <TableHead v-for="k in FOLLOW_UP_ORDER" :key="k" class="text-right">{{ FOLLOW_UP_META[k].label }}</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow v-for="r in followUpRows" :key="r.key" :class="r.muted ? 'text-muted-foreground' : ''">
+                                    <TableCell :class="r.muted ? '' : 'font-medium'">{{ r.label }}</TableCell>
+                                    <TableCell v-for="k in FOLLOW_UP_ORDER" :key="k" class="text-right text-sm tabular-nums">{{ r.counts[k] || '—' }}</TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </div>
+                    <p v-if="summary.history.season.hasFollowUp" class="text-sm">
+                        1/7 hesabına giren tespitlerin {{ summary.history.season.real.counted.pattern }} / {{ summary.history.season.real.counted.evaluated }} kadarı ({{ pct(summary.history.season.real.counted.share) }}) budama deseni gösterdi.
+                        <template v-if="summary.history.season.falsePassRate">Ayna testinin sahte tespitlerinde aynı oran {{ summary.history.season.falsePassRate.pattern }} / {{ summary.history.season.falsePassRate.evaluated }} ({{ pct(summary.history.season.falsePassRate.share) }}).</template>
+                        <template v-if="summary.history.season.precisionFloor !== null"> Bu iki orandan çıkan gerçek tespit payının alt sınırı {{ pct(summary.history.season.precisionFloor) }}.</template>
+                        <template v-else> Sayılar bir alt sınır hesaplamaya yetmiyor.</template>
+                    </p>
+                    <p class="text-sm">
+                        Çok yıllı tutarlılık ({{ summary.history.multiYear.seasons.map(seasonLabel).join(', ') }}): {{ summary.history.multiYear.gardensRepeated }} bahçede aynı zemin iki sezonda sayıldı ({{ formatM2(summary.history.multiYear.repeatedM2) }}); 1/7 kuralında aynı zemin üst üste derin budanmaz, bu alan birikimli hesaptan düşülür.
+                        Birikimli hedefe göre müstahsil: {{ summary.history.multiYear.producers.on_track }} hedefinde, {{ summary.history.multiYear.producers.behind }} geride, {{ summary.history.multiYear.producers.none }} müstahsilde sayılan alan yok.
+                    </p>
+                    <p class="text-xs text-muted-foreground">Sınama kararları değiştirmez; eksperin önce bakacağı bahçeleri gösterir. “Kalıcı değişim” ve “her yıl tekrarlıyor” çıkan tespitler budama gibi davranmıyor. Saha doğrulamasının yerini tutmaz.</p>
                 </CardContent>
             </Card>
 
@@ -292,6 +406,10 @@ function onView(v: unknown): void {
                                     <TableCell>
                                         <Badge :variant="toneVariant(CLASS_META[r.class].tone)">{{ CLASS_META[r.class].label }}</Badge>
                                         <Badge v-if="r.radar?.witness" variant="outline" class="ml-1">Radar tanığı</Badge>
+                                        <div v-if="(r.followUp && r.followUp.status !== 'no_followup') || r.repeatedGround.length" class="mt-1 flex flex-wrap gap-1">
+                                            <Badge v-if="r.followUp && r.followUp.status !== 'no_followup'" :variant="toneVariant(FOLLOW_UP_META[r.followUp.status].tone)">{{ FOLLOW_UP_META[r.followUp.status].label }}</Badge>
+                                            <Badge v-if="r.repeatedGround.length" variant="warning">Zemin iki sezonda sayıldı</Badge>
+                                        </div>
                                     </TableCell>
                                     <TableCell class="text-sm">{{ AGREEMENT_LABEL[r.agreement] }}</TableCell>
                                     <TableCell class="text-sm tabular-nums">{{ r.bracket ? `${fmtDate(r.bracket.from)} → ${fmtDate(r.bracket.to)}` : '—' }}</TableCell>
@@ -341,6 +459,7 @@ function onView(v: unknown): void {
                                     <TableHead class="text-right">Muhtemel</TableHead>
                                     <TableHead class="text-right">Hafif</TableHead>
                                     <TableHead class="text-right">Eksik</TableHead>
+                                    <TableHead v-if="summary.history" class="text-right">Birikimli ({{ summary.history.multiYear.seasons.length }} sezon)</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -356,6 +475,16 @@ function onView(v: unknown): void {
                                     <TableCell class="text-right text-sm tabular-nums">{{ p.probableM2 ? formatM2(p.probableM2) : '—' }}</TableCell>
                                     <TableCell class="text-right text-sm tabular-nums text-muted-foreground">{{ p.lightM2 ? formatM2(p.lightM2) : '—' }}</TableCell>
                                     <TableCell class="text-right text-sm tabular-nums">{{ p.shortfallM2 ? formatM2(p.shortfallM2) : '—' }}</TableCell>
+                                    <TableCell v-if="summary.history" class="text-right text-sm tabular-nums">
+                                        <template v-if="p.multiYear">
+                                            <span class="font-semibold">{{ formatM2(p.multiYear.netM2) }}</span> / {{ formatM2(p.multiYear.requiredM2) }}
+                                            <div class="text-xs text-muted-foreground">
+                                                <Badge :variant="toneVariant(MULTI_YEAR_META[p.multiYear.status].tone)">{{ MULTI_YEAR_META[p.multiYear.status].label }}</Badge>
+                                                <span v-if="p.multiYear.repeatedM2"> · {{ formatM2(p.multiYear.repeatedM2) }} tekrar düşüldü</span>
+                                            </div>
+                                        </template>
+                                        <template v-else>—</template>
+                                    </TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>
@@ -389,6 +518,16 @@ function onView(v: unknown): void {
                             <div class="font-medium">Budanan alan {{ selected.area ? `≈ ${formatM2(selected.area.m2)}` : '—' }}</div>
                             <div v-if="selected.area" class="text-xs text-muted-foreground">Aralık {{ formatM2(selected.area.lowM2) }} – {{ formatM2(selected.area.highM2) }} · kaynak: {{ SOURCE_LABEL[selected.area.source] }} · 1/7 hesabına giren {{ formatM2(selected.countedM2) }}</div>
                             <div class="text-xs text-muted-foreground">Kesim aralığı: {{ selected.bracket ? `${fmtDate(selected.bracket.from)} → ${fmtDate(selected.bracket.to)}` : '—' }}</div>
+                        </div>
+                        <div v-if="selected.followUp || selected.repeatedGround.length" class="rounded-lg border p-3">
+                            <div class="flex flex-wrap items-center gap-2 font-medium">
+                                Geriye dönük sınama
+                                <Badge v-if="selected.followUp" :variant="toneVariant(FOLLOW_UP_META[selected.followUp.status].tone)">{{ FOLLOW_UP_META[selected.followUp.status].label }}</Badge>
+                            </div>
+                            <div v-if="selected.followUp" class="text-xs text-muted-foreground">{{ followUpText(selected.followUp) }}</div>
+                            <div v-for="g in selected.repeatedGround" :key="g.a + g.b" class="text-xs text-muted-foreground">
+                                Aynı zemin {{ seasonLabel(g.a) }} ve {{ seasonLabel(g.b) }} sezonlarında sayıldı: piksellerin {{ pct(g.share) }} kadarı ortak, ≈ {{ formatM2(g.m2) }}.
+                            </div>
                         </div>
                         <div class="overflow-x-auto rounded-lg border bg-card">
                             <Table>
