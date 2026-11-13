@@ -2743,7 +2743,7 @@ export interface LicenceAuditRow {
     };
     building: { state: AuditBuildingState; count: number; insideM2: number; source: string };
     licence: { licensed: boolean; areaM2: number | null; codes: string[]; source: 'demo' | 'caykur' | 'none' };
-    confirmation: { tea: boolean; source: string; note: string; date: string } | null;
+    confirmation: { tea: boolean | null; building: boolean | null; sparse: boolean; source: string; note: string; date: string } | null;
     decision: AuditDecision;
     leaning: Exclude<AuditDecision, 'needs_review'>;
     confidence: AuditConfidence;
@@ -2761,6 +2761,10 @@ export interface LicenceAuditSummary {
     method: string;
     rules: Record<string, number>;
     licenceSource: 'demo' | 'caykur';
+    /** How the demo register was put together (null with ÇAYKUR's real list). */
+    demoLicences: { rules: Record<string, unknown>; byOrigin: Record<string, number>; byScenario: Record<string, number>; note: string } | null;
+    /** Field notes that say "tea" against what the satellite reads on its own. */
+    fieldCheck: { notes: number; teaNoted: number; teaNotedDetected: number; teaNotedInconclusive: number; teaNotedMissed: number; titleMismatch: number } | null;
     buildingSource: string;
     model: {
         type: string;

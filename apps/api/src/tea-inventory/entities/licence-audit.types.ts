@@ -60,7 +60,8 @@ export interface AuditParcel {
     };
     building: { state: AuditBuildingState; count: number; insideM2: number; source: string };
     licence: { licensed: boolean; areaM2: number | null; codes: string[]; source: 'demo' | 'caykur' | 'none' };
-    confirmation: { tea: boolean; source: string; note: string; date: string } | null;
+    /** Ground observation by a person (expert confirmation or field note); a null side was not observed. */
+    confirmation: { tea: boolean | null; building: boolean | null; sparse: boolean; source: string; note: string; date: string } | null;
     decision: AuditDecision;
     leaning: Exclude<AuditDecision, 'needs_review'>;
     confidence: AuditConfidence;
@@ -102,6 +103,10 @@ export interface LicenceAuditBlock {
     evidenceRules: Record<string, unknown>;
     model: AuditModel;
     licenceSource: 'demo' | 'caykur';
+    /** How the demo register was put together (null with ÇAYKUR's real list). */
+    demoLicences: { rules: Record<string, unknown>; byOrigin: Record<string, number>; byScenario: Record<string, number>; note: string } | null;
+    /** Field notes that say "tea" against what the satellite reads on its own. */
+    fieldCheck: { notes: number; teaNoted: number; teaNotedDetected: number; teaNotedInconclusive: number; teaNotedMissed: number; titleMismatch: number } | null;
     buildingSource: string;
     summary: AuditSummary;
     parcels: AuditParcel[];

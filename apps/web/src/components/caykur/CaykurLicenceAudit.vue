@@ -73,7 +73,7 @@ const FLAG_LABEL: Record<AuditFlag, string> = {
     beyond_training: 'Parsel, modelin eğitildiği çay parsellerinden yüksekte',
     small_parcel: 'Parsel 10 m piksel ağı için küçük',
     detectors_disagree: 'Envanter tespiti ile nitelikten bağımsız tespit ayrışıyor',
-    expert_confirmed: 'Eksper teyidi var',
+    expert_confirmed: 'Saha gözlemi var (eksper teyidi ya da arazi notu)',
     licence_unverified: 'DEMO ruhsat kaydı bu parseli kapsamıyor; “ruhsat yok” gerçek ÇAYKUR listesiyle doğrulanmalı',
     large_parcel: 'Parsel çok büyük: çay cebi parsel payıyla ölçülemez, bahçe sınırıyla bakılmalı',
 };
@@ -242,7 +242,10 @@ onBeforeUnmount(() => {
                         Her parsel için üç bağımsız kaynak yan yana konur: <strong>TKGM tapu niteliği</strong>, <strong>ÇAYKUR ruhsat kaydı</strong> ve <strong>uydu tespiti</strong> (çay ve yapı).
                         Uydu tespiti tapu niteliğinden bağımsızdır: denetlenen nitelikler (çayır, tarla, karma) eğitimde kullanılmaz, rakım ve eğim modele girmez, kar maskelenir.
                         Kural tek yönlü katıdır: birinin aleyhine olan bir bulgu (ruhsatlandırma hatası, ruhsatsız çay) ancak kanıt açıksa verilir; kararsız, küçük ya da zayıf kanıtlı parsel “inceleme gerekli” olur ve hangi karara yakın olduğu yazılır.
-                        <template v-if="summary.licenceSource === 'demo'">Gerçek ÇAYKUR ruhsat listesi henüz verilmediği için ruhsat sütunu DEMO kayıttan gelir; ruhsata dayanan kararlar da o yüzden gösterim amaçlıdır.</template>
+                        <template v-if="summary.licenceSource === 'demo'">
+                            Gerçek ÇAYKUR ruhsat listesi henüz verilmediği için ruhsat sütunu DEMO kayıttan gelir; ruhsata dayanan kararlar da o yüzden gösterim amaçlıdır.
+                            <template v-if="summary.demoLicences">{{ summary.demoLicences.note }}</template>
+                        </template>
                     </CardDescription>
                 </CardHeader>
             </Card>
@@ -304,6 +307,9 @@ onBeforeUnmount(() => {
                             Ayrılmış test parsellerinde doğruluk {{ pct(summary.model.heldOut.accuracy) }}; çay parsellerinin {{ pct(summary.model.heldOut.teaRecall) }} kadarı yakalanıyor, “çay” denen piksellerin {{ pct(summary.model.heldOut.teaPrecision) }} kadarı gerçekten çay tapulu.
                             Bu sayılar tapu niteliği temiz olan sınıflarla uyumu ölçer; saha doğrulaması değildir.
                             Eğitimdeki en yüksek çay parseli {{ summary.model.maxTrainingTeaElevationM ?? '—' }} m: bunun üstündeki parsellerde uydu sonucu tek başına bulgu sayılmaz.
+                            <template v-if="summary.fieldCheck && summary.fieldCheck.teaNoted">
+                                Arazi notlarıyla karşılaştırma: sahada “çay var” denen {{ summary.fieldCheck.teaNoted }} parselin {{ summary.fieldCheck.teaNotedDetected }} tanesinde uydu da çay görüyor, {{ summary.fieldCheck.teaNotedInconclusive }} tanesinde kararsız, {{ summary.fieldCheck.teaNotedMissed }} tanesinde görmüyor.
+                            </template>
                         </CardDescription>
                     </CardHeader>
                     <CardContent class="flex flex-col gap-3 border-t pt-4 pb-4">
@@ -397,7 +403,7 @@ onBeforeUnmount(() => {
                                         <span v-else class="text-muted-foreground">kayıt yok</span>
                                     </TableCell>
                                     <TableCell class="text-sm">
-                                        {{ r.confirmation ? (r.confirmation.tea ? 'çay var (eksper)' : 'çay yok (eksper)') : TEA_LABEL[r.detection.tea] }}
+                                        {{ r.confirmation && r.confirmation.tea !== null ? (r.confirmation.tea ? (r.confirmation.sparse ? 'çay var, seyrek (saha)' : 'çay var (saha)') : 'çay yok (saha)') : TEA_LABEL[r.detection.tea] }}
                                         <span v-if="r.detection.teaShare !== null" class="tabular-nums"> · {{ pct(r.detection.teaShare) }}</span>
                                         <div class="text-xs text-muted-foreground">{{ r.detection.teaAreaM2 === null ? '' : `≈ ${formatM2(r.detection.teaAreaM2)} çay · ` }}{{ BUILDING_LABEL[r.building.state] }}</div>
                                     </TableCell>
@@ -486,9 +492,9 @@ onBeforeUnmount(() => {
                                         <TableCell class="text-xs text-muted-foreground">parselin {{ pct(detail.detection.teaShare) }} kadarı çay{{ detail.detection.teaAreaM2 === null ? '' : ` (≈ ${formatM2(detail.detection.teaAreaM2)})` }} · {{ detail.building.count }} bina izi{{ detail.building.insideM2 ? `, ${formatM2(detail.building.insideM2)} parsel içinde` : '' }}</TableCell>
                                     </TableRow>
                                     <TableRow v-if="detail.confirmation">
-                                        <TableCell class="font-medium">Eksper teyidi</TableCell>
-                                        <TableCell>{{ detail.confirmation.tea ? 'var' : 'yok' }}</TableCell>
-                                        <TableCell>—</TableCell>
+                                        <TableCell class="font-medium">Saha gözlemi</TableCell>
+                                        <TableCell>{{ detail.confirmation.tea === null ? '—' : detail.confirmation.tea ? (detail.confirmation.sparse ? 'var, seyrek' : 'var') : 'yok' }}</TableCell>
+                                        <TableCell>{{ detail.confirmation.building === null ? '—' : detail.confirmation.building ? 'var' : 'yok' }}</TableCell>
                                         <TableCell class="text-xs text-muted-foreground">{{ detail.confirmation.source }} · {{ detail.confirmation.date }}<template v-if="detail.confirmation.note"> · {{ detail.confirmation.note }}</template></TableCell>
                                     </TableRow>
                                 </TableBody>
