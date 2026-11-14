@@ -2804,6 +2804,10 @@ export interface DroneVerificationDetail extends DroneVerificationRow {
         video: { visible: [number, number]; trackedFrames: number; match: { t: number; inliers: number; keypoints: number } };
         outline: { t: number; frame: [number, number]; polygon: Array<[number, number]>; reference: string; referenceUrl: string; kind: 'hand_drawn' | 'cadastre' };
         frames: DroneFrame[];
+        /** Outline per tracked instant, in seconds of the source video and pixels of the frame. */
+        track: Array<{ t: number; polygon: Array<[number, number]> }>;
+        /** Clip the page plays; `start` is its offset in the source video. */
+        clip: { url: string; start: number; end: number; width: number; height: number } | null;
         notes: string[];
     } | null;
 }

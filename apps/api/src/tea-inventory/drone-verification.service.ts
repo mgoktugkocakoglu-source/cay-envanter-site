@@ -37,7 +37,7 @@ export interface DroneVerificationDetail extends DroneVerificationRow {
     satellite: { tea: string; teaShare: number | null; fullPixels: number };
     geometry: Poly;
     /** Null while no drone source covers the parcel. */
-    drone: (Omit<DroneVerificationParcel, 'frames' | 'outline'> & { frames: Array<DroneVerificationParcel['frames'][number] & { frameUrl: string; classesUrl: string }>; outline: DroneVerificationParcel['outline'] & { referenceUrl: string }; sourceTitle: string }) | null;
+    drone: (Omit<DroneVerificationParcel, 'frames' | 'outline'> & { frames: Array<DroneVerificationParcel['frames'][number] & { frameUrl: string; classesUrl: string }>; outline: DroneVerificationParcel['outline'] & { referenceUrl: string }; sourceTitle: string; clip: { url: string; start: number; end: number; width: number; height: number } | null }) | null;
 }
 export type DroneMapProperties = Pick<DroneVerificationRow, 'key' | 'block' | 'parcel' | 'nature' | 'class' | 'status' | 'licensed'>;
 
@@ -100,6 +100,8 @@ export class DroneVerificationService {
                       frames: analysed.frames.map((f) => ({ ...f, frameUrl: base + f.frame, classesUrl: base + f.classes })),
                       outline: { ...analysed.outline, referenceUrl: base + analysed.outline.reference },
                       sourceTitle: drone.sources.find((s) => s.id === analysed.sourceId)?.title ?? analysed.sourceId,
+                      track: analysed.track ?? [],
+                      clip: drone.clip ? { url: base + drone.clip.file, start: drone.clip.start, end: drone.clip.end, width: drone.clip.width, height: drone.clip.height } : null,
                   }
                 : null,
         };

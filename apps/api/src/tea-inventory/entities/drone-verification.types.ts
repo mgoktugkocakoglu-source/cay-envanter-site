@@ -110,6 +110,8 @@ export interface DroneVerificationParcel {
     /** Outline on the reference frame, in frame pixels. `hand_drawn` is a marker's drawing, not the cadastral boundary. */
     outline: { t: number; frame: [number, number]; polygon: Array<[number, number]>; reference: string; kind: 'hand_drawn' | 'cadastre' };
     frames: DroneFrame[];
+    /** Outline per tracked instant (video seconds of the source), for drawing it over the playing clip. */
+    track: Array<{ t: number; polygon: Array<[number, number]> }>;
     notes: string[];
 }
 
@@ -119,6 +121,8 @@ export interface DroneVerificationBlock {
     rules: Record<string, number>;
     sources: DroneSource[];
     capture: DroneCapture;
+    /** The part of the video the parcels are on, re-encoded for the site; `start` is its offset in the source video. */
+    clip: { file: string; start: number; end: number; width: number; height: number; bytes: number } | null;
     suitability: Array<{ topic: string; verdict: 'ok' | 'limited' | 'no'; text: string }>;
     validation: DroneValidation;
     licenceSource: 'demo' | 'caykur';

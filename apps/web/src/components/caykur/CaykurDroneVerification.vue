@@ -83,7 +83,12 @@ const isLoadingRows = ref(false);
 const detail = ref<DroneVerificationDetail | null>(null);
 const isLoadingDetail = ref(false);
 const frameIndex = ref(0);
-const showClasses = ref(false);
+/** Evidence view: the playing clip with the outline drawn over it, or one analysed frame (clean / tinted by class). */
+const mode = ref<'video' | 'frame' | 'classes'>('video');
+const videoEl = ref<HTMLVideoElement | null>(null);
+/** Playback position in seconds of the source video. */
+const videoTime = ref(0);
+let ticker = 0;
 const overviewContainer = ref<HTMLElement | null>(null);
 const parcelContainer = ref<HTMLElement | null>(null);
 let overviewMap: L.Map | null = null;
@@ -94,6 +99,7 @@ const sheetOpen = computed({
     set: (open: boolean) => {
         if (!open) {
             detail.value = null;
+            cancelAnimationFrame(ticker);
             parcelMap?.remove();
             parcelMap = null;
         }
@@ -101,6 +107,14 @@ const sheetOpen = computed({
 });
 const source = computed(() => summary.value?.sources[0] ?? null);
 const frame = computed(() => detail.value?.drone?.frames[frameIndex.value] ?? null);
+const clip = computed(() => detail.value?.drone?.clip ?? null);
+/** The tracked outline nearest to the playback position; none while the parcel is not tracked at that instant. */
+const overlayPoints = computed(() => {
+    const track = detail.value?.drone?.track ?? [];
+    let best: (typeof track)[number] | null = null;
+    for (const k of track) if (!best || Math.abs(k.t - videoTime.value) < Math.abs(best.t - videoTime.value)) best = k;
+    return best && Math.abs(best.t - videoTime.value) <= 0.3 ? best.polygon.map(([x, y]) => `${x},${y}`).join(' ') : null;
+});
 
 const pct = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `%${Math.round(v * 100)}`);
 /** Video time as m:ss. */
@@ -157,10 +171,31 @@ function renderOverview(): void {
     const focus = analysed.length ? L.featureGroup(analysed).getBounds() : layer.getBounds();
     if (focus.isValid()) map.fitBounds(focus, { padding: [80, 80], maxZoom: 19 });
 }
+function tick(): void {
+    if (videoEl.value && clip.value) videoTime.value = videoEl.value.currentTime + clip.value.start;
+    ticker = requestAnimationFrame(tick);
+}
+/** Jumps the clip to a moment of the source video. */
+function seek(t: number): void {
+    if (!videoEl.value || !clip.value) return;
+    videoEl.value.currentTime = Math.max(t - clip.value.start, 0);
+}
+function onVideoReady(): void {
+    const d = detail.value?.drone;
+    if (d) seek(d.video.visible[0]);
+}
+function pickFrame(index: number): void {
+    frameIndex.value = index;
+    const f = detail.value?.drone?.frames[index];
+    if (mode.value === 'video' && f) {
+        videoEl.value?.pause();
+        seek(f.t);
+    }
+}
 async function open(block: string, parcel: string): Promise<void> {
     isLoadingDetail.value = true;
     frameIndex.value = 0;
-    showClasses.value = false;
+    cancelAnimationFrame(ticker);
     const res = await api.getDroneVerificationParcel(props.areaId, block, parcel);
     isLoadingDetail.value = false;
     if (!res.data) {
@@ -170,6 +205,9 @@ async function open(block: string, parcel: string): Promise<void> {
     detail.value = res.data;
     const reference = res.data.drone?.frames.findIndex((f) => f.isReference) ?? -1;
     frameIndex.value = Math.max(reference, 0);
+    mode.value = res.data.drone?.clip ? 'video' : 'frame';
+    videoTime.value = res.data.drone?.video.visible[0] ?? 0;
+    ticker = requestAnimationFrame(tick);
     await nextTick();
     // The sheet animates in: Leaflet needs the container at its final size.
     setTimeout(renderParcel, 250);
@@ -203,6 +241,7 @@ watch(page, () => void loadRows());
 watch(() => props.areaId, () => void load(), { immediate: true });
 onBeforeUnmount(() => {
     if (searchTimer) clearTimeout(searchTimer);
+    cancelAnimationFrame(ticker);
     overviewMap?.remove();
     parcelMap?.remove();
 });
@@ -385,7 +424,7 @@ onBeforeUnmount(() => {
         </template>
 
         <Sheet v-model:open="sheetOpen">
-            <SheetContent class="w-full overflow-y-auto sm:max-w-2xl">
+            <SheetContent class="w-full overflow-y-auto sm:max-w-5xl">
                 <LoadingState v-if="isLoadingDetail" text="Parsel yükleniyor…" class="p-6" />
                 <template v-else-if="detail">
                     <SheetHeader class="border-b">
@@ -447,24 +486,38 @@ onBeforeUnmount(() => {
                             </div>
                             <p v-if="detail.drone.hypothesis" class="text-muted-foreground"><span class="font-medium text-foreground">Başlangıç gözlemi (saha ekibi):</span> {{ detail.drone.hypothesis }}</p>
 
-                            <div v-if="frame" class="flex flex-col gap-2">
-                                <div class="flex flex-wrap items-center justify-between gap-2">
-                                    <div class="font-medium">Kanıt kareleri</div>
-                                    <div class="flex gap-2">
-                                        <Button :variant="showClasses ? 'outline' : 'default'" class="h-11 md:h-9" @click="showClasses = false">Görüntü</Button>
-                                        <Button :variant="showClasses ? 'default' : 'outline'" class="h-11 md:h-9" @click="showClasses = true">Otomatik sınıflar</Button>
+                            <div v-if="frame" class="grid gap-4 lg:grid-cols-2">
+                                <div class="flex flex-col gap-2">
+                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                        <div class="font-medium">Drone görüntüsü</div>
+                                        <div class="flex gap-2">
+                                            <Button v-if="clip" :variant="mode === 'video' ? 'default' : 'outline'" class="h-11 md:h-9" @click="mode = 'video'">Video</Button>
+                                            <Button :variant="mode === 'frame' ? 'default' : 'outline'" class="h-11 md:h-9" @click="mode = 'frame'">Kare</Button>
+                                            <Button :variant="mode === 'classes' ? 'default' : 'outline'" class="h-11 md:h-9" @click="mode = 'classes'">Otomatik sınıflar</Button>
+                                        </div>
                                     </div>
+                                    <div v-if="mode === 'video' && clip" class="relative overflow-hidden rounded-lg border bg-black">
+                                        <video ref="videoEl" :src="clip.url" class="block w-full" controls muted loop playsinline preload="metadata" :aria-label="`${detail.block}/${detail.parcel} parselinin drone videosu`" @loadedmetadata="onVideoReady" />
+                                        <svg :viewBox="`0 0 ${clip.width} ${clip.height}`" class="pointer-events-none absolute inset-0 size-full" aria-hidden="true">
+                                            <polygon v-if="overlayPoints" :points="overlayPoints" fill="none" :stroke="CLASS_META[detail.class].color" stroke-width="4" stroke-linejoin="round" />
+                                        </svg>
+                                    </div>
+                                    <img v-else :src="mode === 'classes' ? frame.classesUrl : frame.frameUrl" :alt="`${detail.block}/${detail.parcel} parseli, videonun ${clock(frame.t)} anındaki kare`" class="w-full rounded-lg border" />
+                                    <div class="flex flex-wrap gap-2">
+                                        <Button v-for="(f, i) in detail.drone.frames" :key="f.t" :variant="i === frameIndex ? 'default' : 'outline'" class="h-11 tabular-nums md:h-9" @click="pickFrame(i)">{{ clock(f.t) }}{{ f.isReference ? ' ★' : '' }}</Button>
+                                    </div>
+                                    <p class="text-xs text-muted-foreground">
+                                        <template v-if="mode === 'video'">Video konumu {{ clock(videoTime) }}. Çizim, parselin izlenebildiği {{ clock(detail.drone.video.visible[0]) }}–{{ clock(detail.drone.video.visible[1]) }} arasında videoyla birlikte hareket eder; dışında görünmez. </template>
+                                        Çizgi {{ detail.drone.outline.kind === 'hand_drawn' ? 'elle çizilmiş yaklaşık eşleştirmedir; kadastro sınırı değildir' : 'kadastro sınırıdır' }}. ★ işaretli an, çizimin yapıldığı görselle eşleşen karedir
+                                        ({{ detail.drone.video.match.inliers }} / {{ detail.drone.video.match.keypoints }} ortak nokta); diğer anlara çizim otomatik taşındı.
+                                        <template v-if="mode === 'classes'">Yeşil: çay · sarı: diğer bitki · gri: yapı/yol. Bu karede çay payı {{ pct(frame.shares.tea) }}.</template>
+                                    </p>
                                 </div>
-                                <img :src="showClasses ? frame.classesUrl : frame.frameUrl" :alt="`${detail.block}/${detail.parcel} parseli, videonun ${clock(frame.t)} anındaki kare`" class="w-full rounded-lg border" />
-                                <div class="flex flex-wrap gap-2">
-                                    <Button v-for="(f, i) in detail.drone.frames" :key="f.t" :variant="i === frameIndex ? 'default' : 'outline'" class="h-11 tabular-nums md:h-9" @click="frameIndex = i">{{ clock(f.t) }}{{ f.isReference ? ' ★' : '' }}</Button>
+                                <div class="flex flex-col gap-2">
+                                    <div class="flex h-11 items-center font-medium md:h-9">Kadastro sınırı ve uydu</div>
+                                    <div ref="parcelContainer" class="aspect-video w-full overflow-hidden rounded-lg border" />
+                                    <p class="text-xs text-muted-foreground">Çizgi TKGM parsel sınırıdır (WGS84). Altlık Google uydu görüntüsüdür; dik arazide birkaç metre kayık olabilir. Drone görüntüsü eğik bakışlıdır: iki görünüm yön ve ölçek olarak birebir örtüşmez.</p>
                                 </div>
-                                <p class="text-xs text-muted-foreground">
-                                    Kırmızı çizgi {{ detail.drone.outline.kind === 'hand_drawn' ? 'elle çizilmiş yaklaşık eşleştirmedir; kadastro sınırı değildir' : 'kadastro sınırıdır' }}. ★ işaretli kare, çizimin yapıldığı görselle eşleşen karedir
-                                    ({{ detail.drone.video.match.inliers }} / {{ detail.drone.video.match.keypoints }} ortak nokta); diğer karelere çizim otomatik taşındı.
-                                    Parsel videoda {{ clock(detail.drone.video.visible[0]) }}–{{ clock(detail.drone.video.visible[1]) }} arasında izlenebiliyor.
-                                    <template v-if="showClasses">Yeşil: çay · sarı: diğer bitki · gri: yapı/yol. Bu karede çay payı {{ pct(frame.shares.tea) }}.</template>
-                                </p>
                             </div>
 
                             <div v-if="detail.drone.review" class="rounded-lg border p-3">
@@ -491,13 +544,14 @@ onBeforeUnmount(() => {
                                 <li v-for="n in detail.drone.notes" :key="n">{{ n }}</li>
                             </ul>
                         </template>
-                        <p v-else class="text-muted-foreground">Bu parseli kapsayan drone görüntüsü henüz analiz edilmedi. Kayıt ve uydu okuması yukarıda; sınıf atanmadı.</p>
-
-                        <div class="flex flex-col gap-2">
-                            <div class="font-medium">Kadastro sınırı (TKGM)</div>
-                            <div ref="parcelContainer" class="h-64 w-full overflow-hidden rounded-lg border" />
-                            <p class="text-xs text-muted-foreground">Çizgi TKGM parsel sınırıdır (WGS84). Altlık Google uydu görüntüsüdür; dik arazide birkaç metre kayık olabilir.</p>
-                        </div>
+                        <template v-else>
+                            <p class="text-muted-foreground">Bu parseli kapsayan drone görüntüsü henüz analiz edilmedi. Kayıt ve uydu okuması yukarıda; sınıf atanmadı.</p>
+                            <div class="flex flex-col gap-2">
+                                <div class="font-medium">Kadastro sınırı (TKGM)</div>
+                                <div ref="parcelContainer" class="h-64 w-full overflow-hidden rounded-lg border" />
+                                <p class="text-xs text-muted-foreground">Çizgi TKGM parsel sınırıdır (WGS84). Altlık Google uydu görüntüsüdür; dik arazide birkaç metre kayık olabilir.</p>
+                            </div>
+                        </template>
                     </div>
                 </template>
             </SheetContent>
