@@ -108,20 +108,31 @@ const sheetOpen = computed({
 const source = computed(() => summary.value?.sources[0] ?? null);
 const frame = computed(() => detail.value?.drone?.frames[frameIndex.value] ?? null);
 const clip = computed(() => detail.value?.drone?.clip ?? null);
-/** The tracked outline nearest to the playback position; none while the parcel is not tracked at that instant. */
-const overlayPoints = computed(() => {
-    const track = detail.value?.drone?.track ?? [];
-    let best: (typeof track)[number] | null = null;
-    for (const k of track) if (!best || Math.abs(k.t - videoTime.value) < Math.abs(best.t - videoTime.value)) best = k;
-    return best && Math.abs(best.t - videoTime.value) <= 0.3 ? best.polygon.map(([x, y]) => `${x},${y}`).join(' ') : null;
-});
+type OutlineKey = { t: number; polygon: number[][] };
+/**
+ * Outline at the playback position. Between two tracked instants that hold the same corners the outline is
+ * interpolated, so it follows the picture instead of jumping; otherwise the nearest instant is shown, and nothing
+ * while the parcel is not tracked.
+ */
+function outlineAt(track: OutlineKey[], t: number): string | null {
+    let before: OutlineKey | null = null;
+    let after: OutlineKey | null = null;
+    for (const k of track) {
+        if (k.t <= t && (!before || k.t > before.t)) before = k;
+        if (k.t > t && (!after || k.t < after.t)) after = k;
+    }
+    const text = (polygon: number[][]) => polygon.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+    if (before && after && after.t - before.t <= 1.5 && before.polygon.length === after.polygon.length) {
+        const w = (t - before.t) / (after.t - before.t);
+        const to = after.polygon;
+        return text(before.polygon.map(([x, y], i) => [x + (to[i][0] - x) * w, y + (to[i][1] - y) * w]));
+    }
+    const nearest = before && after ? (t - before.t <= after.t - t ? before : after) : (before ?? after);
+    return nearest && Math.abs(nearest.t - t) <= 0.4 ? text(nearest.polygon) : null;
+}
+const overlayPoints = computed(() => outlineAt(detail.value?.drone?.track ?? [], videoTime.value));
 /** The TKGM outline as projected into the video at the playback position (approximate georeference). */
-const cadastrePoints = computed(() => {
-    const track = detail.value?.drone?.cadastreTrack ?? [];
-    let best: (typeof track)[number] | null = null;
-    for (const k of track) if (!best || Math.abs(k.t - videoTime.value) < Math.abs(best.t - videoTime.value)) best = k;
-    return best && Math.abs(best.t - videoTime.value) <= 0.3 ? best.polygon.map(([x, y]) => `${x},${y}`).join(' ') : null;
-});
+const cadastrePoints = computed(() => outlineAt(detail.value?.drone?.cadastreTrack ?? [], videoTime.value));
 
 const pct = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `%${Math.round(v * 100)}`);
 /** Video time as m:ss. */
