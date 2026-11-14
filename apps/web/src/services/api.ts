@@ -2742,8 +2742,27 @@ export interface DroneFrame {
     frameUrl: string;
     classesUrl: string;
 }
+/**
+ * Approximate tie of a video to the map: camera poses solved from the video itself (structure from motion), the model
+ * placed on the map by matching marked buildings to mapped footprints. Metres, not centimetres; no areas.
+ */
+export interface DroneGeoreferenceSummary {
+    method: string;
+    model: { frames: number; points: number; reprojectionErrorPx: number; shot: [number, number]; meanRollDeg: number };
+    controls: Array<{ building: string; target: string; residualM: number }>;
+    markedBuildings: number;
+    rmsM: number;
+    maxResidualM: number;
+    scaleMPerUnit: number;
+    referenceT: number;
+    referenceImage: string;
+    /** Parcels whose projected outline lies fully inside the reference frame. */
+    parcelsInView: string[];
+}
 export interface DroneVerificationSummary {
     neighborhood: string;
+    georeference: DroneGeoreferenceSummary | null;
+    imageryBaseUrl: string;
     generatedAt: string;
     method: string;
     rules: Record<string, number>;
@@ -2808,6 +2827,9 @@ export interface DroneVerificationDetail extends DroneVerificationRow {
         track: Array<{ t: number; polygon: Array<[number, number]> }>;
         /** Clip the page plays; `start` is its offset in the source video. */
         clip: { url: string; start: number; end: number; width: number; height: number } | null;
+        /** TKGM outline projected into the video (approximate), same units as `track`. */
+        cadastreTrack: Array<{ t: number; polygon: Array<[number, number]> }>;
+        handOverlap: { iou: number; handInsideCadastre: number; cadastreInsideHand: number } | null;
         notes: string[];
     } | null;
 }

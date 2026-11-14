@@ -73,6 +73,24 @@ export interface DroneValidation {
     usable: boolean;
 }
 
+/**
+ * Approximate tie of a video to the map: camera poses solved from the video itself (structure from motion), the model
+ * placed on the map by matching marked buildings to mapped footprints. Metres, not centimetres; no areas.
+ */
+export interface DroneGeoreferenceSummary {
+    method: string;
+    model: { frames: number; points: number; reprojectionErrorPx: number; shot: [number, number]; meanRollDeg: number };
+    controls: Array<{ building: string; target: string; residualM: number }>;
+    markedBuildings: number;
+    rmsM: number;
+    maxResidualM: number;
+    scaleMPerUnit: number;
+    referenceT: number;
+    referenceImage: string;
+    /** Parcels whose projected outline lies fully inside the reference frame. */
+    parcelsInView: string[];
+}
+
 export interface DroneReview {
     parcel: string;
     class: DroneClass;
@@ -112,6 +130,10 @@ export interface DroneVerificationParcel {
     frames: DroneFrame[];
     /** Outline per tracked instant (video seconds of the source), for drawing it over the playing clip. */
     track: Array<{ t: number; polygon: Array<[number, number]> }>;
+    /** TKGM outline projected into the video through the approximate georeference; empty without one. */
+    cadastreTrack: Array<{ t: number; polygon: Array<[number, number]> }>;
+    /** Overlap of the hand-drawn outline with the projected cadastre on the reference frame (shares of pixel area). */
+    handOverlap: { iou: number; handInsideCadastre: number; cadastreInsideHand: number } | null;
     notes: string[];
 }
 
@@ -123,6 +145,7 @@ export interface DroneVerificationBlock {
     capture: DroneCapture;
     /** The part of the video the parcels are on, re-encoded for the site; `start` is its offset in the source video. */
     clip: { file: string; start: number; end: number; width: number; height: number; bytes: number } | null;
+    georeference: DroneGeoreferenceSummary | null;
     suitability: Array<{ topic: string; verdict: 'ok' | 'limited' | 'no'; text: string }>;
     validation: DroneValidation;
     licenceSource: 'demo' | 'caykur';

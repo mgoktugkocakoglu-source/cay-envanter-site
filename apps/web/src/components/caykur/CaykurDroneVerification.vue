@@ -115,6 +115,13 @@ const overlayPoints = computed(() => {
     for (const k of track) if (!best || Math.abs(k.t - videoTime.value) < Math.abs(best.t - videoTime.value)) best = k;
     return best && Math.abs(best.t - videoTime.value) <= 0.3 ? best.polygon.map(([x, y]) => `${x},${y}`).join(' ') : null;
 });
+/** The TKGM outline as projected into the video at the playback position (approximate georeference). */
+const cadastrePoints = computed(() => {
+    const track = detail.value?.drone?.cadastreTrack ?? [];
+    let best: (typeof track)[number] | null = null;
+    for (const k of track) if (!best || Math.abs(k.t - videoTime.value) < Math.abs(best.t - videoTime.value)) best = k;
+    return best && Math.abs(best.t - videoTime.value) <= 0.3 ? best.polygon.map(([x, y]) => `${x},${y}`).join(' ') : null;
+});
 
 const pct = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `%${Math.round(v * 100)}`);
 /** Video time as m:ss. */
@@ -357,6 +364,27 @@ onBeforeUnmount(() => {
                 </CardContent>
             </Card>
 
+            <Card v-if="summary.georeference" class="gap-0 py-0">
+                <CardHeader class="py-4">
+                    <CardTitle class="flex flex-wrap items-center gap-2">
+                        Videodan haritalama
+                        <Badge variant="warning">yaklaşık bindirme</Badge>
+                    </CardTitle>
+                    <CardDescription>
+                        {{ summary.georeference.method }}
+                        {{ summary.georeference.model.frames }} kare · {{ formatNumber(summary.georeference.model.points) }} 3B nokta · {{ summary.georeference.controls.length }} kontrol binası · ortalama hata {{ summary.georeference.rmsM }} m (en büyük {{ summary.georeference.maxResidualM }} m) ·
+                        bu karede tam görünen {{ summary.georeference.parcelsInView.length }} parsel.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent class="flex flex-col gap-2 border-t py-4">
+                    <img :src="summary.imageryBaseUrl + summary.georeference.referenceImage" :alt="`Videonun ${clock(summary.georeference.referenceT)} anındaki kare üzerine bindirilmiş TKGM parsel sınırları`" class="w-full rounded-lg border" />
+                    <p class="text-xs text-muted-foreground">
+                        Beyaz ve sarı çizgiler TKGM parsel sınırlarıdır (videoya yaklaşık bindirme); kırmızı çizgiler elle yapılmış işaretlerdir. Bindirme birkaç metre kayık olabilir: bina izlerinin kendisi dik arazide metrelerce kayıktır ve zemin modeli kabadır.
+                        Santimetre düzeyi için RTK/PPK konumlu çekim gerekir.
+                    </p>
+                </CardContent>
+            </Card>
+
             <div class="grid gap-6 lg:grid-cols-2">
                 <Card class="gap-0 py-0">
                     <CardHeader class="py-4">
@@ -499,6 +527,7 @@ onBeforeUnmount(() => {
                                     <div v-if="mode === 'video' && clip" class="relative overflow-hidden rounded-lg border bg-black">
                                         <video ref="videoEl" :src="clip.url" class="block w-full" controls muted loop playsinline preload="metadata" :aria-label="`${detail.block}/${detail.parcel} parselinin drone videosu`" @loadedmetadata="onVideoReady" />
                                         <svg :viewBox="`0 0 ${clip.width} ${clip.height}`" class="pointer-events-none absolute inset-0 size-full" aria-hidden="true">
+                                            <polygon v-if="cadastrePoints" :points="cadastrePoints" fill="none" stroke="#facc15" stroke-width="3" stroke-dasharray="12 8" stroke-linejoin="round" />
                                             <polygon v-if="overlayPoints" :points="overlayPoints" fill="none" :stroke="CLASS_META[detail.class].color" stroke-width="4" stroke-linejoin="round" />
                                         </svg>
                                     </div>
@@ -508,7 +537,8 @@ onBeforeUnmount(() => {
                                     </div>
                                     <p class="text-xs text-muted-foreground">
                                         <template v-if="mode === 'video'">Video konumu {{ clock(videoTime) }}. Çizim, parselin izlenebildiği {{ clock(detail.drone.video.visible[0]) }}–{{ clock(detail.drone.video.visible[1]) }} arasında videoyla birlikte hareket eder; dışında görünmez. </template>
-                                        Çizgi {{ detail.drone.outline.kind === 'hand_drawn' ? 'elle çizilmiş yaklaşık eşleştirmedir; kadastro sınırı değildir' : 'kadastro sınırıdır' }}. ★ işaretli an, çizimin yapıldığı görselle eşleşen karedir
+                                        <template v-if="mode === 'video' && detail.drone.cadastreTrack.length">Kesikli sarı çizgi, videoya yaklaşık olarak bindirilen TKGM sınırıdır (ortalama hata {{ summary?.georeference?.rmsM ?? '—' }} m); sınır tespiti için kullanılmaz. </template>
+                                        Düz çizgi {{ detail.drone.outline.kind === 'hand_drawn' ? 'elle çizilmiş yaklaşık eşleştirmedir; kadastro sınırı değildir' : 'kadastro sınırıdır' }}. ★ işaretli an, çizimin yapıldığı görselle eşleşen karedir
                                         ({{ detail.drone.video.match.inliers }} / {{ detail.drone.video.match.keypoints }} ortak nokta); diğer anlara çizim otomatik taşındı.
                                         <template v-if="mode === 'classes'">Yeşil: çay · sarı: diğer bitki · gri: yapı/yol. Bu karede çay payı {{ pct(frame.shares.tea) }}.</template>
                                     </p>
