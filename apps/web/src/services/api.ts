@@ -2709,6 +2709,106 @@ export interface PixelValidation {
         kindCorrect: { hit: number; n: number };
     };
 }
+// ── Drone-supported land verification (Drone doğrulama): record × drone imagery per parcel ──
+export type DroneClass = 'tea_present' | 'tea_not_found' | 'partial' | 'uncertain';
+export type DroneMapClass = DroneClass | 'not_analysed';
+export type DroneClassFilter = 'analysed' | DroneMapClass;
+export type DroneStatus = 'consistent' | 'needs_review' | 'not_analysed';
+export type DroneConfidence = 'high' | 'medium' | 'low';
+export type DroneSourceKind = 'video' | 'orthophoto' | 'point_cloud' | 'multispectral' | 'surface_model';
+export type DroneGeoreference = 'none' | 'approximate' | 'gnss' | 'rtk_ppk';
+export interface DroneSource {
+    id: string;
+    title: string;
+    kind: DroneSourceKind;
+    georeference: DroneGeoreference;
+    capturedAt: string;
+    capturedAtNote: string;
+    origin: string;
+    platform: string | null;
+    sensor: string | null;
+    groundSampleCm: number | null;
+    horizontalAccuracyCm: number | null;
+}
+export interface DroneFrame {
+    t: number;
+    isReference: boolean;
+    pixels: number;
+    inliers: number | null;
+    sharpness: number;
+    shares: Record<string, number>;
+    frame: string;
+    classes: string;
+    frameUrl: string;
+    classesUrl: string;
+}
+export interface DroneVerificationSummary {
+    neighborhood: string;
+    generatedAt: string;
+    method: string;
+    rules: Record<string, number>;
+    sources: DroneSource[];
+    capture: { width: number; height: number; fps: number; durationS: number; bitrateMbps: number; shot: [number, number]; sharpnessMedian: number; shiftPerSecondShare: number | null; overlapAtOneSecond: number | null; hasFlightLog: boolean; hasCameraCalibration: boolean; georeference: DroneGeoreference };
+    suitability: Array<{ topic: string; verdict: 'ok' | 'limited' | 'no'; text: string }>;
+    validation: {
+        method: string;
+        classes: string[];
+        frames: number[];
+        pixels: number;
+        accuracy: number;
+        teaRecall: number;
+        teaPrecision: number;
+        trainingRectangles: Record<string, number>;
+        referenceTeaRange: [number, number, number] | null;
+        referenceOtherRange: [number, number, number] | null;
+        transfer: { frames: number[]; pixels: number; accuracy: number; teaRecall: number; teaPrecision: number; note: string } | null;
+        topFeatures: Array<{ feature: string; importance: number }>;
+        usable: boolean;
+    };
+    licenceSource: 'demo' | 'caykur';
+    counts: { parcels: number; analysed: number; byClass: Record<DroneMapClass, number>; needsReview: number };
+}
+export interface DroneVerificationRow {
+    key: string;
+    block: string;
+    parcel: string;
+    nature: string;
+    locality: string;
+    areaM2: number;
+    titleTea: boolean;
+    licensed: boolean;
+    class: DroneMapClass;
+    status: DroneStatus;
+    confidence: DroneConfidence | null;
+    analysedAt: string | null;
+    discrepancy: string | null;
+}
+export interface DroneVerificationDetail extends DroneVerificationRow {
+    deedAreaM2: number | null;
+    licence: { licensed: boolean; areaM2: number | null; codes: string[]; source: 'demo' | 'caykur' | 'none' };
+    satellite: { tea: AuditTeaState; teaShare: number | null; fullPixels: number };
+    geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon;
+    drone: {
+        sourceId: string;
+        sourceTitle: string;
+        analysedAt: string;
+        class: DroneClass;
+        classSource: 'review' | 'automatic';
+        confidence: DroneConfidence;
+        automatic: { class: DroneClass; confidence: DroneConfidence; usable: boolean; teaShareMedian: number; teaShareSpread: number; otherShares: Record<string, number> };
+        review: { parcel: string; class: DroneClass; observer: string; verified: boolean; date: string; frames: number[]; note: string } | null;
+        hypothesis: string | null;
+        status: DroneStatus;
+        discrepancy: string | null;
+        action: string;
+        video: { visible: [number, number]; trackedFrames: number; match: { t: number; inliers: number; keypoints: number } };
+        outline: { t: number; frame: [number, number]; polygon: Array<[number, number]>; reference: string; referenceUrl: string; kind: 'hand_drawn' | 'cadastre' };
+        frames: DroneFrame[];
+        notes: string[];
+    } | null;
+}
+export type DroneMapCollection = GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon, Pick<DroneVerificationRow, 'key' | 'block' | 'parcel' | 'nature' | 'class' | 'status' | 'licensed'>>;
+
 // ── Licence audit (Arazi tespit kararı): deed title × licence register × satellite detection ──
 export type AuditTeaState = 'present' | 'absent' | 'inconclusive' | 'not_assessable';
 export type AuditBuildingState = 'inside' | 'boundary' | 'none' | 'unknown';
@@ -4025,6 +4125,15 @@ export const api = {
         const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
         return request<Paginated<PixelGardenRow>>(`/caykur/tea-inventory/areas/${areaId}/pixel-scan/gardens${query ? `?${query}` : ''}`);
     },
+    getDroneVerificationSummary: (areaId: string) => request<DroneVerificationSummary>(`/caykur/tea-inventory/areas/${areaId}/drone-verification/summary`),
+    getDroneVerificationMap: (areaId: string) => request<DroneMapCollection>(`/caykur/tea-inventory/areas/${areaId}/drone-verification/map`),
+    getDroneVerificationParcels: (areaId: string, params?: { page?: number; limit?: number; class?: DroneClassFilter; search?: string }) => {
+        const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
+        const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        return request<Paginated<DroneVerificationRow>>(`/caykur/tea-inventory/areas/${areaId}/drone-verification/parcels${query ? `?${query}` : ''}`);
+    },
+    getDroneVerificationParcel: (areaId: string, block: string, parcel: string) =>
+        request<DroneVerificationDetail>(`/caykur/tea-inventory/areas/${areaId}/drone-verification/parcels/${encodeURIComponent(block)}/${encodeURIComponent(parcel)}`),
     getLicenceAuditSummary: (areaId: string) => request<LicenceAuditSummary>(`/caykur/tea-inventory/areas/${areaId}/licence-audit/summary`),
     getLicenceAuditParcels: (areaId: string, params?: { page?: number; limit?: number; decision?: AuditDecisionFilter; confidence?: AuditConfidence; flag?: AuditFlag; search?: string }) => {
         const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;

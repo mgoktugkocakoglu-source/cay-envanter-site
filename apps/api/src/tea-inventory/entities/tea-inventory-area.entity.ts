@@ -14,6 +14,7 @@ import { FieldTestsBlock } from '@/tea-inventory/entities/field-test.types';
 import { PixelScanBlock } from '@/tea-inventory/entities/pixel-scan.types';
 import { PruningCombinedBlock } from '@/tea-inventory/entities/pruning-combined.types';
 import { LicenceAuditBlock } from '@/tea-inventory/entities/licence-audit.types';
+import { DroneVerificationBlock } from '@/tea-inventory/entities/drone-verification.types';
 
 /** A detected tea patch (Sentinel-2, 10 m) stored with its area. */
 export interface TeaPatch {
@@ -321,6 +322,11 @@ export class TeaInventoryArea {
     // Not selected by default: only the licence-audit service reads it.
     @Column({ type: 'jsonb', nullable: true, name: 'licence_audit', select: false })
     licenceAudit: LicenceAuditBlock | null;
+
+    // Drone-supported land verification block (record × drone imagery per parcel), absent until verify-drone has run.
+    // Not selected by default: only the drone-verification service reads it.
+    @Column({ type: 'jsonb', nullable: true, name: 'drone_verification', select: false })
+    droneVerification: DroneVerificationBlock | null;
 
     // Bundle timestamp; a re-import is skipped when it has not changed.
     @Column({ type: 'timestamp', name: 'bundle_generated_at' })
