@@ -124,7 +124,7 @@ export interface DroneVerificationParcel {
     status: DroneStatus;
     discrepancy: string | null;
     action: string;
-    video: { visible: [number, number]; trackedFrames: number; match: { t: number; inliers: number; keypoints: number } };
+    video: { visible: [number, number]; trackedFrames: number; match: { t: number; inliers: number; keypoints: number } | null };
     /** Outline on the reference frame, in frame pixels. `hand_drawn` is a marker's drawing, not the cadastral boundary. */
     outline: { t: number; frame: [number, number]; polygon: Array<[number, number]>; reference: string; kind: 'hand_drawn' | 'cadastre' };
     frames: DroneFrame[];

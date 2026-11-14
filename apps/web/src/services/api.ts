@@ -2820,7 +2820,7 @@ export interface DroneVerificationDetail extends DroneVerificationRow {
         status: DroneStatus;
         discrepancy: string | null;
         action: string;
-        video: { visible: [number, number]; trackedFrames: number; match: { t: number; inliers: number; keypoints: number } };
+        video: { visible: [number, number]; trackedFrames: number; match: { t: number; inliers: number; keypoints: number } | null };
         outline: { t: number; frame: [number, number]; polygon: Array<[number, number]>; reference: string; referenceUrl: string; kind: 'hand_drawn' | 'cadastre' };
         frames: DroneFrame[];
         /** Outline per tracked instant, in seconds of the source video and pixels of the frame. */

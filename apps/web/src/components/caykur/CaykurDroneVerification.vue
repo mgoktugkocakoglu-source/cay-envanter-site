@@ -285,7 +285,7 @@ onBeforeUnmount(() => {
             <Card class="gap-0 py-0">
                 <CardHeader class="py-4">
                     <CardTitle>Parsel haritası</CardTitle>
-                    <CardDescription>Sınırlar TKGM kadastro geometrisidir; renk, drone görüntüsünden çıkan sınıftır. Bir parsele tıklayınca kayıt, kanıt kareleri ve karşılaştırma açılır.</CardDescription>
+                    <CardDescription>Sınırlar TKGM kadastro geometrisidir; renk, drone görüntüsünden çıkan sınıftır. Bir parsele tıklayınca kayıt, video, kanıt kareleri ve karşılaştırma açılır.</CardDescription>
                 </CardHeader>
                 <CardContent class="flex flex-col gap-3 pb-4">
                     <div ref="overviewContainer" class="h-[28rem] w-full overflow-hidden rounded-lg border" />
@@ -379,7 +379,7 @@ onBeforeUnmount(() => {
                 <CardContent class="flex flex-col gap-2 border-t py-4">
                     <img :src="summary.imageryBaseUrl + summary.georeference.referenceImage" :alt="`Videonun ${clock(summary.georeference.referenceT)} anındaki kare üzerine bindirilmiş TKGM parsel sınırları`" class="w-full rounded-lg border" />
                     <p class="text-xs text-muted-foreground">
-                        Beyaz ve sarı çizgiler TKGM parsel sınırlarıdır (videoya yaklaşık bindirme); kırmızı çizgiler elle yapılmış işaretlerdir. Bindirme birkaç metre kayık olabilir: bina izlerinin kendisi dik arazide metrelerce kayıktır ve zemin modeli kabadır.
+                        Çizgiler TKGM parsel sınırlarıdır (videoya yaklaşık bindirme). Bindirme birkaç metre kayık olabilir: bina izlerinin kendisi dik arazide metrelerce kayıktır ve zemin modeli kabadır.
                         Santimetre düzeyi için RTK/PPK konumlu çekim gerekir.
                     </p>
                 </CardContent>
@@ -538,8 +538,11 @@ onBeforeUnmount(() => {
                                     <p class="text-xs text-muted-foreground">
                                         <template v-if="mode === 'video'">Video konumu {{ clock(videoTime) }}. Çizim, parselin izlenebildiği {{ clock(detail.drone.video.visible[0]) }}–{{ clock(detail.drone.video.visible[1]) }} arasında videoyla birlikte hareket eder; dışında görünmez. </template>
                                         <template v-if="mode === 'video' && detail.drone.cadastreTrack.length">Kesikli sarı çizgi, videoya yaklaşık olarak bindirilen TKGM sınırıdır (ortalama hata {{ summary?.georeference?.rmsM ?? '—' }} m); sınır tespiti için kullanılmaz. </template>
-                                        Düz çizgi {{ detail.drone.outline.kind === 'hand_drawn' ? 'elle çizilmiş yaklaşık eşleştirmedir; kadastro sınırı değildir' : 'kadastro sınırıdır' }}. ★ işaretli an, çizimin yapıldığı görselle eşleşen karedir
-                                        ({{ detail.drone.video.match.inliers }} / {{ detail.drone.video.match.keypoints }} ortak nokta); diğer anlara çizim otomatik taşındı.
+                                        <template v-if="detail.drone.outline.kind === 'cadastre'">Çizgi, videoya yaklaşık olarak bindirilen TKGM sınırıdır (ortalama hata {{ summary?.georeference?.rmsM ?? '—' }} m): hangi parselin nerede olduğunu gösterir, sınır tespiti için kullanılmaz. ★ işaretli an, parselin karede en büyük göründüğü andır.</template>
+                                        <template v-else>
+                                            Düz çizgi elle çizilmiş yaklaşık eşleştirmedir; kadastro sınırı değildir.
+                                            <template v-if="detail.drone.video.match">★ işaretli an, çizimin yapıldığı görselle eşleşen karedir ({{ detail.drone.video.match.inliers }} / {{ detail.drone.video.match.keypoints }} ortak nokta); diğer anlara çizim otomatik taşındı.</template>
+                                        </template>
                                         <template v-if="mode === 'classes'">Yeşil: çay · sarı: diğer bitki · gri: yapı/yol. Bu karede çay payı {{ pct(frame.shares.tea) }}.</template>
                                     </p>
                                 </div>

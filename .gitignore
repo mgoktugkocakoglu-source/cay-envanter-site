@@ -52,3 +52,6 @@ backup.dump
 .vercel
 .env*
 !.env.example
+
+# Drone evidence frames and clips: local until the footage owner and hosting are settled
+apps/web/public/inventory-imagery/*/drone/
