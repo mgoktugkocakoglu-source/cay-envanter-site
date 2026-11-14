@@ -288,7 +288,8 @@ onBeforeUnmount(() => {
                     <CardDescription>Sınırlar TKGM kadastro geometrisidir; renk, drone görüntüsünden çıkan sınıftır. Bir parsele tıklayınca kayıt, video, kanıt kareleri ve karşılaştırma açılır.</CardDescription>
                 </CardHeader>
                 <CardContent class="flex flex-col gap-3 pb-4">
-                    <div ref="overviewContainer" class="h-[28rem] w-full overflow-hidden rounded-lg border" />
+                    <!-- isolate: Leaflet panes carry z-indexes up to 1000; without their own stacking context they sit above the parcel sheet. -->
+                    <div ref="overviewContainer" class="isolate h-[28rem] w-full overflow-hidden rounded-lg border" />
                     <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
                         <span class="flex items-center gap-1.5"><span class="size-3 rounded-sm" :style="{ background: CLASS_META.tea_present.color }" />Çay varlığı destekleniyor</span>
                         <span class="flex items-center gap-1.5"><span class="size-3 rounded-sm" :style="{ background: CLASS_META.tea_not_found.color }" />Çay bulunamadı</span>
