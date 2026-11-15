@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Plane } from '@lucide/vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { EmptyState, LoadingState, StatCard } from '@/components/shared';
+import CaykurDroneTerrain from '@/components/caykur/CaykurDroneTerrain.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -96,6 +97,9 @@ let parcelMap: L.Map | null = null;
 let overviewLayer: L.GeoJSON | null = null;
 /** The approximate orthophoto of the video over the base map, on both maps. */
 const showOrtho = ref(true);
+/** The 3D terrain view loads its library and images only when opened. */
+const showTerrain = ref(false);
+const CLASS_COLORS = Object.fromEntries(Object.entries(CLASS_META).map(([k, v]) => [k, v.color])) as Record<DroneMapClass, string>;
 const orthoOverlays = new Map<L.Map, L.ImageOverlay>();
 function overviewStyle(f?: { properties: { class?: string } | null }): L.PathOptions {
     const cls = (f?.properties?.class ?? 'not_analysed') as DroneMapClass;
@@ -410,6 +414,23 @@ onBeforeUnmount(() => {
                             <Button variant="outline" size="icon" class="size-11 md:size-9" :disabled="page >= pages" aria-label="Sonraki sayfa" @click="page++"><ChevronRight aria-hidden="true" /></Button>
                         </div>
                     </div>
+                </CardContent>
+            </Card>
+
+            <Card v-if="summary.orthophoto?.terrain && mapData" class="gap-0 py-0">
+                <CardHeader class="py-4">
+                    <CardTitle class="flex flex-wrap items-center gap-2">
+                        3B arazi görünümü
+                        <Badge variant="warning">yaklaşık model</Badge>
+                    </CardTitle>
+                    <CardDescription>
+                        Drone ortofotosu, videodan çıkan zemin modelinin üzerine giydirilir; parsel sınırları sınıf rengiyle çizilir. Eğimi ve parsellerin yamaçtaki yerini gösterir.
+                        {{ summary.orthophoto.terrain.note }} Yükseklik farkı {{ formatNumber(Math.round(summary.orthophoto.terrain.reliefM)) }} m; abartı yok.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent class="flex flex-col gap-3 pb-4">
+                    <Button variant="outline" class="min-h-11 self-start md:min-h-9" :aria-expanded="showTerrain" @click="showTerrain = !showTerrain">{{ showTerrain ? '3B görünümü kapat' : '3B görünümü aç' }}</Button>
+                    <CaykurDroneTerrain v-if="showTerrain" :orthophoto="summary.orthophoto" :imagery-base-url="summary.imageryBaseUrl" :parcels="mapData" :colors="CLASS_COLORS" @open="open" />
                 </CardContent>
             </Card>
 

@@ -90,6 +90,8 @@ export interface DroneOrthophoto {
     georefRmsM: number;
     georefMaxResidualM: number;
     method: string;
+    /** Ground surface under the image for a 3D view: relative heights, 16 bit over the red (high) and green (low) channels. */
+    terrain?: { image: string; width: number; height: number; cellM: number; reliefM: number; note: string };
 }
 /**
  * Approximate tie of a video to the map: camera poses solved from the video itself (structure from motion), the model
