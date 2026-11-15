@@ -4,6 +4,8 @@
  */
 export const COMPLIANCE_OVERALL = ['finding', 'review', 'no_evidence', 'conforming', 'out_of_scope'] as const;
 export type ComplianceOverall = (typeof COMPLIANCE_OVERALL)[number];
+export const COMPLIANCE_CERTAINTY = ['agreed', 'single_source', 'conflict', 'undecidable'] as const;
+export type ComplianceCertainty = (typeof COMPLIANCE_CERTAINTY)[number];
 export type CheckStatus = 'pass' | 'fail' | 'review' | 'unknown' | 'na';
 export type RuleSource = 'record' | 'satellite' | 'drone' | 'field' | 'buildings';
 
@@ -30,6 +32,8 @@ export interface ComplianceParcel {
     areaM2: number;
     licensed: boolean;
     overall: ComplianceOverall;
+    certainty: ComplianceCertainty;
+    certaintyReason: string;
     /** Rules that failed or went to review, worst first. */
     open: string[];
     checks: ComplianceCheck[];
@@ -40,7 +44,8 @@ export interface ComplianceBlock {
     method: string;
     ruleset: { id: string; version: string; status: 'draft'; note: string; config: Record<string, number>; rules: ComplianceRule[] };
     licenceSource: 'demo' | 'caykur';
+    certaintyConfig: Record<string, number>;
     sources: { auditGeneratedAt: string; droneGeneratedAt: string | null; droneParcels: number };
-    summary: { parcels: number; byOverall: Record<ComplianceOverall, number>; byRule: Record<string, Record<CheckStatus, number>> };
+    summary: { parcels: number; byOverall: Record<ComplianceOverall, number>; byCertainty: Record<ComplianceCertainty, { parcels: number; areaM2: number }>; byRule: Record<string, Record<CheckStatus, number>> };
     parcels: ComplianceParcel[];
 }

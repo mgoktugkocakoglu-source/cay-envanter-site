@@ -67,6 +67,17 @@ Vue 3 (Composition API + TS), Vite, Pinia, Vue Router. Path alias `@/` → `src/
 - No `any`. Interfaces are **not** `I`-prefixed (`User`, not `IUser`). Enums are `PascalCase`. Vue component names must be multi-word. Use optional chaining / nullish coalescing defensively.
 - Don't leave commented-out code; rely on git history.
 
+## Licence certainty map
+
+`CaykurCompliance.vue` embeds `CaykurComplianceMap.vue`. The read-only compliance API exposes `map` (all audit
+geometries with overall/certainty), `parcels/:block/:parcel` (existing rule detail) and the `certainty` list filter.
+`services/caykur/complianceMap.ts` owns class labels and browser-local GeoJSON/KML exports (all map features,
+including hidden classes; polygon holes and multipart geometries preserved). Export properties and the screen
+retain DEMO and preliminary-assessment notices. Only `agreed` counts as source agreement; the other three classes
+remain undecided. Ratios describe parcel distribution, not accuracy. Old bundles without certainty fall back to
+`undecidable` until the engine report is regenerated and imported. The map uses the existing satellite tile service;
+do not open it during an offline-only validation unless external tile requests are blocked.
+
 ## Infrastructure
 
 - `docker-compose.yml` — local dev (Postgres 16 + api + web, source-mounted hot reload). `docker-compose.prod.yml` — production build. Dockerfiles: `apps/{api,web}/Dockerfile` (prod) and `Dockerfile.dev` (dev).

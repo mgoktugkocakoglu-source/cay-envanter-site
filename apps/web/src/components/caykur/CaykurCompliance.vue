@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { ChevronLeft, ChevronRight, ListChecks } from '@lucide/vue';
 import { EmptyState, LoadingState, StatCard } from '@/components/shared';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,9 @@ import { useToast } from '@/composables/useToast';
 import { api, type ComplianceCheckStatus, type ComplianceOverall, type ComplianceParcel, type ComplianceRuleSource, type ComplianceSummary } from '@/services/api';
 import { formatM2 } from '@/services/caykur/teaInventory';
 import { formatNumber } from '@/services/caykur';
+import CaykurComplianceMap from '@/components/caykur/CaykurComplianceMap.vue';
+import { CERTAINTIES, CERTAINTY_META } from '@/services/caykur/complianceMap';
+import type { ComplianceCertainty } from '@/services/api';
 
 /**
  * Rule-based licence compliance report (Uygunluk raporu), a separate module under licensing: every parcel is tested
@@ -59,9 +62,17 @@ const pages = ref(1);
 const page = ref(1);
 const search = ref('');
 const overallFilter = ref<ComplianceOverall | typeof ALL>(ALL);
+const certaintyFilter = ref<ComplianceCertainty | typeof ALL>(ALL);
 const ruleFilter = ref<string>(ALL);
 const selected = ref<ComplianceParcel | null>(null);
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
+let loadId = 0;
+let rowsId = 0;
+let detailId = 0;
+const detailLoading = ref(false);
+const agreedCount = computed(() => summary.value?.summary.byCertainty?.agreed.parcels ?? 0);
+const undecidedCount = computed(() => (summary.value?.summary.parcels ?? 0) - agreedCount.value);
+const ratio = (count: number): string => summary.value?.summary.parcels ? `%${(100 * count / summary.value.summary.parcels).toLocaleString('tr-TR', { maximumFractionDigits: 1 })}` : '—';
 
 const rules = computed(() => summary.value?.ruleset.rules ?? []);
 const ruleById = computed(() => new Map(rules.value.map((r) => [r.id, r])));
@@ -73,21 +84,37 @@ const sheetOpen = computed({
 });
 
 async function load(): Promise<void> {
+    const current = ++loadId;
+    rowsId++;
+    detailId++;
+    detailLoading.value = false;
+    selected.value = null;
+    rows.value = [];
+    total.value = 0;
+    pages.value = 1;
+    if (searchTimer) clearTimeout(searchTimer);
     isLoading.value = true;
     const res = await api.getComplianceSummary(props.areaId);
+    if (current !== loadId) return;
     isLoading.value = false;
     summary.value = res.data ?? null;
-    if (res.data) await loadRows();
+    if (res.data) {
+        if (page.value !== 1) page.value = 1;
+        else await loadRows();
+    }
 }
 async function loadRows(): Promise<void> {
+    const current = ++rowsId;
     isLoadingRows.value = true;
     const res = await api.getComplianceParcels(props.areaId, {
         page: page.value,
         limit: PAGE_SIZE,
         overall: overallFilter.value === ALL ? undefined : overallFilter.value,
+        certainty: certaintyFilter.value === ALL ? undefined : certaintyFilter.value,
         rule: ruleFilter.value === ALL ? undefined : ruleFilter.value,
         search: search.value.trim() || undefined,
     });
+    if (current !== rowsId) return;
     isLoadingRows.value = false;
     if (!res.data) {
         toast.error(res.error?.message ?? 'Parsel listesi alınamadı');
@@ -96,6 +123,23 @@ async function loadRows(): Promise<void> {
     rows.value = res.data.data;
     total.value = res.data.meta.total;
     pages.value = Math.max(1, res.data.meta.totalPages);
+}
+async function openParcel(block: string, parcel: string): Promise<void> {
+    const current = ++detailId;
+    detailLoading.value = true;
+    const result = await api.getComplianceParcel(props.areaId, block, parcel);
+    if (current !== detailId) return;
+    detailLoading.value = false;
+    if (result.data) selected.value = result.data;
+    else toast.error(result.error?.message ?? 'Parsel ayrıntısı alınamadı');
+}
+function selectRow(row: ComplianceParcel): void {
+    detailId++;
+    detailLoading.value = false;
+    selected.value = row;
+}
+function onCertainty(value: unknown): void {
+    if (value === ALL || CERTAINTIES.includes(value as ComplianceCertainty)) certaintyFilter.value = value as ComplianceCertainty | typeof ALL;
 }
 function onOverall(v: unknown): void {
     if (typeof v === 'string' && OVERALL_FILTERS.some((f) => f.value === v)) overallFilter.value = v as ComplianceOverall | typeof ALL;
@@ -106,19 +150,26 @@ function onRule(v: unknown): void {
 /** Shows the parcels where one rule is open, from the rule table. */
 function pickRule(id: string): void {
     overallFilter.value = ALL;
+    certaintyFilter.value = ALL;
     ruleFilter.value = id;
 }
 function reload(): void {
     if (page.value === 1) void loadRows();
     else page.value = 1;
 }
-watch([overallFilter, ruleFilter], reload);
+watch([overallFilter, ruleFilter, certaintyFilter], reload);
 watch(search, () => {
     if (searchTimer) clearTimeout(searchTimer);
     searchTimer = setTimeout(reload, 300);
 });
 watch(page, () => void loadRows());
 watch(() => props.areaId, () => void load(), { immediate: true });
+onBeforeUnmount(() => {
+    loadId++;
+    rowsId++;
+    detailId++;
+    if (searchTimer) clearTimeout(searchTimer);
+});
 </script>
 
 <template>
@@ -126,6 +177,8 @@ watch(() => props.areaId, () => void load(), { immediate: true });
         <LoadingState v-if="isLoading" text="Uygunluk raporu yükleniyor…" />
         <EmptyState v-else-if="!summary" :icon="ListChecks" title="Bu mahalle için uygunluk raporu yok" description="Arazi tespit kararı üretildikten sonra kural denetimi çalıştırıldığında burada görünür." />
         <template v-else>
+            <CaykurComplianceMap :area-id="areaId" @select="openParcel" />
+            <LoadingState v-if="detailLoading" text="Parsel ayrıntısı yükleniyor…" />
             <Card class="gap-0 py-0">
                 <CardHeader class="py-4">
                     <CardTitle class="flex flex-wrap items-center gap-2">
@@ -149,6 +202,12 @@ watch(() => props.areaId, () => void load(), { immediate: true });
                 <StatCard label="Uygun" :value="formatNumber(summary.summary.byOverall.conforming)" :hint="`${formatNumber(summary.summary.parcels)} parselden`" />
                 <StatCard label="Kanıt yetersiz" :value="formatNumber(summary.summary.byOverall.no_evidence)" :hint="`kapsam dışı: ${formatNumber(summary.summary.byOverall.out_of_scope)} parsel`" />
             </div>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+                <StatCard label="Kaynaklar uyumlu" :value="formatNumber(agreedCount)" :hint="`${ratio(agreedCount)} · karar verilen ön değerlendirme grubu; idari karar değildir`" />
+                <StatCard label="Karar verilemedi" :value="formatNumber(undecidedCount)" :hint="`${ratio(undecidedCount)} · tek kaynak, çelişki veya belirsiz okuma`" />
+            </div>
+            <p class="text-xs text-muted-foreground">Oranlar parsel dağılımıdır, doğruluk yüzdesi değildir. Mevcut kural sonuçları kaynak uyumundan bağımsızdır; “Uygun” sonucu tek başına karar için yeterli değildir.</p>
 
             <Card class="gap-0 py-0">
                 <CardHeader class="py-4">
@@ -198,6 +257,16 @@ watch(() => props.areaId, () => void load(), { immediate: true });
                             <Input id="compliance-search" v-model="search" placeholder="örn. 106/23" class="h-11 md:h-9" />
                         </div>
                         <div class="flex flex-col gap-1.5 md:w-56">
+                            <Label for="compliance-certainty">Kesinlik sınıfı</Label>
+                            <Select :model-value="certaintyFilter" @update:model-value="onCertainty">
+                                <SelectTrigger id="compliance-certainty" class="min-h-11 w-full"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem :value="ALL">Bütün sınıflar</SelectItem>
+                                    <SelectItem v-for="key in CERTAINTIES" :key="key" :value="key">{{ CERTAINTY_META[key].label }}</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div class="flex flex-col gap-1.5 md:w-56">
                             <Label for="compliance-overall">Sonuç</Label>
                             <Select :model-value="overallFilter" @update:model-value="onOverall">
                                 <SelectTrigger id="compliance-overall" class="h-11 w-full md:h-9"><SelectValue /></SelectTrigger>
@@ -231,7 +300,7 @@ watch(() => props.areaId, () => void load(), { immediate: true });
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                <TableRow v-for="r in rows" :key="r.key" class="cursor-pointer" tabindex="0" @click="selected = r" @keydown.enter="selected = r">
+                                <TableRow v-for="r in rows" :key="r.key" class="cursor-pointer" tabindex="0" @click="selectRow(r)" @keydown.enter="selectRow(r)">
                                     <TableCell class="font-medium">
                                         {{ r.block }}/{{ r.parcel }}
                                         <div class="text-xs text-muted-foreground">{{ r.locality || '—' }} · {{ formatM2(r.areaM2) }}</div>
@@ -240,7 +309,13 @@ watch(() => props.areaId, () => void load(), { immediate: true });
                                         {{ r.nature }}
                                         <div class="text-xs text-muted-foreground">{{ r.licensed ? 'ruhsatlı' : 'ruhsat kaydı yok' }}</div>
                                     </TableCell>
-                                    <TableCell><Badge :variant="toneVariant(OVERALL_META[r.overall].tone)">{{ OVERALL_META[r.overall].label }}</Badge></TableCell>
+                                    <TableCell>
+                                        <div class="flex flex-col items-start gap-1">
+                                            <Badge :variant="toneVariant(CERTAINTY_META[r.certainty ?? 'undecidable'].tone)">{{ CERTAINTY_META[r.certainty ?? 'undecidable'].label }}</Badge>
+                                            <span v-if="r.certainty !== 'agreed'" class="text-xs text-muted-foreground">Karar verilemedi</span>
+                                            <Badge :variant="toneVariant(OVERALL_META[r.overall].tone)">Kural: {{ OVERALL_META[r.overall].label }}</Badge>
+                                        </div>
+                                    </TableCell>
                                     <TableCell>
                                         <div class="flex flex-wrap gap-1">
                                             <Badge v-for="c in r.checks.filter((x) => x.status === 'fail' || x.status === 'review')" :key="c.rule" :variant="toneVariant(STATUS_META[c.status].tone)">{{ c.rule }}</Badge>
@@ -270,12 +345,14 @@ watch(() => props.areaId, () => void load(), { immediate: true });
                         <SheetTitle>{{ summary?.neighborhood }} {{ selected.block }}/{{ selected.parcel }}</SheetTitle>
                         <SheetDescription>{{ selected.nature }} · {{ selected.locality || 'mevkii yok' }} · {{ formatM2(selected.areaM2) }} · {{ selected.licensed ? 'ruhsatlı' : 'ruhsat kaydı yok' }}</SheetDescription>
                         <div class="flex flex-wrap gap-2 pt-1">
+                            <Badge :variant="toneVariant(CERTAINTY_META[selected.certainty ?? 'undecidable'].tone)">{{ CERTAINTY_META[selected.certainty ?? 'undecidable'].label }}</Badge>
                             <Badge :variant="toneVariant(OVERALL_META[selected.overall].tone)">{{ OVERALL_META[selected.overall].label }}</Badge>
                             <Badge variant="warning">Ön değerlendirme</Badge>
                             <Badge v-if="summary?.licenceSource === 'demo'" variant="warning">DEMO ruhsat kaydı</Badge>
                         </div>
                     </SheetHeader>
                     <div class="flex flex-col gap-4 p-4">
+                        <p class="rounded-lg border p-3 text-sm">{{ selected.certaintyReason }} <span v-if="selected.certainty !== 'agreed'">Karar verilemedi.</span> Saha ve kayıt kontrolü öncesinde idari karar olarak kullanılamaz.</p>
                         <p class="text-sm"><span class="font-medium">Öneri:</span> {{ selected.action }}</p>
                         <ul class="flex flex-col gap-3">
                             <li v-for="c in selected.checks" :key="c.rule" class="flex flex-col gap-1 rounded-lg border p-3" :class="{ 'opacity-60': c.status === 'na' }">

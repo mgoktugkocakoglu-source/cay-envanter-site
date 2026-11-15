@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@ne
 import { JwtAuthGuard, CaykurRolesGuard } from '@/auth/guards';
 import { CaykurRoles } from '@/auth/decorators';
 import { CaykurRole } from '@/auth/enums';
-import { ComplianceService, ComplianceSummary } from '@/tea-inventory/compliance.service';
+import { ComplianceMap, ComplianceService, ComplianceSummary } from '@/tea-inventory/compliance.service';
 import { ComplianceParcel } from '@/tea-inventory/entities/compliance.types';
 import { ComplianceQueryDto } from '@/tea-inventory/dto';
 import { Paginated } from '@/common/dto/paginated.dto';
@@ -18,6 +18,24 @@ const READ_ROLES = [CaykurRole.KURUM_ADMIN, CaykurRole.FABRIKA_SORUMLUSU, Caykur
 @Controller('caykur/tea-inventory/areas/:id/compliance')
 export class ComplianceController {
     constructor(private readonly service: ComplianceService) { }
+
+    @Get('map')
+    @ApiOperation({ summary: 'All audit parcels as GeoJSON with preliminary certainty classes and DEMO notice' })
+    @ApiParam({ name: 'id', description: 'Inventory area id' })
+    @ApiResponse({ status: 200, description: 'GeoJSON FeatureCollection' })
+    async map(@Param('id', ParseUUIDPipe) id: string): Promise<ComplianceMap> {
+        return this.service.map(id);
+    }
+
+    @Get('parcels/:block/:parcel')
+    @ApiOperation({ summary: 'One parcel and its rule evidence' })
+    @ApiParam({ name: 'id', description: 'Inventory area id' })
+    @ApiParam({ name: 'block', description: 'Cadastral block number' })
+    @ApiParam({ name: 'parcel', description: 'Cadastral parcel number' })
+    @ApiResponse({ status: 200, description: 'Parcel evidence' })
+    async parcel(@Param('id', ParseUUIDPipe) id: string, @Param('block') block: string, @Param('parcel') parcel: string): Promise<ComplianceParcel> {
+        return this.service.parcel(id, block, parcel);
+    }
 
     @Get('summary')
     @ApiOperation({ summary: 'Rule set, sources and outcome counts per rule' })

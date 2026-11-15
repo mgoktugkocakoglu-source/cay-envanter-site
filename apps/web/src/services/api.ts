@@ -2738,6 +2738,7 @@ export interface ExecutiveSummary {
     areas: ExecutiveAreaRow[];
 }
 export type ComplianceOverall = 'finding' | 'review' | 'no_evidence' | 'conforming' | 'out_of_scope';
+export type ComplianceCertainty = 'agreed' | 'single_source' | 'conflict' | 'undecidable';
 export type ComplianceCheckStatus = 'pass' | 'fail' | 'review' | 'unknown' | 'na';
 export type ComplianceRuleSource = 'record' | 'satellite' | 'drone' | 'field' | 'buildings';
 export interface ComplianceRule {
@@ -2757,6 +2758,8 @@ export interface ComplianceParcel {
     areaM2: number;
     licensed: boolean;
     overall: ComplianceOverall;
+    certainty: ComplianceCertainty;
+    certaintyReason: string;
     open: string[];
     checks: Array<{ rule: string; status: ComplianceCheckStatus; evidence: string }>;
     action: string;
@@ -2768,9 +2771,20 @@ export interface ComplianceSummary {
     method: string;
     ruleset: { id: string; version: string; status: 'draft'; note: string; config: Record<string, number>; rules: ComplianceRule[] };
     licenceSource: 'demo' | 'caykur';
+    certaintyConfig: Record<string, number>;
     sources: { auditGeneratedAt: string; droneGeneratedAt: string | null; droneParcels: number };
-    summary: { parcels: number; byOverall: Record<ComplianceOverall, number>; byRule: Record<string, Record<ComplianceCheckStatus, number>> };
+    summary: { parcels: number; byOverall: Record<ComplianceOverall, number>; byCertainty: Record<ComplianceCertainty, { parcels: number; areaM2: number }>; byRule: Record<string, Record<ComplianceCheckStatus, number>> };
 }
+export type ComplianceMapProperties = Pick<ComplianceParcel, 'key' | 'block' | 'parcel' | 'nature' | 'areaM2' | 'overall' | 'certainty' | 'certaintyReason'> & {
+    licenceSource: 'demo' | 'caykur';
+    notice: string;
+};
+export type ComplianceMapCollection = GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon, ComplianceMapProperties> & {
+    name: string;
+    notice: string;
+    generatedAt: string;
+    licenceSource: 'demo' | 'caykur';
+};
 export type DroneGeoreference = 'none' | 'approximate' | 'gnss' | 'rtk_ppk';
 export interface DroneSource {
     id: string;
@@ -4242,7 +4256,9 @@ export const api = {
         request<DroneVerificationDetail>(`/caykur/tea-inventory/areas/${areaId}/drone-verification/parcels/${encodeURIComponent(block)}/${encodeURIComponent(parcel)}`),
     getExecutiveSummary: () => request<ExecutiveSummary>('/caykur/tea-inventory/executive-summary'),
     getComplianceSummary: (areaId: string) => request<ComplianceSummary>(`/caykur/tea-inventory/areas/${areaId}/compliance/summary`),
-    getComplianceParcels: (areaId: string, params?: { page?: number; limit?: number; overall?: ComplianceOverall; rule?: string; search?: string }) => {
+    getComplianceMap: (areaId: string) => request<ComplianceMapCollection>(`/caykur/tea-inventory/areas/${areaId}/compliance/map`),
+    getComplianceParcel: (areaId: string, block: string, parcel: string) => request<ComplianceParcel>(`/caykur/tea-inventory/areas/${areaId}/compliance/parcels/${encodeURIComponent(block)}/${encodeURIComponent(parcel)}`),
+    getComplianceParcels: (areaId: string, params?: { page?: number; limit?: number; overall?: ComplianceOverall; certainty?: ComplianceCertainty; rule?: string; search?: string }) => {
         const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
         const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
         return request<Paginated<ComplianceParcel>>(`/caykur/tea-inventory/areas/${areaId}/compliance/parcels${query ? `?${query}` : ''}`);

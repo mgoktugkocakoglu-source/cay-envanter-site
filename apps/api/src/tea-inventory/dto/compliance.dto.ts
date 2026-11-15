@@ -1,9 +1,14 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
-import { COMPLIANCE_OVERALL } from '@/tea-inventory/entities/compliance.types';
+import { COMPLIANCE_CERTAINTY, COMPLIANCE_OVERALL } from '@/tea-inventory/entities/compliance.types';
 
 export class ComplianceQueryDto {
+    @ApiPropertyOptional({ enum: COMPLIANCE_CERTAINTY, description: 'Independent evidence agreement class' })
+    @IsOptional()
+    @IsIn(COMPLIANCE_CERTAINTY)
+    certainty?: (typeof COMPLIANCE_CERTAINTY)[number];
+
     @ApiPropertyOptional({ default: 1, minimum: 1 })
     @IsOptional()
     @Type(() => Number)
