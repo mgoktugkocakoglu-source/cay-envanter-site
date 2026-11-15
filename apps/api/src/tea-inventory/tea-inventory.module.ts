@@ -44,6 +44,8 @@ import { LicenceAuditService } from '@/tea-inventory/licence-audit.service';
 import { LicenceAuditController } from '@/tea-inventory/licence-audit.controller';
 import { DroneVerificationService } from '@/tea-inventory/drone-verification.service';
 import { DroneVerificationController } from '@/tea-inventory/drone-verification.controller';
+import { ComplianceService } from '@/tea-inventory/compliance.service';
+import { ComplianceController } from '@/tea-inventory/compliance.controller';
 import { FieldTestController } from '@/tea-inventory/field-test.controller';
 import { GardenHealthController } from '@/tea-inventory/garden-health.controller';
 import { TeaInventoryController } from '@/tea-inventory/tea-inventory.controller';
@@ -68,7 +70,7 @@ import { TeaInventorySeedService } from '@/tea-inventory/tea-inventory-seed.serv
             FertilisationRecord,
         ]),
     ],
-    controllers: [TeaInventoryController, ProducerPruningController, LicensingController, PruningFusionController, ReportController, MinistryRequestController, CalibrationController, GardenHealthController, LandEvaluationController, GardenAgeController, FieldTestController, PixelScanController, PruningCombinedController, LicenceAuditController, DroneVerificationController],
-    providers: [TeaInventoryService, TeaInventorySeedService, ProducerPruningService, LicensingService, LicensingOperationsService, PruningFusionService, EvidenceService, SeasonReportService, MinistryRequestService, CalibrationService, GardenHealthService, RegionOverviewService, LandEvaluationService, GardenAgeService, FieldTestService, FieldTestReportService, PixelScanService, PruningCombinedService, PruningWorklistService, LicenceAuditService, DroneVerificationService],
+    controllers: [ComplianceController, TeaInventoryController, ProducerPruningController, LicensingController, PruningFusionController, ReportController, MinistryRequestController, CalibrationController, GardenHealthController, LandEvaluationController, GardenAgeController, FieldTestController, PixelScanController, PruningCombinedController, LicenceAuditController, DroneVerificationController],
+    providers: [ComplianceService, TeaInventoryService, TeaInventorySeedService, ProducerPruningService, LicensingService, LicensingOperationsService, PruningFusionService, EvidenceService, SeasonReportService, MinistryRequestService, CalibrationService, GardenHealthService, RegionOverviewService, LandEvaluationService, GardenAgeService, FieldTestService, FieldTestReportService, PixelScanService, PruningCombinedService, PruningWorklistService, LicenceAuditService, DroneVerificationService],
 })
 export class TeaInventoryModule { }

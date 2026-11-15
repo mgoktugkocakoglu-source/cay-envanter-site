@@ -2716,6 +2716,40 @@ export type DroneClassFilter = 'analysed' | DroneMapClass;
 export type DroneStatus = 'consistent' | 'needs_review' | 'not_analysed';
 export type DroneConfidence = 'high' | 'medium' | 'low';
 export type DroneSourceKind = 'video' | 'orthophoto' | 'point_cloud' | 'multispectral' | 'surface_model';
+export type ComplianceOverall = 'finding' | 'review' | 'no_evidence' | 'conforming' | 'out_of_scope';
+export type ComplianceCheckStatus = 'pass' | 'fail' | 'review' | 'unknown' | 'na';
+export type ComplianceRuleSource = 'record' | 'satellite' | 'drone' | 'field' | 'buildings';
+export interface ComplianceRule {
+    id: string;
+    title: string;
+    expects: string;
+    appliesTo: string;
+    sources: ComplianceRuleSource[];
+    findingNeeds: string;
+}
+export interface ComplianceParcel {
+    key: string;
+    block: string;
+    parcel: string;
+    nature: string;
+    locality: string;
+    areaM2: number;
+    licensed: boolean;
+    overall: ComplianceOverall;
+    open: string[];
+    checks: Array<{ rule: string; status: ComplianceCheckStatus; evidence: string }>;
+    action: string;
+}
+/** Rule-based licence compliance report: rule set, sources and outcome counts (preliminary assessment). */
+export interface ComplianceSummary {
+    neighborhood: string;
+    generatedAt: string;
+    method: string;
+    ruleset: { id: string; version: string; status: 'draft'; note: string; config: Record<string, number>; rules: ComplianceRule[] };
+    licenceSource: 'demo' | 'caykur';
+    sources: { auditGeneratedAt: string; droneGeneratedAt: string | null; droneParcels: number };
+    summary: { parcels: number; byOverall: Record<ComplianceOverall, number>; byRule: Record<string, Record<ComplianceCheckStatus, number>> };
+}
 export type DroneGeoreference = 'none' | 'approximate' | 'gnss' | 'rtk_ppk';
 export interface DroneSource {
     id: string;
@@ -4179,6 +4213,12 @@ export const api = {
     },
     getDroneVerificationParcel: (areaId: string, block: string, parcel: string) =>
         request<DroneVerificationDetail>(`/caykur/tea-inventory/areas/${areaId}/drone-verification/parcels/${encodeURIComponent(block)}/${encodeURIComponent(parcel)}`),
+    getComplianceSummary: (areaId: string) => request<ComplianceSummary>(`/caykur/tea-inventory/areas/${areaId}/compliance/summary`),
+    getComplianceParcels: (areaId: string, params?: { page?: number; limit?: number; overall?: ComplianceOverall; rule?: string; search?: string }) => {
+        const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
+        const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        return request<Paginated<ComplianceParcel>>(`/caykur/tea-inventory/areas/${areaId}/compliance/parcels${query ? `?${query}` : ''}`);
+    },
     getLicenceAuditSummary: (areaId: string) => request<LicenceAuditSummary>(`/caykur/tea-inventory/areas/${areaId}/licence-audit/summary`),
     getLicenceAuditParcels: (areaId: string, params?: { page?: number; limit?: number; decision?: AuditDecisionFilter; confidence?: AuditConfidence; flag?: AuditFlag; search?: string }) => {
         const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;

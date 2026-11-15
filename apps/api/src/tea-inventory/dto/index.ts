@@ -14,3 +14,4 @@ export * from './pixel-scan.dto';
 export * from './pruning-combined.dto';
 export * from './licence-audit.dto';
 export * from './drone-verification.dto';
+export * from './compliance.dto';

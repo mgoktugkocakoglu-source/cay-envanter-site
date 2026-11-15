@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import CaykurLicensingOperations, { type OperationKind } from '@/components/caykur/CaykurLicensingOperations.vue';
 import CaykurLicenceAudit from '@/components/caykur/CaykurLicenceAudit.vue';
 import CaykurDroneVerification from '@/components/caykur/CaykurDroneVerification.vue';
+import CaykurCompliance from '@/components/caykur/CaykurCompliance.vue';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmptyState, ListToolbar, LoadingState, SearchInput, StatCard } from '@/components/shared';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -82,7 +83,7 @@ const tkgm = useTkgmParcelLookup();
 const summary = ref<LicensingSummary | null>(null);
 const isLoading = ref(true);
 const error = ref<string | null>(null);
-const view = ref<'producers' | 'applications' | 'map' | 'audit' | 'drone'>('producers');
+const view = ref<'producers' | 'applications' | 'map' | 'audit' | 'drone' | 'compliance'>('producers');
 
 // ── Producers ──
 const search = ref('');
@@ -510,7 +511,7 @@ onBeforeUnmount(() => {
 });
 
 function onView(v: unknown): void {
-    if (v === 'producers' || v === 'applications' || v === 'map' || v === 'audit' || v === 'drone') view.value = v;
+    if (v === 'producers' || v === 'applications' || v === 'map' || v === 'audit' || v === 'drone' || v === 'compliance') view.value = v;
 }
 function onMatch(v: unknown): void {
     matchFilter.value = typeof v === 'string' && v !== '' ? (v as LicenseMatchLevel | typeof ALL) : ALL;
@@ -659,6 +660,7 @@ function toggleGarden(code: string): void {
                 <ToggleGroupItem value="map" class="h-11 px-3 md:h-9">Kurum haritası</ToggleGroupItem>
                 <ToggleGroupItem value="audit" class="h-11 px-3 md:h-9">Arazi tespit kararı</ToggleGroupItem>
                 <ToggleGroupItem value="drone" class="h-11 px-3 md:h-9">Drone doğrulama</ToggleGroupItem>
+                <ToggleGroupItem value="compliance" class="h-11 px-3 md:h-9">Uygunluk raporu</ToggleGroupItem>
             </ToggleGroup>
         </div>
 
@@ -667,6 +669,9 @@ function toggleGarden(code: string): void {
 
         <!-- ── Drone-supported land verification: record × drone imagery (separate module) ── -->
         <CaykurDroneVerification v-if="view === 'drone'" :area-id="areaId" />
+
+        <!-- ── Rule-based licence compliance report: every parcel against a written rule set (separate module) ── -->
+        <CaykurCompliance v-if="view === 'compliance'" :area-id="areaId" />
 
         <!-- ── Producers ── -->
         <Card v-if="view === 'producers'">
