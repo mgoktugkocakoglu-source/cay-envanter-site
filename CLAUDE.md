@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 "Çay Üreticisi Platformu" — a digital platform for tea (çay) producers. pnpm-workspace monorepo: a NestJS API (`apps/api`) and a Vue 3 web app (`apps/web`) that is also packaged as a native mobile app via Capacitor. Product UI/content is Turkish; **all code, DB schema, API contracts, and comments must be English** (see Conventions).
 
-> `AGENTS.md` in the repo root is an unrelated n8n-MCP agent prompt — ignore it for this codebase. `GEMINI.md` and the `.agent/` rules are the relevant project guidance.
+> `AGENTS.md` in the repo root is the short guide for other coding agents (Codex) and points back to this file; keep the two consistent. The n8n-MCP agent prompt that used to live there is `n8n-workflows/n8n-agent-prompt.md`. `GEMINI.md` and the `.agent/` rules are further project guidance.
 
 ## Commands
 
