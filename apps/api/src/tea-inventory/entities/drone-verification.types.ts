@@ -109,6 +109,10 @@ export interface DroneGeoreferenceSummary {
     referenceImage: string;
     /** Parcels whose projected outline lies fully inside the reference frame. */
     parcelsInView: string[];
+    /** Untouched frames along the flight with the outlines of the parcels each one really shows (frame pixels). */
+    referenceFrames?: Array<{ t: number; image: string; width: number; height: number; outlines: Array<{ parcel: string; pixels: number; polygon: Array<[number, number]> }> }>;
+    /** Correction spread between the controls, and the error at a control predicted from the others. */
+    localCorrection?: { used: boolean; reachM: number | null; leftOutRmsM: number };
 }
 
 export interface DroneReview {

@@ -97,6 +97,22 @@ let parcelMap: L.Map | null = null;
 let overviewLayer: L.GeoJSON | null = null;
 /** The approximate orthophoto of the video over the base map, on both maps. */
 const showOrtho = ref(true);
+/** Which of the reference frames of the video mapping card is shown. */
+const referenceIndex = ref(0);
+const referenceFrame = computed(() => summary.value?.georeference?.referenceFrames?.[referenceIndex.value] ?? null);
+const classByParcel = computed(() => new Map((mapData.value?.features ?? []).map((f) => [`${f.properties.block}/${f.properties.parcel}`, f.properties.class])));
+/** Outlines of the shown frame, largest first in the markup so that small parcels stay on top and clickable. */
+const referenceOutlines = computed(() =>
+    [...(referenceFrame.value?.outlines ?? [])]
+        .sort((a, b) => b.pixels - a.pixels)
+        .map((o) => {
+            const cls = classByParcel.value.get(o.parcel) ?? 'not_analysed';
+            const [block, parcel] = o.parcel.split('/') as [string, string];
+            const cx = o.polygon.reduce((sum, p) => sum + p[0], 0) / o.polygon.length;
+            const cy = o.polygon.reduce((sum, p) => sum + p[1], 0) / o.polygon.length;
+            return { key: o.parcel, block, parcel, points: o.polygon.map((p) => p.join(',')).join(' '), color: CLASS_META[cls].color, label: `${o.parcel} · ${CLASS_META[cls].label}`, showLabel: o.pixels >= 6000, cx, cy };
+        }),
+);
 /** The 3D terrain view loads its library and images only when opened. */
 const showTerrain = ref(false);
 const CLASS_COLORS = Object.fromEntries(Object.entries(CLASS_META).map(([k, v]) => [k, v.color])) as Record<DroneMapClass, string>;
@@ -442,14 +458,39 @@ onBeforeUnmount(() => {
                     </CardTitle>
                     <CardDescription>
                         {{ summary.georeference.method }}
-                        {{ summary.georeference.model.frames }} kare · {{ formatNumber(summary.georeference.model.points) }} 3B nokta · {{ summary.georeference.controls.length }} kontrol binası · ortalama hata {{ summary.georeference.rmsM }} m (en büyük {{ summary.georeference.maxResidualM }} m) ·
-                        bu karede tam görünen {{ summary.georeference.parcelsInView.length }} parsel.
+                        {{ summary.georeference.model.frames }} kare · {{ formatNumber(summary.georeference.model.points) }} 3B nokta · {{ summary.georeference.controls.length }} kontrol binası · ortalama hata {{ summary.georeference.rmsM }} m (en büyük {{ summary.georeference.maxResidualM }} m).
+                        <template v-if="summary.georeference.localCorrection?.used">Kontrol binaları arasında yerel düzeltme uygulanır; dışarıda bırakılan bir binada beklenen hata {{ summary.georeference.localCorrection.leftOutRmsM }} m.</template>
                     </CardDescription>
                 </CardHeader>
                 <CardContent class="flex flex-col gap-2 border-t py-4">
-                    <img :src="summary.imageryBaseUrl + summary.georeference.referenceImage" :alt="`Videonun ${clock(summary.georeference.referenceT)} anındaki kare üzerine bindirilmiş TKGM parsel sınırları`" class="w-full rounded-lg border" />
+                    <template v-if="referenceFrame">
+                        <div class="flex flex-wrap gap-2" role="group" aria-label="Videodan kare seçimi">
+                            <Button v-for="(f, i) in summary.georeference.referenceFrames" :key="f.t" :variant="i === referenceIndex ? 'default' : 'outline'" class="min-h-11 tabular-nums md:min-h-9" :aria-pressed="i === referenceIndex" @click="referenceIndex = i">
+                                {{ clock(f.t) }} · {{ f.outlines.length }} parsel
+                            </Button>
+                        </div>
+                        <div class="relative overflow-hidden rounded-lg border">
+                            <img :src="summary.imageryBaseUrl + referenceFrame.image" :alt="`Videonun ${clock(referenceFrame.t)} anındaki kare`" class="block w-full" />
+                            <svg :viewBox="`0 0 ${referenceFrame.width} ${referenceFrame.height}`" class="absolute inset-0 size-full" role="group" :aria-label="`Karede görünen ${referenceFrame.outlines.length} parselin TKGM sınırları`">
+                                <g v-for="o in referenceOutlines" :key="o.key" class="reference-parcel cursor-pointer" tabindex="0" role="button" :aria-label="o.label" @click="open(o.block, o.parcel)" @keydown.enter="open(o.block, o.parcel)">
+                                    <title>{{ o.label }}</title>
+                                    <polygon :points="o.points" fill="none" stroke="#0f172a" stroke-opacity="0.55" stroke-width="4" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+                                    <polygon :points="o.points" class="reference-fill" :fill="o.color" :stroke="o.color" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+                                    <text v-if="o.showLabel" :x="o.cx" :y="o.cy" text-anchor="middle" dominant-baseline="middle" font-size="15" font-weight="600" fill="#ffffff" stroke="#0f172a" stroke-width="3" paint-order="stroke" class="pointer-events-none select-none">{{ o.key }}</text>
+                                </g>
+                            </svg>
+                        </div>
+                        <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
+                            <span class="flex items-center gap-1.5"><span class="size-3 rounded-sm" :style="{ background: CLASS_META.tea_present.color }" />Çay mevcut</span>
+                            <span class="flex items-center gap-1.5"><span class="size-3 rounded-sm" :style="{ background: CLASS_META.tea_not_found.color }" />Çay bulunamadı</span>
+                            <span class="flex items-center gap-1.5"><span class="size-3 rounded-sm" :style="{ background: CLASS_META.partial.color }" />Kısmen çay</span>
+                            <span class="flex items-center gap-1.5"><span class="size-3 rounded-sm" :style="{ background: CLASS_META.uncertain.color }" />Belirsiz</span>
+                            <span>Bir parsele tıklayınca ayrıntısı açılır.</span>
+                        </div>
+                    </template>
+                    <img v-else :src="summary.imageryBaseUrl + summary.georeference.referenceImage" :alt="`Videonun ${clock(summary.georeference.referenceT)} anındaki kare üzerine bindirilmiş TKGM parsel sınırları`" class="w-full rounded-lg border" />
                     <p class="text-xs text-muted-foreground">
-                        Çizgiler TKGM parsel sınırlarıdır (videoya yaklaşık bindirme). Bindirme birkaç metre kayık olabilir: bina izlerinin kendisi dik arazide metrelerce kayıktır ve zemin modeli kabadır.
+                        Çizgiler TKGM parsel sınırlarıdır (videoya yaklaşık bindirme). Yalnız karenin gerçekten gördüğü, yakın ve zemini çözülmüş parseller çizilir; sırtın arkasında kalan ya da çok uzaktaki parseller çizilmez. Bindirme birkaç metre kayık olabilir: bina izlerinin kendisi dik arazide metrelerce kayıktır ve zemin modeli kabadır.
                         Santimetre düzeyi için RTK/PPK konumlu çekim gerekir.
                     </p>
                 </CardContent>
@@ -665,3 +706,23 @@ onBeforeUnmount(() => {
         </Sheet>
     </div>
 </template>
+
+<style scoped>
+/* Hover and focus states of the outlines drawn over a video frame (SVG presentation, no layout). */
+.reference-fill {
+    fill-opacity: 0.06;
+    transition: fill-opacity 120ms;
+}
+.reference-parcel:hover .reference-fill,
+.reference-parcel:focus-visible .reference-fill {
+    fill-opacity: 0.4;
+}
+.reference-parcel:focus-visible {
+    outline: none;
+}
+@media (prefers-reduced-motion: reduce) {
+    .reference-fill {
+        transition: none;
+    }
+}
+</style>

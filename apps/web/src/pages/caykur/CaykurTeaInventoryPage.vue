@@ -26,6 +26,8 @@ import CaykurReports from '@/components/caykur/CaykurReports.vue';
 import CaykurCalibration from '@/components/caykur/CaykurCalibration.vue';
 import CaykurGardenHealth from '@/components/caykur/CaykurGardenHealth.vue';
 import CaykurRegionOverview from '@/components/caykur/CaykurRegionOverview.vue';
+import CaykurExecutiveSummary from '@/components/caykur/CaykurExecutiveSummary.vue';
+import CaykurMethodNotes from '@/components/caykur/CaykurMethodNotes.vue';
 import CaykurLandEvaluation from '@/components/caykur/CaykurLandEvaluation.vue';
 import CaykurGardenAge from '@/components/caykur/CaykurGardenAge.vue';
 import CaykurFieldTests from '@/components/caykur/CaykurFieldTests.vue';
@@ -118,6 +120,11 @@ watch([activeTab, areas], () => {
     const target = areas.value.find((a) => a.code === FIELD_TEST_AREA_CODE);
     if (target && areaId.value !== target.id) areaId.value = target.id;
 });
+/** From the executive summary: the neighbourhood opens on the licensing tab, where its audit and compliance views are. */
+function openAreaCompliance(id: string): void {
+    areaId.value = id;
+    activeTab.value = 'licensing';
+}
 function openArea(id: string): void {
     areaId.value = id;
     activeTab.value = 'inventory';
@@ -173,12 +180,14 @@ const periodLine = computed(() => {
     return p?.start && p?.end ? `${p.start.slice(0, 4)}–${String(Number(p.end.slice(0, 4)) - 1)} Sentinel-1/2` : 'Sentinel-1/2';
 });
 
+const DEFAULT_AREA_CODE = 'trabzon-of-cataldere';
 // ── Loading ──
 async function loadAreas(): Promise<void> {
     const res = await api.getInventoryAreas();
     if (res.data) {
         areas.value = res.data.data;
-        areaId.value = areas.value[0]?.id ?? '';
+        // The pilot neighbourhood opens first: it is the one every module has data for.
+        areaId.value = (areas.value.find((x) => x.code === DEFAULT_AREA_CODE) ?? areas.value[0])?.id ?? '';
         if (!areaId.value) isLoadingArea.value = false;
     } else {
         areaError.value = res.error?.message ?? 'Envanter alanları alınamadı';
@@ -433,6 +442,8 @@ function onRowKey(e: KeyboardEvent, id: string): void {
                     </TabsList>
                 </Tabs>
 
+                <CaykurExecutiveSummary v-if="activeTab === 'summary'" :selected-area-id="areaId" @select="openAreaCompliance" />
+                <CaykurMethodNotes v-if="activeTab === 'method'" />
                 <CaykurRegionOverview v-if="activeTab === 'region'" ref="regionOverview" :selected-area-id="areaId" @select="openArea" />
 
                 <div v-show="activeTab === 'inventory'" class="flex flex-col gap-6">

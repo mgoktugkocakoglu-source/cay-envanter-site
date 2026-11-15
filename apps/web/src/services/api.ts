@@ -2716,6 +2716,27 @@ export type DroneClassFilter = 'analysed' | DroneMapClass;
 export type DroneStatus = 'consistent' | 'needs_review' | 'not_analysed';
 export type DroneConfidence = 'high' | 'medium' | 'low';
 export type DroneSourceKind = 'video' | 'orthophoto' | 'point_cloud' | 'multispectral' | 'surface_model';
+export interface ExecutiveAreaRow {
+    id: string;
+    code: string;
+    province: string;
+    district: string;
+    neighborhood: string;
+    updatedAt: string;
+    licenceSource: 'demo' | 'caykur' | null;
+    parcels: number;
+    audit: { generatedAt: string; byDecision: Record<string, number> } | null;
+    compliance: { generatedAt: string; rulesetVersion: string; byOverall: Record<ComplianceOverall, number> } | null;
+    drone: { analysedAt: string | null; analysed: number; needsReview: number; verified: number; byClass: Partial<Record<DroneClass, number>>; rmsM: number | null } | null;
+    fieldObserved: number;
+}
+/** Executive summary: what has been checked in every neighbourhood, by which evidence, and what is open. */
+export interface ExecutiveSummary {
+    generatedAt: string;
+    totals: { areas: number; areasAudited: number; areasWithCompliance: number; areasWithDrone: number; demoAreas: number; parcels: number; byOverall: Record<ComplianceOverall, number>; droneAnalysed: number; droneVerified: number; fieldObserved: number };
+    openRules: Array<{ id: string; title: string; fail: number; review: number }>;
+    areas: ExecutiveAreaRow[];
+}
 export type ComplianceOverall = 'finding' | 'review' | 'no_evidence' | 'conforming' | 'out_of_scope';
 export type ComplianceCheckStatus = 'pass' | 'fail' | 'review' | 'unknown' | 'na';
 export type ComplianceRuleSource = 'record' | 'satellite' | 'drone' | 'field' | 'buildings';
@@ -2792,6 +2813,10 @@ export interface DroneGeoreferenceSummary {
     referenceImage: string;
     /** Parcels whose projected outline lies fully inside the reference frame. */
     parcelsInView: string[];
+    /** Untouched frames along the flight with the outlines of the parcels each one really shows (frame pixels). */
+    referenceFrames?: Array<{ t: number; image: string; width: number; height: number; outlines: Array<{ parcel: string; pixels: number; polygon: Array<[number, number]> }> }>;
+    /** Correction spread between the controls, and the error at a control predicted from the others. */
+    localCorrection?: { used: boolean; reachM: number | null; leftOutRmsM: number };
 }
 /**
  * Approximate orthophoto of the video (py/drone_ortho.py): each ground cell coloured from the solved frame that sees
@@ -4215,6 +4240,7 @@ export const api = {
     },
     getDroneVerificationParcel: (areaId: string, block: string, parcel: string) =>
         request<DroneVerificationDetail>(`/caykur/tea-inventory/areas/${areaId}/drone-verification/parcels/${encodeURIComponent(block)}/${encodeURIComponent(parcel)}`),
+    getExecutiveSummary: () => request<ExecutiveSummary>('/caykur/tea-inventory/executive-summary'),
     getComplianceSummary: (areaId: string) => request<ComplianceSummary>(`/caykur/tea-inventory/areas/${areaId}/compliance/summary`),
     getComplianceParcels: (areaId: string, params?: { page?: number; limit?: number; overall?: ComplianceOverall; rule?: string; search?: string }) => {
         const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
