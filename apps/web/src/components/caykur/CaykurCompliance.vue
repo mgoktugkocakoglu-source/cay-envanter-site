@@ -17,6 +17,8 @@ import { formatM2 } from '@/services/caykur/teaInventory';
 import { formatNumber } from '@/services/caykur';
 import CaykurComplianceMap from '@/components/caykur/CaykurComplianceMap.vue';
 import CaykurRemoteEvidence from '@/components/caykur/CaykurRemoteEvidence.vue';
+import CaykurComplianceTerrain from '@/components/caykur/CaykurComplianceTerrain.vue';
+import CaykurParcelDroneEvidence from '@/components/caykur/CaykurParcelDroneEvidence.vue';
 import { CERTAINTIES, CERTAINTY_META } from '@/services/caykur/complianceMap';
 import type { ComplianceCertainty } from '@/services/api';
 
@@ -179,6 +181,7 @@ onBeforeUnmount(() => {
         <EmptyState v-else-if="!summary" :icon="ListChecks" title="Bu mahalle için uygunluk raporu yok" description="Arazi tespit kararı üretildikten sonra kural denetimi çalıştırıldığında burada görünür." />
         <template v-else>
             <CaykurComplianceMap :area-id="areaId" @select="openParcel" />
+            <CaykurComplianceTerrain :area-id="areaId" @select="openParcel" />
             <LoadingState v-if="detailLoading" text="Parsel ayrıntısı yükleniyor…" />
             <Card class="gap-0 py-0">
                 <CardHeader class="py-4">
@@ -354,6 +357,7 @@ onBeforeUnmount(() => {
                     </SheetHeader>
                     <div class="flex flex-col gap-4 p-4">
                         <CaykurRemoteEvidence :area-id="areaId" :block="selected.block" :parcel="selected.parcel" />
+                        <CaykurParcelDroneEvidence :area-id="areaId" :block="selected.block" :parcel="selected.parcel" />
                         <p class="rounded-lg border p-3 text-sm">{{ selected.certaintyReason }} <span v-if="selected.certainty !== 'agreed'">Karar verilemedi.</span> Saha ve kayıt kontrolü öncesinde idari karar olarak kullanılamaz.</p>
                         <p class="text-sm"><span class="font-medium">Öneri:</span> {{ selected.action }}</p>
                         <ul class="flex flex-col gap-3">

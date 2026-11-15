@@ -15,6 +15,7 @@ import { PruningCombinedBlock } from '@/tea-inventory/entities/pruning-combined.
 import { LicenceAuditBlock } from '@/tea-inventory/entities/licence-audit.types';
 import { DroneVerificationBlock } from '@/tea-inventory/entities/drone-verification.types';
 import { ComplianceBlock } from '@/tea-inventory/entities/compliance.types';
+import { RemoteTerrain } from '@/tea-inventory/entities/remote-terrain.types';
 import { TeaInventoryGarden, GardenSeason, GardenPruningEvent, GardenFusion, RadarResult, RadarSeries, GardenHealthSeason } from '@/tea-inventory/entities/tea-inventory-garden.entity';
 import { TeaInventoryLicense } from '@/tea-inventory/entities/tea-inventory-license.entity';
 import { ParcelLineage } from '@/tea-inventory/entities/parcel-lineage.entity';
@@ -113,6 +114,7 @@ interface InventoryBundle {
     licenceAudit?: LicenceAuditBlock | null;
     droneVerification?: DroneVerificationBlock | null;
     compliance?: ComplianceBlock | null;
+    remoteTerrain?: RemoteTerrain | null;
 }
 
 /** Optional land-evaluation block: area-level climate/summary plus one evaluation per parcel key. */
@@ -307,6 +309,7 @@ export class TeaInventorySeedService implements OnModuleInit {
                     licenceAudit: bundle.licenceAudit ?? null,
                     droneVerification: bundle.droneVerification ?? null,
                     compliance: bundle.compliance ?? null,
+                    remoteTerrain: bundle.remoteTerrain ?? null,
                     bundleGeneratedAt: generatedAt,
                 }),
             );

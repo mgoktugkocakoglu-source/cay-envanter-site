@@ -13,6 +13,11 @@ import { RemoteEvidenceService } from '@/tea-inventory/remote-evidence.service';
 export class RemoteEvidenceController {
     constructor(private readonly service: RemoteEvidenceService) { }
 
+    @Get('terrain')
+    @ApiOperation({ summary: 'Existing relative terrain metadata; no orthophoto and no new reconstruction' })
+    @ApiParam({ name: 'id', description: 'Inventory area id' })
+    terrain(@Param('id', ParseUUIDPipe) id: string) { return this.service.terrain(id); }
+
     @Get('timeline')
     @ApiOperation({ summary: 'Locally imported satellite scenes and approximate drone coverage' })
     @ApiParam({ name: 'id', description: 'Inventory area id' })

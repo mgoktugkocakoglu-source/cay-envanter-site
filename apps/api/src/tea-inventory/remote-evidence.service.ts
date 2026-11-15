@@ -12,6 +12,12 @@ export class RemoteEvidenceService {
         @InjectRepository(TeaInventoryParcel) private readonly parcels: Repository<TeaInventoryParcel>,
     ) { }
 
+    async terrain(id: string) {
+        const area = await this.areas.findOne({ where: { id }, select: ['id', 'remoteTerrain'] });
+        if (!area) throw new NotFoundException('Area not found');
+        return area.remoteTerrain ?? null;
+    }
+
     async timeline(id: string) {
         const area = await this.areas.findOne({ where: { id }, select: ['id', 'producerScan', 'droneVerification'] });
         if (!area) throw new NotFoundException('Area not found');

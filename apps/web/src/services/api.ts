@@ -2750,6 +2750,21 @@ export interface RemoteParcelEvidence {
     annual: { years: number[]; ndvi: Array<number | null> } | null;
     drone: { capturedAt: string; capturedAtNote: string; class: string; verified: boolean } | null;
 }
+export interface RemoteTerrain {
+    sourceId: string;
+    capturedAt: string;
+    capturedAtNote: string;
+    imageUrl: string;
+    bounds: { southWest: [number, number]; northEast: [number, number] };
+    width: number;
+    height: number;
+    widthM: number;
+    heightM: number;
+    reliefM: number;
+    note: string;
+    georefRmsM: number;
+    georefMaxResidualM: number;
+}
 export type ComplianceCheckStatus = 'pass' | 'fail' | 'review' | 'unknown' | 'na';
 export type ComplianceRuleSource = 'record' | 'satellite' | 'drone' | 'field' | 'buildings';
 export interface ComplianceRule {
@@ -4269,6 +4284,7 @@ export const api = {
     getComplianceSummary: (areaId: string) => request<ComplianceSummary>(`/caykur/tea-inventory/areas/${areaId}/compliance/summary`),
     getComplianceMap: (areaId: string) => request<ComplianceMapCollection>(`/caykur/tea-inventory/areas/${areaId}/compliance/map`),
     getRemoteEvidenceTimeline: (areaId: string) => request<RemoteEvidenceTimeline>(`/caykur/tea-inventory/areas/${areaId}/remote-evidence/timeline`),
+    getRemoteTerrain: (areaId: string) => request<RemoteTerrain | null>(`/caykur/tea-inventory/areas/${areaId}/remote-evidence/terrain`),
     getRemoteParcelEvidence: (areaId: string, block: string, parcel: string) => request<RemoteParcelEvidence>(`/caykur/tea-inventory/areas/${areaId}/remote-evidence/parcels/${encodeURIComponent(block)}/${encodeURIComponent(parcel)}`),
     getComplianceParcel: (areaId: string, block: string, parcel: string) => request<ComplianceParcel>(`/caykur/tea-inventory/areas/${areaId}/compliance/parcels/${encodeURIComponent(block)}/${encodeURIComponent(parcel)}`),
     getComplianceParcels: (areaId: string, params?: { page?: number; limit?: number; overall?: ComplianceOverall; certainty?: ComplianceCertainty; rule?: string; search?: string }) => {

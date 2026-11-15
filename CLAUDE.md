@@ -99,3 +99,7 @@ All web pages are built from one kit — shadcn-vue primitives in `apps/web/src/
 ## Remote evidence timeline
 
 The read-only `remote-evidence` endpoints expose existing scene metadata and parcel age-series observations. The compliance map uses local Sentinel-2 images without external tiles; selecting a date does not recalculate licence classes. Thick outlines identify parcels with a drone reading, not an exact flight footprint. `CaykurRemoteEvidence.vue` shows monthly NDVI with gaps and annual Landsat values; neither is a tea classifier. No new field observation workflow is planned.
+
+## Relative 3D licence view
+
+The separate remoteTerrain JSONB block imports existing local relative heights. GET remote-evidence/terrain returns metadata or null. CaykurComplianceTerrain and CaykurLicenceTerrain render a neutral surface with certainty overlays and parcel selection; the disabled video orthophoto stays disabled. Bounds intersections are bounding-box coverage, not verified imagery coverage. CaykurParcelDroneEvidence shows original local frame crops in the existing compliance detail panel. No classifications or measurements are recomputed. WebGL failure retains keyboard parcel selection. Validate offline with external requests blocked.
