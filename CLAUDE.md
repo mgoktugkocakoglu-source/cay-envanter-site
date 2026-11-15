@@ -95,3 +95,7 @@ Core visual rules: working green `#15803D` for primary actions / active / succes
 
 ### UI kit (shadcn-vue + Tailwind v4)
 All web pages are built from one kit — shadcn-vue primitives in `apps/web/src/components/ui/*` and app blocks in `apps/web/src/components/shared/*` (`PageContainer`, `PageHeader`, `StatCard`, `ListToolbar`, `SearchInput`, `EmptyState`, `LoadingState`, `ConfirmDialog`, …). The rules (which component for which need, touch targets, tokens-only colours, no `<style scoped>` for layout) are in **`apps/web/src/components/shared/CONVENTIONS.md`**; `src/pages/FieldsPage.vue` is the reference page. Add shadcn-vue components by hand (copy from shadcn-vue source) — the CLI `add` runs `npm install` and corrupts the pnpm layout. For visual checks of auth-gated pages without logging in, open `/dev/preview/<page>` (DEV-only route backed by `src/dev/previewMocks.ts`).
+
+## Remote evidence timeline
+
+The read-only `remote-evidence` endpoints expose existing scene metadata and parcel age-series observations. The compliance map uses local Sentinel-2 images without external tiles; selecting a date does not recalculate licence classes. Thick outlines identify parcels with a drone reading, not an exact flight footprint. `CaykurRemoteEvidence.vue` shows monthly NDVI with gaps and annual Landsat values; neither is a tea classifier. No new field observation workflow is planned.

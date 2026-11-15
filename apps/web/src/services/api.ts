@@ -2739,6 +2739,17 @@ export interface ExecutiveSummary {
 }
 export type ComplianceOverall = 'finding' | 'review' | 'no_evidence' | 'conforming' | 'out_of_scope';
 export type ComplianceCertainty = 'agreed' | 'single_source' | 'conflict' | 'undecidable';
+export interface RemoteEvidenceTimeline {
+    imagery: { baseUrl: string; bounds: { west: number; south: number; east: number; north: number }; items: Array<{ date: string; file: string; teaVisible: number; teaMedianNdvi: number }> } | null;
+    drone: { sources: Array<{ capturedAt: string; capturedAtNote: string; title: string }>; parcelKeys: string[]; shot: [number, number]; durationS: number } | null;
+}
+export interface RemoteParcelEvidence {
+    key: string;
+    fullPixels: number;
+    monthly: { years: number[]; months: number[]; ndvi: Record<number, Array<number | null>> } | null;
+    annual: { years: number[]; ndvi: Array<number | null> } | null;
+    drone: { capturedAt: string; capturedAtNote: string; class: string; verified: boolean } | null;
+}
 export type ComplianceCheckStatus = 'pass' | 'fail' | 'review' | 'unknown' | 'na';
 export type ComplianceRuleSource = 'record' | 'satellite' | 'drone' | 'field' | 'buildings';
 export interface ComplianceRule {
@@ -4257,6 +4268,8 @@ export const api = {
     getExecutiveSummary: () => request<ExecutiveSummary>('/caykur/tea-inventory/executive-summary'),
     getComplianceSummary: (areaId: string) => request<ComplianceSummary>(`/caykur/tea-inventory/areas/${areaId}/compliance/summary`),
     getComplianceMap: (areaId: string) => request<ComplianceMapCollection>(`/caykur/tea-inventory/areas/${areaId}/compliance/map`),
+    getRemoteEvidenceTimeline: (areaId: string) => request<RemoteEvidenceTimeline>(`/caykur/tea-inventory/areas/${areaId}/remote-evidence/timeline`),
+    getRemoteParcelEvidence: (areaId: string, block: string, parcel: string) => request<RemoteParcelEvidence>(`/caykur/tea-inventory/areas/${areaId}/remote-evidence/parcels/${encodeURIComponent(block)}/${encodeURIComponent(parcel)}`),
     getComplianceParcel: (areaId: string, block: string, parcel: string) => request<ComplianceParcel>(`/caykur/tea-inventory/areas/${areaId}/compliance/parcels/${encodeURIComponent(block)}/${encodeURIComponent(parcel)}`),
     getComplianceParcels: (areaId: string, params?: { page?: number; limit?: number; overall?: ComplianceOverall; certainty?: ComplianceCertainty; rule?: string; search?: string }) => {
         const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;

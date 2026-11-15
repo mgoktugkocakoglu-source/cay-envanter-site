@@ -16,6 +16,7 @@ import { api, type ComplianceCheckStatus, type ComplianceOverall, type Complianc
 import { formatM2 } from '@/services/caykur/teaInventory';
 import { formatNumber } from '@/services/caykur';
 import CaykurComplianceMap from '@/components/caykur/CaykurComplianceMap.vue';
+import CaykurRemoteEvidence from '@/components/caykur/CaykurRemoteEvidence.vue';
 import { CERTAINTIES, CERTAINTY_META } from '@/services/caykur/complianceMap';
 import type { ComplianceCertainty } from '@/services/api';
 
@@ -352,6 +353,7 @@ onBeforeUnmount(() => {
                         </div>
                     </SheetHeader>
                     <div class="flex flex-col gap-4 p-4">
+                        <CaykurRemoteEvidence :area-id="areaId" :block="selected.block" :parcel="selected.parcel" />
                         <p class="rounded-lg border p-3 text-sm">{{ selected.certaintyReason }} <span v-if="selected.certainty !== 'agreed'">Karar verilemedi.</span> Saha ve kayıt kontrolü öncesinde idari karar olarak kullanılamaz.</p>
                         <p class="text-sm"><span class="font-medium">Öneri:</span> {{ selected.action }}</p>
                         <ul class="flex flex-col gap-3">
