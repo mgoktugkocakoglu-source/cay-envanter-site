@@ -74,6 +74,24 @@ export interface DroneValidation {
 }
 
 /**
+ * Approximate orthophoto of the video (py/drone_ortho.py): each ground cell coloured from the solved frame that sees
+ * it best, through the sparse ground surface. A map-aligned view for a reviewer; not a survey product.
+ */
+export interface DroneOrthophoto {
+    image: string;
+    width: number;
+    height: number;
+    resolutionM: number;
+    /** [lon, lat] corners (WGS84). */
+    bounds: { southWest: [number, number]; northEast: [number, number] };
+    coveredHa: number;
+    framesUsed: number;
+    shot: [number, number];
+    georefRmsM: number;
+    georefMaxResidualM: number;
+    method: string;
+}
+/**
  * Approximate tie of a video to the map: camera poses solved from the video itself (structure from motion), the model
  * placed on the map by matching marked buildings to mapped footprints. Metres, not centimetres; no areas.
  */
@@ -146,6 +164,8 @@ export interface DroneVerificationBlock {
     /** The part of the video the parcels are on, re-encoded for the site; `start` is its offset in the source video. */
     clip: { file: string; start: number; end: number; width: number; height: number; bytes: number } | null;
     georeference: DroneGeoreferenceSummary | null;
+    /** Absent in bundles written before the orthophoto step existed. */
+    orthophoto?: DroneOrthophoto | null;
     suitability: Array<{ topic: string; verdict: 'ok' | 'limited' | 'no'; text: string }>;
     validation: DroneValidation;
     licenceSource: 'demo' | 'caykur';

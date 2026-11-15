@@ -55,7 +55,7 @@ export class DroneVerificationService {
         const byClass: Record<DroneMapClass, number> = { tea_present: 0, tea_not_found: 0, partial: 0, uncertain: 0, not_analysed: 0 };
         for (const p of parcels) byClass[p.class]++;
         byClass.not_analysed = Math.max(audit.parcels.length - parcels.length, 0);
-        return { ...rest, georeference: rest.georeference ?? null, neighborhood, counts: { parcels: audit.parcels.length, analysed: parcels.length, byClass, needsReview: parcels.filter((p) => p.status === 'needs_review').length } };
+        return { ...rest, georeference: rest.georeference ?? null, orthophoto: rest.orthophoto ?? null, neighborhood, counts: { parcels: audit.parcels.length, analysed: parcels.length, byClass, needsReview: parcels.filter((p) => p.status === 'needs_review').length } };
     }
 
     async parcels(areaId: string, query: DroneVerificationQueryDto): Promise<Paginated<DroneVerificationRow>> {

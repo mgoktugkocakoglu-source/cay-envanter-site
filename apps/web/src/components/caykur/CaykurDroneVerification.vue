@@ -93,6 +93,30 @@ const overviewContainer = ref<HTMLElement | null>(null);
 const parcelContainer = ref<HTMLElement | null>(null);
 let overviewMap: L.Map | null = null;
 let parcelMap: L.Map | null = null;
+let overviewLayer: L.GeoJSON | null = null;
+/** The approximate orthophoto of the video over the base map, on both maps. */
+const showOrtho = ref(true);
+const orthoOverlays = new Map<L.Map, L.ImageOverlay>();
+function overviewStyle(f?: { properties: { class?: string } | null }): L.PathOptions {
+    const cls = (f?.properties?.class ?? 'not_analysed') as DroneMapClass;
+    const done = cls !== 'not_analysed';
+    // Over the drone image the fill is kept thin, so the ground stays readable under the class colour.
+    const over = showOrtho.value && summary.value?.orthophoto;
+    return { color: CLASS_META[cls].color, weight: done ? (over ? 2 : 3) : 1, opacity: done ? 1 : 0.7, fillColor: CLASS_META[cls].color, fillOpacity: done ? (over ? 0.08 : 0.35) : (over ? 0 : 0.05) };
+}
+function syncOrtho(map: L.Map): void {
+    const o = summary.value?.orthophoto;
+    if (!o) return;
+    let overlay = orthoOverlays.get(map);
+    if (!overlay) {
+        const [west, south] = o.bounds.southWest;
+        const [east, north] = o.bounds.northEast;
+        overlay = L.imageOverlay(summary.value!.imageryBaseUrl + o.image, [[south, west], [north, east]], { alt: 'Drone videosundan yaklaşık ortofoto' });
+        orthoOverlays.set(map, overlay);
+    }
+    if (showOrtho.value) overlay.addTo(map);
+    else overlay.remove();
+}
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 const sheetOpen = computed({
     get: () => detail.value !== null || isLoadingDetail.value,
@@ -164,20 +188,19 @@ async function loadRows(): Promise<void> {
     pages.value = Math.max(1, res.data.meta.totalPages);
 }
 function renderOverview(): void {
+    if (overviewMap) orthoOverlays.delete(overviewMap);
     overviewMap?.remove();
     overviewMap = null;
+    overviewLayer = null;
     if (!overviewContainer.value || !mapData.value) return;
     const map = L.map(overviewContainer.value, { zoomControl: false, attributionControl: false, scrollWheelZoom: false });
     overviewMap = map;
     L.tileLayer(TILES, TILE_OPTIONS).addTo(map);
     L.control.zoom({ position: 'topright' }).addTo(map);
     const analysed: L.Layer[] = [];
+    syncOrtho(map);
     const layer = L.geoJSON(mapData.value, {
-        style: (f) => {
-            const cls = (f?.properties.class ?? 'not_analysed') as DroneMapClass;
-            const done = cls !== 'not_analysed';
-            return { color: CLASS_META[cls].color, weight: done ? 3 : 1, opacity: done ? 1 : 0.7, fillColor: CLASS_META[cls].color, fillOpacity: done ? 0.35 : 0.05 };
-        },
+        style: (f) => overviewStyle(f),
         onEachFeature: (f, l) => {
             const p = f.properties;
             l.bindTooltip(`${p.block}/${p.parcel} · ${p.nature} · ${CLASS_META[p.class as DroneMapClass].label}`, { sticky: true });
@@ -185,6 +208,7 @@ function renderOverview(): void {
             if (p.class !== 'not_analysed') analysed.push(l);
         },
     }).addTo(map);
+    overviewLayer = layer;
     // Start on the analysed parcels: they are a handful in a neighbourhood of hundreds.
     const focus = analysed.length ? L.featureGroup(analysed).getBounds() : layer.getBounds();
     if (focus.isValid()) map.fitBounds(focus, { padding: [80, 80], maxZoom: 19 });
@@ -231,6 +255,7 @@ async function open(block: string, parcel: string): Promise<void> {
     setTimeout(renderParcel, 250);
 }
 function renderParcel(): void {
+    if (parcelMap) orthoOverlays.delete(parcelMap);
     parcelMap?.remove();
     parcelMap = null;
     const d = detail.value;
@@ -238,12 +263,17 @@ function renderParcel(): void {
     parcelMap = L.map(parcelContainer.value, { zoomControl: false, attributionControl: false, scrollWheelZoom: false });
     L.tileLayer(TILES, TILE_OPTIONS).addTo(parcelMap);
     L.control.zoom({ position: 'topright' }).addTo(parcelMap);
+    syncOrtho(parcelMap);
     const outline = L.geoJSON({ type: 'Feature', geometry: d.geometry, properties: {} } as GeoJSON.Feature, { style: { color: CLASS_META[d.class].color, weight: 3, fill: false } }).addTo(parcelMap);
     parcelMap.fitBounds(outline.getBounds(), { padding: [50, 50], maxZoom: 19 });
 }
 function onClass(v: unknown): void {
     if (typeof v === 'string' && CLASS_FILTERS.some((f) => f.value === v)) classFilter.value = v as DroneClassFilter | typeof ALL;
 }
+watch(showOrtho, () => {
+    for (const map of [overviewMap, parcelMap]) if (map) syncOrtho(map);
+    overviewLayer?.setStyle((f) => overviewStyle(f));
+});
 watch(classFilter, () => {
     page.value = 1;
     void loadRows();
@@ -301,6 +331,13 @@ onBeforeUnmount(() => {
                 <CardContent class="flex flex-col gap-3 pb-4">
                     <!-- isolate: Leaflet panes carry z-indexes up to 1000; without their own stacking context they sit above the parcel sheet. -->
                     <div ref="overviewContainer" class="isolate h-[28rem] w-full overflow-hidden rounded-lg border" />
+                    <div v-if="summary.orthophoto" class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <Button variant="outline" class="min-h-11 shrink-0 md:min-h-9" :aria-pressed="showOrtho" @click="showOrtho = !showOrtho">{{ showOrtho ? 'Drone görüntüsünü gizle' : 'Drone görüntüsünü göster' }}</Button>
+                        <p class="text-xs text-muted-foreground">
+                            Yaklaşık ortofoto (ön değerlendirme): videonun {{ summary.orthophoto.framesUsed }} karesinden {{ summary.orthophoto.coveredHa }} ha, {{ summary.orthophoto.resolutionM }} m/piksel. Konum hatası kontrol binalarında ortalama {{ summary.orthophoto.georefRmsM }} m (en büyük {{ summary.orthophoto.georefMaxResidualM }} m);
+                            çatılar ve ağaç tepeleri yatık görünür. Sınır tespiti ve alan ölçümü için kullanılmaz.
+                        </p>
+                    </div>
                     <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
                         <span class="flex items-center gap-1.5"><span class="size-3 rounded-sm" :style="{ background: CLASS_META.tea_present.color }" />Çay varlığı destekleniyor</span>
                         <span class="flex items-center gap-1.5"><span class="size-3 rounded-sm" :style="{ background: CLASS_META.tea_not_found.color }" />Çay bulunamadı</span>
@@ -559,8 +596,12 @@ onBeforeUnmount(() => {
                                     </p>
                                 </div>
                                 <div class="flex flex-col gap-2">
-                                    <div class="flex h-11 items-center font-medium md:h-9">Kadastro sınırı ve uydu</div>
+                                    <div class="flex h-11 items-center justify-between gap-2 font-medium md:h-9">
+                                        <span>Kadastro sınırı, {{ summary?.orthophoto && showOrtho ? 'drone ortofotosu' : 'uydu' }}</span>
+                                        <Button v-if="summary?.orthophoto" variant="outline" size="sm" class="min-h-11 md:min-h-9" :aria-pressed="showOrtho" @click="showOrtho = !showOrtho">{{ showOrtho ? 'Uyduya geç' : 'Drone ortofotosu' }}</Button>
+                                    </div>
                                     <div ref="parcelContainer" class="aspect-video w-full overflow-hidden rounded-lg border" />
+                                    <p v-if="summary?.orthophoto && showOrtho" class="text-xs text-muted-foreground">Drone görüntüsü videodan üretilen yaklaşık ortofotodur (konum hatası ortalama {{ summary.orthophoto.georefRmsM }} m); çizginin içi ile görüntü birkaç metre kayık olabilir.</p>
                                     <p class="text-xs text-muted-foreground">Çizgi TKGM parsel sınırıdır (WGS84). Altlık Google uydu görüntüsüdür; dik arazide birkaç metre kayık olabilir. Drone görüntüsü eğik bakışlıdır: iki görünüm yön ve ölçek olarak birebir örtüşmez.</p>
                                 </div>
                             </div>

@@ -2759,9 +2759,28 @@ export interface DroneGeoreferenceSummary {
     /** Parcels whose projected outline lies fully inside the reference frame. */
     parcelsInView: string[];
 }
+/**
+ * Approximate orthophoto of the video (py/drone_ortho.py): each ground cell coloured from the solved frame that sees
+ * it best, through the sparse ground surface. A map-aligned view for a reviewer; not a survey product.
+ */
+export interface DroneOrthophoto {
+    image: string;
+    width: number;
+    height: number;
+    resolutionM: number;
+    /** [lon, lat] corners (WGS84). */
+    bounds: { southWest: [number, number]; northEast: [number, number] };
+    coveredHa: number;
+    framesUsed: number;
+    shot: [number, number];
+    georefRmsM: number;
+    georefMaxResidualM: number;
+    method: string;
+}
 export interface DroneVerificationSummary {
     neighborhood: string;
     georeference: DroneGeoreferenceSummary | null;
+    orthophoto: DroneOrthophoto | null;
     imageryBaseUrl: string;
     generatedAt: string;
     method: string;
