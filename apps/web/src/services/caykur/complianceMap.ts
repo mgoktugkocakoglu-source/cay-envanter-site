@@ -2,10 +2,10 @@ import type { ComplianceCertainty, ComplianceMapCollection } from '@/services/ap
 import type { Tone } from '@/components/caykur/tone';
 
 export const CERTAINTY_META: Record<ComplianceCertainty, { label: string; tone: Tone; color: string; note: string }> = {
-    agreed: { label: 'Kaynaklar uyumlu', tone: 'success', color: 'var(--success)', note: 'İki bağımsız görüntü ve kayıtlar uyumlu; açık kural yok.' },
-    single_source: { label: 'Tek kaynak', tone: 'warning', color: 'var(--warning)', note: 'Karar verilemedi: ikinci net görüntü kaynağı yok.' },
-    conflict: { label: 'Çelişki', tone: 'danger', color: 'var(--destructive)', note: 'Karar verilemedi: kaynak veya kayıt çelişkisi var.' },
-    undecidable: { label: 'Belirsiz', tone: 'muted', color: 'var(--muted-foreground)', note: 'Karar verilemedi: net okuma yok veya açık kural var.' },
+    agreed: { label: 'Kaynaklar uyumlu', tone: 'success', color: 'var(--success)', note: 'En az iki bağımsız kaynak (uydu, drone, saha gözlemi) aynı yönde ve tapu niteliğiyle tutarlı.' },
+    single_source: { label: 'Tek kaynak', tone: 'warning', color: 'var(--warning)', note: 'Tek kaynak net okunuyor ve tapu niteliğiyle çelişmiyor; ikinci bağımsız kaynak yok.' },
+    conflict: { label: 'Çelişki', tone: 'danger', color: 'var(--destructive)', note: 'Kaynaklar birbiriyle ya da tapu niteliğiyle çelişiyor. DEMO ruhsat kaydı çelişki sayılmaz.' },
+    undecidable: { label: 'Belirsiz', tone: 'muted', color: 'var(--muted-foreground)', note: 'Net okuma veren kaynak yok (küçük parsel, kararsız uydu, drone yok ya da belirsiz).' },
 };
 export const CERTAINTIES = Object.keys(CERTAINTY_META) as ComplianceCertainty[];
 

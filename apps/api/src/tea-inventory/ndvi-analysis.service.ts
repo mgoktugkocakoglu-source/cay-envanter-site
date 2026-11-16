@@ -34,7 +34,7 @@ export class NdviAnalysisService {
         });
         return { type: 'FeatureCollection' as const, year, years, rules: NDVI_RULES, features,
             licenceSource: area.licenceAudit.licenceSource, sourceGeneratedAt: area.age?.generatedAt ?? null,
-            notice: `${area.licenceAudit.licenceSource === 'demo' ? 'DEMO ruhsat kayıtları. ' : ''}NDVI çayı veya ihlali kanıtlamaz. Kalibre edilmemiş tarama; ön değerlendirmedir, idari karar değildir. Referans yalnız arşivdeki seçilmiş parsellerdir; tüm mahalleyi temsil etmez.`,
+            notice: `${area.licenceAudit.licenceSource === 'demo' ? 'DEMO ruhsat kayıtları. ' : ''}NDVI çayı veya ihlali kanıtlamaz. Tarama eşiği ayna ve sentetik düşüş testiyle sınandı (saha verisiyle değil); ön değerlendirmedir, idari karar değildir. Referans yalnız arşivdeki seçilmiş parsellerdir; tüm mahalleyi temsil etmez.`,
         };
     }
 }

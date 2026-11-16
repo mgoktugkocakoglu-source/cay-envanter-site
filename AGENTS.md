@@ -39,6 +39,36 @@ node start-db.mjs           # in ../lokal: local embedded Postgres
   modules' blocks and does not change them.
 - No purchases, no paid services, no new accounts.
 
+## What the product is for, and how rules may change
+
+The owner sells this to ÇAYKUR as a tool that **decides as many gardens and parcels as the evidence allows**. Two
+outcomes count as success on a screen: "the two pruning methods agree" (combined class `confirmed`, shown as *uyumlu*)
+and "the sources agree" (compliance `agreed`). The owner wants these numbers **as high as measurement supports**; a
+change that shrinks them is a regression unless a measurement shows it removed false alarms.
+
+Caution is already built in (review classes, DEMO labels, "preliminary assessment"). Adding more of it by tightening
+a detection rule is not neutral: on 15–16 Nov 2026 a tightening of the combined pruning rule cut agreed gardens from
+10 to 1 in 2025-26 and removed no false alarm (0 before, 0 after on the mirrored series); it was withdrawn.
+
+Rules for any agent:
+
+- **Do not change a detection or promotion rule, a threshold, or what counts as agreement / conflict on reasoning
+  alone.** Measure it. Pruning: `node scripts/combined-validate.mjs … --season <y>` (mirrored series = false alarms,
+  shared simulated cuts = detection). NDVI screening: `node scripts/ndvi-threshold-check.mjs` in `cayhesabim/apps/api`.
+  Compliance certainty: report the class counts before and after.
+- A rule change goes in **only with the before/after numbers in the commit message**, and only if it keeps or raises
+  the agreed counts, or lowers measured false alarms. Otherwise leave the rule and tell the owner what you found.
+- **Never drop a validation, history or accuracy output because rules changed. Regenerate it** with the new rules in
+  the same change. A module without its measured numbers is worse than the old rule.
+- **A DEMO register is not evidence.** It may not create conflicts, findings of disagreement, or block agreement.
+- Weak notes (area gap from 10 m pixels, open building footprints, deed-area gap) stay in their own rule; they do not
+  turn a parcel into a conflict.
+- Presentation work (maps, exports, wording, layout) is welcome and needs none of this. Do not rename result classes or
+  hide result cards the owner already uses without being asked.
+- When unsure whether something is a rule change, ask the owner before touching it.
+
+The rule details live in `../cay-envanter/AGENTS.md` (combined pruning, compliance certainty).
+
 ## Conventions most often missed
 
 - `@/` alias for every internal import; thin controllers, logic in services; a DTO for every input; Swagger decorators.

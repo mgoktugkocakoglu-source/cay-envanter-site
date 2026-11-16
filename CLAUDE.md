@@ -77,6 +77,7 @@ retain DEMO and preliminary-assessment notices. Only `agreed` counts as source a
 remain undecided. Ratios describe parcel distribution, not accuracy. Old bundles without certainty fall back to
 `undecidable` until the engine report is regenerated and imported. The map uses the existing satellite tile service;
 do not open it during an offline-only validation unless external tile requests are blocked.
+Class meaning is defined in the engine (`../cay-envanter/AGENTS.md`, "Compliance certainty"); the labels and notes in `services/caykur/complianceMap.ts` must say the same thing.
 
 ## Infrastructure
 
@@ -104,13 +105,24 @@ The read-only `remote-evidence` endpoints expose existing scene metadata and par
 
 The separate remoteTerrain JSONB block imports existing local relative heights. GET remote-evidence/terrain returns metadata or null. CaykurComplianceTerrain and CaykurLicenceTerrain render a neutral surface with certainty overlays and parcel selection; the disabled video orthophoto stays disabled. Bounds intersections are bounding-box coverage, not verified imagery coverage. CaykurParcelDroneEvidence shows original local frame crops in the existing compliance detail panel. No classifications or measurements are recomputed. WebGL failure retains keyboard parcel selection. Validate offline with external requests blocked.
 
-## Independent NDVI screening
+## NDVI screening
 
-CaykurNdviAnalysis is an optional layer in compliance, backed by GET ndvi-analysis/map?year=YYYY. Its own read-only service uses existing parcel age.s2 series and audit geometries; it never reads drone evidence, writes classifications or changes neighbouring module outputs. NDVI_RULES are uncalibrated screening thresholds: same-month medians from at least three of the preceding five years, six whole pixels, four comparable months, and a 0.15 drop over two consecutive calendar months. Two subsequent consecutive recovered months indicate recovery; gaps and isolated changes stay review. Neighbour medians exclude the selected parcel and require ten eligible peers, and are contextual only. Missing series remain insufficient; the archive is selected tea candidates, not all parcels. No fresh imagery is fetched. Validate with vue-tsc and nest build; no seed export is needed because imported observations are read on demand.
+`CaykurNdviAnalysis` is an optional layer in compliance, backed by `GET ndvi-analysis/map?year=YYYY`. Its read-only
+service uses the imported parcel `age.s2` monthly series and audit geometries; it never reads drone evidence and writes
+nothing. `NDVI_RULES` (`ndvi-analysis.model.ts`): same-month medians from at least three of the preceding five years,
+six whole pixels, four comparable months, and a drop of 0.12 in two consecutive calendar months = `decline`; two later
+recovered months = `recovery`; gaps and isolated drops = `review`. The drop threshold is measured, not guessed:
+`node scripts/ndvi-threshold-check.mjs` in `apps/api` (after `nest build`) reports false "decline" on mirrored series
+and detection of injected lasting drops for several thresholds; the table is in the model's comment. Change `drop` only
+with a new run. Neighbour medians are context only. No fresh imagery is fetched.
 
-## Combined pruning v2
+## Combined pruning (v4)
 
-Internal confirmed means method agreement, not independent verification. The producer table separates supported lower-bound area from a probable-area scenario; light and pending cuts are excluded from counted filters. Legacy combined validation and history are omitted until compatible diagnostics exist. Diagnostic cards are collapsed on fusion, pixel and combined screens; results, area uncertainty and preliminary/DEMO notices stay visible. No purchase state is changed by combined screening.
+The engine's combined verdict is back on the measured promotion rule (see `../cay-envanter/AGENTS.md`): `confirmed`
+(shown as "Yöntemler uyumlu") = both modules positive on the same event. `summary.validation` and `history` are shipped
+again and render in the collapsed "Model davranış testleri" and "Geriye dönük sınama" blocks of
+`CaykurPruningCombined.vue`. The headline card counts producers who reach the target with agreed or probable area.
+No purchase state is changed by this view; purchase decisions stay with the fusion module.
 
 ## Pruning target scenarios
 
