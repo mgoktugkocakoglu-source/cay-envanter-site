@@ -16,6 +16,7 @@ import { PruningCombinedBlock } from '@/tea-inventory/entities/pruning-combined.
 import { LicenceAuditBlock } from '@/tea-inventory/entities/licence-audit.types';
 import { DroneVerificationBlock } from '@/tea-inventory/entities/drone-verification.types';
 import { ComplianceBlock } from '@/tea-inventory/entities/compliance.types';
+import { LandCoverBlock } from '@/tea-inventory/entities/land-cover.types';
 import { RemoteTerrain } from '@/tea-inventory/entities/remote-terrain.types';
 
 /** A detected tea patch (Sentinel-2, 10 m) stored with its area. */
@@ -334,6 +335,11 @@ export class TeaInventoryArea {
     // Not selected by default: only the compliance service reads it.
     @Column({ type: 'jsonb', nullable: true, name: 'compliance', select: false })
     compliance: ComplianceBlock | null;
+
+    // Land cover per parcel (tea reading, cover shares, model card), absent until the land-cover module has run.
+    // Not selected by default: only the land-cover service reads it.
+    @Column({ type: 'jsonb', nullable: true, name: 'land_cover', select: false })
+    landCover: LandCoverBlock | null;
 
     @Column({ type: 'jsonb', nullable: true, name: 'remote_terrain', select: false })
     remoteTerrain: RemoteTerrain | null;

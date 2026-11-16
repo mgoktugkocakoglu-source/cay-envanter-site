@@ -2742,6 +2742,68 @@ export interface ExecutiveSummary {
     openRules: Array<{ id: string; title: string; fail: number; review: number }>;
     areas: ExecutiveAreaRow[];
 }
+export type CoverClass = 'tea' | 'hazelnut' | 'forest' | 'grass' | 'crop' | 'built' | 'other';
+export type CoverDominant = CoverClass | 'mixed';
+export type CoverTeaState = 'present' | 'partial' | 'absent' | 'not_assessable';
+export interface CoverStat { mean: number; sd: number }
+export interface CoverComparisonRow {
+    features: string;
+    bands: number;
+    learner: string;
+    target: 'cover' | 'tea_only';
+    accuracy: CoverStat;
+    teaAccuracy: CoverStat;
+    teaRecall: CoverStat;
+    teaPrecision: CoverStat;
+    teaF1: CoverStat;
+}
+export interface CoverParcel {
+    key: string;
+    block: string;
+    parcel: string;
+    nature: string;
+    locality: string;
+    areaM2: number;
+    pixels: number;
+    tea: CoverTeaState;
+    teaShare: number | null;
+    teaProbability: number | null;
+    dominant: CoverDominant | null;
+    dominantShare: number | null;
+    shares: Record<CoverClass, number> | null;
+    confidence: 'high' | 'medium' | 'low' | null;
+    elevationM?: number;
+    beyondTraining: boolean;
+}
+/** Land-cover module: model card (data-source comparison, cross-validation) and class counts; preliminary assessment. */
+export interface LandCoverSummary {
+    neighborhood: string;
+    generatedAt: string;
+    method: string;
+    rules: Record<string, number>;
+    classes: CoverClass[];
+    labels: Record<CoverDominant, string>;
+    model: {
+        features: string;
+        learner: string;
+        bands: number;
+        trainingPixels: Record<CoverClass, number>;
+        trainingGroups: number;
+        crossValidation: Pick<CoverComparisonRow, 'accuracy' | 'teaAccuracy' | 'teaRecall' | 'teaPrecision' | 'teaF1'>;
+        confusion: number[][];
+        teaThresholds: Array<{ threshold: number; recall: number; precision: number }>;
+        calledTeaByClass: Record<CoverClass, number | null>;
+        /** Held-out titled parcels read as a whole (tea share at or above the "present" band): the figure closest to how the module is used. */
+        parcelLevel?: { teaParcels: number; otherParcels: number; teaFound: number; teaMissed: number; otherCalledTea: number; otherRight: number; accuracy: number; teaRecall: number; teaPrecision: number; byClass: Record<string, { parcels: number; calledTea: number }> } | null;
+        comparison: CoverComparisonRow[];
+        folds: number;
+        topFeatures: Array<{ band: string; importance: number }>;
+        maxTrainingTeaElevationM: number | null;
+        validationNote: string;
+    };
+    summary: { parcels: number; assessed: number; byTea: Record<CoverTeaState, number>; byDominant: Record<CoverDominant, number>; byConfidence: Record<'high' | 'medium' | 'low', number>; teaAreaM2: number };
+}
+export type LandCoverMap = GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon, Pick<CoverParcel, 'key' | 'block' | 'parcel' | 'nature' | 'tea' | 'teaShare' | 'dominant' | 'confidence'>>;
 export type ComplianceOverall = 'finding' | 'review' | 'no_evidence' | 'conforming' | 'out_of_scope';
 export type ComplianceCertainty = 'agreed' | 'single_source' | 'conflict' | 'undecidable';
 export interface RemoteEvidenceTimeline {
@@ -4287,6 +4349,13 @@ export const api = {
     getDroneVerificationParcel: (areaId: string, block: string, parcel: string) =>
         request<DroneVerificationDetail>(`/caykur/tea-inventory/areas/${areaId}/drone-verification/parcels/${encodeURIComponent(block)}/${encodeURIComponent(parcel)}`),
     getExecutiveSummary: () => request<ExecutiveSummary>('/caykur/tea-inventory/executive-summary'),
+    getLandCoverSummary: (areaId: string) => request<LandCoverSummary>(`/caykur/tea-inventory/areas/${areaId}/land-cover/summary`),
+    getLandCoverMap: (areaId: string) => request<LandCoverMap>(`/caykur/tea-inventory/areas/${areaId}/land-cover/map`),
+    getLandCoverParcels: (areaId: string, params?: { page?: number; limit?: number; tea?: CoverTeaState; dominant?: CoverDominant; search?: string }) => {
+        const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string | number]>;
+        const query = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        return request<Paginated<CoverParcel>>(`/caykur/tea-inventory/areas/${areaId}/land-cover/parcels${query ? `?${query}` : ''}`);
+    },
     getComplianceSummary: (areaId: string) => request<ComplianceSummary>(`/caykur/tea-inventory/areas/${areaId}/compliance/summary`),
     getComplianceMap: (areaId: string) => request<ComplianceMapCollection>(`/caykur/tea-inventory/areas/${areaId}/compliance/map`),
     getRemoteEvidenceTimeline: (areaId: string) => request<RemoteEvidenceTimeline>(`/caykur/tea-inventory/areas/${areaId}/remote-evidence/timeline`),

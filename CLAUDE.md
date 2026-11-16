@@ -132,3 +132,12 @@ Fusion producer rows expose supportedAreaM2 (deep/pruned lower area bound after 
 ## Remote planning views
 
 RemotePlanningService/Controller read imported boundaries, tea patches and existing NDVI analysis without changing detection rules. Mapping uses 500 m logistics grid cells clipped to each neighbourhood, ranked by candidate tea density; not flight routes, sorties, legal clearance or full district coverage. Of currently has 12 local bundles; Rize has no imported coverage in this checkout. GeoJSON exports preserve the scope notice. Changes and calendar-year report cards reuse existing NDVI statuses and monthly observations; they do not issue notifications or persist review workflow. Access uses existing READ roles. New tabs: mapping, changes, reportcard. Offline smoke test produced 481 tea-containing blocks across 12 Of bundles.
+
+## Land cover (Arazi örtüsü)
+
+`CaykurLandCover.vue` is a sub-view of `CaykurLicensing.vue` ("Arazi örtüsü"), backed by the read-only
+`land-cover/{summary,parcels,map}` endpoints (`land-cover.service.ts`, area column `land_cover`, `select: false`). The
+engine block (`../cay-envanter/AGENTS.md`, "Land-cover module") carries per parcel the tea reading and cover shares and
+a model card: the comparison of data sources, cross-validation numbers, confusion table and parcel-level figures. The
+view only displays them; classes, share bands and the chosen model are the engine's. Map outlines come from the licence
+audit block. Labels are deed titles and a global land-cover map, so every number is agreement with those, not field truth.
