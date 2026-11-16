@@ -1,3 +1,4 @@
+import type { NdviMap } from '@/services/caykur/ndviAnalysis';
 import { useAuthStore, UserType } from '@/stores/authStore';
 
 // Capacitor (native) build'de mutlak URL gereklidir; web'de Vite proxy '/api' yeterlidir
@@ -4284,6 +4285,7 @@ export const api = {
     getComplianceSummary: (areaId: string) => request<ComplianceSummary>(`/caykur/tea-inventory/areas/${areaId}/compliance/summary`),
     getComplianceMap: (areaId: string) => request<ComplianceMapCollection>(`/caykur/tea-inventory/areas/${areaId}/compliance/map`),
     getRemoteEvidenceTimeline: (areaId: string) => request<RemoteEvidenceTimeline>(`/caykur/tea-inventory/areas/${areaId}/remote-evidence/timeline`),
+    getNdviAnalysisMap: (areaId: string, year?: number) => request<NdviMap>(`/caykur/tea-inventory/areas/${areaId}/ndvi-analysis/map${year === undefined ? '' : '?year=' + year}`),
     getRemoteTerrain: (areaId: string) => request<RemoteTerrain | null>(`/caykur/tea-inventory/areas/${areaId}/remote-evidence/terrain`),
     getRemoteParcelEvidence: (areaId: string, block: string, parcel: string) => request<RemoteParcelEvidence>(`/caykur/tea-inventory/areas/${areaId}/remote-evidence/parcels/${encodeURIComponent(block)}/${encodeURIComponent(parcel)}`),
     getComplianceParcel: (areaId: string, block: string, parcel: string) => request<ComplianceParcel>(`/caykur/tea-inventory/areas/${areaId}/compliance/parcels/${encodeURIComponent(block)}/${encodeURIComponent(parcel)}`),

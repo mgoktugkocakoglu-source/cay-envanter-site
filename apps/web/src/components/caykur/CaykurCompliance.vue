@@ -17,6 +17,7 @@ import { formatM2 } from '@/services/caykur/teaInventory';
 import { formatNumber } from '@/services/caykur';
 import CaykurComplianceMap from '@/components/caykur/CaykurComplianceMap.vue';
 import CaykurRemoteEvidence from '@/components/caykur/CaykurRemoteEvidence.vue';
+import CaykurNdviAnalysis from '@/components/caykur/CaykurNdviAnalysis.vue';
 import CaykurComplianceTerrain from '@/components/caykur/CaykurComplianceTerrain.vue';
 import CaykurParcelDroneEvidence from '@/components/caykur/CaykurParcelDroneEvidence.vue';
 import { CERTAINTIES, CERTAINTY_META } from '@/services/caykur/complianceMap';
@@ -181,6 +182,7 @@ onBeforeUnmount(() => {
         <EmptyState v-else-if="!summary" :icon="ListChecks" title="Bu mahalle için uygunluk raporu yok" description="Arazi tespit kararı üretildikten sonra kural denetimi çalıştırıldığında burada görünür." />
         <template v-else>
             <CaykurComplianceMap :area-id="areaId" @select="openParcel" />
+            <CaykurNdviAnalysis :area-id="areaId" @select="openParcel" />
             <CaykurComplianceTerrain :area-id="areaId" @select="openParcel" />
             <LoadingState v-if="detailLoading" text="Parsel ayrıntısı yükleniyor…" />
             <Card class="gap-0 py-0">
