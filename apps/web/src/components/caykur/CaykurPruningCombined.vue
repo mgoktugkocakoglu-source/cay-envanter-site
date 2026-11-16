@@ -42,7 +42,7 @@ const props = defineProps<{ areaId: string }>();
 const PAGE_SIZE = 15;
 const MONTHS_TR = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
 const CLASS_META: Record<CombinedClass, { label: string; tone: Tone }> = {
-    confirmed: { label: 'Kesin', tone: 'success' },
+    confirmed: { label: 'Yöntemler uyumlu', tone: 'success' },
     probable: { label: 'Muhtemel', tone: 'info' },
     light: { label: 'Hafif budama', tone: 'warning' },
     seasonal: { label: 'Mevsimsel desen', tone: 'muted' },
@@ -57,8 +57,8 @@ const AGREEMENT_LABEL: Record<CombinedAgreement, string> = {
     neither: 'Hiçbiri görmedi',
 };
 const STATUS_META: Record<CombinedProducerStatus, { label: string; tone: Tone }> = {
-    met: { label: 'Hedef kesin alanla doldu', tone: 'success' },
-    met_with_probable: { label: 'Hedef muhtemel alanla doldu', tone: 'info' },
+    met: { label: 'Desteklenen alt alan hedefe ulaşıyor', tone: 'success' },
+    met_with_probable: { label: 'Muhtemel alan eklenirse hedefe ulaşır', tone: 'info' },
     partial: { label: 'Budama var, hedef dolmadı', tone: 'warning' },
     light_only: { label: 'Yalnız hafif budama', tone: 'muted' },
     none: { label: 'Budama görülmedi', tone: 'muted' },
@@ -73,9 +73,9 @@ const FUSION_LABEL: Record<string, string> = { pruned: 'budandı', likely: 'olas
 const PIXEL_LABEL: Record<string, string> = { deep: 'derin budama', light: 'hafif budama', pending: 'sınıf bekliyor', transient: 'geçici düşüş', weak: 'zayıf sinyal', none: 'değişim yok', no_data: 'veri yok' };
 const DECISION_LABEL: Record<string, string> = { auto_open: 'alım açık', auto_pending: 'bekliyor', auto_short: 'eksik', auto_none: 'görülmedi', expert_anomaly: 'eksper', no_license: 'ruhsat yok', no_data: 'veri yok' };
 const GARDEN_FILTERS: Array<{ value: CombinedClassFilter; label: string }> = [
-    { value: 'positive', label: 'Budama görülen bahçeler (kesin + muhtemel + hafif)' },
-    { value: 'counted', label: '1/7 hesabına girenler (kesin + muhtemel)' },
-    { value: 'confirmed', label: 'Kesin' },
+    { value: 'positive', label: 'Budama görülen bahçeler (uyumlu + muhtemel + hafif)' },
+    { value: 'counted', label: 'Hedef senaryosuna girenler (derin kesimler)' },
+    { value: 'confirmed', label: 'Yöntemler uyumlu' },
     { value: 'probable', label: 'Muhtemel' },
     { value: 'light', label: 'Hafif budama' },
     { value: 'seasonal', label: 'Mevsimsel desen (önceki sezonda da aynı düşüş)' },
@@ -85,7 +85,7 @@ const GARDEN_FILTERS: Array<{ value: CombinedClassFilter; label: string }> = [
 ];
 const PRODUCER_FILTERS: Array<{ value: CombinedProducerFilter; label: string }> = [
     { value: 'active', label: 'Budama görülen müstahsiller' },
-    { value: 'open', label: 'Hedefi dolanlar' },
+    { value: 'open', label: 'Hedefe ulaşan veya muhtemelle ulaşabilecekler' },
     { value: 'changed', label: 'Çok-sensör alım kararından farklı çıkanlar' },
     { value: 'partial', label: 'Budama var, hedef dolmadı' },
     { value: 'light_only', label: 'Yalnız hafif budama' },
@@ -109,10 +109,10 @@ const MULTI_YEAR_META: Record<MultiYearStatus, { label: string; tone: Tone }> = 
     no_license: { label: 'ruhsat yok', tone: 'muted' },
 };
 const VALIDATION_ROWS: Record<string, string> = {
-    confirmed_low: 'Kesin · alt sınır',
-    confirmed_high: 'Kesin · üst sınır',
-    counted_low: 'Kesin + muhtemel · alt sınır',
-    counted_high: 'Kesin + muhtemel · üst sınır',
+    confirmed_low: 'Yöntemler uyumlu · alt sınır',
+    confirmed_high: 'Yöntemler uyumlu · üst sınır',
+    counted_low: 'Yöntemler uyumlu + muhtemel · alt sınır',
+    counted_high: 'Yöntemler uyumlu + muhtemel · üst sınır',
     light: 'Hafif sınıfına düşen',
     seasonal: 'Mevsimsel desene ayrılan (kayıp)',
     any: 'Herhangi bir sınıf',
@@ -164,7 +164,7 @@ const followUpRows = computed<Array<{ key: string; label: string; counts: Follow
     const h = summary.value?.history?.season;
     if (!h) return [];
     const rows = [
-        { key: 'confirmed', label: 'Kesin', counts: h.byClass.confirmed, muted: false },
+        { key: 'confirmed', label: 'Yöntemler uyumlu', counts: h.byClass.confirmed, muted: false },
         { key: 'probable', label: 'Muhtemel', counts: h.byClass.probable, muted: false },
         { key: 'light', label: 'Hafif budama', counts: h.byClass.light, muted: false },
     ];
@@ -261,16 +261,9 @@ function onView(v: unknown): void {
         <template v-else>
             <Card class="gap-0 py-0">
                 <CardHeader class="py-4">
-                    <CardTitle class="flex flex-wrap items-center gap-2">Birleşik karar <Badge variant="warning">Saha doğrulaması bekliyor</Badge></CardTitle>
-                    <CardDescription>
-                        Ayrı bir modül: çok-sensör kararı ile piksel taramasını okur, ikisini de değiştirmez ve bahçe başına tek karar verir.
-                        <strong>Kesin</strong>: iki modül de aynı kesimi gördü (değişim tarihleri {{ summary.rules.sameEventDays }} gün içinde).
-                        <strong>Muhtemel</strong>: yalnız biri gördü.
-                        <strong>Hafif budama</strong>: yalnız piksel taraması gördü ve kesim hızla toparlandı; 1/7 hesabına girmez.
-                        <strong>Mevsimsel desen</strong>: muhtemel olacaktı, ama aynı piksellerde aynı düşüş bir önceki sezonun aynı döneminde de var (gölge, bakı, erken sürgün); 1/7 hesabına girmez.
-                        Alan, piksel taramasının çizdiği kümeden; o yoksa çok-sensörün alan çıktısından gelir. Radar ve koherans karar vermez, yalnızca tanık olarak gösterilir.
-                        Alım kararları çok-sensör modülde kalır; buradaki müstahsil hesabı karşılaştırma içindir.
-                    </CardDescription>
+                    <CardTitle class="flex flex-wrap items-center gap-2">Birleşik karar <Badge variant="warning">Ön değerlendirme</Badge></CardTitle>
+                    <CardDescription>DEMO ruhsat kayıtları · Ön değerlendirme; idari karar değildir. Yöntemler aynı görüntüleri paylaşabilir; uyuşmaları bağımsız doğrulama değildir.</CardDescription>
+                    <details class="text-sm"><summary class="min-h-11 cursor-pointer py-3">Yöntem ve hedef hesabı</summary><p>Uyumlu sonuç, derin kesim ve örtüşen gözlem aralığı gerektirir. Hafif ve toparlanması beklenen kesimler hedef hesabına girmez. Mevsimsel tekrar tüm olumlu sonuçlarda kontrol edilir. Desteklenen alan uyumlu tespitlerin alt sınırıdır; muhtemel alan yalnız ek senaryodur, alım açmaz. Önceki kurallara ait test ve geçmiş özetleri yeni sonuçlara uygulanmaz.</p></details>
                     <div v-if="summary.seasons.length > 1" class="flex flex-wrap items-center gap-3 pt-2">
                         <span class="text-sm text-muted-foreground">Sezon</span>
                         <Select :model-value="summary.season" @update:model-value="onSeason">
@@ -288,7 +281,7 @@ function onView(v: unknown): void {
                 <CardHeader class="py-4">
                     <CardTitle class="flex flex-wrap items-center gap-2">Devam eden sezon <Badge variant="warning">Ara sonuç</Badge></CardTitle>
                     <CardDescription>
-                        Sezon sürüyor; son kullanılabilir görüntü {{ fmtDate(summary.dataThrough) }}. Şimdilik yalnız piksel taraması konuşuyor: çok-sensör karar sezon bitince eklenir, o yüzden “kesin” sınıfı henüz oluşamaz ve görülen kesimler “muhtemel” olarak listelenir.
+                        Sezon sürüyor; son kullanılabilir görüntü {{ fmtDate(summary.dataThrough) }}. Şimdilik yalnız piksel taraması konuşuyor: çok-sensör karar sezon bitince eklenir, o yüzden “uyumlu” sınıfı henüz oluşamaz ve görülen kesimler “muhtemel” olarak listelenir.
                         Kesimin derin mi hafif mi olduğu toparlanma izlenmeden bilinemez; bu sayılar yeni görüntü geldikçe değişir.
                         <template v-if="summary.liveFalseAlarms !== null && summary.liveFalseAlarms !== undefined">Aynı görüntülerde ayna testi {{ summary.liveFalseAlarms }} sahte tespit veriyor (üst sınır); listedeki {{ positives }} tespitin bir kısmı gerçek olmayabilir, saha kontrolü bu yüzden önemli.</template>
                         Alım kararı için kullanılmaz.
@@ -297,18 +290,18 @@ function onView(v: unknown): void {
             </Card>
 
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard label="Kesin" :value="formatNumber(summary.summary.byClass.confirmed)" :hint="`bahçe · ${formatM2(summary.summary.areaM2.confirmed)} · iki modül de gördü`" :icon="Combine" />
-                <StatCard label="Muhtemel" :value="formatNumber(summary.summary.byClass.probable)" :hint="`bahçe · ${formatM2(summary.summary.areaM2.probable)} · yalnız çok-sensör ${summary.summary.byAgreement.fusion_only}, yalnız piksel ${summary.summary.byClass.probable - summary.summary.byAgreement.fusion_only - summary.summary.byAgreement.both_other_dates}, tarihi ayrı ${summary.summary.byAgreement.both_other_dates}`" />
+                <StatCard label="Yöntemler uyumlu" :value="formatNumber(summary.summary.byClass.confirmed)" :hint="`bahçe · ${formatM2(summary.summary.areaM2.confirmed)} · iki modül de gördü`" :icon="Combine" />
+                <StatCard label="Muhtemel" :value="formatNumber(summary.summary.byClass.probable)" :hint="`bahçe · ${formatM2(summary.summary.areaM2.probable)} · yalnız çok-sensör ${summary.summary.byAgreement.fusion_only}, tür ve tarih uyuşmazlıkları ayrıntıda, tarihi ayrı ${summary.summary.byAgreement.both_other_dates}`" />
                 <StatCard label="Hafif budama" :value="formatNumber(summary.summary.byClass.light)" :hint="`bahçe · ${formatM2(summary.summary.areaM2.light)} · 1/7 hesabına girmez · ayrıca ${summary.summary.byClass.seasonal ?? 0} bahçe mevsimsel desen`" />
-                <StatCard label="Hedefi dolan müstahsil" :value="formatNumber(summary.summary.producers.met + summary.summary.producers.met_with_probable)" :hint="`${summary.summary.producers.met} kesin alanla · ${summary.summary.producers.met_with_probable} muhtemel alanla · ${summary.summary.producersChanged} müstahsilde çok-sensör alım kararından farklı`" />
+                <StatCard label="Desteklenen alanla hedefe ulaşan" :value="formatNumber(summary.summary.producers.met)" :hint="`${summary.summary.producers.met} uyumlu alanla · ${summary.summary.producers.met_with_probable} muhtemel alanla · ${summary.summary.producersChanged} müstahsilde çok-sensör alım kararından farklı`" />
             </div>
 
-            <Card v-if="summary.validation" class="gap-0 py-0">
+            <details v-if="summary.validation" class="rounded-lg border p-3"><summary class="min-h-11 cursor-pointer py-3 text-sm font-medium">Model davranış testleri · ayrıntılar</summary><Card class="gap-0 py-0">
                 <CardHeader class="py-4">
-                    <CardTitle>Ölçülen doğruluk (saha verisi olmadan)</CardTitle>
+                    <CardTitle>Model davranış testleri (saha verisi olmadan)</CardTitle>
                     <CardDescription>
-                        Yanlış alarm üst sınırı, {{ summary.validation.gardens }} bahçede: kesin {{ summary.validation.falseAlarms.confirmed }}, muhtemel {{ summary.validation.falseAlarms.probable }}, hafif {{ summary.validation.falseAlarms.light }}<template v-if="summary.validation.falseAlarms.seasonal !== undefined">; {{ summary.validation.falseAlarms.seasonal }} sahte tespit mevsimsel desen sınamasıyla ayıklandı</template>.
-                        Gerçek çalışmada kesin {{ summary.summary.byClass.confirmed }}, muhtemel {{ summary.summary.byClass.probable }}, hafif {{ summary.summary.byClass.light }} bahçe var.
+                        Yanlış alarm üst sınırı, {{ summary.validation.gardens }} bahçede: uyumlu {{ summary.validation.falseAlarms.confirmed }}, muhtemel {{ summary.validation.falseAlarms.probable }}, hafif {{ summary.validation.falseAlarms.light }}<template v-if="summary.validation.falseAlarms.seasonal !== undefined">; {{ summary.validation.falseAlarms.seasonal }} sahte tespit mevsimsel desen sınamasıyla ayıklandı</template>.
+                        Gerçek çalışmada uyumlu {{ summary.summary.byClass.confirmed }}, muhtemel {{ summary.summary.byClass.probable }}, hafif {{ summary.summary.byClass.light }} bahçe var.
                         {{ summary.validation.falseAlarms.note }}
                     </CardDescription>
                 </CardHeader>
@@ -337,9 +330,9 @@ function onView(v: unknown): void {
                     </div>
                     <p class="text-xs text-muted-foreground">{{ summary.validation.detection.note }} Bu sayılar gerçek saha doğrulamasının yerini tutmaz; Saha Testi vakaları geldikçe onunla değiştirilecek.</p>
                 </CardContent>
-            </Card>
+            </Card></details>
 
-            <Card v-if="summary.history?.season" class="gap-0 py-0">
+            <details v-if="summary.history?.season" class="rounded-lg border p-3"><summary class="min-h-11 cursor-pointer py-3 text-sm font-medium">Geriye dönük sınama · ayrıntılar</summary><Card class="gap-0 py-0">
                 <CardHeader class="py-4">
                     <CardTitle>Geriye dönük sınama · komşu sezonlarla</CardTitle>
                     <CardDescription>
@@ -377,7 +370,7 @@ function onView(v: unknown): void {
                     </p>
                     <p class="text-xs text-muted-foreground">Sınama kararları değiştirmez; eksperin önce bakacağı bahçeleri gösterir. “Kalıcı değişim” ve “her yıl tekrarlıyor” çıkan tespitler budama gibi davranmıyor. Saha doğrulamasının yerini tutmaz.</p>
                 </CardContent>
-            </Card>
+            </Card></details>
 
             <div class="flex flex-wrap items-center gap-3">
                 <span class="text-sm text-muted-foreground">Görünüm</span>
@@ -456,7 +449,7 @@ function onView(v: unknown): void {
             <Card v-else class="gap-0 py-0">
                 <CardHeader class="py-4">
                     <CardTitle>Müstahsiller · 1/{{ summary.rules.pruningRatio }} karşılaştırması</CardTitle>
-                    <CardDescription>{{ formatNumber(producerTotal) }} müstahsil · sayılan alan = kesin + muhtemel (önceki sezonlarda sayılmış zemin düşülür); hafif budama sayılmaz. Alım kararını bu tablo vermez.</CardDescription>
+                    <CardDescription>{{ formatNumber(producerTotal) }} müstahsil · desteklenen alt alan ve muhtemel ilave ayrı gösterilir. Hafif ve bekleyen kesim sayılmaz. Alım kararı değildir.</CardDescription>
                     <div class="pt-2">
                         <Select :model-value="producerFilter" @update:model-value="onProducerFilter">
                             <SelectTrigger class="h-11 w-full sm:w-96 md:h-9" aria-label="Müstahsil durumu filtresi"><SelectValue /></SelectTrigger>
@@ -477,10 +470,10 @@ function onView(v: unknown): void {
                                     <TableHead>Birleşik durum</TableHead>
                                     <TableHead>Çok-sensör alım kararı</TableHead>
                                     <TableHead class="text-right">Hedef</TableHead>
-                                    <TableHead class="text-right">Kesin</TableHead>
+                                    <TableHead class="text-right">Desteklenen alt alan</TableHead>
                                     <TableHead class="text-right">Muhtemel</TableHead>
                                     <TableHead class="text-right">Hafif</TableHead>
-                                    <TableHead class="text-right">Eksik</TableHead>
+                                    <TableHead class="text-right">Desteklenen alanla eksik</TableHead><TableHead class="text-right">Muhtemel eklenirse eksik</TableHead>
                                     <TableHead v-if="summary.history" class="text-right">Birikimli ({{ summary.history.multiYear.seasons.length }} sezon)</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -496,7 +489,7 @@ function onView(v: unknown): void {
                                     <TableCell class="text-right text-sm font-semibold tabular-nums">{{ p.confirmedM2 ? formatM2(p.confirmedM2) : '—' }}</TableCell>
                                     <TableCell class="text-right text-sm tabular-nums">{{ p.probableM2 ? formatM2(p.probableM2) : '—' }}</TableCell>
                                     <TableCell class="text-right text-sm tabular-nums text-muted-foreground">{{ p.lightM2 ? formatM2(p.lightM2) : '—' }}</TableCell>
-                                    <TableCell class="text-right text-sm tabular-nums">{{ p.shortfallM2 ? formatM2(p.shortfallM2) : '—' }}</TableCell>
+                                    <TableCell class="text-right text-sm tabular-nums">{{ formatM2(Math.max(0, p.requiredM2 - p.confirmedM2)) }}</TableCell><TableCell class="text-right text-sm tabular-nums">{{ p.shortfallM2 ? formatM2(p.shortfallM2) : '—' }}</TableCell>
                                     <TableCell v-if="summary.history" class="text-right text-sm tabular-nums">
                                         <template v-if="p.multiYear">
                                             <span class="font-semibold">{{ formatM2(p.multiYear.netM2) }}</span> / {{ formatM2(p.multiYear.requiredM2) }}
@@ -538,7 +531,9 @@ function onView(v: unknown): void {
                         <p>{{ selected.reason }}.</p>
                         <div class="rounded-lg border bg-muted/40 p-3">
                             <div class="font-medium">Budanan alan {{ selected.area ? `≈ ${formatM2(selected.area.m2)}` : '—' }}</div>
-                            <div v-if="selected.area" class="text-xs text-muted-foreground">Aralık {{ formatM2(selected.area.lowM2) }} – {{ formatM2(selected.area.highM2) }} · kaynak: {{ SOURCE_LABEL[selected.area.source] }} · 1/7 hesabına giren {{ formatM2(selected.countedM2) }}</div>
+                            <p v-if="selected.pixel?.verdict === 'pending'" class="text-sm text-warning">Toparlanma bekleniyor; hedef hesabına alan eklenmedi.</p>
+                            <p v-if="selected.kind === 'light'" class="text-sm">Hafif kesim göstergesi; derin budama hedef alanına eklenmedi.</p>
+                            <div v-if="selected.area" class="text-xs text-muted-foreground">Aralık {{ formatM2(selected.area.lowM2) }} – {{ formatM2(selected.area.highM2) }} · kaynak: {{ SOURCE_LABEL[selected.area.source] }} · hedef senaryosundaki alan {{ formatM2(selected.countedM2) }}</div>
                             <div class="text-xs text-muted-foreground">Kesim aralığı: {{ selected.bracket ? `${fmtDate(selected.bracket.from)} → ${fmtDate(selected.bracket.to)}` : '—' }}</div>
                         </div>
                         <div v-if="selected.seasonal" class="rounded-lg border p-3">

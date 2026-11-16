@@ -107,3 +107,7 @@ The separate remoteTerrain JSONB block imports existing local relative heights. 
 ## Independent NDVI screening
 
 CaykurNdviAnalysis is an optional layer in compliance, backed by GET ndvi-analysis/map?year=YYYY. Its own read-only service uses existing parcel age.s2 series and audit geometries; it never reads drone evidence, writes classifications or changes neighbouring module outputs. NDVI_RULES are uncalibrated screening thresholds: same-month medians from at least three of the preceding five years, six whole pixels, four comparable months, and a 0.15 drop over two consecutive calendar months. Two subsequent consecutive recovered months indicate recovery; gaps and isolated changes stay review. Neighbour medians exclude the selected parcel and require ten eligible peers, and are contextual only. Missing series remain insufficient; the archive is selected tea candidates, not all parcels. No fresh imagery is fetched. Validate with vue-tsc and nest build; no seed export is needed because imported observations are read on demand.
+
+## Combined pruning v2
+
+Internal confirmed means method agreement, not independent verification. The producer table separates supported lower-bound area from a probable-area scenario; light and pending cuts are excluded from counted filters. Legacy combined validation and history are omitted until compatible diagnostics exist. Diagnostic cards are collapsed on fusion, pixel and combined screens; results, area uncertainty and preliminary/DEMO notices stay visible. No purchase state is changed by combined screening.

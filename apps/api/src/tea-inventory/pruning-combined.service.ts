@@ -72,7 +72,7 @@ export class PruningCombinedService {
         let list = season.gardens;
         if (query.class === 'positive') list = list.filter((g) => POSITIVE.includes(g.class));
         else if (query.class === 'doubtful') list = list.filter((g) => POSITIVE.includes(g.class) && (DOUBTFUL.includes(followUpOf(g.id)?.status as FollowUpStatus) || repeatedOf(g.id).length > 0));
-        else if (query.class === 'counted') list = list.filter((g) => COUNTED.includes(g.class));
+        else if (query.class === 'counted') list = list.filter((g) => COUNTED.includes(g.class) && g.kind === 'deep' && g.countedM2 > 0);
         else if (query.class === 'recent') list = list.filter((g) => POSITIVE.includes(g.class) && through !== null && !!g.bracket && through - Date.parse(g.bracket.to) <= RECENT_DAYS * DAY);
         else if (query.class) list = list.filter((g) => g.class === query.class);
         list = [...list].sort((a, b) => CLASS_RANK[b.class] - CLASS_RANK[a.class] || (b.area?.m2 ?? 0) - (a.area?.m2 ?? 0));

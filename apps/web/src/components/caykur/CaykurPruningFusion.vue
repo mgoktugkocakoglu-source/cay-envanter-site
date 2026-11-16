@@ -657,7 +657,7 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
         </div>
 
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Budandı (kesin)" :value="formatNumber(summary.gardens.byClass.pruned)" :hint="`bahçe · budanan alan ${formatM2(summary.gardens.measured ? summary.gardens.measured.prunedM2 : summary.gardens.prunedAreaM2)} · optik + radar birlikte`" :icon="Scissors" />
+            <StatCard label="Güçlü budama göstergesi" :value="formatNumber(summary.gardens.byClass.pruned)" :hint="`bahçe · budanan alan ${formatM2(summary.gardens.measured ? summary.gardens.measured.prunedM2 : summary.gardens.prunedAreaM2)} · kaynak desteği parsel kanıtında`" :icon="Scissors" />
             <StatCard label="Olası budama" :value="formatNumber(summary.gardens.byClass.likely)" :hint="`bahçe · budanan alan ${formatM2(summary.gardens.measured ? summary.gardens.measured.likelyM2 : summary.gardens.likelyAreaM2)} · tek sensör ya da kalıcılık bekleniyor`" />
             <StatCard label="Alım otomatik açıldı" :value="formatNumber(summary.producers.byDecision.auto_open)" :hint="`müstahsil · ${summary.producers.byDecision.auto_pending} bekliyor · ${summary.producers.byDecision.auto_none} görülmedi`" :icon="Users" />
             <StatCard label="Eksper kuyruğu (anomali)" :value="formatNumber(summary.producers.byDecision.expert_anomaly)" :hint="`yalnız çelişki / tekrar / sınır / ruhsat dosyaları · tarama her ${summary.everyDays} gün, ${summary.timeline.length} tarama`" :icon="Radar" />
@@ -683,9 +683,9 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
             </AlertDescription>
         </Alert>
 
-        <Card v-if="summary.validation" class="gap-0 py-0">
+        <details v-if="summary.validation" class="rounded-lg border p-3"><summary class="min-h-11 cursor-pointer py-3 text-sm font-medium">Model davranış testleri · ayrıntılar</summary><Card class="gap-0 py-0">
             <CardHeader class="py-4">
-                <CardTitle>Ölçülen doğruluk · piksel taramasıyla aynı sentetik kesimlerde</CardTitle>
+                <CardTitle>Model davranış testleri · piksel taramasıyla aynı sentetik kesimlerde</CardTitle>
                 <CardDescription>
                     Yanlış alarm üst sınırı: {{ summary.validation.falseAlarms.gardens }} / {{ summary.validation.gardens }} bahçe
                     ({{ summary.validation.falseAlarms.pruned }} “budandı” + {{ summary.validation.falseAlarms.likely }} “olası”); gerçek çalışmada {{ summary.validation.real.pruned }} + {{ summary.validation.real.likely }} bahçe bu sınıflarda.
@@ -725,9 +725,9 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                     Bu sayılar gerçek saha doğrulamasının yerini tutmaz.
                 </p>
             </CardContent>
-        </Card>
+        </Card></details>
 
-        <Card v-if="summary.radarCheck" class="gap-0 py-0">
+        <details v-if="summary.radarCheck" class="rounded-lg border p-3"><summary class="min-h-11 cursor-pointer py-3 text-sm font-medium">Radar blok testi · ayrıntılar</summary><Card class="gap-0 py-0">
             <CardHeader class="py-4">
                 <CardTitle>Radar blok testi · Sentinel-1 hangi ölçekte ne görebiliyor</CardTitle>
                 <CardDescription>
@@ -784,7 +784,7 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                     Saçılım (VH, VH/VV) blok ortalamasında da sessiz çaydan ayrışmıyor; koherans hem tek bahçede hem blokta şansın üzerinde, ama tek bir bahçe için karar verdirecek büyüklükte değil. Radar bu yüzden kararı tek başına vermez, optik bulguyu destekleyen ek tanık olarak kalır.
                 </p>
             </CardContent>
-        </Card>
+        </Card></details>
 
         <Card v-if="curve">
             <CardHeader>
@@ -848,7 +848,7 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                                 <TableHead class="hidden md:table-cell">Bahçe</TableHead>
                                 <TableHead>1/7 hedefi</TableHead>
                                 <TableHead>Alım kararı</TableHead>
-                                <TableHead class="hidden lg:table-cell">İlk kesin tespit</TableHead>
+                                <TableHead class="hidden lg:table-cell">İlk güçlü tespit</TableHead>
                                 <TableHead class="w-14 text-right"><span class="sr-only">Kanıt dosyası</span></TableHead>
                             </TableRow>
                         </TableHeader>
@@ -867,7 +867,7 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                                     </div>
                                     <div class="text-xs text-muted-foreground">
                                         sayılan {{ formatM2(r.countedM2 ?? r.prunedAreaM2) }} / hedef {{ r.requiredM2 ? formatM2(r.requiredM2) : '—' }}
-                                        · kesin {{ formatM2(r.prunedAreaM2) }}<span v-if="r.likelyAreaM2"> + olası {{ formatM2(r.likelyAreaM2) }}</span>
+                                        · güçlü {{ formatM2(r.prunedAreaM2) }}<span v-if="r.likelyAreaM2"> + olası {{ formatM2(r.likelyAreaM2) }}</span>
                                     </div>
                                     <div v-if="r.reusedM2" class="text-xs text-warning">tekrar budanan {{ formatM2(r.reusedM2) }} sayılmadı (7 yıl kuralı)</div>
                                     <div v-if="r.requiredM2 && (r.shortfallM2 ?? 0) > 0" class="text-xs text-destructive">eksik: {{ formatM2(r.shortfallM2 ?? 0) }} daha budanmalı</div>
@@ -933,7 +933,7 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                                 <TableHead>Karar</TableHead>
                                 <TableHead class="hidden lg:table-cell">Sensörler</TableHead>
                                 <TableHead class="hidden md:table-cell">Değişim</TableHead>
-                                <TableHead class="hidden text-right lg:table-cell">Kesinleşme</TableHead>
+                                <TableHead class="hidden text-right lg:table-cell">Güçlü tespit tarihi</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1031,7 +1031,7 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                         <div class="grid gap-3 sm:grid-cols-3">
                             <div class="rounded-lg border bg-card p-3"><div class="text-xs text-muted-foreground">Birleşik z / olasılık</div><div class="font-semibold tabular-nums text-foreground">{{ detail.z ?? '—' }} · {{ formatShare(detail.p) }}</div></div>
                             <div class="rounded-lg border bg-card p-3"><div class="text-xs text-muted-foreground">Değişim aralığı</div><div class="text-sm">{{ detail.lastBeforeAt ? fmtDate(detail.lastBeforeAt) : '—' }} → {{ fmtDate(detail.firstAfterAt) }}</div></div>
-                            <div class="rounded-lg border bg-card p-3"><div class="text-xs text-muted-foreground">Tarama tespiti</div><div class="text-sm">{{ detail.likelyAt ? `olası ${fmtDate(detail.likelyAt)}` : '—' }}<span v-if="detail.detectedAt"> · kesin {{ fmtDate(detail.detectedAt) }}</span></div></div>
+                            <div class="rounded-lg border bg-card p-3"><div class="text-xs text-muted-foreground">Tarama tespiti</div><div class="text-sm">{{ detail.likelyAt ? `olası ${fmtDate(detail.likelyAt)}` : '—' }}<span v-if="detail.detectedAt"> · güçlü {{ fmtDate(detail.detectedAt) }}</span></div></div>
                         </div>
 
                         <section class="flex flex-col gap-2">

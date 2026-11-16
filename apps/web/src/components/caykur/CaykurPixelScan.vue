@@ -244,13 +244,14 @@ const fusionMissed = computed(() => {
             <Card class="gap-0 py-0">
                 <CardHeader class="py-4">
                     <CardTitle class="flex flex-wrap items-center gap-2">Piksel taraması <Badge variant="warning">Deneysel · kalibre edilmedi</Badge></CardTitle>
-                    <CardDescription>
+                    <CardDescription>Değişimin yerini ve tahmini alan aralığını gösterir. DEMO ruhsat kayıtları · Ön değerlendirme; idari karar değildir.</CardDescription>
+                    <details><summary class="min-h-11 cursor-pointer py-3 text-sm">Kanıt yöntemi ve sınırlamalar</summary>                    <div class="text-sm text-muted-foreground">
                         Çok-sensör karar bahçeyi tek bir ortalama seriyle yargılar; bahçenin onda biri kesildiğinde bu ortalamada kaybolur. Burada her bahçenin her 10 m Sentinel-2 pikseli, 300 m çevresindeki diğer bahçe piksellerine göre okunur ve sezonun her temiz sahnesi
                         aday tarih olarak denenir ({{ fmtDate(summary.scan.from) }} → {{ fmtDate(summary.scan.to) }}, {{ summary.scan.candidates }} aday · {{ summary.dates }} sahne, {{ summary.excludedDates.length }} tarih kar/gölge nedeniyle dışlandı).
                         Her pikselin kendi mevsimsel örüntüsü önceki iki sezonundan çıkarılır ve tarama bu örüntüden sapma üzerinde yapılır; piksel ayrıca o tarihte mahalledeki tüm piksellerin değişim dağılımından ayrışmalıdır.
                         Küme çekirdeği z ≥ {{ summary.rules.zCore }} ile kurulur, komşular z ≥ {{ summary.rules.zGrow }} ile eklenir, kümenin birleşik z'si ≥ {{ summary.rules.clusterZ }} olmalıdır. Sınır pikselleri (çay örtüsü dışı) çekirdek olamaz. Kümeler toparlanma hızına göre derin budama, hafif budama ya da geçici düşüş olarak ayrılır.
                         Çok-sensör kararını değiştirmez; yanında gösterilir. Sezon {{ seasonLabel(summary.season) }}.
-                    </CardDescription>
+                    </div><p class="text-sm">Alan dönüşümü sınırlı yerel kalibrasyona dayanır; ölçülmüş kesin alan değildir. Alt–üst sınırlar birlikte değerlendirilmelidir.</p></details>
                 </CardHeader>
             </Card>
 
@@ -261,9 +262,9 @@ const fusionMissed = computed(() => {
                 <StatCard label="Çok-sensörün görmediği" :value="formatNumber(summary.summary.newFinds)" hint="bahçe · çok-sensör 'belirsiz' ya da 'budama yok' demişti" />
             </div>
 
-            <Card v-if="summary.validation" class="gap-0 py-0">
+            <details v-if="summary.validation" class="rounded-lg border p-3"><summary class="min-h-11 cursor-pointer py-3 text-sm font-medium">Model davranış testleri · ayrıntılar</summary><Card class="gap-0 py-0">
                 <CardHeader class="py-4">
-                    <CardTitle>Ölçülen doğruluk (saha verisi olmadan)</CardTitle>
+                    <CardTitle>Model davranış testleri (saha verisi olmadan)</CardTitle>
                     <CardDescription>
                         Yanlış alarm üst sınırı: {{ summary.validation.falseAlarms.gardens }} / {{ summary.validation.gardens }} bahçe ({{ pct(summary.validation.falseAlarms.share) }}). {{ summary.validation.falseAlarms.note }}
                     </CardDescription>
@@ -295,9 +296,9 @@ const fusionMissed = computed(() => {
                         Bu sayılar gerçek saha doğrulamasının yerini tutmaz; Saha Testi vakaları geldikçe onunla değiştirilecek.
                     </p>
                 </CardContent>
-            </Card>
+            </Card></details>
 
-            <Card class="gap-0 py-0">
+            <details class="rounded-lg border p-3"><summary class="min-h-11 cursor-pointer py-3 text-sm font-medium">Çok-sensör karar ile karşılaştırma · ayrıntılar</summary><Card class="gap-0 py-0">
                 <CardHeader class="py-4">
                     <CardTitle>Çok-sensör karar ile karşılaştırma</CardTitle>
                     <CardDescription>
@@ -307,7 +308,7 @@ const fusionMissed = computed(() => {
                         Hangisinin doğru olduğunu yalnız saha doğrulaması söyler; Saha Testi sekmesi bunun için var.
                     </CardDescription>
                 </CardHeader>
-            </Card>
+            </Card></details>
 
             <Card class="gap-0 py-0">
                 <CardHeader class="py-4">
