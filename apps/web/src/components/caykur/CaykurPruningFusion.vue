@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { PROGRESS_TONE_CLASS, toneVariant } from '@/components/caykur/tone';
+import { toneVariant } from '@/components/caykur/tone';
 import { useToast } from '@/composables/useToast';
 import { useTkgmParcelLookup } from '@/composables/useTkgmParcelLookup';
 import {
@@ -614,12 +614,7 @@ function onRowKey(e: KeyboardEvent, run: () => void): void {
         run();
     }
 }
-function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'info' {
-    if (r.status === 'pruned_full') return 'success';
-    if (r.status === 'pruned_partial') return 'info';
-    if (r.status === 'none') return 'danger';
-    return 'warning';
-}
+
 </script>
 
 <template>
@@ -659,7 +654,7 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard label="Güçlü budama göstergesi" :value="formatNumber(summary.gardens.byClass.pruned)" :hint="`bahçe · budanan alan ${formatM2(summary.gardens.measured ? summary.gardens.measured.prunedM2 : summary.gardens.prunedAreaM2)} · kaynak desteği parsel kanıtında`" :icon="Scissors" />
             <StatCard label="Olası budama" :value="formatNumber(summary.gardens.byClass.likely)" :hint="`bahçe · budanan alan ${formatM2(summary.gardens.measured ? summary.gardens.measured.likelyM2 : summary.gardens.likelyAreaM2)} · tek sensör ya da kalıcılık bekleniyor`" />
-            <StatCard label="Alım otomatik açıldı" :value="formatNumber(summary.producers.byDecision.auto_open)" :hint="`müstahsil · ${summary.producers.byDecision.auto_pending} bekliyor · ${summary.producers.byDecision.auto_none} görülmedi`" :icon="Users" />
+            <StatCard label="Eski DEMO alım senaryosu" :value="formatNumber(summary.producers.byDecision.auto_open)" :hint="`müstahsil · ${summary.producers.byDecision.auto_pending} bekliyor · ${summary.producers.byDecision.auto_none} görülmedi`" :icon="Users" />
             <StatCard label="Eksper kuyruğu (anomali)" :value="formatNumber(summary.producers.byDecision.expert_anomaly)" :hint="`yalnız çelişki / tekrar / sınır / ruhsat dosyaları · tarama her ${summary.everyDays} gün, ${summary.timeline.length} tarama`" :icon="Radar" />
         </div>
 
@@ -679,7 +674,7 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                 {{ summary.gardens.measured.byMethod.pixel_scan ?? 0 }} bahçede piksel taramasının çizdiği kümeden,
                 {{ summary.gardens.measured.byMethod.change_patch ?? 0 }} bahçede optik değişim yamasından,
                 {{ summary.gardens.measured.byMethod.ndvi_fraction ?? 0 }} bahçede bahçe ortalamasındaki NDVI düşüşünden.
-                Karar biriminin toplam alanı {{ formatM2(summary.gardens.prunedAreaM2 + summary.gardens.likelyAreaM2) }}; müstahsilin 1/7 hesabı şimdilik bu birim alanıyla yürür.
+                Karar biriminin toplam alanı {{ formatM2(summary.gardens.prunedAreaM2 + summary.gardens.likelyAreaM2) }}; arşivdeki alım senaryosu bu birim alanıyla hesaplanmıştır. Aşağıdaki hedef karşılaştırması ise desteklenen alt alan ve muhtemel ilaveyi ayrı kullanır.
             </AlertDescription>
         </Alert>
 
@@ -811,8 +806,8 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
         <!-- ── Producers ── -->
         <Card v-if="view === 'producers'">
             <CardHeader>
-                <CardTitle>Budama yapan müstahsiller ve alım kararı</CardTitle>
-                <CardDescription>{{ formatNumber(pTotal) }} müstahsil · karar politikası: kanıt temizse uydu kendi karar verir, eksper yalnız anomalileri görür</CardDescription>
+                <CardTitle>Müstahsil hedef senaryoları</CardTitle>
+                <CardDescription>{{ formatNumber(pTotal) }} müstahsil · desteklenen alt alan ve muhtemel ilave ayrı senaryolardır; filtreler arşiv modelinin durumlarını gösterir, alım kararı değildir</CardDescription>
                 <CardAction class="flex gap-2">
                     <Button variant="outline" size="sm" class="h-11 md:h-9" @click="showExpertQueue">Eksper kuyruğu ({{ summary.producers.byDecision.expert_anomaly }})</Button>
                     <Button variant="outline" size="sm" class="h-11 md:h-9" :disabled="isDownloading" @click="downloadCsv"><Download aria-hidden="true" />CSV</Button>
@@ -823,17 +818,17 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                     <SearchInput v-model="pSearch" placeholder="Ad, müstahsil / cüzdan / ruhsat no…" />
                     <template #filters>
                         <Select :model-value="pDecision" @update:model-value="onPDecision">
-                            <SelectTrigger class="h-11 w-full md:h-9 md:w-56" aria-label="Alım kararı"><SelectValue placeholder="Alım kararı" /></SelectTrigger>
+                            <SelectTrigger class="h-11 w-full md:h-9 md:w-56" aria-label="Arşiv alım senaryosu"><SelectValue placeholder="Arşiv alım senaryosu" /></SelectTrigger>
                             <SelectContent>
-                                <SelectItem :value="ALL">Tüm kararlar</SelectItem>
-                                <SelectItem v-for="d in FUSION_DECISION_ORDER" :key="d" :value="d">{{ FUSION_DECISION_META[d].label }} ({{ summary.producers.byDecision[d] }})</SelectItem>
+                                <SelectItem :value="ALL">Tüm arşiv senaryoları</SelectItem>
+                                <SelectItem v-for="d in FUSION_DECISION_ORDER" :key="d" :value="d">Arşiv: {{ FUSION_DECISION_META[d].label }} ({{ summary.producers.byDecision[d] }})</SelectItem>
                             </SelectContent>
                         </Select>
                         <Select :model-value="pStatus" @update:model-value="onPStatus">
                             <SelectTrigger class="h-11 w-full md:h-9 md:w-52" aria-label="Durum"><SelectValue placeholder="Durum" /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem :value="ALL">Tüm durumlar</SelectItem>
-                                <SelectItem v-for="s in PRODUCER_FUSION_ORDER" :key="s" :value="s">{{ PRODUCER_FUSION_META[s].label }} ({{ summary.producers.byStatus[s] }})</SelectItem>
+                                <SelectItem v-for="s in PRODUCER_FUSION_ORDER" :key="s" :value="s">Arşiv: {{ PRODUCER_FUSION_META[s].label }} ({{ summary.producers.byStatus[s] }})</SelectItem>
                             </SelectContent>
                         </Select>
                     </template>
@@ -847,7 +842,7 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                                 <TableHead>Müstahsil</TableHead>
                                 <TableHead class="hidden md:table-cell">Bahçe</TableHead>
                                 <TableHead>1/7 hedefi</TableHead>
-                                <TableHead>Alım kararı</TableHead>
+                                <TableHead>Kanıt senaryosu</TableHead>
                                 <TableHead class="hidden lg:table-cell">İlk güçlü tespit</TableHead>
                                 <TableHead class="w-14 text-right"><span class="sr-only">Kanıt dosyası</span></TableHead>
                             </TableRow>
@@ -857,23 +852,24 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                                 <TableCell>
                                     <div class="font-medium text-foreground">{{ r.name }}</div>
                                     <div class="text-xs text-muted-foreground">{{ r.code }} · {{ r.licenseNo || 'ruhsat yok' }}</div>
-                                    <Badge :variant="toneVariant(PRODUCER_FUSION_META[r.status].tone)" class="mt-1" :title="PRODUCER_FUSION_META[r.status].description">{{ PRODUCER_FUSION_META[r.status].label }}</Badge>
+
                                 </TableCell>
-                                <TableCell class="hidden md:table-cell">{{ r.gardens }}<span class="text-xs text-muted-foreground"> · {{ r.prunedGardens.length }} kesin, {{ r.likelyGardens.length }} olası</span></TableCell>
+                                <TableCell class="hidden md:table-cell">{{ r.gardens }}<span class="text-xs text-muted-foreground"> · {{ r.prunedGardens.length }} güçlü, {{ r.likelyGardens.length }} olası</span></TableCell>
                                 <TableCell>
                                     <div class="flex items-center gap-2">
-                                        <Progress :model-value="Math.min(100, Math.round(r.ratio * 100))" class="h-2 w-24" :class="PROGRESS_TONE_CLASS[ratioTone(r)]" />
-                                        <span class="text-xs tabular-nums">{{ r.requiredM2 ? formatShare(r.ratio) : '—' }}</span>
+                                        <Progress :model-value="Math.min(100, Math.round((r.requiredM2 > 0 ? r.supportedAreaM2 / r.requiredM2 : 0) * 100))" class="h-2 w-24" />
+                                        <span class="text-xs tabular-nums">{{ r.requiredM2 ? formatShare(r.supportedAreaM2 / r.requiredM2) : '—' }}</span>
                                     </div>
                                     <div class="text-xs text-muted-foreground">
-                                        sayılan {{ formatM2(r.countedM2 ?? r.prunedAreaM2) }} / hedef {{ r.requiredM2 ? formatM2(r.requiredM2) : '—' }}
-                                        · güçlü {{ formatM2(r.prunedAreaM2) }}<span v-if="r.likelyAreaM2"> + olası {{ formatM2(r.likelyAreaM2) }}</span>
+                                        desteklenen alt alan {{ formatM2(r.supportedAreaM2) }} / hedef {{ r.requiredM2 ? formatM2(r.requiredM2) : '—' }}
+                                        · muhtemel ilave {{ formatM2(r.possibleAreaM2) }}
                                     </div>
-                                    <div v-if="r.reusedM2" class="text-xs text-warning">tekrar budanan {{ formatM2(r.reusedM2) }} sayılmadı (7 yıl kuralı)</div>
-                                    <div v-if="r.requiredM2 && (r.shortfallM2 ?? 0) > 0" class="text-xs text-destructive">eksik: {{ formatM2(r.shortfallM2 ?? 0) }} daha budanmalı</div>
+                                    <div class="text-xs text-muted-foreground">Desteklenen alanla eksik: {{ formatM2(Math.max(0, r.requiredM2 - r.supportedAreaM2)) }} · muhtemel eklenirse: {{ formatM2(Math.max(0, r.requiredM2 - r.supportedAreaM2 - r.possibleAreaM2)) }}</div>
+                                    <p v-if="r.missingAreaGardens" class="text-xs text-warning">{{ r.missingAreaGardens }} bahçede alan kanıtı eksik; alan eklenmedi.</p>
                                 </TableCell>
                                 <TableCell>
-                                    <Badge :variant="toneVariant(FUSION_DECISION_META[r.decision ?? 'no_data'].tone)" :title="r.decisionReason ?? FUSION_DECISION_META[r.decision ?? 'no_data'].description">{{ FUSION_DECISION_META[r.decision ?? 'no_data'].label }}</Badge>
+                                    <Badge variant="outline">{{ !r.requiredM2 ? 'Ruhsat hedefi yok' : r.anomalies?.length ? 'Ek inceleme gerekli' : r.supportedAreaM2 >= r.requiredM2 ? 'Alt alan hedefe ulaşıyor' : r.supportedAreaM2 + r.possibleAreaM2 >= r.requiredM2 ? 'Muhtemel eklenirse ulaşır' : 'Kanıt hedefi karşılamıyor' }}</Badge>
+                                    <p class="text-xs text-muted-foreground">Ön değerlendirme; alım kararı değildir.</p>
                                     <div v-if="r.anomalies?.length" class="mt-1 flex flex-wrap gap-1">
                                         <Badge v-for="a in r.anomalies" :key="a" variant="outline" class="text-[10px]">{{ FUSION_ANOMALY_LABEL[a] }}</Badge>
                                     </div>
@@ -909,7 +905,7 @@ function ratioTone(r: FusionProducerRow): 'success' | 'warning' | 'danger' | 'in
                         <Select :model-value="gClass" @update:model-value="onGClass">
                             <SelectTrigger class="h-11 w-full md:h-9 md:w-44" aria-label="Karar"><SelectValue placeholder="Karar" /></SelectTrigger>
                             <SelectContent>
-                                <SelectItem :value="ALL">Tüm kararlar</SelectItem>
+                                <SelectItem :value="ALL">Tüm arşiv senaryoları</SelectItem>
                                 <SelectItem v-for="c in FUSION_CLASS_ORDER" :key="c" :value="c">{{ FUSION_CLASS_META[c].label }} ({{ summary.gardens.byClass[c] }})</SelectItem>
                             </SelectContent>
                         </Select>

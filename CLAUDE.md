@@ -111,3 +111,7 @@ CaykurNdviAnalysis is an optional layer in compliance, backed by GET ndvi-analys
 ## Combined pruning v2
 
 Internal confirmed means method agreement, not independent verification. The producer table separates supported lower-bound area from a probable-area scenario; light and pending cuts are excluded from counted filters. Legacy combined validation and history are omitted until compatible diagnostics exist. Diagnostic cards are collapsed on fusion, pixel and combined screens; results, area uncertainty and preliminary/DEMO notices stay visible. No purchase state is changed by combined screening.
+
+## Pruning target scenarios
+
+Fusion producer rows expose supportedAreaM2 (deep/pruned lower area bound after existing reuse), possibleAreaM2 and missingAreaGardens. Missing area is never replaced with a whole garden. UI and CSV distinguish these scenarios from imported legacy purchase decisions; no purchase state changes. Combined v3 displays additional prior-cell exclusion from the engine. Old diagnostics remain unavailable; deterministic rule checks are not field accuracy validation.

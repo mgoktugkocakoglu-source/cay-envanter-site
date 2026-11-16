@@ -1433,6 +1433,9 @@ export interface FusionGardenDetail extends FusionGardenRow {
 }
 
 export interface FusionProducerRow {
+    supportedAreaM2: number;
+    possibleAreaM2: number;
+    missingAreaGardens: number;
     id: string;
     code: string;
     name: string;
@@ -3160,6 +3163,7 @@ export interface CombinedSummary {
     liveSeason: string | null;
 }
 export interface CombinedGardenRow {
+    repeatExclusion?: { excludedM2: number; checked: boolean; method: string };
     id: string;
     code: string;
     block: string;

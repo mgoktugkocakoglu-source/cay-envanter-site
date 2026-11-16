@@ -10,6 +10,7 @@ export type CombinedProducerStatus = 'met' | 'met_with_probable' | 'partial' | '
 export type CombinedAreaSource = 'pixel_scan' | 'change_patch' | 'ndvi_fraction';
 
 export interface CombinedGarden {
+    repeatExclusion?: { excludedM2: number; checked: boolean; method: string };
     id: string;
     producerId: string;
     areaM2: number;

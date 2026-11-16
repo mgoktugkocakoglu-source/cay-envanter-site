@@ -64,6 +64,9 @@ export interface FusionGardenDetail extends FusionGardenRow {
 }
 
 export interface FusionProducerRow extends ProducerFusion {
+    supportedAreaM2: number;
+    possibleAreaM2: number;
+    missingAreaGardens: number;
     id: string;
     code: string;
     name: string;
@@ -257,7 +260,7 @@ export class PruningFusionService {
     /** "Budama yapanlar" as CSV (UTF-8 BOM, Excel-compatible). */
     async producersCsv(areaId: string, requested?: string): Promise<string> {
         const rows = await this.producerRows(areaId, requested);
-        const header = ['Müstahsil no', 'Ad soyad', 'Cüzdan no', 'Ruhsat no', 'Bahçe', 'Ruhsat alanı (m²)', '1/7 hedefi (m²)', 'Budanan alan (m²)', 'Olası budanan (m²)', 'Tekrar budanan, sayılmadı (m²)', 'Sayılan yeni alan (m²)', 'Eksik (m²)', 'Hedef oranı', 'Durum', 'Alım kararı', 'Anomaliler', 'İlk tespit', 'Budanan bahçeler', 'Demo'];
+        const header = ['Müstahsil no', 'Ad soyad', 'Cüzdan no', 'Ruhsat no', 'Bahçe', 'Ruhsat alanı (m²)', '1/7 hedefi (m²)', 'Budanan alan (m²)', 'Olası budanan (m²)', 'Tekrar budanan, sayılmadı (m²)', 'Sayılan yeni alan (m²)', 'Eksik (m²)', 'Eski model hedef oranı', 'Eski model durumu', 'Eski DEMO alım senaryosu', 'Anomaliler', 'İlk tespit', 'Budanan bahçeler', 'Demo', 'Desteklenen alt alan (m²)', 'Muhtemel ilave (m²)', 'Alt alanla eksik (m²)', 'Muhtemel eklenirse eksik (m²)', 'Alan kanıtı eksik bahçe', 'Uyarı'];
         const cell = (v: string | number | null) => `"${String(v ?? '').replace(/"/g, '""')}"`;
         const label: Record<ProducerFusionStatus, string> = {
             pruned_full: '1/7 tamam (çok-sensör)',
@@ -279,7 +282,7 @@ export class PruningFusionService {
         const lines = rows.map((r) =>
             [
                 r.code, r.name, r.walletNo, r.licenseNo, r.gardens, r.licensedAreaM2, r.requiredM2, r.prunedAreaM2, r.likelyAreaM2, r.reusedM2 ?? 0, r.countedM2 ?? r.prunedAreaM2, r.shortfallM2 ?? '', r.ratio, label[r.status],
-                decisionLabel[r.decision ?? 'no_data'], (r.anomalies ?? []).join(' '), r.firstDetectedAt ?? '', r.prunedGardens.join(' '), 'Evet',
+                decisionLabel[r.decision ?? 'no_data'], (r.anomalies ?? []).join(' '), r.firstDetectedAt ?? '', r.prunedGardens.join(' '), 'Evet', r.supportedAreaM2, r.possibleAreaM2, Math.max(0, r.requiredM2 - r.supportedAreaM2), Math.max(0, r.requiredM2 - r.supportedAreaM2 - r.possibleAreaM2), r.missingAreaGardens, 'DEMO ön değerlendirme; idari karar değildir. Alım sütunları eski model senaryosudur.',
             ].map(cell).join(';'),
         );
         return `﻿${header.map(cell).join(';')}\n${lines.join('\n')}\n`;
@@ -375,14 +378,28 @@ export class PruningFusionService {
         const area = await this.findArea(areaId);
         const season = this.resolveSeason(area, requested);
         const producers = await this.producerRepo.find({ where: { areaId, season }, order: { name: 'ASC' } });
+        const gardens = await this.gardenRepo.find({ where: { areaId }, select: ['producerCode', 'seasons'] });
         const order: Record<ProducerFusionStatus, number> = { pruned_full: 0, pruned_partial: 1, unclear: 2, none: 3, no_data: 4, no_license: 5 };
         return producers
             .filter((p) => p.fusion)
             .map((p) => {
                 const f = p.fusion as ProducerFusion;
+                let supportedAreaM2 = 0;
+                let possibleAreaM2 = 0;
+                let missingAreaGardens = 0;
+                for (const g of gardens.filter(g => g.producerCode === p.code)) {
+                    const evidence = g.seasons[season]?.fusion;
+                    if (!evidence || !['pruned', 'likely'].includes(evidence.verdict.class)) continue;
+                    if (!evidence.prunedArea) { missingAreaGardens++; continue; }
+                    const remaining = 1 - Math.min(1, Math.max(0, evidence.repeat?.reusedShare ?? 0));
+                    if (evidence.verdict.class === 'pruned' && evidence.verdict.kind === 'deep_pruning') supportedAreaM2 += evidence.prunedArea.lowM2 * remaining;
+                    else possibleAreaM2 += evidence.prunedArea.m2 * remaining;
+                }
+                supportedAreaM2 = Math.round(supportedAreaM2);
+                possibleAreaM2 = Math.round(possibleAreaM2);
                 // The ratio is on the counted area (confirmed + likely minus reused), the figure the policy decides on.
                 const counted = f.countedM2 ?? f.prunedAreaM2;
-                return { id: p.id, code: p.code, name: p.name, walletNo: p.walletNo, licenseNo: p.licenseNo, ...f, ratio: f.requiredM2 > 0 ? Math.round((counted / f.requiredM2) * 1000) / 1000 : 0 };
+                return { id: p.id, code: p.code, name: p.name, walletNo: p.walletNo, licenseNo: p.licenseNo, ...f, supportedAreaM2, possibleAreaM2, missingAreaGardens, ratio: f.requiredM2 > 0 ? Math.round((counted / f.requiredM2) * 1000) / 1000 : 0 };
             })
             .sort((a, b) => order[a.status] - order[b.status] || b.ratio - a.ratio || a.name.localeCompare(b.name, 'tr-TR'));
     }

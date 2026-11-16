@@ -531,6 +531,8 @@ function onView(v: unknown): void {
                         <p>{{ selected.reason }}.</p>
                         <div class="rounded-lg border bg-muted/40 p-3">
                             <div class="font-medium">Budanan alan {{ selected.area ? `≈ ${formatM2(selected.area.m2)}` : '—' }}</div>
+                            <p v-if="selected.repeatExclusion?.excludedM2" class="text-sm text-warning">Kayıtlı önceki sezonlarla aynı piksel hücreleri: ek {{ formatM2(selected.repeatExclusion.excludedM2) }} hedef hesabından çıkarıldı. Hücre içindeki kesim konumu bilinmediği için ihtiyatlı sınırdır.</p>
+                            <p v-if="selected.repeatExclusion && !selected.repeatExclusion.checked" class="text-xs text-muted-foreground">Piksel bazlı tekrar kontrolü yapılamadı; mevcut çok sensör tekrar bilgisi kullanıldı.</p>
                             <p v-if="selected.pixel?.verdict === 'pending'" class="text-sm text-warning">Toparlanma bekleniyor; hedef hesabına alan eklenmedi.</p>
                             <p v-if="selected.kind === 'light'" class="text-sm">Hafif kesim göstergesi; derin budama hedef alanına eklenmedi.</p>
                             <div v-if="selected.area" class="text-xs text-muted-foreground">Aralık {{ formatM2(selected.area.lowM2) }} – {{ formatM2(selected.area.highM2) }} · kaynak: {{ SOURCE_LABEL[selected.area.source] }} · hedef senaryosundaki alan {{ formatM2(selected.countedM2) }}</div>
