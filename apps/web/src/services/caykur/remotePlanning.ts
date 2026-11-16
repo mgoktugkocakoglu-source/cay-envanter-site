@@ -1,0 +1,2 @@
+export interface MappingRegion { blocks: Array<{ id: string; geometry: GeoJSON.Geometry; teaM2: number; areaM2: number; density: number }>; period: Record<string, unknown>; id: string; province: string; district: string; neighborhood: string; geometry: GeoJSON.Geometry; teaM2: number; areaM2: number; density: number | null; sourceUpdatedAt: string }
+export interface MappingPlan { data: MappingRegion[]; notice: string }

@@ -127,3 +127,8 @@ No purchase state is changed by this view; purchase decisions stay with the fusi
 ## Pruning target scenarios
 
 Fusion producer rows expose supportedAreaM2 (deep/pruned lower area bound after existing reuse), possibleAreaM2 and missingAreaGardens. Missing area is never replaced with a whole garden. UI and CSV distinguish these scenarios from imported legacy purchase decisions; no purchase state changes. Combined v3 displays additional prior-cell exclusion from the engine. Old diagnostics remain unavailable; deterministic rule checks are not field accuracy validation.
+
+
+## Remote planning views
+
+RemotePlanningService/Controller read imported boundaries, tea patches and existing NDVI analysis without changing detection rules. Mapping uses 500 m logistics grid cells clipped to each neighbourhood, ranked by candidate tea density; not flight routes, sorties, legal clearance or full district coverage. Of currently has 12 local bundles; Rize has no imported coverage in this checkout. GeoJSON exports preserve the scope notice. Changes and calendar-year report cards reuse existing NDVI statuses and monthly observations; they do not issue notifications or persist review workflow. Access uses existing READ roles. New tabs: mapping, changes, reportcard. Offline smoke test produced 481 tea-containing blocks across 12 Of bundles.

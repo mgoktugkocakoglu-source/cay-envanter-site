@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CaykurRemotePlanning from '@/components/caykur/CaykurRemotePlanning.vue';
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ArrowDown, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, Info, Leaf, MapPinned, X } from '@lucide/vue';
@@ -714,6 +715,9 @@ function onRowKey(e: KeyboardEvent, id: string): void {
 
                 <CaykurFieldTests v-if="activeTab === 'field' && mapData" :area-id="area.id" :map-data="mapData" />
                 <CaykurLicensing v-if="activeTab === 'licensing' && mapData" :area-id="area.id" :map-data="mapData" :tea-patches="area.teaPatches" />
+                <CaykurRemotePlanning v-if="activeTab === 'mapping'" :area-id="area.id" mode="mapping" />
+                <CaykurRemotePlanning v-if="activeTab === 'changes'" :area-id="area.id" mode="changes" />
+                <CaykurRemotePlanning v-if="activeTab === 'reportcard'" :area-id="area.id" mode="report" />
                 <CaykurGardenHealth v-if="activeTab === 'health'" :area-id="area.id" />
                 <CaykurLandEvaluation v-if="activeTab === 'land'" :area-id="area.id" />
                 <CaykurGardenAge v-if="activeTab === 'age'" :area-id="area.id" />

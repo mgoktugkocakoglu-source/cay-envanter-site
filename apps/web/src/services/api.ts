@@ -1,3 +1,4 @@
+import type { MappingPlan } from '@/services/caykur/remotePlanning';
 import type { NdviMap } from '@/services/caykur/ndviAnalysis';
 import { useAuthStore, UserType } from '@/stores/authStore';
 
@@ -4289,6 +4290,8 @@ export const api = {
     getComplianceSummary: (areaId: string) => request<ComplianceSummary>(`/caykur/tea-inventory/areas/${areaId}/compliance/summary`),
     getComplianceMap: (areaId: string) => request<ComplianceMapCollection>(`/caykur/tea-inventory/areas/${areaId}/compliance/map`),
     getRemoteEvidenceTimeline: (areaId: string) => request<RemoteEvidenceTimeline>(`/caykur/tea-inventory/areas/${areaId}/remote-evidence/timeline`),
+    getRemoteMappingPlan: () => request<MappingPlan>('/caykur/tea-inventory/remote-planning/regions'),
+    getRemoteTimeline: (id: string, year?: number) => request<NdviMap>(`/caykur/tea-inventory/remote-planning/areas/${id}/timeline${year === undefined ? '' : '?year=' + year}`),
     getNdviAnalysisMap: (areaId: string, year?: number) => request<NdviMap>(`/caykur/tea-inventory/areas/${areaId}/ndvi-analysis/map${year === undefined ? '' : '?year=' + year}`),
     getRemoteTerrain: (areaId: string) => request<RemoteTerrain | null>(`/caykur/tea-inventory/areas/${areaId}/remote-evidence/terrain`),
     getRemoteParcelEvidence: (areaId: string, block: string, parcel: string) => request<RemoteParcelEvidence>(`/caykur/tea-inventory/areas/${areaId}/remote-evidence/parcels/${encodeURIComponent(block)}/${encodeURIComponent(parcel)}`),
