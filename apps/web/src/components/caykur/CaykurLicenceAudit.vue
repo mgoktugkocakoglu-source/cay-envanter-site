@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CaykurRemoteEvidence from '@/components/caykur/CaykurRemoteEvidence.vue';
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { ChevronLeft, ChevronRight, Download, ScanSearch } from '@lucide/vue';
 import L from 'leaflet';
@@ -31,7 +32,7 @@ import { formatM2 } from '@/services/caykur/teaInventory';
 import { formatNumber } from '@/services/caykur';
 
 /**
- * Licence audit (Arazi tespit kararı), a separate module under licensing: per cadastral parcel the TKGM deed title,
+ * Licence audit (Arazi ön değerlendirmesi), a separate module under licensing: per cadastral parcel the TKGM deed title,
  * ÇAYKUR's licence register and a title-independent satellite detection are set side by side and bound to one
  * decision. It reads the other modules' data and changes none of it; the decision is a flag for an expert.
  */
@@ -40,13 +41,13 @@ const props = defineProps<{ areaId: string }>();
 const ALL = 'all';
 const PAGE_SIZE = 15;
 const DECISION_META: Record<AuditDecision, { label: string; short: string; tone: Tone; t: boolean; l: boolean; d: boolean | null; note: string }> = {
-    tea_land: { label: 'ÇAY ARAZİSİ', short: 'Çay arazisi', tone: 'success', t: true, l: true, d: true, note: 'Tapu, ruhsat ve saha aynı şeyi söylüyor.' },
-    licensing_error: { label: 'ÇAYKUR RUHSATLANDIRMA HATASI', short: 'Ruhsatlandırma hatası', tone: 'danger', t: false, l: true, d: false, note: 'Ruhsat var; ne tapu ne saha çay gösteriyor.' },
-    unlicensed_tea: { label: 'RUHSATSIZ ÇAY ARAZİSİ', short: 'Ruhsatsız çay', tone: 'danger', t: false, l: false, d: true, note: 'Sahada çay var; tapuda ve ruhsat kaydında yok.' },
-    unlicensed_tea_titled: { label: 'RUHSATSIZ ÇAY ARAZİSİ (tapuda çay)', short: 'Ruhsatsız çay (tapuda çay)', tone: 'warning', t: true, l: false, d: true, note: 'Tapuda ve sahada çay var; ruhsat kaydı yok. Ruhsatlandırma adayı.' },
-    licence_no_tea: { label: 'RUHSAT VAR, ÇAY YOK', short: 'Ruhsat var, çay yok', tone: 'danger', t: true, l: true, d: false, note: 'Tapu ve ruhsat çay diyor; sahada çay görülmüyor (sökülmüş ya da terk edilmiş olabilir).' },
-    title_outdated: { label: 'RUHSATLI ÇAY, TAPU NİTELİĞİ GÜNCEL DEĞİL', short: 'Tapu niteliği güncel değil', tone: 'info', t: false, l: true, d: true, note: 'Ruhsatlı ve sahada çay var; tapu niteliği hiç güncellenmemiş (cins değişikliği).' },
-    title_only: { label: 'YALNIZ TAPUDA ÇAY', short: 'Yalnız tapuda çay', tone: 'muted', t: true, l: false, d: false, note: 'Tapu çay diyor; ruhsat yok, sahada çay yok.' },
+    tea_land: { label: 'ÇAY ARAZİSİ', short: 'Çay arazisi', tone: 'success', t: true, l: true, d: true, note: 'Kayıtlar ve arazi okuması uyum yönünde; doğrulanmış gerçeklik değildir.' },
+    licensing_error: { label: 'RUHSAT–ARAZİ UYUMSUZLUĞU ŞÜPHESİ', short: 'Ruhsat–arazi uyumsuzluğu şüphesi', tone: 'danger', t: false, l: true, d: false, note: 'Ruhsat kaydıyla tapu ve görüntü arasında fark var; kayıt ve kanıt incelemesi gerekli.' },
+    unlicensed_tea: { label: 'RUHSAT KAYDIYLA EŞLEŞMEYEN ÇAY ADAYI', short: 'Kayıtla eşleşmeyen çay adayı', tone: 'danger', t: false, l: false, d: true, note: 'Görüntü çay yönünde; tapu niteliği farklı ve mevcut ruhsat listesinde eşleşme yok.' },
+    unlicensed_tea_titled: { label: 'RUHSAT KAYDIYLA EŞLEŞMEYEN ÇAY ADAYI (tapuda çay)', short: 'Kayıtla eşleşmeyen aday (tapuda çay)', tone: 'warning', t: true, l: false, d: true, note: 'Tapu ve görüntü çay yönünde; mevcut ruhsat listesinde eşleşme yok. Gerçek kayıt kontrolü gerekli.' },
+    licence_no_tea: { label: 'RUHSAT VAR, ÇAY TESPİTİ DESTEKLENMİYOR', short: 'Ruhsat var, çay tespiti desteklenmiyor', tone: 'danger', t: true, l: true, d: false, note: 'Tapu ve ruhsat kaydı çay yönünde; mevcut görüntü okuması bunu desteklemiyor. Nedeni belirlenmedi.' },
+    title_outdated: { label: 'RUHSAT KAYDI İLE TAPU–GÖRÜNTÜ FARKI', short: 'Tapu–görüntü farkı', tone: 'info', t: false, l: true, d: true, note: 'Tapu niteliği ile ruhsat ve görüntü arasında fark var; hangi kaynağın güncel olduğu doğrulanmalı.' },
+    title_only: { label: 'YALNIZ TAPUDA ÇAY', short: 'Yalnız tapuda çay', tone: 'muted', t: true, l: false, d: false, note: 'Tapuda çay niteliği var; ruhsat eşleşmesi ve görüntü desteği bulunamadı.' },
     out_of_scope: { label: 'KAPSAM DIŞI', short: 'Kapsam dışı', tone: 'muted', t: false, l: false, d: false, note: 'Üç kaynakta da çay yok.' },
     needs_review: { label: 'İNCELEME GEREKLİ', short: 'İnceleme gerekli', tone: 'warning', t: false, l: false, d: null, note: 'Uydu tespiti kararsız, parsel çok küçük ya da kanıt bir bulgu için yetersiz.' },
 };
@@ -65,7 +66,7 @@ const CONFIDENCE_META: Record<AuditConfidence, { label: string; tone: Tone }> = 
 const TEA_LABEL: Record<AuditTeaState, string> = { present: 'çay var', absent: 'çay yok', inconclusive: 'kararsız', not_assessable: 'değerlendirilemiyor' };
 const BUILDING_LABEL: Record<AuditBuildingState, string> = { inside: 'parselde yapı var', boundary: 'sınırda yapı var', none: 'yapı izi yok', unknown: 'yapı verisi yok' };
 const FLAG_LABEL: Record<AuditFlag, string> = {
-    area_over: 'Ruhsat alanı sahadaki çaydan belirgin büyük',
+    area_over: 'Ruhsat alanı ile uydu alan tahmini arasında fark var',
     area_under: 'Sahadaki çay ruhsat alanından belirgin büyük',
     building_not_in_title: 'Parselde yapı var, tapu niteliğinde yok',
     title_building_not_seen: 'Tapuda yapı var, bina izi bulunamadı (küçük ve ağaç altındaki evler veri setinde çoğu kez yoktur)',
@@ -228,13 +229,13 @@ onBeforeUnmount(() => {
 
 <template>
     <div class="flex flex-col gap-6">
-        <LoadingState v-if="isLoading" text="Arazi tespit kararı yükleniyor…" />
+        <LoadingState v-if="isLoading" text="Arazi ön değerlendirmesi yükleniyor…" />
         <EmptyState v-else-if="!summary" :icon="ScanSearch" title="Bu mahalle için arazi tespit kararı yok" description="Motor tarafında audit-licensing çalıştırıldığında burada görünür: her parsel için tapu niteliği, ÇAYKUR ruhsat kaydı ve uydu tespiti yan yana konur." />
         <template v-else>
             <Card class="gap-0 py-0">
                 <CardHeader class="py-4">
                     <CardTitle class="flex flex-wrap items-center gap-2">
-                        Arazi tespit kararı
+                        Arazi ön değerlendirmesi
                         <Badge v-if="summary.licenceSource === 'demo'" variant="warning">DEMO ruhsat kaydı</Badge>
                         <Badge variant="outline">Eksper için işaret, hukuki karar değil</Badge>
                     </CardTitle>
@@ -251,10 +252,10 @@ onBeforeUnmount(() => {
             </Card>
 
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard label="Çay arazisi" :value="formatNumber(summary.summary.byDecision.tea_land)" :hint="`${formatNumber(summary.summary.parcels)} parselden · tapu, ruhsat ve saha uyumlu`" :icon="ScanSearch" />
-                <StatCard label="Ruhsatlandırma hatası" :value="formatNumber(summary.summary.byDecision.licensing_error)" :hint="`ayrıca ${summary.summary.byDecision.licence_no_tea} parselde ruhsat var, çay yok`" />
-                <StatCard label="Ruhsatsız çay arazisi" :value="formatNumber(unlicensed)" :hint="`${summary.summary.byDecision.unlicensed_tea} tapuda çay yok · ${summary.summary.byDecision.unlicensed_tea_titled} tapuda çay var · ≈ ${formatM2(summary.summary.areaM2.unlicensedTea)}`" />
-                <StatCard label="İnceleme gerekli" :value="formatNumber(summary.summary.byDecision.needs_review)" hint="kararsız, küçük ya da zayıf kanıtlı parsel; saha / eksper bakmalı" />
+                <StatCard label="Çay arazisi" :value="formatNumber(summary.summary.byDecision.tea_land)" :hint="`${formatNumber(summary.summary.parcels)} parselden · kayıtlar ve arazi okuması uyum yönünde`" :icon="ScanSearch" />
+                <StatCard label="Ruhsat–arazi uyumsuzluğu şüphesi" :value="formatNumber(summary.summary.byDecision.licensing_error)" :hint="`ayrıca ${summary.summary.byDecision.licence_no_tea} parselde ruhsat var, çay yok`" />
+                <StatCard label="Ruhsat kaydıyla eşleşmeyen çay adayı" :value="formatNumber(unlicensed)" :hint="`${summary.summary.byDecision.unlicensed_tea} tapuda çay yok · ${summary.summary.byDecision.unlicensed_tea_titled} tapuda çay var · ≈ ${formatM2(summary.summary.areaM2.unlicensedTea)}`" />
+                <StatCard label="İnceleme gerekli" :value="formatNumber(summary.summary.byDecision.needs_review)" hint="kararsız, küçük ya da zayıf kanıtlı parsel; ek görüntü veya kayıt incelemesi gerekli" />
             </div>
 
             <div class="grid gap-4 lg:grid-cols-2">
@@ -271,7 +272,7 @@ onBeforeUnmount(() => {
                                         <TableHead>Tapu</TableHead>
                                         <TableHead>Ruhsat</TableHead>
                                         <TableHead>Saha</TableHead>
-                                        <TableHead>Karar</TableHead>
+                                        <TableHead>Ön değerlendirme</TableHead>
                                         <TableHead class="text-right">Parsel</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -287,7 +288,7 @@ onBeforeUnmount(() => {
                                         <TableCell class="text-right font-semibold tabular-nums">{{ summary.summary.byDecision[d] }}</TableCell>
                                     </TableRow>
                                     <TableRow>
-                                        <TableCell colspan="3" class="text-sm text-muted-foreground">saha belirsiz</TableCell>
+                                        <TableCell colspan="3" class="text-sm text-muted-foreground">arazi okuması belirsiz</TableCell>
                                         <TableCell>
                                             <Badge variant="warning">İnceleme gerekli</Badge>
                                             <div class="mt-1 text-xs text-muted-foreground">{{ DECISION_META.needs_review.note }}</div>
@@ -352,8 +353,8 @@ onBeforeUnmount(() => {
                             </Table>
                         </div>
                         <p class="text-sm">
-                            Tapu × saha ({{ summary.summary.parcels - summary.summary.titleVsGround.unknown }} değerlendirilebilen parsel): ikisinde de çay {{ summary.summary.titleVsGround.titleTeaGroundTea }}, tapuda çay sahada yok {{ summary.summary.titleVsGround.titleTeaGroundNone }},
-                            <strong>tapuda çay yok sahada çay var {{ summary.summary.titleVsGround.titleOtherGroundTea }}</strong>, ikisinde de yok {{ summary.summary.titleVsGround.titleOtherGroundNone }}.
+                            Tapu × arazi okuması ({{ summary.summary.parcels - summary.summary.titleVsGround.unknown }} değerlendirilebilen parsel): ikisinde de çay {{ summary.summary.titleVsGround.titleTeaGroundTea }}, tapuda çay, arazi okumasında destek yok {{ summary.summary.titleVsGround.titleTeaGroundNone }},
+                            <strong>tapuda farklı nitelik, arazi okumasında çay adayı {{ summary.summary.titleVsGround.titleOtherGroundTea }}</strong>, ikisinde de yok {{ summary.summary.titleVsGround.titleOtherGroundNone }}.
                         </p>
                         <p class="text-xs text-muted-foreground">Yapı tespiti: {{ summary.buildingSource }}. Küçük ve ağaç altındaki evler bu veri setinde çoğu kez yoktur; bina izinin olmaması yapı olmadığını göstermez, bu yüzden yapı bilgisi kararı değiştirmez, yalnızca işaret olarak gösterilir.</p>
                     </CardContent>
@@ -385,7 +386,7 @@ onBeforeUnmount(() => {
                                     <TableHead>TKGM tapu niteliği</TableHead>
                                     <TableHead>ÇAYKUR ruhsatı</TableHead>
                                     <TableHead>Uydu tespiti</TableHead>
-                                    <TableHead>Karar</TableHead>
+                                    <TableHead>Ön değerlendirme</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -403,7 +404,8 @@ onBeforeUnmount(() => {
                                         <span v-else class="text-muted-foreground">kayıt yok</span>
                                     </TableCell>
                                     <TableCell class="text-sm">
-                                        {{ r.confirmation && r.confirmation.tea !== null ? (r.confirmation.tea ? (r.confirmation.sparse ? 'çay var, seyrek (saha)' : 'çay var (saha)') : 'çay yok (saha)') : TEA_LABEL[r.detection.tea] }}
+                                        {{ TEA_LABEL[r.detection.tea] }}
+                                        <div v-if="r.confirmation" class="text-xs text-muted-foreground">Ayrı geçmiş gözlem kaydı var; ayrıntıda gösterilir.</div>
                                         <span v-if="r.detection.teaShare !== null" class="tabular-nums"> · {{ pct(r.detection.teaShare) }}</span>
                                         <div class="text-xs text-muted-foreground">{{ r.detection.teaAreaM2 === null ? '' : `≈ ${formatM2(r.detection.teaAreaM2)} çay · ` }}{{ BUILDING_LABEL[r.building.state] }}</div>
                                     </TableCell>
@@ -442,7 +444,7 @@ onBeforeUnmount(() => {
                         </div>
                     </SheetHeader>
                     <div class="flex flex-col gap-4 p-4 text-sm">
-                        <p>{{ detail.reason }}</p>
+                        <details class="text-sm"><summary class="min-h-11 cursor-pointer py-3">Arşiv raporunun özgün açıklaması</summary><p>Eski model ifadesidir; idari karar veya güncel doğrulama değildir.</p><p>{{ detail.reason }}</p></details>
 
                         <div class="flex flex-col gap-2">
                             <div ref="mapContainer" class="h-80 w-full overflow-hidden rounded-lg border" />
@@ -492,7 +494,7 @@ onBeforeUnmount(() => {
                                         <TableCell class="text-xs text-muted-foreground">parselin {{ pct(detail.detection.teaShare) }} kadarı çay{{ detail.detection.teaAreaM2 === null ? '' : ` (≈ ${formatM2(detail.detection.teaAreaM2)})` }} · {{ detail.building.count }} bina izi{{ detail.building.insideM2 ? `, ${formatM2(detail.building.insideM2)} parsel içinde` : '' }}</TableCell>
                                     </TableRow>
                                     <TableRow v-if="detail.confirmation">
-                                        <TableCell class="font-medium">Saha gözlemi</TableCell>
+                                        <TableCell class="font-medium">Geçmiş gözlem kaydı</TableCell>
                                         <TableCell>{{ detail.confirmation.tea === null ? '—' : detail.confirmation.tea ? (detail.confirmation.sparse ? 'var, seyrek' : 'var') : 'yok' }}</TableCell>
                                         <TableCell>{{ detail.confirmation.building === null ? '—' : detail.confirmation.building ? 'var' : 'yok' }}</TableCell>
                                         <TableCell class="text-xs text-muted-foreground">{{ detail.confirmation.source }} · {{ detail.confirmation.date }}<template v-if="detail.confirmation.note"> · {{ detail.confirmation.note }}</template></TableCell>
@@ -511,11 +513,13 @@ onBeforeUnmount(() => {
                                 <span>Radar VH (yaz): {{ num(detail.detection.vhSummer, 1) }} dB</span>
                                 <span>Rakım: {{ detail.detection.elevationM ?? '—' }} m</span>
                                 <span>Karsız kış gözlemi: {{ detail.detection.leafOffObs ?? '—' }}</span>
-                                <span>Tam piksel (5 m iç tampon): {{ detail.detection.fullPixels }}</span>
+                                <span>Yaklaşık piksel eşdeğeri (parsel alanı / 100 m²): {{ detail.detection.fullPixels }}</span>
                                 <span>Envanter tespiti (karşılaştırma): {{ pct(detail.detection.inventoryShare) }}</span>
                             </div>
                         </div>
 
+                        <p class="text-xs text-muted-foreground">Piksel eşdeğeri, parsel alanından hesaplanır; parsel içine bütünüyle düşen gerçek uydu piksellerinin sayısı değildir. Dar ve parçalı parsellerde komşu örtü etkisini ölçmez. Tapu niteliği arazi gözlemi değildir. Geçmiş gözlem, uydu okumasından ayrı bir kaynaktır. Sonuç ön değerlendirmedir, idari karar değildir.</p>
+                        <CaykurRemoteEvidence :area-id="areaId" :block="detail.block" :parcel="detail.parcel" />
                         <div v-if="detail.flags.length" class="rounded-lg border p-3">
                             <div class="font-medium">İşaretler</div>
                             <ul class="list-disc pl-4 pt-1 text-xs text-muted-foreground">

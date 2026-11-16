@@ -358,7 +358,7 @@ export const FUSION_GROUP_LABEL: Record<FusionGroup, string> = { optical: 'Optik
 // ── Digital licence register ──
 
 export const MATCH_LEVEL_META: Record<LicenseMatchLevel, ProducerStatusMeta> = {
-    exact: { label: 'Kesin eşleşme', description: 'Ruhsattaki ada/parsel güncel TKGM kaydıyla birebir eşleşti.', tone: 'success' },
+    exact: { label: 'Ada/parsel birebir eşleşiyor', description: 'Ruhsattaki ada/parsel güncel TKGM kaydıyla birebir eşleşti.', tone: 'success' },
     historical: { label: 'Tarihsel eşleşme', description: 'Eski pafta/parsel kaydı, eski–yeni parsel tablosu (22-a yenileme, ifraz, tevhit) üzerinden güncel parsele bağlandı.', tone: 'info' },
     probable: { label: 'Olası eşleşme', description: 'Ruhsatta yalnızca mevki/zilyetlik tarifi var; aday parseller üretildi, eksper teyidi bekliyor.', tone: 'warning' },
     unmatched: { label: 'Eşleşmeyen', description: 'Ruhsattaki parsel kaydı güncel kadastroda bulunamadı; alan tahsis edilemiyor.', tone: 'danger' },

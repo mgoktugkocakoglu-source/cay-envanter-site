@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Download, FileText, MapPinned, MoreHorizonta
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import CaykurLicensingOperations, { type OperationKind } from '@/components/caykur/CaykurLicensingOperations.vue';
+import CaykurProducerDossier from '@/components/caykur/CaykurProducerDossier.vue';
 import CaykurLicenceAudit from '@/components/caykur/CaykurLicenceAudit.vue';
 import CaykurDroneVerification from '@/components/caykur/CaykurDroneVerification.vue';
 import CaykurCompliance from '@/components/caykur/CaykurCompliance.vue';
@@ -579,7 +580,7 @@ function toggleGarden(code: string): void {
             <StatCard
                 label="Ruhsat"
                 :value="formatNumber(summary.licenses.total)"
-                :hint="`kesin ${summary.licenses.byMatchLevel.exact} · tarihsel ${summary.licenses.byMatchLevel.historical} · olası ${summary.licenses.byMatchLevel.probable} · eşleşmeyen ${summary.licenses.byMatchLevel.unmatched}`"
+                :hint="`ada/parsel birebir ${summary.licenses.byMatchLevel.exact} · tarihsel ${summary.licenses.byMatchLevel.historical} · olası ${summary.licenses.byMatchLevel.probable} · eşleşmeyen ${summary.licenses.byMatchLevel.unmatched}`"
                 :icon="ScrollText"
             />
             <StatCard
@@ -658,7 +659,7 @@ function toggleGarden(code: string): void {
                 <ToggleGroupItem value="producers" class="h-11 px-3 md:h-9">Müstahsiller</ToggleGroupItem>
                 <ToggleGroupItem value="applications" class="h-11 px-3 md:h-9">Başvuru kuyruğu</ToggleGroupItem>
                 <ToggleGroupItem value="map" class="h-11 px-3 md:h-9">Kurum haritası</ToggleGroupItem>
-                <ToggleGroupItem value="audit" class="h-11 px-3 md:h-9">Arazi tespit kararı</ToggleGroupItem>
+                <ToggleGroupItem value="audit" class="h-11 px-3 md:h-9">Arazi ön değerlendirmesi</ToggleGroupItem>
                 <ToggleGroupItem value="drone" class="h-11 px-3 md:h-9">Drone doğrulama</ToggleGroupItem>
                 <ToggleGroupItem value="compliance" class="h-11 px-3 md:h-9">Uygunluk raporu</ToggleGroupItem>
             </ToggleGroup>
@@ -916,6 +917,7 @@ function toggleGarden(code: string): void {
                     </SheetHeader>
 
                     <div class="flex flex-col gap-6 p-4 md:p-6">
+                        <CaykurProducerDossier :area-id="areaId" :profile="profile" :generated-at="summary?.generatedAt ?? null" />
                         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             <div class="rounded-lg border bg-card p-3">
                                 <div class="text-xs text-muted-foreground">Ruhsat alanı (tahsis)</div>

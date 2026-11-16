@@ -53,7 +53,7 @@ onBeforeUnmount(() => requestId++);
         <template v-else-if="data">
             <p v-if="data.drone" class="text-sm">Drone: {{ data.drone.capturedAt }} · {{ data.drone.capturedAtNote }} {{ data.drone.verified ? 'Kayıt doğrulanmış olarak işaretli.' : 'Görüntü okuması doğrulanmış ölçüm değildir.' }}</p>
             <p v-else class="text-sm text-muted-foreground">Bu parselde drone okuması yok.</p>
-            <p v-if="data.fullPixels < 6" class="text-sm text-warning">Parsel uydu ızgarası için küçük ({{ data.fullPixels }} tam piksel); komşu örtü etkisi nedeniyle güçlü sonuç çıkarılamaz.</p>
+            <p v-if="data.fullPixels < 6" class="text-sm text-warning">Parsel uydu ızgarası için küçük ({{ data.fullPixels }} yaklaşık piksel eşdeğeri); komşu örtü etkisi nedeniyle güçlü sonuç çıkarılamaz.</p>
             <template v-if="data.monthly?.years.length">
                 <Label for="remote-evidence-year">Sentinel-2 aylık NDVI · yıl</Label>
                 <Select v-model="year"><SelectTrigger id="remote-evidence-year" class="min-h-11"><SelectValue /></SelectTrigger><SelectContent><SelectItem v-for="value in data.monthly.years" :key="value" :value="String(value)">{{ value }}</SelectItem></SelectContent></Select>
