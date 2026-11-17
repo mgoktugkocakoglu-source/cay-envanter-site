@@ -2757,6 +2757,44 @@ export interface CoverComparisonRow {
     teaPrecision: CoverStat;
     teaF1: CoverStat;
 }
+/** Reference-free cover group of a pixel or parcel (py/cover_groups.py): named from its own yearly greenness curve. */
+export interface CoverGroup {
+    name: string;
+    label: string;
+    note: string;
+    pixels: number;
+    share: number;
+    clusters: number;
+    centre: { ndvi: number; ndviLow: number; winter: number; summer: number; ratio: number; winterNir: number };
+    /** Mean NDVI of the group per calendar month, January first. */
+    monthly: number[];
+}
+export interface CoverUnsupervised {
+    generatedAt: string;
+    method: string;
+    rules: Record<string, number>;
+    pixels: number;
+    groups: CoverGroup[];
+    /** Where the pixels of clean deed titles fall; a plausibility note, not an accuracy measure. */
+    titleConsistency: Record<string, { pixels: number; shares: Record<string, number> }> | null;
+    byGroup: Record<string, number>;
+    /** Parcels by trained tea reading (present / partial / absent) and reference-free group. */
+    againstTrained: Record<string, Record<string, number>>;
+}
+export interface CoverLabelRow {
+    id: string;
+    coverClass: CoverClass;
+    geometry: GeoJSON.Polygon;
+    areaM2: number;
+    note: string | null;
+    createdAt: string;
+}
+/** Ground reference areas drawn on the site: the reference the land-cover model is calibrated and scored against. */
+export interface CoverLabelList {
+    rules: { minAreaM2: number; maxAreaM2: number; usefulPerClass: number };
+    counts: Record<CoverClass, { areas: number; areaM2: number }>;
+    labels: CoverLabelRow[];
+}
 export interface CoverParcel {
     key: string;
     block: string;
@@ -2774,6 +2812,8 @@ export interface CoverParcel {
     confidence: 'high' | 'medium' | 'low' | null;
     elevationM?: number;
     beyondTraining: boolean;
+    group?: string | null;
+    groupShares?: Record<string, number> | null;
 }
 /** Land-cover module: model card (data-source comparison, cross-validation) and class counts; preliminary assessment. */
 export interface LandCoverSummary {
@@ -2795,15 +2835,18 @@ export interface LandCoverSummary {
         calledTeaByClass: Record<CoverClass, number | null>;
         /** Held-out titled parcels read as a whole (tea share at or above the "present" band): the figure closest to how the module is used. */
         parcelLevel?: { teaParcels: number; otherParcels: number; teaFound: number; teaMissed: number; otherCalledTea: number; otherRight: number; accuracy: number; teaRecall: number; teaPrecision: number; byClass: Record<string, { parcels: number; calledTea: number }> } | null;
+        /** Scores against areas a person marked on the site; null until such areas have been sampled by the engine. */
+        fieldValidation?: { areas: number; pixels: number; byClass: Record<string, { areas: number; pixels: number }>; asIs: { teaAccuracy: number; coverAccuracy: number; teaRecall: number; teaPrecision: number; areaAccuracy: number; calledTeaByClass: Record<string, number> } | null; calibrated: { teaAccuracy: number; coverAccuracy: number; teaRecall: number; teaPrecision: number; areaAccuracy: number; calledTeaByClass: Record<string, number> } | null; note: string | null } | null;
         comparison: CoverComparisonRow[];
         folds: number;
         topFeatures: Array<{ band: string; importance: number }>;
         maxTrainingTeaElevationM: number | null;
         validationNote: string;
     };
+    unsupervised: CoverUnsupervised | null;
     summary: { parcels: number; assessed: number; byTea: Record<CoverTeaState, number>; byDominant: Record<CoverDominant, number>; byConfidence: Record<'high' | 'medium' | 'low', number>; teaAreaM2: number };
 }
-export type LandCoverMap = GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon, Pick<CoverParcel, 'key' | 'block' | 'parcel' | 'nature' | 'tea' | 'teaShare' | 'dominant' | 'confidence'>>;
+export type LandCoverMap = GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon, Pick<CoverParcel, 'key' | 'block' | 'parcel' | 'nature' | 'tea' | 'teaShare' | 'dominant' | 'confidence'> & { group: string | null }>;
 export type ComplianceOverall = 'finding' | 'review' | 'no_evidence' | 'conforming' | 'out_of_scope';
 export type ComplianceCertainty = 'agreed' | 'single_source' | 'conflict' | 'undecidable';
 export interface RemoteEvidenceTimeline {
@@ -4349,6 +4392,11 @@ export const api = {
     getDroneVerificationParcel: (areaId: string, block: string, parcel: string) =>
         request<DroneVerificationDetail>(`/caykur/tea-inventory/areas/${areaId}/drone-verification/parcels/${encodeURIComponent(block)}/${encodeURIComponent(parcel)}`),
     getExecutiveSummary: () => request<ExecutiveSummary>('/caykur/tea-inventory/executive-summary'),
+    getCoverLabels: (areaId: string) => request<CoverLabelList>(`/caykur/tea-inventory/areas/${areaId}/cover-labels`),
+    exportCoverLabels: (areaId: string) => request<GeoJSON.FeatureCollection>(`/caykur/tea-inventory/areas/${areaId}/cover-labels/export`),
+    createCoverLabel: (areaId: string, data: { coverClass: CoverClass; ring: Array<[number, number]>; note?: string }) =>
+        request<CoverLabelRow>(`/caykur/tea-inventory/areas/${areaId}/cover-labels`, { method: 'POST', body: JSON.stringify(data) }),
+    deleteCoverLabel: (areaId: string, labelId: string) => request<void>(`/caykur/tea-inventory/areas/${areaId}/cover-labels/${labelId}`, { method: 'DELETE' }),
     getLandCoverSummary: (areaId: string) => request<LandCoverSummary>(`/caykur/tea-inventory/areas/${areaId}/land-cover/summary`),
     getLandCoverMap: (areaId: string) => request<LandCoverMap>(`/caykur/tea-inventory/areas/${areaId}/land-cover/map`),
     getLandCoverParcels: (areaId: string, params?: { page?: number; limit?: number; tea?: CoverTeaState; dominant?: CoverDominant; search?: string }) => {

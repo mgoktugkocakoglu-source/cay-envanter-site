@@ -16,3 +16,4 @@ export * from './licence-audit.dto';
 export * from './drone-verification.dto';
 export * from './compliance.dto';
 export * from './land-cover.dto';
+export * from './cover-label.dto';

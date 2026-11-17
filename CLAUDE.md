@@ -141,3 +141,8 @@ engine block (`../cay-envanter/AGENTS.md`, "Land-cover module") carries per parc
 a model card: the comparison of data sources, cross-validation numbers, confusion table and parcel-level figures. The
 view only displays them; classes, share bands and the chosen model are the engine's. Map outlines come from the licence
 audit block. Labels are deed titles and a global land-cover map, so every number is agreement with those, not field truth.
+
+The same view shows the engine's reference-free grouping (third map colouring, group table with yearly curves) and
+`CaykurCoverLabels.vue`, where the owner draws areas whose cover they know (`cover-labels` endpoints, table
+`cover_labels`, keyed by area code so labels survive re-imports; minimum 400 m²). "GeoJSON indir" gives the file the
+engine calibrates with. When the bundle carries `model.fieldValidation`, the view shows accuracy against those areas.

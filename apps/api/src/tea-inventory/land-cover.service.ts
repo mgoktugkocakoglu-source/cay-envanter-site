@@ -10,7 +10,7 @@ import { Paginated, paginate } from '@/common/dto/paginated.dto';
 export interface LandCoverSummary extends Omit<LandCoverBlock, 'parcels'> {
     neighborhood: string;
 }
-export type LandCoverMapProperties = Pick<CoverParcel, 'key' | 'block' | 'parcel' | 'nature' | 'tea' | 'teaShare' | 'dominant' | 'confidence'>;
+export type LandCoverMapProperties = Pick<CoverParcel, 'key' | 'block' | 'parcel' | 'nature' | 'tea' | 'teaShare' | 'dominant' | 'confidence'> & { group: string | null };
 export type LandCoverMap = FeatureCollection<Polygon | MultiPolygon, LandCoverMapProperties>;
 
 /** Order of the list: tea first, then partial, then no tea, then parcels the grid cannot describe. */
@@ -24,7 +24,7 @@ export class LandCoverService {
     async summary(areaId: string): Promise<LandCoverSummary> {
         const { block, neighborhood } = await this.load(areaId);
         const { parcels: _parcels, ...rest } = block;
-        return { ...rest, neighborhood };
+        return { ...rest, unsupervised: rest.unsupervised ?? null, neighborhood };
     }
 
     async parcels(areaId: string, query: LandCoverQueryDto): Promise<Paginated<CoverParcel>> {
@@ -49,7 +49,7 @@ export class LandCoverService {
             type: 'FeatureCollection',
             features: block.parcels.flatMap((p) => {
                 const g = geometry.get(p.key);
-                return g ? [{ type: 'Feature' as const, geometry: g, properties: { key: p.key, block: p.block, parcel: p.parcel, nature: p.nature, tea: p.tea, teaShare: p.teaShare, dominant: p.dominant, confidence: p.confidence } }] : [];
+                return g ? [{ type: 'Feature' as const, geometry: g, properties: { key: p.key, block: p.block, parcel: p.parcel, nature: p.nature, tea: p.tea, teaShare: p.teaShare, dominant: p.dominant, confidence: p.confidence, group: p.group ?? null } }] : [];
             }),
         };
     }

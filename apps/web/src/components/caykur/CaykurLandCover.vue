@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import CaykurCoverLabels from '@/components/caykur/CaykurCoverLabels.vue';
 import { toneVariant, type Tone } from '@/components/caykur/tone';
 import { useToast } from '@/composables/useToast';
 import { api, type CoverClass, type CoverComparisonRow, type CoverDominant, type CoverParcel, type CoverTeaState, type LandCoverMap, type LandCoverSummary } from '@/services/api';
@@ -34,6 +35,10 @@ const TEA_META: Record<CoverTeaState, { label: string; tone: Tone; color: string
 };
 /** Map colours of the cover classes: distinct hues, tea in the product green. */
 const COVER_COLOR: Record<CoverDominant, string> = { tea: '#15803d', hazelnut: '#a16207', forest: '#134e4a', grass: '#84cc16', crop: '#eab308', built: '#64748b', other: '#a8a29e', mixed: '#7c3aed' };
+/** Colours of the reference-free groups: evergreen in the product green, the leaf-dropping group in brown. */
+const GROUP_COLOR: Record<string, string> = { evergreen: '#15803d', evergreen_shadow: '#0f766e', semi_evergreen: '#65a30d', deciduous: '#a16207', sparse: '#eab308', built: '#64748b', bare: '#a8a29e', mixed: '#7c3aed' };
+const MONTH_LABELS = ['O', 'Ş', 'M', 'N', 'M', 'H', 'T', 'A', 'E', 'E', 'K', 'A'];
+const TITLE_LABEL: Record<string, string> = { tea: 'Tapusu çay bahçesi', hazelnut: 'Tapusu fındık bahçesi', forest: 'Tapusu orman' };
 const FEATURE_LABEL: Record<string, string> = {
     ndvi: 'Yalnız NDVI (yıllık dağılım, aylık ritim, her dem yeşillik)',
     top10: 'En güçlü on optik öznitelik',
@@ -65,7 +70,7 @@ const page = ref(1);
 const search = ref('');
 const teaFilter = ref<CoverTeaState | typeof ALL>(ALL);
 const dominantFilter = ref<CoverDominant | typeof ALL>(ALL);
-const colourBy = ref<'tea' | 'cover'>('tea');
+const colourBy = ref<'tea' | 'cover' | 'group'>('tea');
 const mapContainer = ref<HTMLElement | null>(null);
 let map: L.Map | null = null;
 let layer: L.GeoJSON | null = null;
@@ -75,6 +80,18 @@ const pct = (v: number | null | undefined) => (v === null || v === undefined ? '
 const pct1 = (v: number) => `%${(v * 100).toFixed(1)}`;
 const labels = computed(() => summary.value?.labels ?? ({} as Record<CoverDominant, string>));
 const dominantOptions = computed(() => (Object.keys(summary.value?.summary.byDominant ?? {}) as CoverDominant[]).filter((k) => (summary.value?.summary.byDominant[k] ?? 0) > 0));
+const groups = computed(() => summary.value?.unsupervised?.groups ?? []);
+const groupLabel = computed(() => Object.fromEntries([...groups.value.map((g) => [g.name, g.label]), ['mixed', 'Karışık']]) as Record<string, string>);
+/** Yearly curve of a group as SVG points (x = month, y = NDVI 0–1). */
+const curve = (monthly: number[]) => monthly.map((v, i) => `${(i * 100) / 11},${(1 - Math.max(0, Math.min(1, v))) * 32}`).join(' ');
+/** Parcels the trained model calls tea, split by what the reference-free grouping says. */
+const agreement = computed(() => {
+    const u = summary.value?.unsupervised;
+    if (!u) return null;
+    const row = u.againstTrained.present ?? {};
+    const total = Object.values(row).reduce((s, v) => s + v, 0);
+    return { total, evergreen: row.evergreen ?? 0, semi: (row.semi_evergreen ?? 0) + (row.evergreen_shadow ?? 0), other: total - (row.evergreen ?? 0) - (row.semi_evergreen ?? 0) - (row.evergreen_shadow ?? 0) };
+});
 /** One row per feature set with the reference learner, all cover classes at once: the comparison the choice rests on. */
 const comparison = computed(() => {
     const m = summary.value?.model;
@@ -96,9 +113,10 @@ const confusionRows = computed(() => {
     }).filter((r) => r.n > 0);
 });
 
-function styleOf(f?: { properties: { tea?: CoverTeaState; dominant?: CoverDominant | null } | null }): L.PathOptions {
+function styleOf(f?: { properties: { tea?: CoverTeaState; dominant?: CoverDominant | null; group?: string | null } | null }): L.PathOptions {
     const p = f?.properties;
-    const color = colourBy.value === 'tea' ? TEA_META[p?.tea ?? 'not_assessable'].color : p?.dominant ? COVER_COLOR[p.dominant] : TEA_META.not_assessable.color;
+    const none = TEA_META.not_assessable.color;
+    const color = colourBy.value === 'tea' ? TEA_META[p?.tea ?? 'not_assessable'].color : colourBy.value === 'cover' ? (p?.dominant ? COVER_COLOR[p.dominant] : none) : (p?.group ? (GROUP_COLOR[p.group] ?? none) : none);
     return { color, weight: 1.5, fillColor: color, fillOpacity: p?.tea === 'not_assessable' ? 0.08 : 0.4 };
 }
 function renderMap(): void {
@@ -206,15 +224,121 @@ onBeforeUnmount(() => {
                     <div class="flex flex-wrap gap-2" role="group" aria-label="Harita renklendirmesi">
                         <Button :variant="colourBy === 'tea' ? 'default' : 'outline'" class="min-h-11 md:min-h-9" :aria-pressed="colourBy === 'tea'" @click="colourBy = 'tea'">Çay durumu</Button>
                         <Button :variant="colourBy === 'cover' ? 'default' : 'outline'" class="min-h-11 md:min-h-9" :aria-pressed="colourBy === 'cover'" @click="colourBy = 'cover'">Baskın örtü</Button>
+                        <Button v-if="summary.unsupervised" :variant="colourBy === 'group' ? 'default' : 'outline'" class="min-h-11 md:min-h-9" :aria-pressed="colourBy === 'group'" @click="colourBy = 'group'">Kıyassız gruplama</Button>
                     </div>
                     <div ref="mapContainer" class="isolate h-[28rem] w-full overflow-hidden rounded-lg border" />
                     <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
                         <template v-if="colourBy === 'tea'">
                             <span v-for="(m, k) in TEA_META" :key="k" class="flex items-center gap-1.5"><span class="size-3 rounded-sm" :style="{ background: m.color }" />{{ m.label }}</span>
                         </template>
-                        <template v-else>
+                        <template v-else-if="colourBy === 'cover'">
                             <span v-for="k in dominantOptions" :key="k" class="flex items-center gap-1.5"><span class="size-3 rounded-sm" :style="{ background: COVER_COLOR[k] }" />{{ labels[k] }} ({{ summary.summary.byDominant[k] }})</span>
                         </template>
+                        <template v-else>
+                            <span v-for="g in groups" :key="g.name" class="flex items-center gap-1.5"><span class="size-3 rounded-sm" :style="{ background: GROUP_COLOR[g.name] }" />{{ g.label }} ({{ summary.unsupervised?.byGroup[g.name] ?? 0 }})</span>
+                            <span class="flex items-center gap-1.5"><span class="size-3 rounded-sm" :style="{ background: GROUP_COLOR.mixed }" />Karışık ({{ summary.unsupervised?.byGroup.mixed ?? 0 }})</span>
+                        </template>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card v-if="summary.unsupervised" class="gap-0 py-0">
+                <CardHeader class="py-4">
+                    <CardTitle class="flex flex-wrap items-center gap-2">
+                        Kıyassız gruplama
+                        <Badge variant="outline">Tapu ve etiket kullanılmaz</Badge>
+                        <Badge variant="warning">Doğruluk ölçülemez</Badge>
+                    </CardTitle>
+                    <CardDescription>{{ summary.unsupervised.method }}</CardDescription>
+                </CardHeader>
+                <CardContent class="px-0 pb-0">
+                    <div class="overflow-x-auto border-t">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Grup</TableHead>
+                                    <TableHead>Yıl içinde yeşillik (Ocak → Aralık)</TableHead>
+                                    <TableHead class="text-right">Kış / yaz</TableHead>
+                                    <TableHead class="text-right">Piksel payı</TableHead>
+                                    <TableHead class="text-right">Parsel</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow v-for="g in groups" :key="g.name">
+                                    <TableCell class="min-w-64 whitespace-normal">
+                                        <span class="mr-1.5 inline-block size-3 rounded-sm align-middle" :style="{ background: GROUP_COLOR[g.name] }" /><span class="font-medium">{{ g.label }}</span>
+                                        <div class="text-xs text-muted-foreground">{{ g.note }}</div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <svg viewBox="0 -2 100 36" class="h-10 w-40" role="img" :aria-label="`${g.label}: aylık yeşillik, kışın ${g.centre.winter.toFixed(2)}, yazın ${g.centre.summer.toFixed(2)}`">
+                                            <polyline :points="curve(g.monthly)" fill="none" :stroke="GROUP_COLOR[g.name]" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+                                        </svg>
+                                        <div class="flex w-40 justify-between text-[10px] text-muted-foreground" aria-hidden="true"><span v-for="(m, i) in MONTH_LABELS" :key="i">{{ m }}</span></div>
+                                    </TableCell>
+                                    <TableCell class="text-right tabular-nums">{{ pct(g.centre.ratio) }}</TableCell>
+                                    <TableCell class="text-right tabular-nums">{{ pct1(g.share) }}</TableCell>
+                                    <TableCell class="text-right tabular-nums">{{ formatNumber(summary.unsupervised.byGroup[g.name] ?? 0) }}</TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </div>
+                    <div class="flex flex-col gap-2 border-t p-4 text-sm">
+                        <p v-if="agreement">
+                            <span class="font-medium">İki bağımsız yöntem:</span>
+                            eğitimli modelin “çay var” dediği {{ formatNumber(agreement.total) }} parselin {{ formatNumber(agreement.evergreen) }} tanesini bu yöntem de “her dem yeşil” buluyor;
+                            {{ formatNumber(agreement.semi) }} tanesi kısmen yeşil ya da gölgede, {{ formatNumber(agreement.other) }} tanesi başka grupta.
+                            İkisinin de çay gösterdiği parseller en güvenilir olanlardır.
+                        </p>
+                        <p v-if="summary.unsupervised.titleConsistency" class="text-xs text-muted-foreground">
+                            Tutarlılık notu (doğruluk değildir):
+                            <template v-for="(t, key) in summary.unsupervised.titleConsistency" :key="key">
+                                {{ TITLE_LABEL[key] ?? key }} olan piksellerin {{ pct(t.shares.evergreen ?? 0) }} kadarı “her dem yeşil”, {{ pct(t.shares.deciduous ?? 0) }} kadarı “yaprak döken” grupta.
+                            </template>
+                            Kıştan kışa yeşil kalan orman altı örtü ve çayırlar yüzünden “yaprak döken” grup bu bölgede beklenenden küçük çıkar.
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <CaykurCoverLabels :area-id="areaId" :parcels="mapData" :labels="labels" :colors="COVER_COLOR" />
+
+            <Card v-if="summary.model.fieldValidation" class="gap-0 py-0">
+                <CardHeader class="py-4">
+                    <CardTitle class="flex flex-wrap items-center gap-2">
+                        İşaretli alanlara göre doğruluk
+                        <Badge variant="success">Gerçek kıyas noktası</Badge>
+                    </CardTitle>
+                    <CardDescription>
+                        {{ formatNumber(summary.model.fieldValidation.areas) }} işaretli alan, {{ formatNumber(summary.model.fieldValidation.pixels) }} piksel
+                        ({{ Object.entries(summary.model.fieldValidation.byClass).map(([c, v]) => `${labels[c as CoverDominant] ?? c} ${v.areas}`).join(' · ') }}).
+                        Bu sayılar tapuya değil, sizin işaretlediğiniz alanlara göre ölçülmüştür.
+                        <template v-if="summary.model.fieldValidation.note"> {{ summary.model.fieldValidation.note }}</template>
+                    </CardDescription>
+                </CardHeader>
+                <CardContent v-if="summary.model.fieldValidation.asIs" class="px-0 pb-0">
+                    <div class="overflow-x-auto border-t">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Model</TableHead>
+                                    <TableHead class="text-right">Alan düzeyinde doğruluk</TableHead>
+                                    <TableHead class="text-right">Çay var/yok (piksel)</TableHead>
+                                    <TableHead class="text-right">Çay yakalama</TableHead>
+                                    <TableHead class="text-right">Çay kesinliği</TableHead>
+                                    <TableHead class="text-right">Bütün sınıflar</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow v-for="row in [{ label: 'Yalnız tapu etiketleriyle eğitilen (bugünkü durumun gerçek sınaması)', s: summary.model.fieldValidation.asIs }, { label: 'İşaretli alanlarla kalibre edilen (alanlar birbirine karşı sınandı)', s: summary.model.fieldValidation.calibrated }].filter((x) => x.s)" :key="row.label">
+                                    <TableCell class="min-w-64 whitespace-normal">{{ row.label }}</TableCell>
+                                    <TableCell class="text-right tabular-nums">{{ pct1(row.s!.areaAccuracy) }}</TableCell>
+                                    <TableCell class="text-right tabular-nums">{{ pct1(row.s!.teaAccuracy) }}</TableCell>
+                                    <TableCell class="text-right tabular-nums">{{ pct1(row.s!.teaRecall) }}</TableCell>
+                                    <TableCell class="text-right tabular-nums">{{ pct1(row.s!.teaPrecision) }}</TableCell>
+                                    <TableCell class="text-right tabular-nums">{{ pct1(row.s!.coverAccuracy) }}</TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
                     </div>
                 </CardContent>
             </Card>
@@ -363,6 +487,7 @@ onBeforeUnmount(() => {
                                         <Badge :variant="toneVariant(TEA_META[r.tea].tone)">{{ TEA_META[r.tea].label }}</Badge>
                                         <div v-if="r.teaShare !== null" class="mt-1 text-xs text-muted-foreground">çay payı {{ pct(r.teaShare) }} · güven {{ r.confidence === 'high' ? 'yüksek' : r.confidence === 'medium' ? 'orta' : 'düşük' }}</div>
                                         <div v-if="r.beyondTraining" class="text-xs text-warning">eğitimdeki en yüksek çaydan yukarıda</div>
+                                        <div v-if="r.group" class="text-xs text-muted-foreground">kıyassız: {{ groupLabel[r.group] ?? r.group }}</div>
                                     </TableCell>
                                     <TableCell class="text-sm">{{ r.dominant ? labels[r.dominant] : '—' }}<span v-if="r.dominantShare !== null && r.dominant !== 'mixed'" class="text-muted-foreground"> · {{ pct(r.dominantShare) }}</span></TableCell>
                                     <TableCell class="min-w-56">
