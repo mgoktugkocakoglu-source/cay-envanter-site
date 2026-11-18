@@ -5,7 +5,7 @@
  * filtered groups can be handed straight to `ShellLayout`.
  */
 
-import { BookOpenCheck, ClipboardCheck, HeartPulse, History, LayoutDashboard, Leaf, MapPinned, Mountain, Ruler, Scissors, ScrollText } from '@lucide/vue';
+import { BookOpenCheck, ClipboardCheck, HeartPulse, History, LayoutDashboard, Leaf, MapPinned, Mountain, Ruler, Scissors, ScrollText, Sprout } from '@lucide/vue';
 import type { NavGroup, NavItem } from '@/config/navigation';
 import { Icons } from '@/lib/icons';
 import type { ModuleKey } from '@/services/caykur/roles';
@@ -15,13 +15,14 @@ export interface CaykurNavItem extends NavItem {
 }
 
 /** Tab keys of the tea-inventory page; the sidebar deep-links to them with `?tab=`. */
-export type TeaInventoryTab = 'mapping' | 'changes' | 'reportcard' | 'summary' | 'method' | 'region' | 'inventory' | 'pruning' | 'field' | 'licensing' | 'health' | 'land' | 'age';
+export type TeaInventoryTab = 'cover' | 'mapping' | 'changes' | 'reportcard' | 'summary' | 'method' | 'region' | 'inventory' | 'pruning' | 'field' | 'licensing' | 'health' | 'land' | 'age';
 export const TEA_INVENTORY_PATH = '/caykur/tea-inventory';
 export const TEA_INVENTORY_TABS: Array<{ key: TeaInventoryTab; label: string; icon: NavItem['icon'] }> = [
     { key: 'mapping', label: 'Haritalama Planı', icon: MapPinned },
     { key: 'changes', label: 'Değişim Takibi', icon: History },
     { key: 'reportcard', label: 'Sezonluk Karne', icon: BookOpenCheck },
     { key: 'summary', label: 'Yönetici Özeti', icon: LayoutDashboard },
+    { key: 'cover', label: 'Arazi Örtüsü', icon: Sprout },
     { key: 'region', label: 'Bölge', icon: MapPinned },
     { key: 'pruning', label: 'Budama Takibi', icon: Scissors },
     { key: 'field', label: 'Saha Testi', icon: ClipboardCheck },
@@ -49,6 +50,7 @@ export const NAV_GROUPS: CaykurNavGroup[] = [
     },
     // The tea-inventory page keeps its own tab strip; these entries deep-link to its tabs.
     { label: 'Genel', items: [tabItem('summary'), tabItem('method')] },
+    { label: 'Arazi Tespiti', items: [tabItem('cover')] },
     { label: 'Budama', items: [tabItem('region'), tabItem('pruning'), tabItem('field')] },
     { label: 'Ruhsatlandırma', items: [tabItem('inventory'), tabItem('licensing')] },
     { label: 'Zirai Analizler', items: [tabItem('mapping'), tabItem('changes'), tabItem('reportcard'), tabItem('health'), tabItem('land'), tabItem('age')] },

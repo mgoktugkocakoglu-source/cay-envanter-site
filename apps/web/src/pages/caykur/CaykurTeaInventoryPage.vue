@@ -29,6 +29,7 @@ import CaykurGardenHealth from '@/components/caykur/CaykurGardenHealth.vue';
 import CaykurRegionOverview from '@/components/caykur/CaykurRegionOverview.vue';
 import CaykurExecutiveSummary from '@/components/caykur/CaykurExecutiveSummary.vue';
 import CaykurMethodNotes from '@/components/caykur/CaykurMethodNotes.vue';
+import CaykurLandCover from '@/components/caykur/CaykurLandCover.vue';
 import CaykurLandEvaluation from '@/components/caykur/CaykurLandEvaluation.vue';
 import CaykurGardenAge from '@/components/caykur/CaykurGardenAge.vue';
 import CaykurFieldTests from '@/components/caykur/CaykurFieldTests.vue';
@@ -445,6 +446,7 @@ function onRowKey(e: KeyboardEvent, id: string): void {
 
                 <CaykurExecutiveSummary v-if="activeTab === 'summary'" :selected-area-id="areaId" @select="openAreaCompliance" />
                 <CaykurMethodNotes v-if="activeTab === 'method'" />
+                <CaykurLandCover v-if="activeTab === 'cover'" :area-id="area.id" />
                 <CaykurRegionOverview v-if="activeTab === 'region'" ref="regionOverview" :selected-area-id="areaId" @select="openArea" />
 
                 <div v-show="activeTab === 'inventory'" class="flex flex-col gap-6">

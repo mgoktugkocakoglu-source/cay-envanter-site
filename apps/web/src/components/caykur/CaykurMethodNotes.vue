@@ -41,6 +41,15 @@ const MODULES: ModuleNote[] = [
         checkedNote: 'Ayrılmış test parsellerinde sınandı (oranlar Arazi tespit kararı sekmesinde); bağımsız saha etiketiyle sınanmadı.',
     },
     {
+        name: 'Arazi örtüsü',
+        where: 'Arazi Tespiti → Arazi Örtüsü',
+        does: 'Her parselde çay olup olmadığını ve başka hangi örtünün bulunduğunu (fındık, orman, çayır, ekili alan, yapı) uydu piksellerinden okur. Ayrıca tapu ve etiket kullanmayan bir gruplama ile parselleri yıl içindeki yeşillik ritmine göre ayırır.',
+        data: ['Sentinel-2 mevsimlik bantlar ve aylık yeşillik eğrisi', 'Sentinel-1 radar (dört mevsim)', 'Eğitim etiketi olarak temiz tapu nitelikleri ve küresel arazi örtüsü haritası', 'Sitede işaretlenen kesin alanlar (varsa)'],
+        cannot: ['Üç pikselden küçük parselleri okuyamaz.', 'Fındık bahçelerini çaydan güvenle ayıramıyor: sınamada fındık tapulu parsellerin çoğu çay olarak okundu.', 'Alan ölçmez; paylar piksel sayımıdır.', 'Kıyassız gruplama doğruluk yüzdesi veremez ve çayı diğer her dem yeşillerden ayıramaz.'],
+        checked: 'partial',
+        checkedNote: 'Parsel bazlı çapraz sınamayla ölçüldü (oranlar ekranda); kıyas noktası tapu niteliğidir. İşaretli alanlar girildiğinde gerçek doğruluk ayrıca gösterilir.',
+    },
+    {
         name: 'Arazi tespit kararı',
         where: 'Ruhsatlandırma → Ruhsat İşlemleri → Arazi tespit kararı',
         does: 'Üç bağımsız kaynağı (tapu niteliği, ruhsat kaydı, uyduda çay) parsel başına tek karara bağlar: çay arazisi, ruhsat hatası, ruhsatsız çay ve diğer beş birleşim.',

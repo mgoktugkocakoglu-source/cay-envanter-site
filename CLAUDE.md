@@ -146,3 +146,5 @@ The same view shows the engine's reference-free grouping (third map colouring, g
 `CaykurCoverLabels.vue`, where the owner draws areas whose cover they know (`cover-labels` endpoints, table
 `cover_labels`, keyed by area code so labels survive re-imports; minimum 400 m²). "GeoJSON indir" gives the file the
 engine calibrates with. When the bundle carries `model.fieldValidation`, the view shows accuracy against those areas.
+
+Since 18 Nov 2026 the land-cover view is a page-level tab of its own (`cover`, sidebar heading "Arazi Tespiti"), mounted in `CaykurTeaInventoryPage.vue`; it is no longer a sub-view of `CaykurLicensing.vue`.
