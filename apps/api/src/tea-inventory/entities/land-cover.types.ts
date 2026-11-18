@@ -3,7 +3,11 @@
  * are classified into cover classes; the parcel's tea reading and dominant cover come from the pixel shares. The model
  * card carries the comparison of data sources it was chosen from. Preliminary assessment, never a decision.
  */
-export const COVER_CLASSES = ['tea', 'hazelnut', 'forest', 'grass', 'crop', 'built', 'other'] as const;
+/** What the method can tell apart from canopy height and winter greenness. Hazelnut and forest are both tree cover. */
+export const COVER_CLASSES = ['tea', 'trees', 'open', 'built'] as const;
+/** What a person can mark on the site; finer than the model's classes, so the marks stay useful if the classes grow. */
+export const COVER_LABEL_CLASSES = ['tea', 'hazelnut', 'forest', 'grass', 'crop', 'built', 'other'] as const;
+export type CoverLabelClass = (typeof COVER_LABEL_CLASSES)[number];
 export type CoverClass = (typeof COVER_CLASSES)[number];
 export const COVER_DOMINANT = [...COVER_CLASSES, 'mixed'] as const;
 export type CoverDominant = (typeof COVER_DOMINANT)[number];
@@ -11,41 +15,35 @@ export const COVER_TEA_STATES = ['present', 'partial', 'absent', 'not_assessable
 export type CoverTeaState = (typeof COVER_TEA_STATES)[number];
 export type CoverConfidence = 'high' | 'medium' | 'low';
 
-export interface CoverStat { mean: number; sd: number }
-export interface CoverComparisonRow {
-    features: string;
-    bands: number;
-    learner: string;
-    /** `cover`: all classes at once; `tea_only`: tea against everything else. */
-    target: 'cover' | 'tea_only';
-    accuracy: CoverStat;
-    teaAccuracy: CoverStat;
-    teaRecall: CoverStat;
-    teaPrecision: CoverStat;
-    teaF1: CoverStat;
+export interface CoverReferenceScore { teaFound: number; teaTotal: number; noTeaRight: number; noTeaTotal: number; accuracy: number; balanced: number }
+/** One method scored on the independent reference parcels (people's readings, never deed titles). */
+export interface CoverComparisonRow extends CoverReferenceScore {
+    key: string;
+    label: string;
+    description: string;
+    /** The same score with the disputed "no tea" readings left out. */
+    undisputed: CoverReferenceScore;
 }
 export interface CoverModel {
-    features: string;
+    method: string;
     learner: string;
     bands: number;
-    bandNames: string[];
+    /** Consensus-labelled pixels per class the model was trained on, and pixels the two physical facts left unlabelled. */
     trainingPixels: Record<CoverClass, number>;
-    trainingGroups: number;
-    crossValidation: Pick<CoverComparisonRow, 'accuracy' | 'teaAccuracy' | 'teaRecall' | 'teaPrecision' | 'teaF1'>;
-    /** Rows = true class, columns = predicted class, in COVER_CLASSES order. */
-    confusion: number[][];
-    teaThresholds: Array<{ threshold: number; recall: number; precision: number }>;
-    calledTeaByClass: Record<CoverClass, number | null>;
-    /** Held-out titled parcels read as a whole (tea share at or above the "present" band): the figure closest to how the module is used. */
-    parcelLevel?: { teaParcels: number; otherParcels: number; teaFound: number; teaMissed: number; otherCalledTea: number; otherRight: number; accuracy: number; teaRecall: number; teaPrecision: number; byClass: Record<string, { parcels: number; calledTea: number }> } | null;
-    /** Scores against areas a person marked on the site; null until such areas have been sampled by the engine. */
-    fieldValidation?: { areas: number; pixels: number; byClass: Record<string, { areas: number; pixels: number }>; asIs: { teaAccuracy: number; coverAccuracy: number; teaRecall: number; teaPrecision: number; areaAccuracy: number; calledTeaByClass: Record<string, number> } | null; calibrated: { teaAccuracy: number; coverAccuracy: number; teaRecall: number; teaPrecision: number; areaAccuracy: number; calledTeaByClass: Record<string, number> } | null; note: string | null } | null;
+    unlabelledPixels: number;
+    markedPixels: number;
+    reference: { parcels: number; tea: number; noTea: number; drone: number; field: number; disputed: string[]; note: string };
     comparison: CoverComparisonRow[];
-    folds: number;
-    topFeatures: Array<{ band: string; importance: number }>;
-    maxTrainingTeaElevationM: number | null;
+    used: CoverComparisonRow | null;
+    /** The earlier title-trained study, scored against titles: kept to show why that figure misleads. */
+    titleStudy: { features: string; learner: string; teaAccuracy: number; teaRecall: number; teaPrecision: number; note: string } | null;
+    /** Scores against areas a person marked on the site; null until such areas have been sampled by the engine. */
+    fieldValidation: { areas: number; pixels: number; byClass: Record<string, { areas: number; pixels: number }>; asIs: { teaAccuracy: number; coverAccuracy: number; teaRecall: number; teaPrecision: number; areaAccuracy: number; calledTeaByClass: Record<string, number> } | null; calibrated: { teaAccuracy: number; coverAccuracy: number; teaRecall: number; teaPrecision: number; areaAccuracy: number; calledTeaByClass: Record<string, number> } | null; note: string | null } | null;
+    sources: Array<{ name: string; role: string }>;
     validationNote: string;
 }
+export type CoverFlag = 'tea_under_canopy' | 'evergreen_open_not_tea' | 'rule_disagrees';
+export interface CoverEvidence { canopyHeightM: number; tallShare: number; winterRatio: number; ruleTeaShare: number; ruleState: 'present' | 'partial' | 'absent' }
 /** Reference-free cover group of a pixel or parcel (py/cover_groups.py): named from its own yearly greenness curve. */
 export interface CoverGroup {
     name: string;
@@ -85,20 +83,23 @@ export interface CoverParcel {
     dominantShare: number | null;
     shares: Record<CoverClass, number> | null;
     confidence: CoverConfidence | null;
-    elevationM?: number;
-    beyondTraining: boolean;
+    /** Canopy and winter evidence of the parcel, beside the model's reading. */
+    evidence?: CoverEvidence | null;
+    flags?: CoverFlag[];
     /** Dominant reference-free group and the group shares; null without the grouping or below the pixel floor. */
     group?: string | null;
     groupShares?: Record<string, number> | null;
 }
 export interface LandCoverBlock {
     generatedAt: string;
+    /** 2 = consensus-labelled method. Older bundles are not shown. */
+    version?: number;
     method: string;
     rules: Record<string, number>;
     classes: CoverClass[];
     labels: Record<CoverDominant, string>;
     model: CoverModel;
     unsupervised?: CoverUnsupervised | null;
-    summary: { parcels: number; assessed: number; byTea: Record<CoverTeaState, number>; byDominant: Record<CoverDominant, number>; byConfidence: Record<CoverConfidence, number>; teaAreaM2: number };
+    summary: { parcels: number; assessed: number; byTea: Record<CoverTeaState, number>; byDominant: Record<CoverDominant, number>; byConfidence: Record<CoverConfidence, number>; byFlag: Record<CoverFlag, number>; teaAreaM2: number; titleTea: Record<'present' | 'partial' | 'absent', number>; titleOther: Record<'present' | 'partial' | 'absent', number> };
     parcels: CoverParcel[];
 }

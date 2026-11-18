@@ -5,7 +5,7 @@ import { area as turfArea, kinks, polygon } from '@turf/turf';
 import type { FeatureCollection, Polygon } from 'geojson';
 import { TeaInventoryArea } from '@/tea-inventory/entities/tea-inventory-area.entity';
 import { CoverLabel } from '@/tea-inventory/entities/cover-label.entity';
-import { COVER_CLASSES, CoverClass } from '@/tea-inventory/entities/land-cover.types';
+import { COVER_LABEL_CLASSES, CoverLabelClass } from '@/tea-inventory/entities/land-cover.types';
 import { CreateCoverLabelDto } from '@/tea-inventory/dto';
 
 /** A 10 m pixel must fit inside with room to spare; smaller areas give the model no clean pixel. */
@@ -13,7 +13,7 @@ export const COVER_LABEL_RULES = { minAreaM2: 400, maxAreaM2: 200_000, usefulPer
 
 export interface CoverLabelRow {
     id: string;
-    coverClass: CoverClass;
+    coverClass: CoverLabelClass;
     geometry: Polygon;
     areaM2: number;
     note: string | null;
@@ -21,10 +21,10 @@ export interface CoverLabelRow {
 }
 export interface CoverLabelList {
     rules: typeof COVER_LABEL_RULES;
-    counts: Record<CoverClass, { areas: number; areaM2: number }>;
+    counts: Record<CoverLabelClass, { areas: number; areaM2: number }>;
     labels: CoverLabelRow[];
 }
-export type CoverLabelExport = FeatureCollection<Polygon, { id: string; cls: CoverClass; areaM2: number; note: string | null; createdAt: string }>;
+export type CoverLabelExport = FeatureCollection<Polygon, { id: string; cls: CoverLabelClass; areaM2: number; note: string | null; createdAt: string }>;
 
 /** Ground reference areas for the land-cover module: drawn on the site, read by the engine as a GeoJSON export. */
 @Injectable()
@@ -36,7 +36,7 @@ export class CoverLabelService {
 
     async list(areaId: string): Promise<CoverLabelList> {
         const rows = await this.labelRepo.find({ where: { areaCode: await this.codeOf(areaId) }, order: { createdAt: 'DESC' } });
-        const counts = Object.fromEntries(COVER_CLASSES.map((c) => [c, { areas: 0, areaM2: 0 }])) as CoverLabelList['counts'];
+        const counts = Object.fromEntries(COVER_LABEL_CLASSES.map((c) => [c, { areas: 0, areaM2: 0 }])) as CoverLabelList['counts'];
         for (const r of rows) {
             counts[r.coverClass].areas++;
             counts[r.coverClass].areaM2 += Math.round(r.areaM2);

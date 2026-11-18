@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/composables/useToast';
-import { api, type CoverClass, type CoverLabelList, type LandCoverMap } from '@/services/api';
+import { api, type CoverLabelClass, type CoverLabelList, type LandCoverMap } from '@/services/api';
 import { formatM2 } from '@/services/caykur/teaInventory';
 import { formatNumber } from '@/services/caykur';
 
@@ -22,9 +22,12 @@ import { formatNumber } from '@/services/caykur';
  * the reference the land-cover model is calibrated and scored against; until enough exist, every accuracy figure of
  * the module is agreement with deed titles only.
  */
-const props = defineProps<{ areaId: string; parcels: LandCoverMap | null; labels: Record<string, string>; colors: Record<string, string> }>();
+const props = defineProps<{ areaId: string; parcels: LandCoverMap | null }>();
 
-const CLASSES: CoverClass[] = ['tea', 'hazelnut', 'forest', 'grass', 'crop', 'built', 'other'];
+/** Finer than the model's classes on purpose: a marked hazelnut orchard stays a hazelnut orchard if the model learns to tell it. */
+const CLASSES: CoverLabelClass[] = ['tea', 'hazelnut', 'forest', 'grass', 'crop', 'built', 'other'];
+const labels: Record<CoverLabelClass, string> = { tea: 'Çay', hazelnut: 'Fındık', forest: 'Orman / ağaçlık', grass: 'Çayır / otluk', crop: 'Ekili alan (sebze, mısır)', built: 'Yapı / yol', other: 'Çıplak zemin / su' };
+const colors: Record<CoverLabelClass, string> = { tea: '#15803d', hazelnut: '#a16207', forest: '#134e4a', grass: '#84cc16', crop: '#eab308', built: '#64748b', other: '#a8a29e' };
 const TILES = 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}';
 type Pm = { enableDraw: (shape: string, options?: Record<string, unknown>) => void; disableDraw: () => void; setGlobalOptions: (o: Record<string, unknown>) => void };
 
@@ -32,7 +35,7 @@ const toast = useToast();
 const isLoading = ref(true);
 const isSaving = ref(false);
 const data = ref<CoverLabelList | null>(null);
-const coverClass = ref<CoverClass>('tea');
+const coverClass = ref<CoverLabelClass>('tea');
 const note = ref('');
 const drawing = ref(false);
 /** The ring just drawn, waiting to be saved. */
@@ -53,9 +56,9 @@ function drawSaved(): void {
     saved?.remove();
     saved = L.layerGroup().addTo(map);
     for (const l of data.value?.labels ?? []) {
-        const color = props.colors[l.coverClass] ?? '#0f172a';
+        const color = colors[l.coverClass] ?? '#0f172a';
         L.geoJSON({ type: 'Feature', geometry: l.geometry, properties: {} } as GeoJSON.Feature, { style: { color: '#ffffff', weight: 3, fillColor: color, fillOpacity: 0.55 } })
-            .bindTooltip(`${props.labels[l.coverClass] ?? l.coverClass} · ${formatM2(l.areaM2)}${l.note ? ` · ${l.note}` : ''}`, { sticky: true })
+            .bindTooltip(`${labels[l.coverClass] ?? l.coverClass} · ${formatM2(l.areaM2)}${l.note ? ` · ${l.note}` : ''}`, { sticky: true })
             .addTo(saved);
     }
 }
@@ -113,7 +116,7 @@ async function save(): Promise<void> {
         toast.error(res.error?.message ?? 'Alan kaydedilemedi');
         return;
     }
-    toast.success(`${props.labels[coverClass.value] ?? coverClass.value} alanı kaydedildi`);
+    toast.success(`${labels[coverClass.value] ?? coverClass.value} alanı kaydedildi`);
     note.value = '';
     cancel();
     const list = await api.getCoverLabels(props.areaId);
@@ -144,7 +147,7 @@ async function download(): Promise<void> {
     URL.revokeObjectURL(url);
 }
 function onClass(v: unknown): void {
-    if (typeof v === 'string' && (CLASSES as string[]).includes(v)) coverClass.value = v as CoverClass;
+    if (typeof v === 'string' && (CLASSES as string[]).includes(v)) coverClass.value = v as CoverLabelClass;
 }
 watch(() => props.areaId, () => void load(), { immediate: true });
 onBeforeUnmount(() => map?.remove());

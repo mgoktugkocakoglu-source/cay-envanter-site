@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
 import type { Polygon } from 'geojson';
-import type { CoverClass } from '@/tea-inventory/entities/land-cover.types';
+import type { CoverLabelClass } from '@/tea-inventory/entities/land-cover.types';
 
 /**
  * A ground reference area drawn by a person who knows what grows there: the reference the land-cover model is
@@ -17,7 +17,7 @@ export class CoverLabel {
     areaCode: string;
 
     @Column({ type: 'varchar', length: 20, name: 'cover_class' })
-    coverClass: CoverClass;
+    coverClass: CoverLabelClass;
 
     // WGS84 polygon as drawn on the map.
     @Column({ type: 'jsonb' })

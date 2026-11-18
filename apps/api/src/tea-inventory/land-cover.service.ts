@@ -57,7 +57,8 @@ export class LandCoverService {
     private async load(areaId: string): Promise<{ block: LandCoverBlock; neighborhood: string }> {
         const area = await this.areaRepo.findOne({ where: { id: areaId }, select: ['id', 'neighborhood', 'landCover'] });
         if (!area) throw new NotFoundException('Area not found');
-        if (!area.landCover) throw new NotFoundException('No land-cover result for this area');
+        // Bundles of the first, title-trained method have another shape and a misleading accuracy; they are not served.
+        if (!area.landCover || area.landCover.version !== 2) throw new NotFoundException('No land-cover result for this area');
         return { block: area.landCover, neighborhood: area.neighborhood };
     }
 }

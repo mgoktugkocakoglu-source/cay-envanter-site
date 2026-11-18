@@ -135,16 +135,18 @@ RemotePlanningService/Controller read imported boundaries, tea patches and exist
 
 ## Land cover (Arazi örtüsü)
 
-`CaykurLandCover.vue` is a sub-view of `CaykurLicensing.vue` ("Arazi örtüsü"), backed by the read-only
-`land-cover/{summary,parcels,map}` endpoints (`land-cover.service.ts`, area column `land_cover`, `select: false`). The
-engine block (`../cay-envanter/AGENTS.md`, "Land-cover module") carries per parcel the tea reading and cover shares and
-a model card: the comparison of data sources, cross-validation numbers, confusion table and parcel-level figures. The
-view only displays them; classes, share bands and the chosen model are the engine's. Map outlines come from the licence
-audit block. Labels are deed titles and a global land-cover map, so every number is agreement with those, not field truth.
+`CaykurLandCover.vue` is a page-level tab (`cover`, sidebar heading "Arazi Tespiti") mounted in
+`CaykurTeaInventoryPage.vue`, backed by the read-only `land-cover/{summary,parcels,map}` endpoints
+(`land-cover.service.ts`, area column `land_cover`, `select: false`; only blocks with `version: 2` are served).
+
+The engine block (`../cay-envanter/AGENTS.md`, "Land-cover module") is method v2: labels from canopy height and winter
+greenness, never from deed titles; classes `tea`, `trees`, `open`, `built`. The view only displays it: tea reading and
+cover shares per parcel with the canopy / winter evidence and flags, and the model card "Yöntem ne kadar isabetli" with
+every method scored on the independent reference parcels (drone readings and field observations). Agreement with deed
+titles must never be shown as accuracy; the card explains why. Map outlines come from the licence audit block.
 
 The same view shows the engine's reference-free grouping (third map colouring, group table with yearly curves) and
 `CaykurCoverLabels.vue`, where the owner draws areas whose cover they know (`cover-labels` endpoints, table
-`cover_labels`, keyed by area code so labels survive re-imports; minimum 400 m²). "GeoJSON indir" gives the file the
+`cover_labels`, keyed by area code so labels survive re-imports; minimum 400 m²). The marking classes are finer than the
+model's (`COVER_LABEL_CLASSES`: tea, hazelnut, forest, grass, crop, built, other). "GeoJSON indir" gives the file the
 engine calibrates with. When the bundle carries `model.fieldValidation`, the view shows accuracy against those areas.
-
-Since 18 Nov 2026 the land-cover view is a page-level tab of its own (`cover`, sidebar heading "Arazi Tespiti"), mounted in `CaykurTeaInventoryPage.vue`; it is no longer a sub-view of `CaykurLicensing.vue`.

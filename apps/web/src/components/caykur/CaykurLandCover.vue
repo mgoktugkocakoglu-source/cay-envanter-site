@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import CaykurCoverLabels from '@/components/caykur/CaykurCoverLabels.vue';
 import { toneVariant, type Tone } from '@/components/caykur/tone';
 import { useToast } from '@/composables/useToast';
-import { api, type CoverClass, type CoverComparisonRow, type CoverDominant, type CoverParcel, type CoverTeaState, type LandCoverMap, type LandCoverSummary } from '@/services/api';
+import { api, type CoverClass, type CoverDominant, type CoverFlag, type CoverParcel, type CoverTeaState, type LandCoverMap, type LandCoverSummary } from '@/services/api';
 import { formatM2 } from '@/services/caykur/teaInventory';
 import { formatNumber } from '@/services/caykur';
 
@@ -33,22 +33,19 @@ const TEA_META: Record<CoverTeaState, { label: string; tone: Tone; color: string
     absent: { label: 'Çay yok', tone: 'danger', color: '#b91c1c' },
     not_assessable: { label: 'Değerlendirilemedi', tone: 'muted', color: '#94a3b8' },
 };
-/** Map colours of the cover classes: distinct hues, tea in the product green. */
-const COVER_COLOR: Record<CoverDominant, string> = { tea: '#15803d', hazelnut: '#a16207', forest: '#134e4a', grass: '#84cc16', crop: '#eab308', built: '#64748b', other: '#a8a29e', mixed: '#7c3aed' };
+/** Map colours of the cover classes: tea in the product green, tree cover dark, open ground light. */
+const COVER_COLOR: Record<CoverDominant, string> = { tea: '#15803d', trees: '#134e4a', open: '#eab308', built: '#64748b', mixed: '#7c3aed' };
+const SHORT_LABEL: Record<CoverDominant, string> = { tea: 'Çay', trees: 'Ağaç örtüsü', open: 'Açık alan', built: 'Yapı / çıplak', mixed: 'Karışık' };
+const FLAG_LABEL: Record<CoverFlag, string> = {
+    tea_under_canopy: 'ağaç haritası üzerinde ağaç gösteriyor: ağaç altı çay olabilir ya da ağaçlar sonradan kesilmiş',
+    evergreen_open_not_tea: 'açık ve her dem yeşil görünüyor ama model çay okumadı',
+    rule_disagrees: 'fiziksel kural çay göstermiyor',
+};
 /** Colours of the reference-free groups: evergreen in the product green, the leaf-dropping group in brown. */
 const GROUP_COLOR: Record<string, string> = { evergreen: '#15803d', evergreen_shadow: '#0f766e', semi_evergreen: '#65a30d', deciduous: '#a16207', sparse: '#eab308', built: '#64748b', bare: '#a8a29e', mixed: '#7c3aed' };
+const MARKED_LABEL: Record<string, string> = { tea: 'Çay', hazelnut: 'Fındık', forest: 'Orman', grass: 'Çayır', crop: 'Ekili alan', built: 'Yapı', other: 'Çıplak zemin' };
 const MONTH_LABELS = ['O', 'Ş', 'M', 'N', 'M', 'H', 'T', 'A', 'E', 'E', 'K', 'A'];
 const TITLE_LABEL: Record<string, string> = { tea: 'Tapusu çay bahçesi', hazelnut: 'Tapusu fındık bahçesi', forest: 'Tapusu orman' };
-const FEATURE_LABEL: Record<string, string> = {
-    ndvi: 'Yalnız NDVI (yıllık dağılım, aylık ritim, her dem yeşillik)',
-    top10: 'En güçlü on optik öznitelik',
-    optical: 'Bütün optik (Sentinel-2)',
-    radar: 'Yalnız radar (Sentinel-1)',
-    top10_radar: 'On optik öznitelik + radar',
-    ndvi_radar: 'NDVI + radar',
-    all: 'Bütünleşik (optik + NDVI + radar)',
-};
-const LEARNER_LABEL: Record<string, string> = { rf: 'Rastgele orman', extra_trees: 'Ekstra ağaçlar', boosting: 'Gradyan artırma' };
 const TEA_FILTERS: Array<{ value: CoverTeaState | typeof ALL; label: string }> = [
     { value: ALL, label: 'Bütün parseller' },
     { value: 'present', label: TEA_META.present.label },
@@ -78,7 +75,6 @@ let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
 const pct = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `%${Math.round(v * 100)}`);
 const pct1 = (v: number) => `%${(v * 100).toFixed(1)}`;
-const labels = computed(() => summary.value?.labels ?? ({} as Record<CoverDominant, string>));
 const dominantOptions = computed(() => (Object.keys(summary.value?.summary.byDominant ?? {}) as CoverDominant[]).filter((k) => (summary.value?.summary.byDominant[k] ?? 0) > 0));
 const groups = computed(() => summary.value?.unsupervised?.groups ?? []);
 const groupLabel = computed(() => Object.fromEntries([...groups.value.map((g) => [g.name, g.label]), ['mixed', 'Karışık']]) as Record<string, string>);
@@ -92,26 +88,9 @@ const agreement = computed(() => {
     const total = Object.values(row).reduce((s, v) => s + v, 0);
     return { total, evergreen: row.evergreen ?? 0, semi: (row.semi_evergreen ?? 0) + (row.evergreen_shadow ?? 0), other: total - (row.evergreen ?? 0) - (row.semi_evergreen ?? 0) - (row.evergreen_shadow ?? 0) };
 });
-/** One row per feature set with the reference learner, all cover classes at once: the comparison the choice rests on. */
-const comparison = computed(() => {
-    const m = summary.value?.model;
-    if (!m) return [];
-    const rowsOf = (target: CoverComparisonRow['target']) => m.comparison.filter((r) => r.target === target);
-    const others = rowsOf('cover').filter((r) => r.learner !== 'rf');
-    return [...rowsOf('cover').filter((r) => r.learner === 'rf'), ...others]
-        .map((r) => ({ ...r, chosen: r.features === m.features && r.learner === m.learner, teaOnly: rowsOf('tea_only').find((t) => t.features === r.features && t.learner === r.learner) ?? null }))
-        .sort((a, b) => b.teaF1.mean - a.teaF1.mean);
-});
-/** What the model calls each true class, as shares of that class's test pixels. */
-const confusionRows = computed(() => {
-    const m = summary.value?.model;
-    if (!m) return [];
-    return summary.value!.classes.map((cls, i) => {
-        const row = m.confusion[i] ?? [];
-        const n = row.reduce((s, v) => s + v, 0);
-        return { cls, n, cells: summary.value!.classes.map((c, j) => ({ c, share: n ? (row[j] ?? 0) / n : 0 })) };
-    }).filter((r) => r.n > 0);
-});
+/** Methods ordered by how well they read the reference parcels; the used one is marked. */
+const comparison = computed(() => [...(summary.value?.model.comparison ?? [])].sort((a, b) => b.balanced - a.balanced).map((r) => ({ ...r, chosen: r.key === summary.value?.model.used?.key })));
+const share = (part: number, whole: number) => (whole > 0 ? `%${Math.round((part / whole) * 100)}` : '—');
 
 function styleOf(f?: { properties: { tea?: CoverTeaState; dominant?: CoverDominant | null; group?: string | null } | null }): L.PathOptions {
     const p = f?.properties;
@@ -130,7 +109,7 @@ function renderMap(): void {
         style: (f) => styleOf(f),
         onEachFeature: (f, l) => {
             const p = f.properties as LandCoverMap['features'][number]['properties'];
-            l.bindTooltip(`${p.block}/${p.parcel} · ${p.nature} · ${TEA_META[p.tea].label}${p.teaShare === null ? '' : ` (${pct(p.teaShare)})`}${p.dominant ? ` · ${labels.value[p.dominant] ?? p.dominant}` : ''}`, { sticky: true });
+            l.bindTooltip(`${p.block}/${p.parcel} · ${p.nature} · ${TEA_META[p.tea].label}${p.teaShare === null ? '' : ` (${pct(p.teaShare)})`}${p.dominant ? ` · ${SHORT_LABEL[p.dominant] ?? p.dominant}` : ''}`, { sticky: true });
             l.on('click', () => {
                 search.value = `${p.block}/${p.parcel}`;
             });
@@ -200,9 +179,9 @@ onBeforeUnmount(() => {
             <Card class="gap-0 py-0">
                 <CardHeader class="py-4">
                     <CardTitle class="flex flex-wrap items-center gap-2">
-                        Arazi örtüsü: çay var mı, başka ne yetişiyor
+                        Arazi örtüsü: çay var mı, başka ne var
                         <Badge variant="warning">Ön değerlendirme</Badge>
-                        <Badge variant="outline">Saha verisiyle sınanmadı</Badge>
+                        <Badge variant="outline">Tapudan bağımsız</Badge>
                     </CardTitle>
                     <CardDescription>{{ summary.method }}</CardDescription>
                 </CardHeader>
@@ -211,7 +190,7 @@ onBeforeUnmount(() => {
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <StatCard label="Çay var" :value="formatNumber(summary.summary.byTea.present)" :hint="`tahmini çaylık ≈ ${formatM2(summary.summary.teaAreaM2)} (piksel payından)`" :icon="Sprout" />
                 <StatCard label="Kısmen çay" :value="formatNumber(summary.summary.byTea.partial)" :hint="`parselin %${Math.round(summary.rules.teaAbsentShare * 100)}–%${Math.round(summary.rules.teaPresentShare * 100)} kadarı çay`" />
-                <StatCard label="Çay yok" :value="formatNumber(summary.summary.byTea.absent)" hint="başka bir örtü baskın" />
+                <StatCard label="Çay yok" :value="formatNumber(summary.summary.byTea.absent)" :hint="`tapusu çay bahçesi olanlardan ${summary.summary.titleTea.absent} tanesi`" />
                 <StatCard label="Değerlendirilemedi" :value="formatNumber(summary.summary.byTea.not_assessable)" :hint="`${summary.rules.minPixels} pikselden küçük parseller`" />
             </div>
 
@@ -232,7 +211,7 @@ onBeforeUnmount(() => {
                             <span v-for="(m, k) in TEA_META" :key="k" class="flex items-center gap-1.5"><span class="size-3 rounded-sm" :style="{ background: m.color }" />{{ m.label }}</span>
                         </template>
                         <template v-else-if="colourBy === 'cover'">
-                            <span v-for="k in dominantOptions" :key="k" class="flex items-center gap-1.5"><span class="size-3 rounded-sm" :style="{ background: COVER_COLOR[k] }" />{{ labels[k] }} ({{ summary.summary.byDominant[k] }})</span>
+                            <span v-for="k in dominantOptions" :key="k" class="flex items-center gap-1.5"><span class="size-3 rounded-sm" :style="{ background: COVER_COLOR[k] }" />{{ SHORT_LABEL[k] }} ({{ summary.summary.byDominant[k] }})</span>
                         </template>
                         <template v-else>
                             <span v-for="g in groups" :key="g.name" class="flex items-center gap-1.5"><span class="size-3 rounded-sm" :style="{ background: GROUP_COLOR[g.name] }" />{{ g.label }} ({{ summary.unsupervised?.byGroup[g.name] ?? 0 }})</span>
@@ -300,7 +279,7 @@ onBeforeUnmount(() => {
                 </CardContent>
             </Card>
 
-            <CaykurCoverLabels :area-id="areaId" :parcels="mapData" :labels="labels" :colors="COVER_COLOR" />
+            <CaykurCoverLabels :area-id="areaId" :parcels="mapData" />
 
             <Card v-if="summary.model.fieldValidation" class="gap-0 py-0">
                 <CardHeader class="py-4">
@@ -310,7 +289,7 @@ onBeforeUnmount(() => {
                     </CardTitle>
                     <CardDescription>
                         {{ formatNumber(summary.model.fieldValidation.areas) }} işaretli alan, {{ formatNumber(summary.model.fieldValidation.pixels) }} piksel
-                        ({{ Object.entries(summary.model.fieldValidation.byClass).map(([c, v]) => `${labels[c as CoverDominant] ?? c} ${v.areas}`).join(' · ') }}).
+                        ({{ Object.entries(summary.model.fieldValidation.byClass).map(([c, v]) => `${MARKED_LABEL[c] ?? c} ${v.areas}`).join(' · ') }}).
                         Bu sayılar tapuya değil, sizin işaretlediğiniz alanlara göre ölçülmüştür.
                         <template v-if="summary.model.fieldValidation.note"> {{ summary.model.fieldValidation.note }}</template>
                     </CardDescription>
@@ -329,7 +308,7 @@ onBeforeUnmount(() => {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                <TableRow v-for="row in [{ label: 'Yalnız tapu etiketleriyle eğitilen (bugünkü durumun gerçek sınaması)', s: summary.model.fieldValidation.asIs }, { label: 'İşaretli alanlarla kalibre edilen (alanlar birbirine karşı sınandı)', s: summary.model.fieldValidation.calibrated }].filter((x) => x.s)" :key="row.label">
+                                <TableRow v-for="row in [{ label: 'İşaretli alanlar eğitime katılmadan (bugünkü modelin gerçek sınaması)', s: summary.model.fieldValidation.asIs }, { label: 'İşaretli alanlarla kalibre edilen (alanlar birbirine karşı sınandı)', s: summary.model.fieldValidation.calibrated }].filter((x) => x.s)" :key="row.label">
                                     <TableCell class="min-w-64 whitespace-normal">{{ row.label }}</TableCell>
                                     <TableCell class="text-right tabular-nums">{{ pct1(row.s!.areaAccuracy) }}</TableCell>
                                     <TableCell class="text-right tabular-nums">{{ pct1(row.s!.teaAccuracy) }}</TableCell>
@@ -345,91 +324,67 @@ onBeforeUnmount(() => {
 
             <Card class="gap-0 py-0">
                 <CardHeader class="py-4">
-                    <CardTitle>Hangi veri çayı en iyi buluyor</CardTitle>
+                    <CardTitle class="flex flex-wrap items-center gap-2">
+                        Yöntem ne kadar isabetli
+                        <Badge variant="outline">Tapuya göre değil, bakılan parsellere göre</Badge>
+                    </CardTitle>
                     <CardDescription>
-                        Aynı etiketli piksellerde, {{ summary.model.folds }} katlı parsel bazlı çapraz sınama: model hiç görmediği parsellerde sınanır.
-                        {{ formatNumber(Object.values(summary.model.trainingPixels).reduce((s, v) => s + v, 0)) }} piksel, {{ formatNumber(summary.model.trainingGroups) }} parsel/blok.
-                        Kullanılan model: <strong>{{ FEATURE_LABEL[summary.model.features] ?? summary.model.features }}</strong> · {{ LEARNER_LABEL[summary.model.learner] ?? summary.model.learner }} · {{ summary.model.bands }} öznitelik.
-                        {{ summary.model.validationNote }}
+                        Her yöntem, bir kişinin baktığı {{ summary.model.reference.parcels }} parselde sınandı: drone videosunda gözle okunan {{ summary.model.reference.drone }} parsel ve {{ summary.model.reference.field }} saha gözlemi
+                        ({{ summary.model.reference.tea }} çay, {{ summary.model.reference.noTea }} çay yok). Bu parsellerin hiçbiri eğitimde kullanılmadı.
                     </CardDescription>
                 </CardHeader>
                 <CardContent class="px-0 pb-0">
-                    <div class="grid gap-4 border-t p-4 sm:grid-cols-2 lg:grid-cols-4">
-                        <StatCard label="Çay yakalama" :value="pct1(summary.model.crossValidation.teaRecall.mean)" :hint="`gerçek çay piksellerinin bulunan payı · ± ${pct1(summary.model.crossValidation.teaRecall.sd)}`" />
-                        <StatCard label="Çay kesinliği" :value="pct1(summary.model.crossValidation.teaPrecision.mean)" :hint="`“çay” denen piksellerin gerçekten çay olan payı · ± ${pct1(summary.model.crossValidation.teaPrecision.sd)}`" />
-                        <StatCard label="Çay var / yok doğruluğu" :value="pct1(summary.model.crossValidation.teaAccuracy.mean)" :hint="`çay ile çay olmayanı ayırma · ± ${pct1(summary.model.crossValidation.teaAccuracy.sd)}`" />
-                        <StatCard label="Bütün sınıflarda doğruluk" :value="pct1(summary.model.crossValidation.accuracy.mean)" :hint="`örtü türünü de doğru bilme · ± ${pct1(summary.model.crossValidation.accuracy.sd)}`" />
+                    <div v-if="summary.model.used" class="grid gap-4 border-t p-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <StatCard label="Çay parsellerini bulma" :value="share(summary.model.used.teaFound, summary.model.used.teaTotal)" :hint="`${summary.model.used.teaFound} / ${summary.model.used.teaTotal} parsel`" />
+                        <StatCard label="Çay olmayanı ayırma" :value="share(summary.model.used.noTeaRight, summary.model.used.noTeaTotal)" :hint="`${summary.model.used.noTeaRight} / ${summary.model.used.noTeaTotal} parsel`" />
+                        <StatCard label="Dengeli doğruluk" :value="pct1(summary.model.used.balanced)" hint="iki oranın ortalaması" />
+                        <StatCard label="Tartışmalı okumalar hariç" :value="pct1(summary.model.used.undisputed.balanced)" :hint="`${summary.model.reference.disputed.length} “çay yok” okuması tartışmalı`" />
                     </div>
-                    <div v-if="summary.model.parcelLevel" class="flex flex-col gap-2 border-t p-4 text-sm">
+                    <div class="overflow-x-auto border-t">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Yöntem</TableHead>
+                                    <TableHead class="text-right">Çay bulunan</TableHead>
+                                    <TableHead class="text-right">Çay yok doğru</TableHead>
+                                    <TableHead class="text-right">Dengeli doğruluk</TableHead>
+                                    <TableHead class="text-right">Tartışmalılar hariç</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow v-for="r in comparison" :key="r.key" :class="{ 'bg-muted/50 font-medium': r.chosen }">
+                                    <TableCell class="min-w-72 whitespace-normal">
+                                        {{ r.label }} <Badge v-if="r.chosen" variant="success" class="ml-1">kullanılan</Badge>
+                                        <div class="text-xs font-normal text-muted-foreground">{{ r.description }}</div>
+                                    </TableCell>
+                                    <TableCell class="text-right tabular-nums">{{ r.teaFound }} / {{ r.teaTotal }}</TableCell>
+                                    <TableCell class="text-right tabular-nums">{{ r.noTeaRight }} / {{ r.noTeaTotal }}</TableCell>
+                                    <TableCell class="text-right tabular-nums">{{ pct1(r.balanced) }}</TableCell>
+                                    <TableCell class="text-right tabular-nums">{{ pct1(r.undisputed.balanced) }}</TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </div>
+                    <div class="flex flex-col gap-2 border-t p-4 text-sm">
                         <p>
-                            <span class="font-medium">Parsel düzeyinde:</span>
-                            tapuda çay bahçesi olan {{ formatNumber(summary.model.parcelLevel.teaParcels) }} sınama parselinin {{ formatNumber(summary.model.parcelLevel.teaFound) }} tanesinde çay bulundu ({{ pct1(summary.model.parcelLevel.teaRecall) }});
-                            “çay var” denen parsellerin {{ pct1(summary.model.parcelLevel.teaPrecision) }} kadarının tapusu da çay bahçesi.
-                            Tapusu fındık ya da orman olan {{ formatNumber(summary.model.parcelLevel.otherParcels) }} parselin {{ formatNumber(summary.model.parcelLevel.otherCalledTea) }} tanesi çay olarak okundu.
+                            <span class="font-medium">Neden tapu etiketi işe yaramıyor:</span>
+                            ağaçla kaplanmış eski çay bahçelerinin tapusunda hâlâ “çay bahçesi” yazar. Tapuyla eğitilen model ağaç örtüsünü çay diye öğrenir; hangi veri eklenirse eklensin yarı yarıya yanılır.
+                            <template v-if="summary.model.titleStudy">Aynı model tapuya karşı sınandığında {{ pct1(summary.model.titleStudy.teaAccuracy) }} doğru görünüyordu; o sayı arazideki durumu değil, tapuyla uyumu ölçüyordu.</template>
+                        </p>
+                        <p>
+                            <span class="font-medium">Kullanılan yöntem:</span>
+                            etiketler, ağaç yüksekliği ile kış yeşilliğinin açıkça uzlaştığı {{ formatNumber(Object.values(summary.model.trainingPixels).reduce((a, b) => a + b, 0)) }} pikselden gelir
+                            (çay {{ formatNumber(summary.model.trainingPixels.tea) }}, ağaç örtüsü {{ formatNumber(summary.model.trainingPixels.trees) }}, açık alan {{ formatNumber(summary.model.trainingPixels.open) }}, yapı {{ formatNumber(summary.model.trainingPixels.built) }});
+                            uzlaşmayan {{ formatNumber(summary.model.unlabelledPixels) }} pikseli güncel Sentinel-2 verisiyle eğitilen sınıflandırıcı okur.
                         </p>
                         <p class="text-xs text-muted-foreground">
-                            Bu son sayı modelin en zayıf yeridir ve iki açıklaması olabilir: model fındığı çaydan ayıramıyor, ya da bu parsellerde tapu güncel değil ve gerçekten çay var. Saha verisi olmadan ikisi ayrılamaz.
-                            Piksel ölçümleri aşağıdaki tablodadır; parsel okuması birçok pikselin ortak sonucu olduğu için çay parsellerinde pikselden daha isabetlidir.
+                            {{ summary.model.reference.note }}
+                            <template v-if="summary.model.reference.disputed.length">Tartışmalı parseller: {{ summary.model.reference.disputed.join(', ') }}.</template>
+                            {{ summary.model.validationNote }}
                         </p>
-                    </div>
-                    <div class="overflow-x-auto border-t">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Veri kaynağı</TableHead>
-                                    <TableHead>Öğrenici</TableHead>
-                                    <TableHead class="text-right">Öznitelik</TableHead>
-                                    <TableHead class="text-right">Çay yakalama</TableHead>
-                                    <TableHead class="text-right">Çay kesinliği</TableHead>
-                                    <TableHead class="text-right">Çay F1</TableHead>
-                                    <TableHead class="text-right">Çay var/yok doğruluğu</TableHead>
-                                    <TableHead class="text-right">Bütün sınıflar</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                <TableRow v-for="r in comparison" :key="r.features + r.learner" :class="{ 'bg-muted/50 font-medium': r.chosen }">
-                                    <TableCell class="min-w-56 whitespace-normal">{{ FEATURE_LABEL[r.features] ?? r.features }} <Badge v-if="r.chosen" variant="success" class="ml-1">kullanılan</Badge></TableCell>
-                                    <TableCell class="text-sm">{{ LEARNER_LABEL[r.learner] ?? r.learner }}</TableCell>
-                                    <TableCell class="text-right tabular-nums">{{ r.bands }}</TableCell>
-                                    <TableCell class="text-right tabular-nums">{{ pct1(r.teaRecall.mean) }}</TableCell>
-                                    <TableCell class="text-right tabular-nums">{{ pct1(r.teaPrecision.mean) }}</TableCell>
-                                    <TableCell class="text-right tabular-nums">{{ pct1(r.teaF1.mean) }} <span class="text-xs text-muted-foreground">± {{ pct1(r.teaF1.sd) }}</span></TableCell>
-                                    <TableCell class="text-right tabular-nums">{{ pct1(r.teaAccuracy.mean) }}</TableCell>
-                                    <TableCell class="text-right tabular-nums">{{ pct1(r.accuracy.mean) }}</TableCell>
-                                </TableRow>
-                            </TableBody>
-                        </Table>
-                    </div>
-                    <p class="border-t p-4 text-xs text-muted-foreground">
-                        F1, yakalama ile kesinliğin dengeli ortalamasıdır; ± değeri katlar arasındaki yayılımdır. Birbirine bu yayılımdan daha yakın iki satır arasındaki fark anlamlı değildir.
-                        Etiketler tapu niteliği (çay, fındık, orman) ve küresel arazi örtüsü haritasıdır (çayır, ekili alan, yapı): sayılar bunlarla uyumu ölçer, arazideki gerçeği değil.
-                    </p>
-                </CardContent>
-            </Card>
-
-            <Card class="gap-0 py-0">
-                <CardHeader class="py-4">
-                    <CardTitle>Model neyi neyle karıştırıyor</CardTitle>
-                    <CardDescription>Satır gerçek sınıf, sütun modelin verdiği sınıf; hücre o gerçek sınıfın piksellerinin payıdır. “Çay” sütunu, o örtünün ne sıklıkta çay sanıldığını gösterir.</CardDescription>
-                </CardHeader>
-                <CardContent class="px-0 pb-0">
-                    <div class="overflow-x-auto border-t">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Gerçek sınıf</TableHead>
-                                    <TableHead class="text-right">Piksel</TableHead>
-                                    <TableHead v-for="c in summary.classes" :key="c" class="text-right">{{ labels[c] }}</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                <TableRow v-for="r in confusionRows" :key="r.cls">
-                                    <TableCell class="font-medium">{{ labels[r.cls] }}</TableCell>
-                                    <TableCell class="text-right tabular-nums">{{ formatNumber(r.n) }}</TableCell>
-                                    <TableCell v-for="cell in r.cells" :key="cell.c" class="text-right tabular-nums" :class="{ 'font-semibold': cell.c === r.cls, 'text-muted-foreground': cell.share < 0.005 }">{{ cell.share < 0.005 ? '—' : pct(cell.share) }}</TableCell>
-                                </TableRow>
-                            </TableBody>
-                        </Table>
+                        <ul class="text-xs text-muted-foreground">
+                            <li v-for="src in summary.model.sources" :key="src.name"><span class="font-medium">{{ src.name }}:</span> {{ src.role }}</li>
+                        </ul>
                     </div>
                 </CardContent>
             </Card>
@@ -437,7 +392,7 @@ onBeforeUnmount(() => {
             <Card class="gap-0 py-0">
                 <CardHeader class="py-4">
                     <CardTitle>Parseller</CardTitle>
-                    <CardDescription>Paylar, merkezi parselin içine düşen 10 m piksellerin sayımıdır; alan ölçümü değildir. Tapu niteliği yalnız karşılaştırma için gösterilir, modele verilmez.</CardDescription>
+                    <CardDescription>Paylar, merkezi parselin içine düşen 10 m piksellerin sayımıdır; alan ölçümü değildir. Tapu niteliği yalnız karşılaştırma için gösterilir, modele verilmez. Ağaç yüksekliği birkaç yıl öncesinin haritasındandır; sınıfı güncel uydu verisi belirler.</CardDescription>
                 </CardHeader>
                 <CardContent class="px-0 pb-0">
                     <div class="flex flex-col gap-3 border-t p-4 md:flex-row md:items-end">
@@ -458,7 +413,7 @@ onBeforeUnmount(() => {
                                 <SelectTrigger id="cover-dominant" class="h-11 w-full md:h-9"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem :value="ALL">Bütün örtüler</SelectItem>
-                                    <SelectItem v-for="k in dominantOptions" :key="k" :value="k">{{ labels[k] }}</SelectItem>
+                                    <SelectItem v-for="k in dominantOptions" :key="k" :value="k">{{ SHORT_LABEL[k] }}</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -486,16 +441,17 @@ onBeforeUnmount(() => {
                                     <TableCell>
                                         <Badge :variant="toneVariant(TEA_META[r.tea].tone)">{{ TEA_META[r.tea].label }}</Badge>
                                         <div v-if="r.teaShare !== null" class="mt-1 text-xs text-muted-foreground">çay payı {{ pct(r.teaShare) }} · güven {{ r.confidence === 'high' ? 'yüksek' : r.confidence === 'medium' ? 'orta' : 'düşük' }}</div>
-                                        <div v-if="r.beyondTraining" class="text-xs text-warning">eğitimdeki en yüksek çaydan yukarıda</div>
+                                        <div v-if="r.evidence" class="text-xs text-muted-foreground">ağaç yüksekliği {{ r.evidence.canopyHeightM.toFixed(1) }} m · ağaç payı {{ pct(r.evidence.tallShare) }} · kış/yaz yeşilliği {{ pct(r.evidence.winterRatio) }}</div>
+                                        <div v-for="f in r.flags ?? []" :key="f" class="text-xs text-warning">{{ FLAG_LABEL[f] }}</div>
                                         <div v-if="r.group" class="text-xs text-muted-foreground">kıyassız: {{ groupLabel[r.group] ?? r.group }}</div>
                                     </TableCell>
-                                    <TableCell class="text-sm">{{ r.dominant ? labels[r.dominant] : '—' }}<span v-if="r.dominantShare !== null && r.dominant !== 'mixed'" class="text-muted-foreground"> · {{ pct(r.dominantShare) }}</span></TableCell>
+                                    <TableCell class="text-sm">{{ r.dominant ? SHORT_LABEL[r.dominant] : '—' }}<span v-if="r.dominantShare !== null && r.dominant !== 'mixed'" class="text-muted-foreground"> · {{ pct(r.dominantShare) }}</span></TableCell>
                                     <TableCell class="min-w-56">
                                         <template v-if="r.shares">
-                                            <div class="flex h-3 w-full overflow-hidden rounded-sm border" role="img" :aria-label="summary.classes.filter((c) => (r.shares?.[c] ?? 0) > 0).map((c) => `${labels[c]} ${pct(r.shares?.[c])}`).join(', ')">
+                                            <div class="flex h-3 w-full overflow-hidden rounded-sm border" role="img" :aria-label="summary.classes.filter((c) => (r.shares?.[c] ?? 0) > 0).map((c) => `${SHORT_LABEL[c]} ${pct(r.shares?.[c])}`).join(', ')">
                                                 <span v-for="c in summary.classes" :key="c" :style="{ width: `${(r.shares[c as CoverClass] ?? 0) * 100}%`, background: COVER_COLOR[c] }" />
                                             </div>
-                                            <div class="mt-1 text-xs text-muted-foreground">{{ summary.classes.filter((c) => (r.shares?.[c] ?? 0) >= 0.1).map((c) => `${labels[c]} ${pct(r.shares?.[c])}`).join(' · ') }}</div>
+                                            <div class="mt-1 text-xs text-muted-foreground">{{ summary.classes.filter((c) => (r.shares?.[c] ?? 0) >= 0.1).map((c) => `${SHORT_LABEL[c]} ${pct(r.shares?.[c])}`).join(' · ') }}</div>
                                         </template>
                                         <span v-else class="text-sm text-muted-foreground">parsel 10 m ızgara için küçük</span>
                                     </TableCell>
