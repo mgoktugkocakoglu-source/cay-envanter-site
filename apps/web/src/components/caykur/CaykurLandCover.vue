@@ -115,8 +115,15 @@ function renderMap(): void {
             });
         },
     }).addTo(map);
-    const bounds = layer.getBounds();
-    if (bounds.isValid()) map.fitBounds(bounds, { padding: [20, 20] });
+    // Start on the village: a few forest parcels of tens of hectares and far blocks would shrink it to a dot.
+    const centres: L.LatLng[] = [];
+    layer.eachLayer((l) => centres.push((l as L.Polygon).getBounds().getCenter()));
+    const sorted = (pick: (c: L.LatLng) => number) => centres.map(pick).sort((x, y) => x - y);
+    const lats = sorted((c) => c.lat);
+    const lngs = sorted((c) => c.lng);
+    const q = (values: number[], share: number) => values[Math.min(values.length - 1, Math.floor(values.length * share))] as number;
+    const bounds = centres.length >= 10 ? L.latLngBounds([q(lats, 0.05), q(lngs, 0.05)], [q(lats, 0.95), q(lngs, 0.95)]) : layer.getBounds();
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30] });
 }
 async function load(): Promise<void> {
     isLoading.value = true;
