@@ -2774,7 +2774,7 @@ export interface CoverModel {
     sources: Array<{ name: string; role: string }>;
     validationNote: string;
 }
-export type CoverFlag = 'tea_under_canopy' | 'evergreen_open_not_tea' | 'rule_disagrees';
+export type CoverFlag = 'tea_under_canopy' | 'evergreen_open_not_tea' | 'rule_disagrees' | 'high_altitude_rule';
 export interface CoverEvidence { canopyHeightM: number; tallShare: number; winterRatio: number; ruleTeaShare: number; ruleState: 'present' | 'partial' | 'absent' }
 /** Reference-free cover group of a pixel or parcel (py/cover_groups.py): named from its own yearly greenness curve. */
 export interface CoverGroup {

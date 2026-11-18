@@ -40,6 +40,7 @@ const FLAG_LABEL: Record<CoverFlag, string> = {
     tea_under_canopy: 'ağaç haritası üzerinde ağaç gösteriyor: ağaç altı çay olabilir ya da ağaçlar sonradan kesilmiş',
     evergreen_open_not_tea: 'açık ve her dem yeşil görünüyor ama model çay okumadı',
     rule_disagrees: 'fiziksel kural çay göstermiyor',
+    high_altitude_rule: 'yüksek rakım kuralıyla çay sayıldı (kış eşiği gevşetildi)',
 };
 /** Colours of the reference-free groups: evergreen in the product green, the leaf-dropping group in brown. */
 const GROUP_COLOR: Record<string, string> = { evergreen: '#15803d', evergreen_shadow: '#0f766e', semi_evergreen: '#65a30d', deciduous: '#a16207', sparse: '#eab308', built: '#64748b', bare: '#a8a29e', mixed: '#7c3aed' };
