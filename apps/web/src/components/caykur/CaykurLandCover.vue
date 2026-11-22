@@ -15,7 +15,7 @@ import CaykurCoverLabels from '@/components/caykur/CaykurCoverLabels.vue';
 import { toneVariant, type Tone } from '@/components/caykur/tone';
 import { useToast } from '@/composables/useToast';
 import { api, type CoverClass, type CoverDominant, type CoverFlag, type CoverParcel, type CoverTeaState, type LandCoverMap, type LandCoverSummary } from '@/services/api';
-import { formatM2 } from '@/services/caykur/teaInventory';
+import { formatHectare, formatM2 } from '@/services/caykur/teaInventory';
 import { formatNumber } from '@/services/caykur';
 
 /**
@@ -30,10 +30,15 @@ const PAGE_SIZE = 20;
 const TEA_META: Record<CoverTeaState, { label: string; tone: Tone; color: string }> = {
     present: { label: 'Çay var', tone: 'success', color: '#15803d' },
     partial: { label: 'Kısmen çay', tone: 'warning', color: '#d97706' },
-    absent: { label: 'Çay yok', tone: 'danger', color: '#b91c1c' },
-    context: { label: 'Çevresiyle birlikte çay', tone: 'muted', color: '#86b89a' },
+    // "No tea" is a reading, not a fault: it is drawn in a neutral tone, and red stays free for real conflicts elsewhere.
+    absent: { label: 'Çay yok', tone: 'muted', color: '#e2e8f0' },
+    context: { label: 'Çevresiyle birlikte çay', tone: 'muted', color: '#86efac' },
     not_assessable: { label: 'Değerlendirilemedi', tone: 'muted', color: '#94a3b8' },
 };
+/** Parcels above this size (forest and treasury land) are drawn as an outline only, so they do not flood the map. */
+const OUTLINE_ONLY_M2 = 30_000;
+/** Line patterns repeat what the colours say, for readers who cannot tell the colours apart. */
+const TEA_DASH: Partial<Record<CoverTeaState, string>> = { partial: '6 4', context: '2 4', not_assessable: '1 5' };
 /** Map colours of the cover classes: tea in the product green, tree cover dark, open ground light. */
 const COVER_COLOR: Record<CoverDominant, string> = { tea: '#15803d', trees: '#134e4a', open: '#eab308', built: '#64748b', mixed: '#7c3aed' };
 const SHORT_LABEL: Record<CoverDominant, string> = { tea: 'Çay', trees: 'Ağaç örtüsü', open: 'Açık alan', built: 'Yapı / çıplak', mixed: 'Karışık' };
@@ -78,7 +83,7 @@ let layer: L.GeoJSON | null = null;
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
 const pct = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `%${Math.round(v * 100)}`);
-const pct1 = (v: number) => `%${(v * 100).toFixed(1)}`;
+const pct1 = (v: number) => `%${(v * 100).toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`;
 const dominantOptions = computed(() => (Object.keys(summary.value?.summary.byDominant ?? {}) as CoverDominant[]).filter((k) => (summary.value?.summary.byDominant[k] ?? 0) > 0));
 const groups = computed(() => summary.value?.unsupervised?.groups ?? []);
 const groupLabel = computed(() => Object.fromEntries([...groups.value.map((g) => [g.name, g.label]), ['mixed', 'Karışık']]) as Record<string, string>);
@@ -96,11 +101,15 @@ const agreement = computed(() => {
 const comparison = computed(() => [...(summary.value?.model.comparison ?? [])].sort((a, b) => b.balanced - a.balanced).map((r) => ({ ...r, chosen: r.key === summary.value?.model.used?.key })));
 const share = (part: number, whole: number) => (whole > 0 ? `%${Math.round((part / whole) * 100)}` : '—');
 
-function styleOf(f?: { properties: { tea?: CoverTeaState; dominant?: CoverDominant | null; group?: string | null } | null }): L.PathOptions {
+function styleOf(f?: { properties: { tea?: CoverTeaState; dominant?: CoverDominant | null; group?: string | null; areaM2?: number } | null }): L.PathOptions {
     const p = f?.properties;
+    if ((p?.areaM2 ?? 0) >= OUTLINE_ONLY_M2) return { color: '#f8fafc', weight: 1.5, dashArray: '8 6', fillOpacity: 0 };
     const none = TEA_META.not_assessable.color;
     const color = colourBy.value === 'tea' ? TEA_META[p?.tea ?? 'not_assessable'].color : colourBy.value === 'cover' ? (p?.dominant ? COVER_COLOR[p.dominant] : none) : (p?.group ? (GROUP_COLOR[p.group] ?? none) : none);
-    return { color, weight: 1.5, fillColor: color, fillOpacity: p?.tea === 'not_assessable' ? 0.08 : p?.tea === 'context' ? 0.2 : 0.4 };
+    const byTea = colourBy.value === 'tea';
+    const state = p?.tea ?? 'not_assessable';
+    const fillOpacity = state === 'not_assessable' ? 0.08 : state === 'context' ? 0.3 : byTea && state === 'absent' ? 0.22 : byTea && state === 'present' ? 0.6 : 0.45;
+    return { color, weight: byTea && state === 'present' ? 2 : 1.25, dashArray: byTea ? TEA_DASH[state] : undefined, fillColor: color, fillOpacity };
 }
 function renderMap(): void {
     map?.remove();
@@ -184,13 +193,13 @@ onBeforeUnmount(() => {
 
 <template>
     <div class="flex flex-col gap-4">
-        <LoadingState v-if="isLoading" text="Arazi örtüsü yükleniyor…" />
+        <LoadingState v-if="isLoading" text="Arazi tespiti yükleniyor…" />
         <EmptyState v-else-if="!summary" :icon="Sprout" title="Bu mahalle için arazi örtüsü sonucu yok" description="Uydu öznitelikleri örneklenip sınıflandırma çalıştırıldığında burada görünür." />
         <template v-else>
             <Card class="gap-0 py-0">
                 <CardHeader class="py-4">
                     <CardTitle class="flex flex-wrap items-center gap-2">
-                        Arazi örtüsü: çay var mı, başka ne var
+                        Arazi tespiti: çay var mı, başka ne var
                         <Badge variant="warning">Ön değerlendirme</Badge>
                         <Badge variant="outline">Tapudan bağımsız</Badge>
                     </CardTitle>
@@ -199,7 +208,7 @@ onBeforeUnmount(() => {
             </Card>
 
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard label="Çay var" :value="formatNumber(summary.summary.byTea.present)" :hint="`tahmini çaylık ≈ ${formatM2(summary.summary.teaAreaM2)} (piksel payından)`" :icon="Sprout" />
+                <StatCard label="Çay var" :value="formatNumber(summary.summary.byTea.present)" :hint="`tahmini çaylık yaklaşık ${formatHectare(summary.summary.teaAreaM2)} (piksel payından)`" :icon="Sprout" />
                 <StatCard label="Kısmen çay" :value="formatNumber(summary.summary.byTea.partial)" :hint="`parselin %${Math.round(summary.rules.teaAbsentShare * 100)}–%${Math.round(summary.rules.teaPresentShare * 100)} kadarı çay`" />
                 <StatCard label="Çay yok" :value="formatNumber(summary.summary.byTea.absent)" :hint="`tapusu çay bahçesi olanlardan ${summary.summary.titleTea.absent} tanesi`" />
                 <StatCard label="Değerlendirilemedi" :value="formatNumber(summary.summary.byTea.not_assessable)" :hint="`${summary.rules.minPixels} pikselden küçük parseller; ayrıca ${summary.summary.byTea.context ?? 0} tanesi çevresiyle birlikte çay (dolaylı çıkarım, ölçüm değil)`" />
@@ -216,10 +225,11 @@ onBeforeUnmount(() => {
                         <Button :variant="colourBy === 'cover' ? 'default' : 'outline'" class="min-h-11 md:min-h-9" :aria-pressed="colourBy === 'cover'" @click="colourBy = 'cover'">Baskın örtü</Button>
                         <Button v-if="summary.unsupervised" :variant="colourBy === 'group' ? 'default' : 'outline'" class="min-h-11 md:min-h-9" :aria-pressed="colourBy === 'group'" @click="colourBy = 'group'">Kıyassız gruplama</Button>
                     </div>
-                    <div ref="mapContainer" class="isolate h-[28rem] w-full overflow-hidden rounded-lg border" />
+                    <div ref="mapContainer" class="isolate h-[28rem] w-full overflow-hidden rounded-lg border lg:h-[36rem]" />
                     <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
                         <template v-if="colourBy === 'tea'">
-                            <span v-for="(m, k) in TEA_META" :key="k" class="flex items-center gap-1.5"><span class="size-3 rounded-sm" :style="{ background: m.color }" />{{ m.label }}</span>
+                            <span v-for="(m, k) in TEA_META" :key="k" class="flex items-center gap-1.5"><span class="size-3 rounded-sm border border-slate-400" :style="{ background: m.color, borderStyle: TEA_DASH[k] ? 'dashed' : 'solid' }" />{{ m.label }}</span>
+                            <span class="flex items-center gap-1.5"><span class="size-3 rounded-sm border border-dashed border-slate-500" />{{ formatHectare(OUTLINE_ONLY_M2) }} üstü parsel (yalnız çerçeve)</span>
                         </template>
                         <template v-else-if="colourBy === 'cover'">
                             <span v-for="k in dominantOptions" :key="k" class="flex items-center gap-1.5"><span class="size-3 rounded-sm" :style="{ background: COVER_COLOR[k] }" />{{ SHORT_LABEL[k] }} ({{ summary.summary.byDominant[k] }})</span>

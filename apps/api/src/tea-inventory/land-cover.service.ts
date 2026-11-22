@@ -10,7 +10,7 @@ import { Paginated, paginate } from '@/common/dto/paginated.dto';
 export interface LandCoverSummary extends Omit<LandCoverBlock, 'parcels'> {
     neighborhood: string;
 }
-export type LandCoverMapProperties = Pick<CoverParcel, 'key' | 'block' | 'parcel' | 'nature' | 'tea' | 'teaShare' | 'dominant' | 'confidence'> & { group: string | null };
+export type LandCoverMapProperties = Pick<CoverParcel, 'key' | 'block' | 'parcel' | 'nature' | 'tea' | 'teaShare' | 'dominant' | 'confidence' | 'areaM2'> & { group: string | null };
 export type LandCoverMap = FeatureCollection<Polygon | MultiPolygon, LandCoverMapProperties>;
 
 /** Order of the list: tea first, then partial, then no tea, then parcels the grid cannot describe. */
@@ -49,7 +49,7 @@ export class LandCoverService {
             type: 'FeatureCollection',
             features: block.parcels.flatMap((p) => {
                 const g = geometry.get(p.key);
-                return g ? [{ type: 'Feature' as const, geometry: g, properties: { key: p.key, block: p.block, parcel: p.parcel, nature: p.nature, tea: p.tea, teaShare: p.teaShare, dominant: p.dominant, confidence: p.confidence, group: p.group ?? null } }] : [];
+                return g ? [{ type: 'Feature' as const, geometry: g, properties: { key: p.key, block: p.block, parcel: p.parcel, nature: p.nature, tea: p.tea, teaShare: p.teaShare, dominant: p.dominant, confidence: p.confidence, areaM2: p.areaM2, group: p.group ?? null } }] : [];
             }),
         };
     }

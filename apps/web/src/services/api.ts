@@ -2850,7 +2850,7 @@ export interface LandCoverSummary {
     unsupervised: CoverUnsupervised | null;
     summary: { parcels: number; assessed: number; byTea: Record<CoverTeaState, number>; byDominant: Record<CoverDominant, number>; byConfidence: Record<'high' | 'medium' | 'low', number>; byFlag: Record<CoverFlag, number>; teaAreaM2: number; titleTea: Record<'present' | 'partial' | 'absent', number>; titleOther: Record<'present' | 'partial' | 'absent', number> };
 }
-export type LandCoverMap = GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon, Pick<CoverParcel, 'key' | 'block' | 'parcel' | 'nature' | 'tea' | 'teaShare' | 'dominant' | 'confidence'> & { group: string | null }>;
+export type LandCoverMap = GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon, Pick<CoverParcel, 'key' | 'block' | 'parcel' | 'nature' | 'tea' | 'teaShare' | 'dominant' | 'confidence' | 'areaM2'> & { group: string | null }>;
 export type ComplianceOverall = 'finding' | 'review' | 'no_evidence' | 'conforming' | 'out_of_scope';
 export type ComplianceCertainty = 'agreed' | 'single_source' | 'conflict' | 'undecidable';
 export interface RemoteEvidenceTimeline {

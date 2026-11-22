@@ -22,7 +22,7 @@ export const TEA_INVENTORY_TABS: Array<{ key: TeaInventoryTab; label: string; ic
     { key: 'changes', label: 'Değişim Takibi', icon: History },
     { key: 'reportcard', label: 'Sezonluk Karne', icon: BookOpenCheck },
     { key: 'summary', label: 'Yönetici Özeti', icon: LayoutDashboard },
-    { key: 'cover', label: 'Arazi Örtüsü', icon: Sprout },
+    { key: 'cover', label: 'Arazi Tespiti', icon: Sprout },
     { key: 'region', label: 'Bölge', icon: MapPinned },
     { key: 'pruning', label: 'Budama Takibi', icon: Scissors },
     { key: 'field', label: 'Saha Testi', icon: ClipboardCheck },
