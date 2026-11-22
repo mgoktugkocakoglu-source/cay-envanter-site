@@ -3126,6 +3126,15 @@ export interface LicenceAuditSummary {
     /** Field notes that say "tea" against what the satellite reads on its own. */
     fieldCheck: { notes: number; teaNoted: number; teaNotedDetected: number; teaNotedInconclusive: number; teaNotedMissed: number; titleMismatch: number } | null;
     buildingSource: string;
+    /** Where the parcels' tea reading comes from: the land-cover module (scored on looked-at parcels) or the old title-trained detector. */
+    teaSource?: {
+        kind: 'land_cover' | 'title_model';
+        generatedAt: string | null;
+        reference: { parcels: number; teaFound: number; teaTotal: number; noTeaRight: number; noTeaTotal: number; balanced: number } | null;
+        byElevation: Array<{ band: string; teaParcels: number; teaFound: number }>;
+        highElevationM: number | null;
+        note: string;
+    };
     model: {
         type: string;
         period: { start: string; end: string };

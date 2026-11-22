@@ -102,6 +102,15 @@ export interface LicenceAuditBlock {
     rules: Record<string, number>;
     evidenceRules: Record<string, unknown>;
     model: AuditModel;
+    /** Where the parcels' tea reading comes from: the land-cover module (scored on looked-at parcels) or the old title-trained detector. */
+    teaSource?: {
+        kind: 'land_cover' | 'title_model';
+        generatedAt: string | null;
+        reference: { parcels: number; teaFound: number; teaTotal: number; noTeaRight: number; noTeaTotal: number; balanced: number } | null;
+        byElevation: Array<{ band: string; teaParcels: number; teaFound: number }>;
+        highElevationM: number | null;
+        note: string;
+    };
     licenceSource: 'demo' | 'caykur';
     /** How the demo register was put together (null with ÇAYKUR's real list). */
     demoLicences: { rules: Record<string, unknown>; byOrigin: Record<string, number>; byScenario: Record<string, number>; note: string } | null;

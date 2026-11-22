@@ -305,53 +305,77 @@ onBeforeUnmount(() => {
                     <CardHeader class="py-4">
                         <CardTitle>Uydu tespiti ne kadar güvenilir</CardTitle>
                         <CardDescription>
-                            Ayrılmış test parsellerinde doğruluk {{ pct(summary.model.heldOut.accuracy) }}; çay parsellerinin {{ pct(summary.model.heldOut.teaRecall) }} kadarı yakalanıyor, “çay” denen piksellerin {{ pct(summary.model.heldOut.teaPrecision) }} kadarı gerçekten çay tapulu.
-                            Bu sayılar tapu niteliği temiz olan sınıflarla uyumu ölçer; saha doğrulaması değildir.
-                            Eğitimdeki en yüksek çay parseli {{ summary.model.maxTrainingTeaElevationM ?? '—' }} m: bunun üstündeki parsellerde uydu sonucu tek başına bulgu sayılmaz.
+                            <template v-if="summary.teaSource?.kind === 'land_cover'">
+                                Çay okuması Arazi Tespiti modülünden gelir: eğitim etiketleri tapudan değil, ağaç yüksekliği ile kış yeşilliğinin uzlaştığı piksellerden.
+                                <template v-if="summary.teaSource.reference">
+                                    Bir kişinin baktığı {{ summary.teaSource.reference.parcels }} parselde sınandı: çay olan {{ summary.teaSource.reference.teaTotal }} parselin {{ summary.teaSource.reference.teaFound }} tanesi bulundu, çay olmayan {{ summary.teaSource.reference.noTeaTotal }} parselin {{ summary.teaSource.reference.noTeaRight }} tanesi doğru okundu (dengeli {{ pct(summary.teaSource.reference.balanced) }}).
+                                </template>
+                                Sınama seti küçüktür ve tek mahalledendir.
+                                <template v-if="summary.teaSource.highElevationM">{{ summary.teaSource.highElevationM }} m ve üzerindeki parsellerde uydu sonucu tek başına bulgu sayılmaz.</template>
+                            </template>
+                            <template v-else-if="summary.model">
+                                Ayrılmış test parsellerinde doğruluk {{ pct(summary.model.heldOut.accuracy) }}; çay parsellerinin {{ pct(summary.model.heldOut.teaRecall) }} kadarı yakalanıyor, “çay” denen piksellerin {{ pct(summary.model.heldOut.teaPrecision) }} kadarı gerçekten çay tapulu.
+                                Bu sayılar tapu niteliği temiz olan sınıflarla uyumu ölçer; saha doğrulaması değildir.
+                                Eğitimdeki en yüksek çay parseli {{ summary.model.maxTrainingTeaElevationM ?? '—' }} m: bunun üstündeki parsellerde uydu sonucu tek başına bulgu sayılmaz.
+                            </template>
                             <template v-if="summary.fieldCheck && summary.fieldCheck.teaNoted">
                                 Arazi notlarıyla karşılaştırma: sahada “çay var” denen {{ summary.fieldCheck.teaNoted }} parselin {{ summary.fieldCheck.teaNotedDetected }} tanesinde uydu da çay görüyor, {{ summary.fieldCheck.teaNotedInconclusive }} tanesinde kararsız, {{ summary.fieldCheck.teaNotedMissed }} tanesinde görmüyor.
                             </template>
                         </CardDescription>
                     </CardHeader>
                     <CardContent class="flex flex-col gap-3 border-t pt-4 pb-4">
-                        <div class="overflow-x-auto rounded-lg border bg-card">
+                        <div v-if="summary.teaSource?.kind === 'land_cover'" class="overflow-x-auto rounded-lg border bg-card">
                             <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Test grubu</TableHead>
-                                        <TableHead class="text-right">Piksel</TableHead>
-                                        <TableHead class="text-right">“Çay” denen pay</TableHead>
-                                    </TableRow>
-                                </TableHeader>
+                                <TableHeader><TableRow><TableHead>Rakım</TableHead><TableHead class="text-right">Bilinen çay parseli</TableHead><TableHead class="text-right">Bulunan</TableHead></TableRow></TableHeader>
                                 <TableBody>
-                                    <TableRow v-for="g in summary.model.byGroup" :key="g.group">
-                                        <TableCell class="text-sm">{{ GROUP_LABEL[g.group] ?? g.group }}</TableCell>
-                                        <TableCell class="text-right text-sm tabular-nums">{{ g.pixels }}</TableCell>
-                                        <TableCell class="text-right text-sm tabular-nums">{{ pct(g.calledTea['0.5']) }}</TableCell>
-                                    </TableRow>
-                                </TableBody>
-                            </Table>
-                        </div>
-                        <div class="overflow-x-auto rounded-lg border bg-card">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Rakım</TableHead>
-                                        <TableHead class="text-right">Çay / çay değil piksel</TableHead>
-                                        <TableHead class="text-right">Çay yakalama</TableHead>
-                                        <TableHead class="text-right">Doğruluk</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    <TableRow v-for="b in summary.model.byElevation" :key="b.band">
+                                    <TableRow v-for="b in summary.teaSource.byElevation" :key="b.band">
                                         <TableCell class="text-sm">{{ b.band }}</TableCell>
-                                        <TableCell class="text-right text-sm tabular-nums">{{ b.pixels.tea }} / {{ b.pixels.nonTea }}</TableCell>
-                                        <TableCell class="text-right text-sm tabular-nums">{{ b.pixels.tea ? pct(b.teaRecall) : 'çay örneği yok' }}</TableCell>
-                                        <TableCell class="text-right text-sm tabular-nums">{{ pct(b.accuracy) }}</TableCell>
+                                        <TableCell class="text-right text-sm tabular-nums">{{ b.teaParcels }}</TableCell>
+                                        <TableCell class="text-right text-sm tabular-nums">{{ b.teaFound }}</TableCell>
                                     </TableRow>
                                 </TableBody>
                             </Table>
                         </div>
+                        <template v-else-if="summary.model">
+                            <div class="overflow-x-auto rounded-lg border bg-card">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Test grubu</TableHead>
+                                            <TableHead class="text-right">Piksel</TableHead>
+                                            <TableHead class="text-right">“Çay” denen pay</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        <TableRow v-for="g in summary.model.byGroup" :key="g.group">
+                                            <TableCell class="text-sm">{{ GROUP_LABEL[g.group] ?? g.group }}</TableCell>
+                                            <TableCell class="text-right text-sm tabular-nums">{{ g.pixels }}</TableCell>
+                                            <TableCell class="text-right text-sm tabular-nums">{{ pct(g.calledTea['0.5']) }}</TableCell>
+                                        </TableRow>
+                                    </TableBody>
+                                </Table>
+                            </div>
+                            <div class="overflow-x-auto rounded-lg border bg-card">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Rakım</TableHead>
+                                            <TableHead class="text-right">Çay / çay değil piksel</TableHead>
+                                            <TableHead class="text-right">Çay yakalama</TableHead>
+                                            <TableHead class="text-right">Doğruluk</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        <TableRow v-for="b in summary.model.byElevation" :key="b.band">
+                                            <TableCell class="text-sm">{{ b.band }}</TableCell>
+                                            <TableCell class="text-right text-sm tabular-nums">{{ b.pixels.tea }} / {{ b.pixels.nonTea }}</TableCell>
+                                            <TableCell class="text-right text-sm tabular-nums">{{ b.pixels.tea ? pct(b.teaRecall) : 'çay örneği yok' }}</TableCell>
+                                            <TableCell class="text-right text-sm tabular-nums">{{ pct(b.accuracy) }}</TableCell>
+                                        </TableRow>
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </template>
                         <p class="text-sm">
                             Tapu × arazi okuması ({{ summary.summary.parcels - summary.summary.titleVsGround.unknown }} değerlendirilebilen parsel): ikisinde de çay {{ summary.summary.titleVsGround.titleTeaGroundTea }}, tapuda çay, arazi okumasında destek yok {{ summary.summary.titleVsGround.titleTeaGroundNone }},
                             <strong>tapuda farklı nitelik, arazi okumasında çay adayı {{ summary.summary.titleVsGround.titleOtherGroundTea }}</strong>, ikisinde de yok {{ summary.summary.titleVsGround.titleOtherGroundNone }}.
