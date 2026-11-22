@@ -2746,7 +2746,7 @@ export type CoverClass = 'tea' | 'trees' | 'open' | 'built';
 /** What a person can mark on the site; finer than the model's classes. */
 export type CoverLabelClass = 'tea' | 'hazelnut' | 'forest' | 'grass' | 'crop' | 'built' | 'other';
 export type CoverDominant = CoverClass | 'mixed';
-export type CoverTeaState = 'present' | 'partial' | 'absent' | 'not_assessable';
+export type CoverTeaState = 'present' | 'partial' | 'absent' | 'context' | 'not_assessable';
 export interface CoverReferenceScore { teaFound: number; teaTotal: number; noTeaRight: number; noTeaTotal: number; accuracy: number; balanced: number }
 /** One method scored on the independent reference parcels (people's readings, never deed titles). */
 export interface CoverComparisonRow extends CoverReferenceScore {
@@ -2773,8 +2773,10 @@ export interface CoverModel {
     fieldValidation: { areas: number; pixels: number; byClass: Record<string, { areas: number; pixels: number }>; asIs: { teaAccuracy: number; coverAccuracy: number; teaRecall: number; teaPrecision: number; areaAccuracy: number; calledTeaByClass: Record<string, number> } | null; calibrated: { teaAccuracy: number; coverAccuracy: number; teaRecall: number; teaPrecision: number; areaAccuracy: number; calledTeaByClass: Record<string, number> } | null; note: string | null } | null;
     sources: Array<{ name: string; role: string }>;
     validationNote: string;
+    /** The context reading tested on the reference: each parcel read from its surroundings alone. */
+    contextValidation?: { parcels: number; saidTea: number; saidTeaRight: number; undecided: number; wrong: string[]; note: string } | null;
 }
-export type CoverFlag = 'tea_under_canopy' | 'evergreen_open_not_tea' | 'rule_disagrees' | 'high_altitude_rule';
+export type CoverFlag = 'tea_under_canopy' | 'evergreen_open_not_tea' | 'rule_disagrees' | 'high_altitude_rule' | 'context_tea';
 export interface CoverEvidence { canopyHeightM: number; tallShare: number; winterRatio: number; ruleTeaShare: number; ruleState: 'present' | 'partial' | 'absent' }
 /** Reference-free cover group of a pixel or parcel (py/cover_groups.py): named from its own yearly greenness curve. */
 export interface CoverGroup {
@@ -2824,6 +2826,8 @@ export interface CoverParcel {
     pixels: number;
     tea: CoverTeaState;
     teaShare: number | null;
+    /** Pixels of neighbouring parcels within the context radius and their tea share; null where too few. */
+    context?: { pixels: number; teaShare: number } | null;
     teaProbability: number | null;
     dominant: CoverDominant | null;
     dominantShare: number | null;

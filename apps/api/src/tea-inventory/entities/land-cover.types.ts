@@ -11,7 +11,7 @@ export type CoverLabelClass = (typeof COVER_LABEL_CLASSES)[number];
 export type CoverClass = (typeof COVER_CLASSES)[number];
 export const COVER_DOMINANT = [...COVER_CLASSES, 'mixed'] as const;
 export type CoverDominant = (typeof COVER_DOMINANT)[number];
-export const COVER_TEA_STATES = ['present', 'partial', 'absent', 'not_assessable'] as const;
+export const COVER_TEA_STATES = ['present', 'partial', 'absent', 'context', 'not_assessable'] as const;
 export type CoverTeaState = (typeof COVER_TEA_STATES)[number];
 export type CoverConfidence = 'high' | 'medium' | 'low';
 
@@ -41,8 +41,10 @@ export interface CoverModel {
     fieldValidation: { areas: number; pixels: number; byClass: Record<string, { areas: number; pixels: number }>; asIs: { teaAccuracy: number; coverAccuracy: number; teaRecall: number; teaPrecision: number; areaAccuracy: number; calledTeaByClass: Record<string, number> } | null; calibrated: { teaAccuracy: number; coverAccuracy: number; teaRecall: number; teaPrecision: number; areaAccuracy: number; calledTeaByClass: Record<string, number> } | null; note: string | null } | null;
     sources: Array<{ name: string; role: string }>;
     validationNote: string;
+    /** The context reading tested on the reference: each parcel read from its surroundings alone. */
+    contextValidation?: { parcels: number; saidTea: number; saidTeaRight: number; undecided: number; wrong: string[]; note: string } | null;
 }
-export type CoverFlag = 'tea_under_canopy' | 'evergreen_open_not_tea' | 'rule_disagrees' | 'high_altitude_rule';
+export type CoverFlag = 'tea_under_canopy' | 'evergreen_open_not_tea' | 'rule_disagrees' | 'high_altitude_rule' | 'context_tea';
 export interface CoverEvidence { canopyHeightM: number; tallShare: number; winterRatio: number; ruleTeaShare: number; ruleState: 'present' | 'partial' | 'absent' }
 /** Reference-free cover group of a pixel or parcel (py/cover_groups.py): named from its own yearly greenness curve. */
 export interface CoverGroup {
@@ -78,6 +80,8 @@ export interface CoverParcel {
     pixels: number;
     tea: CoverTeaState;
     teaShare: number | null;
+    /** Pixels of neighbouring parcels within the context radius and their tea share; null where too few. */
+    context?: { pixels: number; teaShare: number } | null;
     teaProbability: number | null;
     dominant: CoverDominant | null;
     dominantShare: number | null;

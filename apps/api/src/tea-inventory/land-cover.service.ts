@@ -14,7 +14,7 @@ export type LandCoverMapProperties = Pick<CoverParcel, 'key' | 'block' | 'parcel
 export type LandCoverMap = FeatureCollection<Polygon | MultiPolygon, LandCoverMapProperties>;
 
 /** Order of the list: tea first, then partial, then no tea, then parcels the grid cannot describe. */
-const RANK: Record<CoverTeaState, number> = { present: 0, partial: 1, absent: 2, not_assessable: 3 };
+const RANK: Record<CoverTeaState, number> = { present: 0, partial: 1, absent: 2, context: 3, not_assessable: 4 };
 
 /** Land-cover module: read-only views of the engine's block. */
 @Injectable()

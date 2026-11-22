@@ -31,6 +31,7 @@ const TEA_META: Record<CoverTeaState, { label: string; tone: Tone; color: string
     present: { label: 'Çay var', tone: 'success', color: '#15803d' },
     partial: { label: 'Kısmen çay', tone: 'warning', color: '#d97706' },
     absent: { label: 'Çay yok', tone: 'danger', color: '#b91c1c' },
+    context: { label: 'Çevresiyle birlikte çay', tone: 'muted', color: '#86b89a' },
     not_assessable: { label: 'Değerlendirilemedi', tone: 'muted', color: '#94a3b8' },
 };
 /** Map colours of the cover classes: tea in the product green, tree cover dark, open ground light. */
@@ -41,6 +42,7 @@ const FLAG_LABEL: Record<CoverFlag, string> = {
     evergreen_open_not_tea: 'açık ve her dem yeşil görünüyor ama model çay okumadı',
     rule_disagrees: 'fiziksel kural çay göstermiyor',
     high_altitude_rule: 'yüksek rakım kuralıyla çay sayıldı (kış eşiği gevşetildi)',
+    context_tea: 'parsel küçük ve çay okunmadı, ama çevresi çay',
 };
 /** Colours of the reference-free groups: evergreen in the product green, the leaf-dropping group in brown. */
 const GROUP_COLOR: Record<string, string> = { evergreen: '#15803d', evergreen_shadow: '#0f766e', semi_evergreen: '#65a30d', deciduous: '#a16207', sparse: '#eab308', built: '#64748b', bare: '#a8a29e', mixed: '#7c3aed' };
@@ -52,6 +54,7 @@ const TEA_FILTERS: Array<{ value: CoverTeaState | typeof ALL; label: string }> =
     { value: 'present', label: TEA_META.present.label },
     { value: 'partial', label: TEA_META.partial.label },
     { value: 'absent', label: TEA_META.absent.label },
+    { value: 'context', label: TEA_META.context.label },
     { value: 'not_assessable', label: TEA_META.not_assessable.label },
 ];
 const TILES = 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}';
@@ -97,7 +100,7 @@ function styleOf(f?: { properties: { tea?: CoverTeaState; dominant?: CoverDomina
     const p = f?.properties;
     const none = TEA_META.not_assessable.color;
     const color = colourBy.value === 'tea' ? TEA_META[p?.tea ?? 'not_assessable'].color : colourBy.value === 'cover' ? (p?.dominant ? COVER_COLOR[p.dominant] : none) : (p?.group ? (GROUP_COLOR[p.group] ?? none) : none);
-    return { color, weight: 1.5, fillColor: color, fillOpacity: p?.tea === 'not_assessable' ? 0.08 : 0.4 };
+    return { color, weight: 1.5, fillColor: color, fillOpacity: p?.tea === 'not_assessable' ? 0.08 : p?.tea === 'context' ? 0.2 : 0.4 };
 }
 function renderMap(): void {
     map?.remove();
@@ -199,7 +202,7 @@ onBeforeUnmount(() => {
                 <StatCard label="Çay var" :value="formatNumber(summary.summary.byTea.present)" :hint="`tahmini çaylık ≈ ${formatM2(summary.summary.teaAreaM2)} (piksel payından)`" :icon="Sprout" />
                 <StatCard label="Kısmen çay" :value="formatNumber(summary.summary.byTea.partial)" :hint="`parselin %${Math.round(summary.rules.teaAbsentShare * 100)}–%${Math.round(summary.rules.teaPresentShare * 100)} kadarı çay`" />
                 <StatCard label="Çay yok" :value="formatNumber(summary.summary.byTea.absent)" :hint="`tapusu çay bahçesi olanlardan ${summary.summary.titleTea.absent} tanesi`" />
-                <StatCard label="Değerlendirilemedi" :value="formatNumber(summary.summary.byTea.not_assessable)" :hint="`${summary.rules.minPixels} pikselden küçük parseller`" />
+                <StatCard label="Değerlendirilemedi" :value="formatNumber(summary.summary.byTea.not_assessable)" :hint="`${summary.rules.minPixels} pikselden küçük parseller; ayrıca ${summary.summary.byTea.context ?? 0} tanesi çevresiyle birlikte çay (dolaylı çıkarım, ölçüm değil)`" />
             </div>
 
             <Card class="gap-0 py-0">
@@ -390,6 +393,12 @@ onBeforeUnmount(() => {
                             <template v-if="summary.model.reference.disputed.length">Tartışmalı parseller: {{ summary.model.reference.disputed.join(', ') }}.</template>
                             {{ summary.model.validationNote }}
                         </p>
+                        <p v-if="summary.model.contextValidation" class="text-xs text-muted-foreground">
+                            <span class="font-medium text-foreground">Çevresiyle birlikte çay:</span>
+                            {{ summary.rules.minPixels }} pikselden küçük parseller tek başına okunamaz. Çevresindeki {{ summary.rules.contextRadiusM }} m içindeki komşu piksellerin en az %{{ Math.round(summary.rules.contextTeaShare * 100) }}'i çaysa parsel bu sınıfa girer; bu bir ölçüm değil, dolaylı çıkarımdır.
+                            Sınama: {{ summary.model.contextValidation.parcels }} parselin her biri yalnız çevresinden okundu; çevre {{ summary.model.contextValidation.saidTea }} parsel için “çay” dedi, {{ summary.model.contextValidation.saidTeaRight }} tanesinde doğru çıktı.
+                            Tersi (“çevrede çay yok, öyleyse parselde de yok”) kullanılmaz.
+                        </p>
                         <ul class="text-xs text-muted-foreground">
                             <li v-for="src in summary.model.sources" :key="src.name"><span class="font-medium">{{ src.name }}:</span> {{ src.role }}</li>
                         </ul>
@@ -449,6 +458,7 @@ onBeforeUnmount(() => {
                                     <TableCell>
                                         <Badge :variant="toneVariant(TEA_META[r.tea].tone)">{{ TEA_META[r.tea].label }}</Badge>
                                         <div v-if="r.teaShare !== null" class="mt-1 text-xs text-muted-foreground">çay payı {{ pct(r.teaShare) }} · güven {{ r.confidence === 'high' ? 'yüksek' : r.confidence === 'medium' ? 'orta' : 'düşük' }}</div>
+                                        <div v-if="r.tea === 'context' && r.context" class="mt-1 text-xs text-muted-foreground">çevredeki {{ r.context.pixels }} pikselin {{ pct(r.context.teaShare) }} kadarı çay · dolaylı çıkarım</div>
                                         <div v-if="r.evidence" class="text-xs text-muted-foreground">ağaç yüksekliği {{ r.evidence.canopyHeightM.toFixed(1) }} m · ağaç payı {{ pct(r.evidence.tallShare) }} · kış/yaz yeşilliği {{ pct(r.evidence.winterRatio) }}</div>
                                         <div v-for="f in r.flags ?? []" :key="f" class="text-xs text-warning">{{ FLAG_LABEL[f] }}</div>
                                         <div v-if="r.group" class="text-xs text-muted-foreground">kıyassız: {{ groupLabel[r.group] ?? r.group }}</div>
